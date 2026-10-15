@@ -302,6 +302,7 @@ function Get-BodyRows([int]$Width, [int]$Rows) {
     if ($Ctl.Picker) { return Get-PickerRows $Width $Rows }
     if ($Ctl.Overlay -and $Ctl.Overlay.Kind -eq 'palette') { return Get-PaletteRows $Width $Rows }
     if ($Ctl.Overlay -and $Ctl.Overlay.Kind -eq 'help') { return Get-HelpRows $Width $Rows }
+    if ($Ctl.Overlay -and $Ctl.Overlay.Kind -eq 'changelog') { return Get-ChangelogRows $Width $Rows }
     if ($Ctl.Overlay -and $Ctl.Overlay.Kind -in 'menu', 'settings') { return Get-MenuRows $Width $Rows }
     $Ctl.BodyRows = $Rows - 2   # search scrolls a match to the middle of this
     $keys = @(if ($Ctl.Zoom) { $Ctl.Focus } else { $Apps.Keys })   # @() so one zoomed column stays a list
@@ -508,32 +509,58 @@ function Get-HelpRows([int]$Width, [int]$Rows) {
         $lines.Add($line.ToArray())
     }
     $inner = ($widths | Measure-Object -Sum).Sum - 4
-    Get-BoxRows 'Keys' $lines 'any key closes · : searches every command · lowercase = focused app, uppercase = all' $Width $Rows $inner
+    Get-BoxRows "Keys · lazyrunner v$($Ctl.Version)" $lines 'any key closes · : searches every command · lowercase = focused app, uppercase = all' $Width $Rows $inner
 }
 
 function Get-ChecklistRows([int]$Width, [int]$Rows) {
     $overlay = $Ctl.Overlay
     $icons = @{ pending = '·'; ok = '✓'; warn = '!'; fail = '✗'; skip = '–' }
     $colors = @{ pending = 'DarkGray'; running = 'Yellow'; ok = 'Green'; warn = 'Yellow'; fail = 'Red'; skip = 'DarkGray' }
+    # What fits between the box's title and its footer: the checks, what's new, then the logo. A small terminal loses
+    # the logo first; with news to show, the checks that passed fold into one line; then the news is cut (, then c
+    # shows it all).
+    $room = $Rows - 3
+    $news = @()
+    if ($overlay.WhatsNew) {   # after an update: the new changelog entries
+        $news = @(Get-WrappedLines @(Format-ChangelogLines $overlay.WhatsNew) ([Math]::Max(20, [Math]::Min($Width - 8, 84)) - 3))
+    }
+    $items = @($overlay.Items)
+    $passed = @($items | Where-Object Status -in 'ok', 'skip')
+    $finished = -not @($items | Where-Object Status -in 'pending', 'running')
+    $fold = $news -and $finished -and $passed.Count -gt 1 -and ($items.Count + [Math]::Min($news.Count, $WhatsNewMaxLines) + 4 -gt $room)
+    if ($fold) { $items = @($items | Where-Object Status -notin 'ok', 'skip') }
+    $checks = @(foreach ($item in $items) {
+            $icon = if ($item.Status -eq 'running') { Get-Spinner } else { $icons[$item.Status] }
+            , @((New-Seg " $icon " $colors[$item.Status]), (New-Seg $item.Name.PadRight(19) 'White'), (New-Seg $item.Detail $(if ($item.Status -eq 'ok') { 'Gray' } else { $colors[$item.Status] })))
+        })
+    if ($fold) { $checks = @(, @((New-Seg " $($icons.ok) " $colors.ok), (New-Seg "$($passed.Count) checks passed" 'Gray'))) + $checks }
+    $newsRoom = [Math]::Min($WhatsNewMaxLines, $room - @($checks).Count - 3)   # its heading and the blank lines around
     $lines = [Collections.Generic.List[object]]::new()
-    $lines.Add(@(New-Seg ''))
-    $sweep = ($Ctl.Frame % ($Logo[0].Length + 15)) - 6   # column of the light; sweeps left to right, then pauses off-logo
-    foreach ($logoLine in $Logo) {
-        $segments = [Collections.Generic.List[object]]::new()
-        $segments.Add((New-Seg '   '))
-        for ($i = 0; $i -lt $logoLine.Length; $i++) {
-            $distance = [Math]::Abs($i - $sweep)
-            $segments.Add((New-Seg ([string]$logoLine[$i]) $(if ($distance -le 1) { 'White' } elseif ($distance -le 3) { 'Cyan' } else { 'DarkCyan' })))
+    $logoFits = @($checks).Count + $(if ($news) { [Math]::Min($news.Count, $WhatsNewMaxLines) + 3 } else { 1 }) + $Logo.Count + 2 -le $room
+    if ($logoFits) {
+        $lines.Add(@(New-Seg ''))
+        $sweep = ($Ctl.Frame % ($Logo[0].Length + 15)) - 6   # column of the light; sweeps left to right, then pauses off-logo
+        foreach ($logoLine in $Logo) {
+            $segments = [Collections.Generic.List[object]]::new()
+            $segments.Add((New-Seg '   '))
+            for ($i = 0; $i -lt $logoLine.Length; $i++) {
+                $distance = [Math]::Abs($i - $sweep)
+                $segments.Add((New-Seg ([string]$logoLine[$i]) $(if ($distance -le 1) { 'White' } elseif ($distance -le 3) { 'Cyan' } else { 'DarkCyan' })))
+            }
+            $lines.Add($segments.ToArray())
         }
-        $lines.Add($segments.ToArray())
     }
     $lines.Add(@(New-Seg ''))
-    foreach ($item in $overlay.Items) {
-        $icon = if ($item.Status -eq 'running') { Get-Spinner } else { $icons[$item.Status] }
-        $lines.Add(@((New-Seg " $icon " $colors[$item.Status]), (New-Seg $item.Name.PadRight(19) 'White'), (New-Seg $item.Detail $(if ($item.Status -eq 'ok') { 'Gray' } else { $colors[$item.Status] }))))
-    }
+    foreach ($check in $checks) { $lines.Add($check) }
     $lines.Add(@(New-Seg ''))
-    Get-BoxRows "$([string]$SparkleFrames[[int]($Ctl.Frame / 3) % 2]) lazyrunner · startup checklist" $lines $overlay.Footer $Width $Rows 84
+    if ($news -and $newsRoom -ge 1) {
+        $lines.Add(@(New-Seg " ✦ What's new" 'Cyan'))
+        $shown = if ($news.Count -gt $newsRoom) { [Math]::Max(0, $newsRoom - 1) } else { $news.Count }
+        foreach ($line in @($news | Select-Object -First $shown)) { $lines.Add(@(New-Seg "   $($line.Text)" $line.Color)) }
+        if ($news.Count -gt $shown) { $lines.Add(@(New-Seg "   … $($news.Count - $shown) more lines - , then c shows the changelog" 'DarkGray')) }
+        $lines.Add(@(New-Seg ''))
+    }
+    Get-BoxRows "$([string]$SparkleFrames[[int]($Ctl.Frame / 3) % 2]) lazyrunner v$($Ctl.Version) · startup checklist" $lines $overlay.Footer $Width $Rows 84
 }
 
 # ---------------------------------------------------------------- control panel
@@ -570,6 +597,7 @@ function Get-SettingsRows([int]$Width) {
     if ((Get-AppKeys 'Frontend')) { $settings.Add(@('s', 'stop/restart all include frontend', $Ctl.Config.stopFrontendOnStop)) }
     $settings.Add(@('e', 'restart APIs on code change', $Ctl.Config.restartOnCodeChange))
     $settings.Add(@('w', 'startup checklist', $Ctl.Config.startupChecklist))
+    $settings.Add(@('v', 'auto-update', $Ctl.Config.autoUpdate))
     $rows = [Collections.Generic.List[object]]::new()
     $current = [Collections.Generic.List[object]]::new()
     $current.Add((New-Seg ' ,' 'Cyan'))

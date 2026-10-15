@@ -9,6 +9,7 @@ New-Item -ItemType Directory -Force $TestRun | Out-Null
 $env:LAZYRUNNER_STATE_DIR = Join-Path $TestRun 'state'
 $env:LAZYRUNNER_CONFIG_PATH = Join-Path $TestRun 'config.json'
 $env:LAZYRUNNER_PROFILES_DIR = Join-Path $TestRun 'profiles'   # your own profiles stay out of it
+$env:LAZYRUNNER_UPDATE_REPO = 'none'   # no update checks against the real release repo (tests set their own)
 
 # lazyrunner.ps1's settings and libraries (everything before its entry point), as lazyrunner loads them.
 function Get-LazyRunnerLoadScript([string]$Root = $LazyRunnerRoot) {

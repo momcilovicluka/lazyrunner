@@ -34,6 +34,12 @@ function Get-SqlEndpoint([string]$Server) {
 # Each check returns @(status, detail) with status ok / warn / fail / skip.
 function Get-Checks {
     $checks = [Collections.Generic.List[object]]::new()
+    $checks.Add(@{ Name = 'lazyrunner'; Run = {
+                $result = Update-LazyRunner
+                $Ctl.UpdatedTo = $result.UpdatedTo
+                $result.Status, $result.Detail
+            }
+        })
     $checks.Add(@{ Name = 'git'; Run = {
                 $version = Get-ToolVersion 'git' @('--version')
                 if ($version) { 'ok', ($version -replace '^git version ', '') } else { 'fail', 'not found on PATH' }
@@ -110,7 +116,10 @@ function Get-Checks {
 
 function Invoke-Checklist([switch]$Manual) {
     $items = @(Get-Checks | ForEach-Object { @{ Name = $_.Name; Run = $_.Run; Arg = $_.Arg; Status = 'pending'; Detail = '' } })
-    $Ctl.Overlay = @{ Kind = 'checklist'; Items = $items; Footer = 'checking…'; Skip = $false }
+    $whatsNew = if ($Manual) { @() } else { @($Ctl.WhatsNew) }   # once, at the first checklist after an update
+    $Ctl.WhatsNew = @()
+    $Ctl.UpdatedTo = $null
+    $Ctl.Overlay = @{ Kind = 'checklist'; Items = $items; Footer = 'checking…'; Skip = $false; WhatsNew = $whatsNew }
     foreach ($item in $items) {
         $item.Status = 'running'
         $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -125,12 +134,15 @@ function Invoke-Checklist([switch]$Manual) {
         Add-Log "$(if ($problem.Status -eq 'fail') { '✗' } else { '!' }) $($problem.Name): $($problem.Detail)" $(if ($problem.Status -eq 'fail') { 'Red' } else { 'Yellow' })
     }
     if (-not $problems) { Add-Log '✓ Startup checklist: all good' 'Green' }
-    # Linger a moment (longer when something needs a look); any key continues.
-    $holdSec = if ($Manual) { 60 } elseif ($problems) { 8 } else { 1.2 }
+    $updatedTo = $Ctl.UpdatedTo
+    # Linger a moment (longer when something needs a look or there is news); any key continues.
+    $holdSec = if ($updatedTo -and -not $Manual) { 1.5 } elseif ($Manual) { 60 } elseif ($whatsNew) { 20 } elseif ($problems) { 8 } else { 1.2 }
     $deadline = (Get-Date).AddSeconds($holdSec)
     while ((Get-Date) -lt $deadline -and -not $Ctl.Overlay.Skip -and -not $Ctl.Quit) {
         $left = [int][Math]::Ceiling(($deadline - (Get-Date)).TotalSeconds)
-        $Ctl.Overlay.Footer = if ($Manual) { 'any key closes' }
+        $Ctl.Overlay.Footer = if ($updatedTo -and -not $Manual) { "v$updatedTo installed - reopening lazyrunner…" }
+        elseif ($Manual) { 'any key closes' }
+        elseif ($whatsNew) { "what's new above (, then c shows the whole changelog) - any key continues ($left s)" }
         elseif ($problems) { "$($problems.Count) to look at (also in the log below) - any key continues ($left s)" }
         else { 'all good - starting…' }
         Read-UiKeys
@@ -138,4 +150,5 @@ function Invoke-Checklist([switch]$Manual) {
         Start-Sleep -Milliseconds 100
     }
     $Ctl.Overlay = $null
+    if ($updatedTo) { Restart-AfterUpdate $updatedTo -Manual:$Manual }
 }

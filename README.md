@@ -44,10 +44,14 @@ Windows only (job objects, Windows Terminal integration). Needs PowerShell 7.
    It checks for git, the .NET SDK and npm, writes `lazyrunner.config.json` next to `lazyrunner.ps1`, unblocks the
    scripts, and adds the `lazyrunner` and `lr` aliases to your PowerShell profile. Optional switches: `-AutoStart off`,
    `-AutoRestart on`, `-StopFrontend off`, `-Frontend off`, `-Notifications off`, `-StartupChecklist off`,
-   `-Theme dracula`.
+   `-AutoUpdate off`, `-Theme dracula`.
 4. **Open a new terminal** and run `lazyrunner` (or `lr`) in your repo.
 
-**Updating:** `git pull` (or unzip over the old folder). Your `lazyrunner.config.json` stays.
+**Updating:** lazyrunner updates itself. When it opens, its startup checklist (or a quiet check when the checklist is
+off) looks at the release branch, installs a higher `VERSION`, reopens on it and shows what's new; `lazyrunner update`
+does the same on demand. A git clone fast-forwards, never over local changes or commits of your own; a folder from a
+zip is refreshed from a cached clone, and your `lazyrunner.config.json` and own files (themes) stay. `,` then `v` (or
+`"autoUpdate": false`) turns it off; `lazyrunner version` shows the version and where updates come from.
 
 **Requirements:** Windows, PowerShell 7+, git; the .NET SDK for .NET apps and Node.js / npm for npm apps (nvm-windows
 works). Any terminal works; Windows Terminal is best (tab colours and progress).
@@ -91,6 +95,8 @@ lazyrunner start      the same, but always starts; if lazyrunner is open in anot
 lazyrunner stop       stop everything in the open lazyrunner (also cancels a running build)
 lazyrunner restart    stop, rebuild if anything changed, run again
 lazyrunner profile …  init / check a project profile (above)
+lazyrunner update     update lazyrunner now (asks for a git login if needed)
+lazyrunner version    the installed version, where updates come from, and what's new in it
 lazyrunner help
 ```
 
@@ -153,6 +159,8 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `w` | Startup checklist when lazyrunner opens |
 | `r` | Run the startup checklist now |
 | `p` | Reload the project profile (reopens lazyrunner) |
+| `v` | Auto-update lazyrunner when it opens |
+| `c` | What's new: the changelog |
 
 ### During a build
 
@@ -231,6 +239,8 @@ the `,` settings, the theme and column widths here. Settings that depend on the 
 | `startupChecklist` | `true` | The startup checklist |
 | `panelLogLines` | `5` | How many recent events the panel shows |
 | `theme` | `default` | A file name from `themes\` without `.json` |
+| `autoUpdate` | `true` | Install a newer lazyrunner when it opens |
+| `updateRepoUrl` / `updateBranch` | | Where updates come from on this machine, instead of `$UpdateRepo` in `lazyrunner.ps1` |
 | `projects.<id>.columnWidths` | equal | Relative width per app key (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |
 | `projects.<id>.apps.<key>.includeInAll` | | `false` keeps that app running on Stop all / Restart all |
@@ -255,3 +265,13 @@ project with its build logs and stamps, per-app logs and timings.
 
 lazyrunner is plain PowerShell 7: `lazyrunner.ps1` and the libraries in `lib\` (`lib\apptypes.ps1` is what a .NET or
 an npm app is). The tests are plain scripts too; [tests/README.md](tests/README.md) lists them.
+
+### Releasing
+
+Installs update from `$UpdateRepo` in `lazyrunner.ps1` (the repo URL and its release branch; empty means no updates).
+A release is a higher `VERSION` on that branch - pushing without bumping it updates nobody:
+
+1. Add a section on top of [CHANGELOG.md](CHANGELOG.md): `## [0.2.0] - 2026-10-20` and what changed, under
+   `### Added` / `### Changed` / `### Fixed`. Installs show it after they update.
+2. Bump `VERSION` (semantic versioning: a new feature 0.2.0, a fix 0.1.1).
+3. Run the tests, commit, and push the branch. Every install picks it up the next time it opens.

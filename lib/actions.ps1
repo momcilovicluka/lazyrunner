@@ -45,7 +45,9 @@ function Get-SettingActions {
         @{ Key = 's'; On = $config.stopFrontendOnStop; Label = 'Stop/Restart all include the frontend'; Run = { Switch-Setting 'stopFrontendOnStop' 'Stop/Restart all include the frontend' }; Show = [bool](Get-AppKeys 'Frontend'); Safe = $true }
         @{ Key = 'e'; On = $config.restartOnCodeChange; Label = 'Restart the APIs when code changes'; Run = { Switch-Setting 'restartOnCodeChange' 'Restart the APIs when code changes' }; Safe = $true }
         @{ Key = 'w'; On = $config.startupChecklist; Label = 'Startup checklist when lazyrunner opens'; Run = { Switch-Setting 'startupChecklist' 'Startup checklist when lazyrunner opens' }; Safe = $true }
-        @{ Key = 'r'; Label = 'Run the startup checklist now'; Run = { $Ctl.Overlay = $null; Invoke-Checklist -Manual } }
+        @{ Key = 'v'; On = $config.autoUpdate; Label = 'Auto-update lazyrunner when it opens'; Run = { Switch-Setting 'autoUpdate' 'Auto-update lazyrunner when it opens' }; Safe = $true }
+        @{ Key = 'r'; Label = 'Run the startup checklist now (and check for an update)'; Run = { $Ctl.Overlay = $null; Invoke-Checklist -Manual } }
+        @{ Key = 'c'; Label = "What's new: the lazyrunner changelog"; Run = { Open-ChangelogView }; Safe = $true }
         @{ Key = 'p'; Label = "Reload the project profile$(if ($Ctl.ProfileChanged) { ' (this branch changed it)' })"; Run = { Invoke-ReloadProfile } }
     ) | Where-Object { $_.Show -ne $false } | ForEach-Object {
         if ($null -ne $_.On) { $_.Label = "$(& $check $_.On) $($_.Label)" }
@@ -117,6 +119,7 @@ function Invoke-OverlayKey([ConsoleKeyInfo]$Key, [switch]$Busy) {
     $overlay = $Ctl.Overlay
     if ($overlay.Kind -eq 'checklist') { $overlay.Skip = $true; return }
     if ($overlay.Kind -eq 'help') { $Ctl.Overlay = $null; return }   # any key closes the reference
+    if ($overlay.Kind -eq 'changelog') { Invoke-ChangelogKey $overlay $name; return }
     $name = Get-KeyName $Key
     if ($overlay.Kind -eq 'palette') { Invoke-PaletteKey $overlay $name $Key -Busy:$Busy; return }
     $items = @(Get-OverlayItems $overlay.Kind)

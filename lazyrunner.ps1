@@ -12,6 +12,8 @@
     lazyrunner profile check [file] [-Json]   Check a project profile: its fields, and against the checkout it is for.
     lazyrunner profile init [folder] [-Save]  Propose a .lazyrunner.json for a checkout (-Save writes it).
                          projects\README.md describes profiles and how to write one.
+    lazyrunner update    Update lazyrunner from its release repo now (asks for a login if git needs one).
+    lazyrunner version   The installed version, where updates come from, and what's new in it.
     lr is short for lazyrunner.
 
     Keys (vim / lazygit style; lowercase = the focused app, uppercase = all apps; ? lists them all):
@@ -32,7 +34,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('start', 'stop', 'restart', 'profile', 'help', '__ui')]
+    [ValidateSet('start', 'stop', 'restart', 'profile', 'update', 'version', 'help', '__ui')]
     [string]$Command = 'start',
     [Parameter(Position = 1)]
     [string]$Action,   # lazyrunner profile check | init
@@ -64,6 +66,15 @@ param(
 $LazyRunnerRoot = $PSScriptRoot
 $ProjectProfile = $null
 
+# Self-update (lib\update.ps1): the repo and branch releases are pushed to. lazyrunner installs a higher VERSION from
+# there when it opens (and when the checklist runs again) unless "autoUpdate" is off. Empty Url = no updates.
+# Per machine, "updateRepoUrl" / "updateBranch" in lazyrunner.config.json override these; LAZYRUNNER_UPDATE_REPO
+# replaces the Url ("none": no updates, which the tests use).
+$UpdateRepo = @{
+    Url    = if ($env:LAZYRUNNER_UPDATE_REPO) { $env:LAZYRUNNER_UPDATE_REPO } else { 'https://github.com/momcilovicluka/lazyrunner.git' }
+    Branch = 'main'
+}
+
 # Used for any value missing from lazyrunner.config.json.
 $ConfigDefaults = @{
     repoRoot                  = ''
@@ -78,6 +89,9 @@ $ConfigDefaults = @{
     restartOnCodeChange       = $false   # rebuild + restart the running apps that build when the watch folder changes (, then e)
     startupChecklist          = $true   # splash that checks tools, ports, database and packages when lazyrunner opens
     theme                     = 'default'   # a file name from themes\ without .json (t cycles); NO_COLOR turns colour off
+    autoUpdate                = $true   # install a newer lazyrunner from $UpdateRepo when it opens (, then v)
+    updateRepoUrl             = ''      # overrides $UpdateRepo.Url on this machine
+    updateBranch              = ''      # overrides $UpdateRepo.Branch on this machine
 }
 # The settings that belong to a project: lazyrunner.config.json keeps them per project, in "projects": { "<id>": { … } }.
 $ProjectConfigKeys = 'columnWidths', 'apps', 'frontend', 'stopFrontendOnStop'
@@ -118,7 +132,7 @@ $MaxLinesPerTick     = 2000
 
 New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
 
-foreach ($lib in 'apptypes', 'profiletools', 'common', 'process', 'build', 'secrets', 'metrics', 'themes', 'view', 'actions', 'input', 'checklist', 'panel') { . (Join-Path $PSScriptRoot "lib\$lib.ps1") }
+foreach ($lib in 'apptypes', 'profiletools', 'common', 'update', 'process', 'build', 'secrets', 'metrics', 'themes', 'view', 'actions', 'input', 'checklist', 'panel') { . (Join-Path $PSScriptRoot "lib\$lib.ps1") }
 
 # ---------------------------------------------------------------- entry point
 
@@ -140,6 +154,8 @@ switch ($Command) {
         }
     }
     'help' { Get-Help $PSCommandPath -Detailed; return }
+    'update' { Invoke-UpdateCommand; return }
+    'version' { Show-VersionCommand; return }
     'profile' {
         $output = @(Invoke-ProfileCommand $Action $Path -Json:$Json -Save:$Save)
         $output | Select-Object -SkipLast 1   # the JSON (check -Json, init); the last item is the exit code

@@ -27,6 +27,10 @@
 .PARAMETER SkipUnchangedBuilds
     on/off: skip dotnet build when nothing in the watched folder changed since the last build. Default: keep, else on.
 
+.PARAMETER AutoUpdate
+    on/off: install a newer lazyrunner from its release repo when it opens (, then v in the panel toggles it).
+    Default: keep, else on.
+
 .PARAMETER Notifications
     on/off: Windows notifications for failed builds, crashes and slow starts finishing. Default: keep, else on.
     Works from Windows PowerShell 5.1 too: it installs PowerShell 7 with winget if needed and reruns itself there.
@@ -41,6 +45,7 @@ param(
     [ValidateSet('on', 'off')][string]$StopFrontend,
     [ValidateSet('on', 'off')][string]$SkipUnchangedBuilds,
     [ValidateSet('on', 'off')][string]$Notifications,
+    [ValidateSet('on', 'off')][string]$AutoUpdate,
     [ValidateSet('on', 'off')][string]$StartupChecklist,
     [ValidateSet('on', 'off')][string]$RestartOnCodeChange,
     [string]$Theme   # a file name from themes\ without .json, e.g. dracula
@@ -106,6 +111,7 @@ $Defaults = [ordered]@{
     panelLogLines             = 5
     startupChecklist          = $true
     theme                     = 'default'
+    autoUpdate                = $true
 }
 $ProjectKeys = @('columnWidths', 'apps', 'frontend', 'stopFrontendOnStop')
 $Switches = [ordered]@{
@@ -117,8 +123,9 @@ $Switches = [ordered]@{
     Notifications       = 'notifications'
     StartupChecklist    = 'startupChecklist'
     RestartOnCodeChange = 'restartOnCodeChange'
+    AutoUpdate          = 'autoUpdate'
 }
-$SwitchValues = @{ Frontend = $Frontend; AutoStart = $AutoStart; AutoRestart = $AutoRestart; StopFrontend = $StopFrontend; SkipUnchangedBuilds = $SkipUnchangedBuilds; Notifications = $Notifications; StartupChecklist = $StartupChecklist; RestartOnCodeChange = $RestartOnCodeChange }
+$SwitchValues = @{ Frontend = $Frontend; AutoStart = $AutoStart; AutoRestart = $AutoRestart; StopFrontend = $StopFrontend; SkipUnchangedBuilds = $SkipUnchangedBuilds; Notifications = $Notifications; StartupChecklist = $StartupChecklist; RestartOnCodeChange = $RestartOnCodeChange; AutoUpdate = $AutoUpdate }
 
 function Write-Ok([string]$Text) { Write-Host "  $([char]0x2713) $Text" -ForegroundColor Green }
 function Write-Warn([string]$Text) { Write-Host "  ! $Text" -ForegroundColor Yellow }

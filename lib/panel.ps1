@@ -535,6 +535,7 @@ function Invoke-Ui([string]$RepoRoot, [switch]$StartNow) {
         Search = $null; PendingG = $null; BodyRows = 20
         Focus = @($Apps.Keys)[0]; Zoom = $false; Picker = $null; Summary = @{ Text = ''; Color = 'Gray' }; LastOsc = ''
         Timings = (Read-Json (Get-TimingsPath)) ?? @{}; ExitCode = 0; ProfileChanged = $false
+        Version = (Get-LazyRunnerVersion); StartNow = [bool]$StartNow; WhatsNew = @(); UpdatedTo = $null
         Http = [Net.Http.HttpClient]@{ Timeout = [timespan]::FromSeconds($ProbeTimeoutSec) }
         Log = [Collections.Generic.List[object]]::new(); PrevRows = @(); LastSize = ''; LastDump = [datetime]::MinValue
     }
@@ -548,8 +549,10 @@ function Invoke-Ui([string]$RepoRoot, [switch]$StartNow) {
         Open-PaneLogs
         Set-Root $RepoRoot
         Show-Frame
-        if ($Ctl.Config.startupChecklist) { Invoke-Checklist }
-        if ($Ctl.Quit) { return }
+        $Ctl.WhatsNew = @(Get-WhatsNew)
+        if ($Ctl.Config.startupChecklist) { Invoke-Checklist }   # it checks for an update first
+        else { Write-WhatsNewLog $Ctl.WhatsNew; Invoke-QuietUpdate }
+        if ($Ctl.Quit) { return }   # quit, or reopening on an update
         if ($StartNow) { Invoke-Start }
         else { Add-Log 'Ready - press U to start everything (auto-start when lazyrunner opens is off: , then u turns it on).' 'Cyan' }
         $nextSlowTick = [datetime]::MinValue
