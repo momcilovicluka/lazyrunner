@@ -1,0 +1,12 @@
+{
+  "name": "Catppuccin Mocha",
+  "description": "Soothing pastels; also recolours the terminal background",
+  "colors": {
+    "Black": "#11111b", "DarkRed": "#eba0ac", "DarkGreen": "#94e2d5", "DarkYellow": "#fab387",
+    "DarkBlue": "#74c7ec", "DarkMagenta": "#cba6f7", "DarkCyan": "#89dceb", "Gray": "#cdd6f4",
+    "DarkGray": "#6c7086", "Red": "#f38ba8", "Green": "#a6e3a1", "Yellow": "#f9e2af",
+    "Blue": "#89b4fa", "Magenta": "#f5c2e7", "Cyan": "#94e2d5", "White": "#ffffff"
+  },
+  "focus": { "background": "#cba6f7", "text": "#1e1e2e", "border": "#cba6f7" },
+  "terminal": { "background": "#1e1e2e", "foreground": "#cdd6f4" }
+}

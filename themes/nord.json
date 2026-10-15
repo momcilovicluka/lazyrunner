@@ -1,0 +1,12 @@
+{
+  "name": "Nord",
+  "description": "Arctic, north-bluish; also recolours the terminal background",
+  "colors": {
+    "Black": "#2e3440", "DarkRed": "#bf616a", "DarkGreen": "#a3be8c", "DarkYellow": "#d08770",
+    "DarkBlue": "#5e81ac", "DarkMagenta": "#b48ead", "DarkCyan": "#8fbcbb", "Gray": "#d8dee9",
+    "DarkGray": "#616e88", "Red": "#bf616a", "Green": "#a3be8c", "Yellow": "#ebcb8b",
+    "Blue": "#81a1c1", "Magenta": "#b48ead", "Cyan": "#88c0d0", "White": "#eceff4"
+  },
+  "focus": { "background": "#88c0d0", "text": "#2e3440", "border": "#88c0d0" },
+  "terminal": { "background": "#2e3440", "foreground": "#d8dee9" }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Tokyo Night",
+  "description": "Neon city at night; also recolours the terminal background",
+  "colors": {
+    "Black": "#15161e", "DarkRed": "#db4b4b", "DarkGreen": "#73daca", "DarkYellow": "#ff9e64",
+    "DarkBlue": "#3d59a1", "DarkMagenta": "#9d7cd8", "DarkCyan": "#2ac3de", "Gray": "#a9b1d6",
+    "DarkGray": "#565f89", "Red": "#f7768e", "Green": "#9ece6a", "Yellow": "#e0af68",
+    "Blue": "#7aa2f7", "Magenta": "#bb9af7", "Cyan": "#7dcfff", "White": "#c0caf5"
+  },
+  "focus": { "background": "#7aa2f7", "text": "#1a1b26", "border": "#bb9af7" },
+  "terminal": { "background": "#1a1b26", "foreground": "#c0caf5" }
+}

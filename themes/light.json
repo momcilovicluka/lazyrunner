@@ -1,0 +1,9 @@
+{
+  "name": "Light",
+  "description": "For light terminal backgrounds: dark text, darker accents",
+  "foregrounds": {
+    "Gray": "30", "White": "30", "Black": "97", "Red": "31", "Green": "32", "Yellow": "33",
+    "Blue": "34", "Magenta": "35", "Cyan": "36", "DarkCyan": "36", "DarkYellow": "33"
+  },
+  "focus": { "background": "DarkBlue", "text": "97", "border": "34" }
+}

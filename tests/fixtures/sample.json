@@ -1,0 +1,24 @@
+{
+  "$schema": "../../projects/profile.schema.json",
+  "schemaVersion": 1,
+  "id": "sample",
+  "name": "Sample",
+  "detect": { "anyFile": ["Sample.sln"] },
+  "watch": ["services"],
+  "apps": [
+    { "key": "orders", "name": "Orders", "icon": "◆", "type": "dotnet", "project": "services/Orders/Orders.csproj", "launchProfile": "Orders", "swagger": "/swagger" },
+    { "key": "billing", "name": "Billing", "type": "dotnet", "project": "services/Billing/Billing.csproj", "launchProfile": "Billing" },
+    { "key": "shop", "name": "Shop", "type": "npm", "dir": "web/shop", "variants": [{ "script": "dev", "port": 58301 }] },
+    {
+      "key": "docs", "name": "Docs", "type": "npm", "dir": "web/docs",
+      "variants": [{ "script": "watch", "servedBy": "orders", "ready": { "file": "dist/index.html" } }]
+    },
+    {
+      "key": "console", "name": "Console", "type": "npm", "dir": "web/console",
+      "variants": [
+        { "label": "mock", "when": { "packageScript": "dev:mock" }, "script": "dev:mock", "port": 58302 },
+        { "label": "live", "script": "dev", "port": 58303 }
+      ]
+    }
+  ]
+}

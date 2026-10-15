@@ -1,0 +1,10 @@
+{
+  "name": "High Contrast",
+  "description": "Bold, bright accents",
+  "foregrounds": {
+    "Red": "1;91", "DarkRed": "1;91", "Green": "1;92", "DarkGreen": "1;92", "Yellow": "1;93", "DarkYellow": "1;93",
+    "Blue": "1;94", "DarkBlue": "1;94", "Magenta": "1;95", "DarkMagenta": "1;95", "Cyan": "1;96", "DarkCyan": "1;96",
+    "Gray": "97", "DarkGray": "37", "White": "1;97"
+  },
+  "focus": { "background": "Yellow", "text": "30", "border": "1;93" }
+}

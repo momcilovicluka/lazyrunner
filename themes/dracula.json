@@ -1,0 +1,12 @@
+{
+  "name": "Dracula",
+  "description": "Dracula palette; also recolours the terminal background",
+  "colors": {
+    "Black": "#21222c", "DarkRed": "#ff5555", "DarkGreen": "#50fa7b", "DarkYellow": "#ffb86c",
+    "DarkBlue": "#6272a4", "DarkMagenta": "#bd93f9", "DarkCyan": "#8be9fd", "Gray": "#f8f8f2",
+    "DarkGray": "#6272a4", "Red": "#ff6e6e", "Green": "#69ff94", "Yellow": "#f1fa8c",
+    "Blue": "#bd93f9", "Magenta": "#ff79c6", "Cyan": "#a4ffff", "White": "#ffffff"
+  },
+  "focus": { "background": "#bd93f9", "text": "#21222c", "border": "#ff79c6" },
+  "terminal": { "background": "#282a36", "foreground": "#f8f8f2" }
+}

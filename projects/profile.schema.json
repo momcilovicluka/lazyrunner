@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lazyrunner/profile.schema.json",
+  "title": "lazyrunner project profile",
+  "description": "What a project is for lazyrunner: the file that marks its repo, the folder whose changes need a rebuild, and the apps it runs. Schema version 1 (projects/README.md). In a repo's .lazyrunner.json, detect can be left out, and with extends only the changes are needed.",
+  "type": "object",
+  "required": ["schemaVersion"],
+  "if": { "required": ["extends"] },
+  "then": { "properties": { "apps": { "items": { "type": "object", "required": ["key"] } } } },
+  "else": { "required": ["id", "name", "watch", "apps"] },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Lets editors check the file; lazyrunner ignores it." },
+    "schemaVersion": { "const": 1, "description": "The profile format version. lazyrunner refuses a version it doesn't know.", "examples": [1] },
+    "extends": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Only in a repo's .lazyrunner.json: the id of a known profile this file changes. Its top-level fields replace that profile's; apps merge by key.", "examples": ["shop"] },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Short lowercase name. Names the project's settings in lazyrunner.config.json and its state folder.", "examples": ["shop"] },
+    "name": { "type": "string", "minLength": 1, "description": "Shown in messages and notifications.", "examples": ["Shop"] },
+    "detect": {
+      "type": "object",
+      "description": "How lazyrunner recognises the repo. Required, except in a repo's .lazyrunner.json (that file marks the repo).",
+      "required": ["anyFile"],
+      "additionalProperties": false,
+      "properties": {
+        "anyFile": {
+          "type": "array", "minItems": 1, "maxItems": 1,
+          "items": { "$ref": "#/$defs/relativePath" },
+          "description": "A file only this project's repo has, relative to its root. lazyrunner looks for it upward from the current folder. One file for now.",
+          "examples": [["Shop.sln"]]
+        }
+      }
+    },
+    "watch": {
+      "type": "array", "minItems": 1, "maxItems": 1,
+      "items": { "$ref": "#/$defs/relativePath" },
+      "description": "The folder whose changes need a rebuild of the .NET apps (unchanged builds are skipped; restart on code change). One folder for now.",
+      "examples": [["services"]]
+    },
+    "apps": {
+      "type": "array", "minItems": 1,
+      "description": "The apps lazyrunner runs, left to right as its columns: .NET apps and npm apps (the tables below)."
+    }
+  },
+  "allOf": [{
+    "if": { "not": { "required": ["extends"] } },
+    "then": { "properties": { "apps": { "items": { "oneOf": [{ "$ref": "#/$defs/dotnetApp" }, { "$ref": "#/$defs/npmApp" }] } } } }
+  }],
+  "$defs": {
+    "relativePath": { "type": "string", "minLength": 1, "pattern": "^[^:]+$", "description": "Relative to the repo root; / or \\ both work." },
+    "appKey": { "type": "string", "pattern": "^[a-z][a-z0-9]*$", "description": "Lowercase letters and digits, starting with a letter." },
+    "icon": { "type": "string", "minLength": 1, "maxLength": 1, "description": "One character before the app's name in its title bar.", "default": "■", "examples": ["◆"] },
+    "dotnetApp": {
+      "title": "A .NET app (\"type\": \"dotnet\")",
+      "description": "An ASP.NET (or any dotnet run) project. lazyrunner builds it with dotnet build, one build at a time and skipped when nothing in watch changed, then runs it with dotnet run --no-build --launch-profile.",
+      "type": "object",
+      "required": ["key", "name", "type", "project", "launchProfile"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/appKey", "description": "Short name, unique in the profile. Used in settings (columnWidths, apps.<key>) and by servedBy.", "examples": ["orders"] },
+        "name": { "type": "string", "minLength": 1, "description": "The column's title.", "examples": ["Orders"] },
+        "icon": { "$ref": "#/$defs/icon" },
+        "type": { "const": "dotnet", "description": "The app type: what lazyrunner does with the app follows from it." },
+        "project": { "allOf": [{ "$ref": "#/$defs/relativePath" }], "pattern": "\\.csproj$", "description": "The .csproj to build and run.", "examples": ["services/Orders/Orders.csproj"] },
+        "launchProfile": { "type": "string", "minLength": 1, "description": "A profile in the project's Properties/launchSettings.json. Its applicationUrl gives the port.", "examples": ["Orders"] },
+        "swagger": { "type": "string", "pattern": "^/", "description": "Optional. The Swagger UI path: lazyrunner probes <swagger>/index.html for the response time, and w opens it. Without it lazyrunner probes /.", "examples": ["/swagger"] }
+      }
+    },
+    "npmApp": {
+      "title": "An npm app (\"type\": \"npm\")",
+      "description": "A folder with package.json, run with npm run <script>. It needs no build from lazyrunner; i runs npm ci for it.",
+      "type": "object",
+      "required": ["key", "name", "type", "dir", "variants"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/appKey", "description": "Short name, unique in the profile.", "examples": ["shop"] },
+        "name": { "type": "string", "minLength": 1, "description": "The column's title.", "examples": ["Shop"] },
+        "icon": { "$ref": "#/$defs/icon" },
+        "type": { "const": "npm", "description": "The app type: what lazyrunner does with the app follows from it." },
+        "dir": { "$ref": "#/$defs/relativePath", "description": "The folder with package.json.", "examples": ["web/shop"] },
+        "variants": {
+          "type": "array", "minItems": 1,
+          "items": { "oneOf": [{ "$ref": "#/$defs/serveVariant" }, { "$ref": "#/$defs/buildVariant" }] },
+          "description": "How it runs, chosen again on every start: the first variant whose when.packageScript package.json has. One without when always applies, so only the last can leave it out.",
+          "examples": [[{ "script": "dev", "port": 5173 }]]
+        }
+      }
+    },
+    "serveVariant": {
+      "title": "A dev-server variant",
+      "description": "The script starts a server on a port (vite, ng serve, next dev …). The app is up once the port listens.",
+      "type": "object",
+      "required": ["script", "port"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "description": "Shown in the column next to the script.", "default": "dev server", "examples": ["mock API"] },
+        "when": { "$ref": "#/$defs/when" },
+        "script": { "type": "string", "minLength": 1, "description": "The npm script to run.", "examples": ["dev"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "description": "The dev server's port, unless the script itself says --port <n>.", "examples": [5173] }
+      }
+    },
+    "buildVariant": {
+      "title": "A watch-build variant",
+      "description": "The script builds and keeps watching, and a .NET app serves the output. The app is up once ready.file is written.",
+      "type": "object",
+      "required": ["script", "servedBy", "ready"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "description": "Shown in the column next to the script.", "default": "watch build", "examples": ["served by Orders"] },
+        "when": { "$ref": "#/$defs/when" },
+        "script": { "type": "string", "minLength": 1, "description": "The npm script to run.", "examples": ["watch"] },
+        "servedBy": { "$ref": "#/$defs/appKey", "description": "The key of the .NET app that serves the build: w opens the app on its port.", "examples": ["orders"] },
+        "ready": {
+          "type": "object", "required": ["file"], "additionalProperties": false,
+          "description": "When the build is done.",
+          "properties": { "file": { "$ref": "#/$defs/relativePath", "description": "A file the build writes, relative to dir: the app is ready once it is newer than the start.", "examples": ["dist/index.html"] } }
+        }
+      }
+    },
+    "when": {
+      "type": "object", "required": ["packageScript"], "additionalProperties": false,
+      "description": "When the variant applies; without it, always.",
+      "properties": { "packageScript": { "type": "string", "minLength": 1, "description": "The variant applies on a checkout whose package.json has this script (so it can differ per branch).", "examples": ["dev:mock"] } }
+    }
+  }
+}

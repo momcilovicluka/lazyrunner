@@ -1,0 +1,12 @@
+{
+  "name": "Solarized Light",
+  "description": "Solarized on cream; recolours the terminal background, so it works in a dark terminal too",
+  "colors": {
+    "Black": "#fdf6e3", "DarkRed": "#b02a27", "DarkGreen": "#6c7d00", "DarkYellow": "#cb4b16",
+    "DarkBlue": "#1f6fa8", "DarkMagenta": "#6c71c4", "DarkCyan": "#1f7a73", "Gray": "#586e75",
+    "DarkGray": "#93a1a1", "Red": "#dc322f", "Green": "#859900", "Yellow": "#b58900",
+    "Blue": "#268bd2", "Magenta": "#d33682", "Cyan": "#2aa198", "White": "#073642"
+  },
+  "focus": { "background": "#268bd2", "text": "#fdf6e3", "border": "#268bd2" },
+  "terminal": { "background": "#fdf6e3", "foreground": "#586e75" }
+}
