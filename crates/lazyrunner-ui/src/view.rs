@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use lazyrunner_core::output::{Level, OutputLine};
+use lazyrunner_core::output::{Hue, Level, Output, OutputLine};
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -191,10 +191,16 @@ fn draw_info(buf: &mut Buffer, area: Rect, column: &mut Column, palette: &Palett
 
 /// Output, newest at the bottom, wrapped to the width. Fresh lines start bright and settle into their colour.
 fn draw_body(buf: &mut Buffer, area: Rect, column: &Column, palette: &Palette, now: Instant) {
+    draw_output(buf, area, &column.output, column.scroll, palette, now);
+}
+
+/// Output, newest at the bottom, wrapped to the width (one cell of margin on the left), `scroll` lines back from
+/// the newest. Fresh lines start bright and settle into their colour.
+pub fn draw_output(buf: &mut Buffer, area: Rect, output: &Output, scroll: usize, palette: &Palette, now: Instant) {
     let width = usize::from(area.width.saturating_sub(1)).max(1);
     let x = area.x + 1;
     let mut y = area.bottom();
-    for line in column.output.newest_first(column.scroll) {
+    for line in output.newest_first(scroll) {
         if y <= area.top() {
             break;
         }
@@ -226,6 +232,9 @@ fn draw_body(buf: &mut Buffer, area: Rect, column: &Column, palette: &Palette, n
 /// The line's coloured parts as byte ranges: time, level tag and message for timestamped lines, else one part.
 fn segments(line: &OutputLine, palette: &Palette) -> Vec<(usize, usize, Color, bool)> {
     let text = line.text.as_bytes();
+    if let Some(hue) = line.hue {
+        return vec![(0, text.len(), hue_color(hue, palette), false)];
+    }
     let (message, tag) = match line.level {
         Level::Error => (palette.red, palette.red),
         Level::Warn => (palette.yellow, palette.yellow),
@@ -240,8 +249,24 @@ fn segments(line: &OutputLine, palette: &Palette) -> Vec<(usize, usize, Color, b
     }
 }
 
+/// A colour lazyrunner gave a line, in this palette.
+pub fn hue_color(hue: Hue, palette: &Palette) -> Color {
+    match hue {
+        Hue::Gray => palette.text,
+        Hue::DarkGray => palette.dim,
+        Hue::Cyan => palette.cyan,
+        Hue::DarkCyan => lerp(palette.cyan, palette.bg, 0.35),
+        Hue::Green => palette.green,
+        Hue::DarkGreen => lerp(palette.green, palette.bg, 0.35),
+        Hue::Yellow => palette.yellow,
+        Hue::DarkYellow => lerp(palette.yellow, palette.bg, 0.35),
+        Hue::Red => palette.red,
+        Hue::Magenta => palette.magenta,
+    }
+}
+
 /// Splits `text` into byte ranges of at most `width` characters.
-fn wrap(text: &str, width: usize) -> Vec<(usize, usize)> {
+pub fn wrap(text: &str, width: usize) -> Vec<(usize, usize)> {
     let mut chunks = Vec::with_capacity(text.len() / width + 1);
     let mut start = 0;
     for (count, (index, _)) in text.char_indices().enumerate() {

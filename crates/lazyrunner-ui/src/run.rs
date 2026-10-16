@@ -446,10 +446,10 @@ fn round(value: f32) -> f64 {
 /// Windows wakes sleeping threads every 15.6 ms unless a process asks for better; 60 fps needs 1 ms. Windows 11 also
 /// ignores that request while the process's window is hidden or covered (power throttling) unless the process opts out,
 /// which would halve the frame rate whenever another window is on top.
-struct TimerResolution;
+pub(crate) struct TimerResolution;
 
 impl TimerResolution {
-    fn high() -> Self {
+    pub(crate) fn high() -> Self {
         #[cfg(windows)]
         // SAFETY: both calls only change this process's own timer and throttling settings; the state struct lives on
         // the stack for the call and its size is passed with it; timeBeginPeriod is undone in drop.

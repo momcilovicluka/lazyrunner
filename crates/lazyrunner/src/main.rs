@@ -1,7 +1,8 @@
-//! lazyrunner, the Rust version. So far: `lazyrunner profile check|init` (P1), and the look-and-feel spike (P0):
-//! synthetic apps streaming output into columns, with a benchmark mode to compare it against the PowerShell version.
+//! lazyrunner, the Rust version: `lazyrunner [start]` runs the project here (P2), `stop` / `restart` tell an open
+//! one, `profile check|init` (P1), and the look-and-feel spike (P0) with its benchmark mode.
 
 mod profile_cli;
+mod start;
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -41,6 +42,29 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Open lazyrunner on the project here and start everything (plain `lazyrunner` starts unless auto-start is off).
+    Start,
+    /// Stop everything in the open lazyrunner.
+    Stop,
+    /// Restart everything in the open lazyrunner (rebuilding what changed).
+    Restart,
+    /// Run the project in a folder without asking (the tests use it; the profile must be trusted already).
+    #[command(hide = true)]
+    Run {
+        #[arg(long)]
+        root: PathBuf,
+        /// Draw into memory at this size (e.g. 160x45) instead of the terminal.
+        #[arg(long, value_name = "WIDTHxHEIGHT")]
+        headless: Option<String>,
+        #[arg(long)]
+        ipc: Option<String>,
+        /// Start everything right away.
+        #[arg(long)]
+        start: bool,
+    },
+    /// Kills what lazyrunner started when lazyrunner itself dies (Linux, macOS).
+    #[command(name = "__guard", hide = true)]
+    Guard,
     /// Check a project profile, or propose one for a checkout (projects/README.md describes profiles).
     Profile {
         /// check: its fields, the schema, and the checkout it is for. init: a .lazyrunner.json for a checkout.
@@ -54,7 +78,7 @@ enum Command {
         #[arg(long)]
         save: bool,
     },
-    /// The look-and-feel spike: synthetic apps streaming output (the default for now).
+    /// The look-and-feel spike: synthetic apps streaming output.
     Spike(SpikeArgs),
     /// Prints synthetic app output; the spike's apps are this.
     #[command(hide = true)]
@@ -101,7 +125,14 @@ struct SpikeArgs {
     ipc: Option<String>,
 }
 
-fn main() -> Result<()> {
+fn main() {
+    if let Err(error) = run_cli() {
+        eprintln!("{error:#}");
+        std::process::exit(1);
+    }
+}
+
+fn run_cli() -> Result<()> {
     let process_started = Instant::now();
     let cli = Cli::parse_from(profile_cli::powershell_flags(std::env::args_os()));
     match cli.command {
@@ -119,11 +150,17 @@ fn main() -> Result<()> {
             Ok(())
         }
         Some(Command::Spike(args)) => spike(args, process_started),
-        None => {
-            let Some(Command::Spike(args)) = Cli::parse_from(["lazyrunner", "spike"]).command else {
-                unreachable!("'spike' parses as the spike command")
-            };
-            spike(args, process_started)
+        Some(Command::Start) => start::start(true),
+        None => start::start(false),
+        Some(Command::Stop) => start::send("stop"),
+        Some(Command::Restart) => start::send("restart"),
+        Some(Command::Run { root, headless, ipc, start }) => {
+            let size = headless.as_deref().map(parse_size).transpose()?;
+            start::run_root(&root, size, ipc, start)
+        }
+        Some(Command::Guard) => {
+            lazyrunner_core::run::child::run_guard();
+            Ok(())
         }
     }
 }

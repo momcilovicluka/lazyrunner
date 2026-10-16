@@ -32,6 +32,23 @@ pub struct OutputLine {
     pub text: String,
     pub level: Level,
     pub born: Instant,
+    /// The colour lazyrunner gave the line (app output, its own notes); `None`: by its level.
+    pub hue: Option<Hue>,
+}
+
+/// The colours lazyrunner gives lines, named as the themes name them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Hue {
+    Gray,
+    DarkGray,
+    Cyan,
+    DarkCyan,
+    Green,
+    DarkGreen,
+    Yellow,
+    DarkYellow,
+    Red,
+    Magenta,
 }
 
 #[derive(Debug)]
@@ -57,7 +74,12 @@ impl Output {
     }
 
     pub fn push(&mut self, text: &str, now: Instant) {
-        let text = strip_ansi(text.trim_end_matches(['\r', '\n']));
+        self.push_hued(text, None, now);
+    }
+
+    /// A line in the colour lazyrunner chose for it.
+    pub fn push_hued(&mut self, text: &str, hue: Option<Hue>, now: Instant) {
+        let text = strip_ansi(text.trim_end_matches(['\r', '\n'])).replace('\t', "    ");
         let level = Level::of(&text);
         match level {
             Level::Error => self.errors += 1,
@@ -67,9 +89,14 @@ impl Output {
         if self.lines.len() == self.capacity {
             self.lines.pop_front();
         }
-        self.lines.push_back(OutputLine { text, level, born: now });
+        self.lines.push_back(OutputLine { text, level, born: now, hue });
         self.total += 1;
         self.last_line_at = Some(now);
+    }
+
+    /// Forgets the lines (Ctrl+L); the counters stay.
+    pub fn clear(&mut self) {
+        self.lines.clear();
     }
 
     pub fn len(&self) -> usize {
@@ -103,7 +130,7 @@ impl Output {
 }
 
 /// Drops terminal escape sequences (colours, cursor moves); the P3 output view renders colours itself.
-fn strip_ansi(text: &str) -> String {
+pub fn strip_ansi(text: &str) -> String {
     if !text.contains('\x1b') {
         return text.to_string();
     }
@@ -118,6 +145,14 @@ fn strip_ansi(text: &str) -> String {
             chars.next();
             for c in chars.by_ref() {
                 if ('@'..='~').contains(&c) {
+                    break;
+                }
+            }
+        } else if chars.peek() == Some(&']') {
+            // An operating system command (window title, hyperlink): up to BEL or ESC \.
+            chars.next();
+            while let Some(c) = chars.next() {
+                if c == '\x07' || (c == '\x1b' && chars.next_if_eq(&'\\').is_some()) {
                     break;
                 }
             }
@@ -219,6 +254,12 @@ mod tests {
         let mut output = Output::new(2);
         output.push("\x1b[32mready\x1b[0m in 5 ms\r\n", Instant::now());
         assert_eq!(output.newest_first(0).next().unwrap().text, "ready in 5 ms");
+        output.push("\x1b]0;title\x07a\tb \x1b]8;;http://x\x1b\\link", Instant::now());
+        assert_eq!(
+            output.newest_first(0).next().unwrap().text,
+            "a    b link",
+            "titles and links go, tabs become spaces"
+        );
     }
 
     #[test]

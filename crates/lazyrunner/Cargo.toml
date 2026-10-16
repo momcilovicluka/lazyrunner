@@ -13,6 +13,7 @@ lazyrunner-core = { path = "../lazyrunner-core" }
 lazyrunner-ui = { path = "../lazyrunner-ui" }
 ratatui = "0.30.2"
 serde_json = "1.0.154"
+sha2 = "0.11.1"
 tokio = { version = "1.53.3", features = ["full"] }
 
 [dev-dependencies]

@@ -270,18 +270,21 @@ an npm app is). The tests are plain scripts too; [tests/README.md](tests/README.
 
 lazyrunner is being rewritten in Rust (Ratatui) to run on Windows, Linux and macOS. It lives in `crates\`:
 `lazyrunner-core` (profiles, settings, apps, processes, output), `lazyrunner-ui` (the terminal UI) and `lazyrunner`
-(the binary). So far it has `lazyrunner profile check` and `profile init` (the same checks, output and `--json` shape as
-the PowerShell version; `-Json` and `-Save` work too), and a look-and-feel spike: synthetic apps streaming output into
-columns.
+(the binary). So far it runs a project's apps (`lazyrunner`, `lazyrunner start`, `stop`, `restart`: builds one at a
+time and skipped when nothing changed, npm variants, readiness, response times, ports, branch and code watching; each
+app's whole process tree stops with it, and nothing outlives lazyrunner, even when it crashes), has `lazyrunner profile
+check` and `profile init` (the same checks, output and `--json` shape as the PowerShell version; `-Json` and `-Save`
+work too), and a look-and-feel spike (`lazyrunner spike`). The full PowerShell look (overlays, themes, menus) comes next.
 
 It keeps its settings and your profiles in `%APPDATA%\lazyrunner` (`lazyrunner.config.json`, `projects\`) and its state
 in `%LOCALAPPDATA%\lazyrunner`; on macOS both are in `~/Library/Application Support/lazyrunner`, on Linux in
 `~/.config/lazyrunner` and `~/.local/state/lazyrunner`. The same `LAZYRUNNER_*` variables replace them.
 
 ```
-cargo run --release                                   # the spike: 5 apps x 2000 lines/s
+cargo run --release                                   # run the project in this folder
+cargo run --release -- spike                          # the spike: 5 apps x 2000 lines/s
 cargo run -- profile check                            # check the profile that applies here
-cargo run --release -- spike --bench 20               # run 20 s and print fps, CPU, memory, first-frame time
+cargo run --release -- spike --bench 20               # 20 s of the spike, then fps, CPU, memory, first frame
 cargo test --workspace                                # unit tests, the ported profile suites, end-to-end tests
 LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference   # rewrite the guide's field reference
 pwsh -NoProfile -File bench\compare-powershell.ps1    # the same load in the Rust and the PowerShell version

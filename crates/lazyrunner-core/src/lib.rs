@@ -11,5 +11,6 @@ pub mod paths;
 pub mod process;
 pub mod profile;
 pub mod profiletools;
+pub mod run;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;
