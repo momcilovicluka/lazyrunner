@@ -269,13 +269,21 @@ an npm app is). The tests are plain scripts too; [tests/README.md](tests/README.
 ### Rust version (in progress)
 
 lazyrunner is being rewritten in Rust (Ratatui) to run on Windows, Linux and macOS. It lives in `crates\`:
-`lazyrunner-core` (apps, processes, output), `lazyrunner-ui` (the terminal UI) and `lazyrunner` (the binary). For now
-the binary runs a look-and-feel spike: synthetic apps streaming output into columns.
+`lazyrunner-core` (profiles, settings, apps, processes, output), `lazyrunner-ui` (the terminal UI) and `lazyrunner`
+(the binary). So far it has `lazyrunner profile check` and `profile init` (the same checks, output and `--json` shape as
+the PowerShell version; `-Json` and `-Save` work too), and a look-and-feel spike: synthetic apps streaming output into
+columns.
+
+It keeps its settings and your profiles in `%APPDATA%\lazyrunner` (`lazyrunner.config.json`, `projects\`) and its state
+in `%LOCALAPPDATA%\lazyrunner`; on macOS both are in `~/Library/Application Support/lazyrunner`, on Linux in
+`~/.config/lazyrunner` and `~/.local/state/lazyrunner`. The same `LAZYRUNNER_*` variables replace them.
 
 ```
 cargo run --release                                   # the spike: 5 apps x 2000 lines/s
+cargo run -- profile check                            # check the profile that applies here
 cargo run --release -- spike --bench 20               # run 20 s and print fps, CPU, memory, first-frame time
-cargo test --workspace                                # unit tests and the end-to-end test (headless, over IPC)
+cargo test --workspace                                # unit tests, the ported profile suites, end-to-end tests
+LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference   # rewrite the guide's field reference
 pwsh -NoProfile -File bench\compare-powershell.ps1    # the same load in the Rust and the PowerShell version
 ```
 

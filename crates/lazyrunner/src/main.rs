@@ -1,5 +1,7 @@
-//! lazyrunner, the Rust version. For now (P0) it runs the look-and-feel spike: synthetic apps streaming output into
-//! columns, with a benchmark mode to compare it against the PowerShell version.
+//! lazyrunner, the Rust version. So far: `lazyrunner profile check|init` (P1), and the look-and-feel spike (P0):
+//! synthetic apps streaming output into columns, with a benchmark mode to compare it against the PowerShell version.
+
+mod profile_cli;
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -39,6 +41,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Check a project profile, or propose one for a checkout (projects/README.md describes profiles).
+    Profile {
+        /// check: its fields, the schema, and the checkout it is for. init: a .lazyrunner.json for a checkout.
+        action: Option<String>,
+        /// check: the profile file (default: the one that applies here). init: the checkout (default: this repo).
+        path: Option<PathBuf>,
+        /// check: print the result as JSON.
+        #[arg(long)]
+        json: bool,
+        /// init: write .lazyrunner.json instead of printing it.
+        #[arg(long)]
+        save: bool,
+    },
     /// The look-and-feel spike: synthetic apps streaming output (the default for now).
     Spike(SpikeArgs),
     /// Prints synthetic app output; the spike's apps are this.
@@ -88,8 +103,11 @@ struct SpikeArgs {
 
 fn main() -> Result<()> {
     let process_started = Instant::now();
-    let cli = Cli::parse();
+    let cli = Cli::parse_from(profile_cli::powershell_flags(std::env::args_os()));
     match cli.command {
+        Some(Command::Profile { action, path, json, save }) => {
+            std::process::exit(profile_cli::run(action.as_deref(), path.as_deref(), json, save))
+        }
         Some(Command::Emit { rate, ready_after_ms, seed, limit }) => {
             let options = EmitterOptions { rate, ready_after: Duration::from_millis(ready_after_ms), seed, limit };
             Ok(emitter::run(&options)?)
