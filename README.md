@@ -266,6 +266,19 @@ project with its build logs and stamps, per-app logs and timings.
 lazyrunner is plain PowerShell 7: `lazyrunner.ps1` and the libraries in `lib\` (`lib\apptypes.ps1` is what a .NET or
 an npm app is). The tests are plain scripts too; [tests/README.md](tests/README.md) lists them.
 
+### Rust version (in progress)
+
+lazyrunner is being rewritten in Rust (Ratatui) to run on Windows, Linux and macOS. It lives in `crates\`:
+`lazyrunner-core` (apps, processes, output), `lazyrunner-ui` (the terminal UI) and `lazyrunner` (the binary). For now
+the binary runs a look-and-feel spike: synthetic apps streaming output into columns.
+
+```
+cargo run --release                                   # the spike: 5 apps x 2000 lines/s
+cargo run --release -- spike --bench 20               # run 20 s and print fps, CPU, memory, first-frame time
+cargo test --workspace                                # unit tests and the end-to-end test (headless, over IPC)
+pwsh -NoProfile -File bench\compare-powershell.ps1    # the same load in the Rust and the PowerShell version
+```
+
 ### Releasing
 
 Installs update from `$UpdateRepo` in `lazyrunner.ps1` (the repo URL and its release branch; empty means no updates).
