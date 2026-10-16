@@ -1,0 +1,143 @@
+lazyrunner License, version 1.0
+
+Copyright (c) 2026 Luka Momčilović. All rights reserved.
+
+lazyrunner is source-available, not open source. You may read the source code,
+but you may use it only as this license allows. Everything this license does
+not expressly allow is reserved to the Owner.
+
+
+1. Definitions
+
+"Owner" means Luka Momčilović, the author and copyright holder of lazyrunner.
+
+"Software" means everything in the Official Repository and in its releases:
+source code, scripts, binaries, documentation, themes, images and other
+files, in every version.
+
+"Official Repository" means https://github.com/momcilovicluka/lazyrunner.
+
+"You" means the person, or the organisation, that uses the Software.
+
+"Noncommercial Use" means only:
+  (a) use by an individual, on their own time, for personal projects that
+      are not done for pay and not done for an employer, a client or a
+      business; and
+  (b) use by a registered non-profit organisation, charity, school or
+      university, for its non-profit activities.
+
+Everything else is commercial use. Commercial use includes, but is not
+limited to: any use at work or in the course of employment; use while doing
+contract, freelance or consulting work; use by or for a company, even
+internally and even when the work itself is free; use on software or
+services that are sold, licensed, or run for a business; and offering the
+Software, or anything based on it, as a product or a service.
+
+
+2. What you may do
+
+If you follow every term of this license, the Owner gives you a personal,
+non-exclusive, non-transferable, non-sublicensable licence to download,
+install and run unmodified copies of the Software obtained from the Official
+Repository or its releases, for Noncommercial Use only.
+
+Self-updates that the Software installs from the Official Repository count
+as copies obtained from the Official Repository.
+
+
+3. Contributing
+
+You may fork the Official Repository on the platform that hosts it, and
+change your fork, only to prepare, submit and revise pull requests to the
+Official Repository. You may run your changed copy only to develop and test
+those pull requests.
+
+Your fork may not be used, published, released, packaged or promoted for any
+other purpose, and you may not maintain it as a separate or alternative
+version of the Software. Delete your fork, and any changed copies, once you
+no longer need them for a pull request.
+
+Contributions are accepted only under the Contributor Agreement in
+CONTRIBUTING.md. Submitting a pull request means you accept it.
+
+
+4. What you may not do
+
+Unless the Owner has agreed in writing, you may not:
+  (a) use the Software for anything other than Noncommercial Use;
+  (b) copy, share, redistribute, mirror, publish or re-host the Software, or
+      any part of it, changed or unchanged, as source code or as binaries,
+      including in packages, installers, containers or other distributions;
+  (c) make, use or share changed versions or derivative works of the
+      Software, except as section 3 allows;
+  (d) sell, rent, lease, lend, sublicense or otherwise transfer the Software
+      or any rights in it;
+  (e) maintain a fork, port or rewrite of the Software, or act as its
+      maintainer, outside the Official Repository;
+  (f) use the Software, or any part of it, to train, fine-tune or evaluate
+      machine-learning models, or include it in datasets;
+  (g) remove or change copyright notices, this license, or the Software's
+      name or branding; or
+  (h) use the name "lazyrunner", or the Owner's name, to promote anything.
+
+Where the terms of service of the platform that hosts the Official
+Repository give other users rights to view or fork it, those rights apply
+only within that platform and only as far as those terms require. They do
+not allow anything else this license forbids.
+
+
+5. Permission for other uses
+
+Commercial use, use at work, redistribution, and any other use that this
+license does not allow need separate written permission from the Owner.
+Ask through the Official Repository. The Owner may refuse, or set any
+conditions, for any reason.
+
+
+6. Ownership
+
+The Software is licensed, not sold. The Owner keeps all rights, title and
+interest in the Software, including copyright, and including the parts that
+others contributed under the Contributor Agreement. Nothing in this license
+transfers any of them to you, or grants you any patent or trademark rights.
+
+
+7. Third-party components
+
+The Software uses third-party components that come with their own licenses.
+Those licenses apply to those components only. This license applies to
+everything else.
+
+
+8. Ending this license
+
+This license ends automatically, without notice, as soon as you break any of
+its terms. When it ends you must stop using the Software and delete every
+copy you have. Sections 4, 6, 9 and 10 continue to apply after it ends.
+
+The Owner may publish later versions of the Software under different terms.
+Those terms apply to those versions.
+
+
+9. No warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. YOU USE IT AT YOUR OWN RISK.
+
+
+10. Limitation of liability
+
+TO THE FULLEST EXTENT THE LAW ALLOWS, THE OWNER IS NOT LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER DIRECT, INDIRECT, INCIDENTAL, SPECIAL OR
+CONSEQUENTIAL, INCLUDING LOSS OF DATA, PROFITS OR BUSINESS, THAT ARISES FROM
+OR IN CONNECTION WITH THE SOFTWARE OR ITS USE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+
+11. General
+
+If a court finds part of this license unenforceable, that part is changed
+only as far as needed to make it enforceable, and the rest stays in effect.
+If the Owner does not enforce a term, the Owner does not give up the right
+to enforce it later.

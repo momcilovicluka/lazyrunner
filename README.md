@@ -275,3 +275,12 @@ A release is a higher `VERSION` on that branch - pushing without bumping it upda
    `### Added` / `### Changed` / `### Fixed`. Installs show it after they update.
 2. Bump `VERSION` (semantic versioning: a new feature 0.2.0, a fix 0.1.1).
 3. Run the tests, commit, and push the branch. Every install picks it up the next time it opens.
+
+## License
+
+lazyrunner is source-available, not open source: free for personal use and for non-profit organisations, under the
+[lazyrunner License](LICENSE). Any use at work or other commercial use needs written permission from the author; ask
+through this repository. Copying, redistributing, or maintaining a separate fork is not allowed.
+
+Pull requests are welcome. Forking is allowed only to prepare them, and contributions come in under the Contributor
+Agreement in [CONTRIBUTING.md](CONTRIBUTING.md).
