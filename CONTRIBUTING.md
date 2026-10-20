@@ -11,11 +11,9 @@ terms below, so the project keeps one owner and one official repository.
 2. Fork the repository on GitHub, and make your change on a branch of your fork.
    The [license](LICENSE) (section 3) allows a fork only for preparing pull
    requests to this repository.
-3. Run the tests:
-   - PowerShell version: `pwsh -NoProfile -File tests\<name>.Tests.ps1` and the
-     `tests\*.e2e.ps1` scripts.
-   - Rust version: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`
-     and `cargo test`.
+3. Run the tests: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`
+   and `cargo test` (README, "Development"). The PowerShell version (0.1) is
+   frozen on the `powershell` branch and takes no more changes.
 4. Open a pull request to `main`, and tick the Contributor Agreement box in the
    pull request description.
 5. Once the pull request is merged or closed, delete your fork if you no longer

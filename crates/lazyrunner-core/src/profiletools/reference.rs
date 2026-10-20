@@ -7,8 +7,7 @@ use serde_json::Value;
 
 use crate::json::{field, list, text, truthy};
 
-pub const START_MARKER: &str =
-    "<!-- reference: made from profile.schema.json by projects\\Update-Reference.ps1 - change the schema, not this -->";
+pub const START_MARKER: &str = "<!-- reference: made from profile.schema.json (LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference) - change the schema, not this -->";
 pub const END_MARKER: &str = "<!-- end of reference -->";
 const APP_PARTS: [&str; 4] = ["dotnetApp", "npmApp", "serveVariant", "buildVariant"];
 

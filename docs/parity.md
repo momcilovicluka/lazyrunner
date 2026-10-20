@@ -1,6 +1,6 @@
 # Parity with the PowerShell version (0.1)
 
-The Rust screen is a port of the PowerShell 0.1 UI (`lib\view.ps1`, `lib\input.ps1`, `lib\actions.ps1`,
+The Rust screen is a port of the PowerShell 0.1 UI (on the `powershell` branch: `lib\view.ps1`, `lib\input.ps1`, `lib\actions.ps1`,
 `lib\checklist.ps1`, `lib\themes.ps1`). Each item below was checked against the PowerShell source. The snapshot tests
 (`crates/lazyrunner-ui/src/screen/snapshots`) pin each screen, and the end-to-end tests (`crates/lazyrunner/tests`)
 press the keys against real apps.

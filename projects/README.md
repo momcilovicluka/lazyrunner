@@ -76,7 +76,7 @@ needs `"detect": { "anyFile": ["Shop.sln"] }`: a file only this repo has.)
 `profile.schema.json` is the source of these tables; editors that read `$schema` (VS Code does) check a profile and
 complete it as you type. Paths are relative to the repo root; `/` and `\` both work.
 
-<!-- reference: made from profile.schema.json by projects\Update-Reference.ps1 - change the schema, not this -->
+<!-- reference: made from profile.schema.json (LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference) - change the schema, not this -->
 
 #### The profile
 

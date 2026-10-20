@@ -49,7 +49,7 @@ pub fn write(path: impl AsRef<Path>, content: &str) {
     std::fs::write(path, content).expect("the file");
 }
 
-/// The sample repo that tests/fixtures/sample.json is the profile of (as tests/fixtures/New-SampleRepo.ps1 makes
+/// The sample repo that tests/fixtures/sample.json is the profile of (as the powershell branch's New-SampleRepo.ps1 made
 /// it): two tiny ASP.NET APIs (real dotnet build and run), and three npm apps without packages: a dev server, a
 /// watch build that an API serves, and one with two variants. A git repo with one commit.
 pub fn sample_repo(path: &Path) -> PathBuf {
