@@ -9,6 +9,7 @@ use lazyrunner_core::changelog::{self, Entry, Line};
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::checks::{self, Outcome, Status};
+use lazyrunner_core::update;
 
 /// Each check shows its spinner at least this long, so every tick can be seen.
 const MIN_CHECK: Duration = Duration::from_millis(150);
@@ -35,13 +36,23 @@ pub struct Checklist {
     pub skip: bool,
     /// Start everything once it is done (auto-start, `lazyrunner start`).
     pub start_after: bool,
+    /// The lazyrunner version this checklist installed (it reopens on it).
+    pub updated_to: Option<String>,
+    installed_before: Option<String>,
     phase: Phase,
-    results: Receiver<(usize, Option<Outcome>)>,
+    results: Receiver<(usize, Message)>,
+}
+
+/// From the checks' thread: a check began, says what it is doing, or is done.
+enum Message {
+    Running,
+    Detail(String),
+    Done(Outcome),
 }
 
 impl Checklist {
     pub fn start(controller: &Controller, manual: bool, whats_new: &[Entry], start_after: bool) -> Self {
-        let checks = checks::checks(controller, changelog::VERSION);
+        let checks = checks::checks(controller);
         let items = checks
             .iter()
             .map(|check| Item { name: check.name.clone(), status: Status::Pending, detail: String::new() })
@@ -50,14 +61,18 @@ impl Checklist {
         std::thread::spawn(move || {
             for (index, check) in checks.into_iter().enumerate() {
                 let started = Instant::now();
-                if sender.send((index, None)).is_err() {
+                if sender.send((index, Message::Running)).is_err() {
                     return;
                 }
-                let outcome = (check.run)();
+                let detail = sender.clone();
+                let mut report = |text: &str| {
+                    let _ = detail.send((index, Message::Detail(text.to_string())));
+                };
+                let outcome = (check.run)(&mut report);
                 if let Some(rest) = MIN_CHECK.checked_sub(started.elapsed()) {
                     std::thread::sleep(rest);
                 }
-                if sender.send((index, Some(outcome))).is_err() {
+                if sender.send((index, Message::Done(outcome))).is_err() {
                     return;
                 }
             }
@@ -69,6 +84,8 @@ impl Checklist {
             manual,
             skip: false,
             start_after,
+            updated_to: None,
+            installed_before: update::installed(),
             phase: Phase::Checking,
             results,
         }
@@ -88,8 +105,9 @@ impl Checklist {
                 Ok((index, outcome)) => {
                     let Some(item) = self.items.get_mut(index) else { continue };
                     match outcome {
-                        None => item.status = Status::Running,
-                        Some((status, detail)) => {
+                        Message::Running => item.status = Status::Running,
+                        Message::Detail(detail) => item.detail = detail,
+                        Message::Done((status, detail)) => {
                             item.status = status;
                             item.detail = detail;
                         }
@@ -120,8 +138,11 @@ impl Checklist {
             if problems.is_empty() {
                 controller.add_log("✓ Startup checklist: all good", Hue::Green);
             }
+            self.updated_to = update::installed().filter(|version| self.installed_before.as_ref() != Some(version));
             // Linger a moment: longer when something needs a look or there is news; any key continues.
-            let hold = if self.manual {
+            let hold = if self.updated_to.is_some() && !self.manual {
+                1.5
+            } else if self.manual {
                 60.0
             } else if !self.news.is_empty() {
                 20.0
@@ -137,7 +158,9 @@ impl Checklist {
             return true;
         }
         let left = until.saturating_duration_since(now).as_secs_f64().ceil() as u64;
-        self.footer = if self.manual {
+        self.footer = if let Some(version) = self.updated_to.as_ref().filter(|_| !self.manual) {
+            format!("v{version} installed - reopening lazyrunner…")
+        } else if self.manual {
             "any key closes".into()
         } else if !self.news.is_empty() {
             format!("what's new above (, then c shows the whole changelog) - any key continues ({left} s)")
@@ -162,6 +185,8 @@ impl Checklist {
             manual: false,
             skip: false,
             start_after: false,
+            updated_to: None,
+            installed_before: None,
             phase: Phase::Checking,
             results,
         }

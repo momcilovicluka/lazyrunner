@@ -13,6 +13,7 @@ use super::net::Listening;
 use super::secrets;
 use super::tools;
 use crate::profile::{AppKind, Source};
+use crate::update;
 
 const SQL_TIMEOUT: Duration = Duration::from_secs(2);
 const SQL_PORT: u16 = 1433;
@@ -32,13 +33,16 @@ pub enum Status {
 
 pub type Outcome = (Status, String);
 
+/// Says what a running check is doing (the update's download progress), shown on its line.
+pub type Report<'a> = &'a mut dyn FnMut(&str);
+
 pub struct Check {
     pub name: String,
-    pub run: Box<dyn FnOnce() -> Outcome + Send>,
+    pub run: Box<dyn FnOnce(Report) -> Outcome + Send>,
 }
 
 fn check(name: impl Into<String>, run: impl FnOnce() -> Outcome + Send + 'static) -> Check {
-    Check { name: name.into(), run: Box::new(run) }
+    Check { name: name.into(), run: Box::new(move |_: Report| run()) }
 }
 
 /// The first line a tool prints for `args`, when it runs and succeeds.
@@ -78,10 +82,22 @@ fn version_of(tool: &str) -> Option<String> {
 }
 
 /// The checks for this project, ready to run.
-pub fn checks(controller: &Controller, lazyrunner_version: &str) -> Vec<Check> {
+pub fn checks(controller: &Controller) -> Vec<Check> {
     let mut checks = Vec::new();
-    let version = lazyrunner_version.to_string();
-    checks.push(check("lazyrunner", move || (Status::Ok, format!("v{version}"))));
+    let config = controller.config.clone();
+    let state_dir = controller.paths().state_dir.clone();
+    checks.push(Check {
+        name: "lazyrunner".into(),
+        run: Box::new(move |report: Report| {
+            let outcome = update::update(&config, &state_dir, false, &mut update::Progress::new(report));
+            let status = match outcome.status {
+                update::Status::Ok => Status::Ok,
+                update::Status::Warn => Status::Warn,
+                update::Status::Skip => Status::Skip,
+            };
+            (status, outcome.detail)
+        }),
+    });
     checks.push(check("git", || match version_of("git") {
         Some(version) => (Status::Ok, version.trim_start_matches("git version ").to_string()),
         None => (Status::Fail, "not found on PATH".into()),

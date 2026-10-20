@@ -1,6 +1,6 @@
 # lazyrunner themes
 
-Each `<id>.json` here is one theme. `T` in lazyrunner cycles through them: Default comes first, then the rest by display name. The folder is re-read on every press, so a new or edited file shows up without restarting. A file that can't be used is skipped, and the panel log says why.
+Each `<id>.json` here is one theme, built into lazyrunner. Your own go in `themes/<id>.json` in lazyrunner's settings folder (`%APPDATA%\lazyrunner` on Windows, `~/.config/lazyrunner` on Linux, `~/Library/Application Support/lazyrunner` on macOS); one with the id of a built-in theme replaces it. `t` in lazyrunner cycles through them: Default comes first, then the rest by display name. The folder is re-read on every press, so a new or edited file shows up without restarting. A file that can't be used is skipped, and the panel log says why.
 
 ## Format
 

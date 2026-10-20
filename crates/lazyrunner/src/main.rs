@@ -3,6 +3,7 @@
 
 mod profile_cli;
 mod start;
+mod update_cli;
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -48,6 +49,16 @@ enum Command {
     Stop,
     /// Restart everything in the open lazyrunner (rebuilding what changed).
     Restart,
+    /// Install a newer lazyrunner if there is one (also when auto-update is off).
+    Update,
+    /// This lazyrunner's version, where its updates come from, and what's new in it.
+    Version,
+    /// What changed after a version (the updated binary prints it for the one that installed it).
+    #[command(name = "__changelog", hide = true)]
+    Changelog {
+        #[arg(long)]
+        after: String,
+    },
     /// Run the project in a folder without asking (the tests use it; the profile must be trusted already).
     #[command(hide = true)]
     Run {
@@ -126,6 +137,8 @@ struct SpikeArgs {
 }
 
 fn main() {
+    // The binary as it starts: an update replaces the file at this path, and reopening runs that one.
+    let _ = lazyrunner_core::update::exe();
     if let Err(error) = run_cli() {
         eprintln!("{error:#}");
         std::process::exit(1);
@@ -152,6 +165,9 @@ fn run_cli() -> Result<()> {
         Some(Command::Spike(args)) => spike(args, process_started),
         Some(Command::Start) => start::start(true),
         None => start::start(false),
+        Some(Command::Update) => update_cli::update(),
+        Some(Command::Version) => update_cli::version(),
+        Some(Command::Changelog { after }) => update_cli::changelog_after(&after),
         Some(Command::Stop) => start::send("stop"),
         Some(Command::Restart) => start::send("restart"),
         Some(Command::Run { root, headless, ipc, start }) => {

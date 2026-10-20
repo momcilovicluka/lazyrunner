@@ -8,7 +8,7 @@ expression: screen.frame()
 
 
 
-  ┌─ Keys · lazyrunner v0.2.0-dev ─────────────────────────────────────────────────────────────────────────┐
+  ┌─ Keys · lazyrunner v<version> ─────────────────────────────────────────────────────────────────────────────┐
   │ Run                                                    > <         Widen / narrow the focused column   │
   │   Space       Start / stop the focused app             =           Equal column widths                 │
   │   u U         Start · focused / all                    Ctrl+L      Clear output                        │

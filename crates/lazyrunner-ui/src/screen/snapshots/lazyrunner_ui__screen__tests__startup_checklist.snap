@@ -3,13 +3,13 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
 
-           ┌─ ✧ lazyrunner v0.2.0-dev · startup checklist ────────────────────────────────────────┐
+           ┌─ ✧ lazyrunner v<version> · startup checklist ────────────────────────────────────────────┐
            │                                                                                      │
            │    █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                                           │
            │    █   █▀█ ▄▀  ▀█▀ █▀▄ █ █ █ █ █ █ █▀  █▀▄                                           │
            │    ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                                           │
            │                                                                                      │
-           │  ✓ lazyrunner         v0.2.0                                                         │
+           │  ✓ lazyrunner         v<version>                                                         │
            │  ✓ git                2.50                                                           │
            │  ! .NET SDK           9.0 - the apps want 10.0                                       │
            │  ⠋ Ports                                                                             │

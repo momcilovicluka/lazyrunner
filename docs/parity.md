@@ -101,10 +101,16 @@ All of these step on PowerShell's 100 ms frame count, whatever the frame rate.
 - **Lines that rewrite themselves with `\r`** (progress bars) keep what a terminal would show. Other control
   characters are dropped.
 
-## Not in P3
+## Updates
 
-- The update check and self-update (the checklist's update row, `v`'s effect, "lazyrunner updated to …" on reopen)
-  come in P4. The `v` setting already toggles and is saved.
+The same steps and messages as PowerShell's ("checking github.com…", "downloading ▕████░░░░░░▏ 40%", "installing
+v0.2.1…", "updated v0.2.0 → v0.2.1", "ahead of the released …", "auto-update off (, then v turns it on)"), in the
+checklist's lazyrunner line, quietly when the checklist is off, and in `lazyrunner update` / `lazyrunner version`.
+After an update at startup lazyrunner reopens on the new binary; after `, then r` with apps running it says ", then p
+reopens lazyrunner on it". ≈ It updates from GitHub Releases (the platform's archive, checked against its .sha256)
+instead of a git branch, so `updateBranch` is gone, and it leaves Homebrew, Scoop and winget installs to those.
+≈ With the checklist off, the update check runs in the background while the apps start (PowerShell held the start
+until it was done); what it installs then waits for , then p.
 
 ## PowerShell bugs not copied
 

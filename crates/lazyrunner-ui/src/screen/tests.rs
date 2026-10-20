@@ -76,7 +76,9 @@ impl Screen {
         }
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
         terminal.draw(|frame| draw(frame, &mut self.ui, &self.controller)).unwrap();
-        text(terminal.backend().buffer())
+        // The version in titles changes with every release; the snapshots shouldn't.
+        let version = format!("v{}", lazyrunner_core::changelog::VERSION);
+        text(terminal.backend().buffer()).replace(&version, "v<version>")
     }
 
     fn frame(&mut self) -> String {

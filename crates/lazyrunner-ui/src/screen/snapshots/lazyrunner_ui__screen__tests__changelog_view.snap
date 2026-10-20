@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-        ┌─ lazyrunner v0.2.0-dev · changelog ────────────────────────────────────────────────────────┐
+        ┌─ lazyrunner v<version> · changelog ────────────────────────────────────────────────────────────┐
         │   • change 3                                                                               │
         │   • change 4                                                                               │
         │   • change 5                                                                               │

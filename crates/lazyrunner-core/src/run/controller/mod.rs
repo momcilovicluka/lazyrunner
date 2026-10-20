@@ -253,6 +253,10 @@ impl Controller {
 
     // ---------------------------------------------------------------- lookups
 
+    pub fn paths(&self) -> &Paths {
+        &self.paths
+    }
+
     pub fn index(&self, key: &str) -> Option<usize> {
         self.apps.iter().position(|app| app.key == key)
     }

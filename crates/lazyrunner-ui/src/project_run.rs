@@ -20,6 +20,7 @@ use lazyrunner_core::profile::{self, ProfileDirs, Project};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::child::Guard;
 use lazyrunner_core::run::controller::Setup;
+use lazyrunner_core::update;
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::sleep_until;
@@ -90,11 +91,14 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         controller.add_log(note.clone(), Hue::Yellow);
     }
     let whats_new = changelog::whats_new(&state_dir);
+    let mut quiet: Option<std::sync::mpsc::Receiver<update::Outcome>>;
     if controller.setting("startupChecklist") {
         let checklist = Checklist::start(&controller, false, &whats_new, options.start_now);
         ui.overlay = Some(Overlay::Checklist(Box::new(checklist)));
+        quiet = None;
     } else {
         log_whats_new(&mut controller, &whats_new);
+        quiet = quiet_update(&controller);
         begin(&mut controller, options.start_now);
     }
 
@@ -175,6 +179,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 ui.now = Instant::now();
                 controller.tick();
                 update_checklist(&mut ui, &mut controller);
+                poll_quiet_update(&mut quiet, &mut ui, &mut controller);
                 dirty = true;
             }
             Some(event) = event_rx.recv() => {
@@ -219,10 +224,68 @@ fn update_checklist(ui: &mut Ui, controller: &mut Controller) {
     if !checklist.update(ui.now, controller) {
         return;
     }
-    let (manual, start_after) = (checklist.manual, checklist.start_after);
+    let (manual, start_after, updated_to) = (checklist.manual, checklist.start_after, checklist.updated_to.clone());
     ui.overlay = None;
-    if !manual {
+    if let Some(version) = updated_to {
+        after_update(ui, controller, &version, manual, start_after);
+    } else if !manual {
         begin(controller, start_after);
+    }
+}
+
+/// After an update lazyrunner reopens on the new binary. At startup nothing runs yet, so it reopens right away (and
+/// starts the apps if it was going to). Later (, then r) running apps would be stopped, so that waits for , then p.
+fn after_update(ui: &mut Ui, controller: &mut Controller, version: &str, manual: bool, start: bool) {
+    let busy = controller.building.is_some()
+        || controller.npm_ci.is_some()
+        || controller.states.iter().any(|state| state.is_running());
+    if manual && busy {
+        controller.add_log(
+            format!(
+                "lazyrunner v{version} is installed - , then p reopens lazyrunner on it (the running apps restart)"
+            ),
+            Hue::Cyan,
+        );
+        return;
+    }
+    let root = controller.root.clone();
+    screen::keys::reopen(ui, controller, root, start && !manual, &format!("lazyrunner v{version} installed"));
+}
+
+/// The checklist is off: the same update check, in the background, while the apps start.
+fn quiet_update(controller: &Controller) -> Option<std::sync::mpsc::Receiver<update::Outcome>> {
+    if !controller.setting("autoUpdate") {
+        return None;
+    }
+    let (config, state_dir) = (controller.config.clone(), controller.paths().state_dir.clone());
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut quiet = |_: &str| {};
+        let _ = sender.send(update::update(&config, &state_dir, false, &mut update::Progress::new(&mut quiet)));
+    });
+    Some(receiver)
+}
+
+/// Its outcome in the log; what it installed reopens lazyrunner, or waits for , then p while apps run.
+fn poll_quiet_update(
+    quiet: &mut Option<std::sync::mpsc::Receiver<update::Outcome>>,
+    ui: &mut Ui,
+    controller: &mut Controller,
+) {
+    let Some(receiver) = quiet else { return };
+    let outcome = match receiver.try_recv() {
+        Ok(outcome) => Some(outcome),
+        Err(std::sync::mpsc::TryRecvError::Empty) => return,
+        Err(std::sync::mpsc::TryRecvError::Disconnected) => None,
+    };
+    *quiet = None;
+    if let Some(outcome) = &outcome
+        && outcome.status == update::Status::Warn
+    {
+        controller.add_log(format!("! lazyrunner: {}", outcome.detail), Hue::Yellow);
+    }
+    if let Some(version) = outcome.and_then(|outcome| outcome.updated_to) {
+        after_update(ui, controller, &version, true, false);
     }
 }
 

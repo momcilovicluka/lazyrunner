@@ -45,6 +45,14 @@ fn send_to_open(paths: &Paths, action: &str, root: Option<&Path>) -> bool {
     runtime.block_on(ipc::request(&control_name(paths), &request)).is_ok_and(|answer| answer["ok"] == true)
 }
 
+/// Whether a lazyrunner is open on this machine (it answers on its control channel).
+pub fn is_open(paths: &Paths) -> bool {
+    let Ok(runtime) = runtime() else { return false };
+    runtime
+        .block_on(ipc::request(&control_name(paths), &json!({ "state": true })))
+        .is_ok_and(|answer| answer["ok"] == true)
+}
+
 /// `lazyrunner stop` and `lazyrunner restart`.
 pub fn send(action: &str) -> Result<()> {
     let paths = Paths::from_env(&install_dir());
@@ -152,12 +160,18 @@ fn run_with(
     start_now: bool,
 ) -> Result<()> {
     let (mut project, mut start_now, mut notes) = (project, start_now, Vec::new());
+    let binary = Binary::now();
     loop {
         match run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes)? {
             Exit::Quit => return Ok(()),
             Exit::Reopen { root, start } => {
                 start_now = start;
                 notes = Vec::new();
+                if binary.replaced() {
+                    // Only comes back when the new binary couldn't be started: this one carries on.
+                    let error = binary.run_again(&root, start);
+                    notes.push(format!("✗ Couldn't open the new lazyrunner ({error:#}) - this one carries on."));
+                }
                 match reopen_project(&root, &paths, headless.is_none()) {
                     Ok(Some(next)) => project = next,
                     Ok(None) => notes.push(format!("{} isn't trusted - kept {}.", root.display(), project.name)),
@@ -165,6 +179,48 @@ fn run_with(
                         notes.push(format!("✗ Couldn't reopen {}: {error:#} - kept {}.", root.display(), project.name))
                     }
                 }
+            }
+        }
+    }
+}
+
+/// This lazyrunner's binary as it started, to tell when an update replaced it (here, or by `lazyrunner update`).
+struct Binary {
+    path: Option<PathBuf>,
+    modified: Option<std::time::SystemTime>,
+}
+
+impl Binary {
+    fn now() -> Self {
+        let path = lazyrunner_core::update::exe();
+        let modified = path.as_deref().and_then(|path| std::fs::metadata(path).and_then(|meta| meta.modified()).ok());
+        Self { path, modified }
+    }
+
+    fn replaced(&self) -> bool {
+        let now = self.path.as_deref().and_then(|path| std::fs::metadata(path).and_then(|meta| meta.modified()).ok());
+        lazyrunner_core::update::installed().is_some() || (now.is_some() && now != self.modified)
+    }
+
+    /// Opens `root` in the new binary, in this terminal (on Unix in this very process); returns only when it
+    /// couldn't be started.
+    fn run_again(&self, root: &Path, start: bool) -> anyhow::Error {
+        let Some(path) = self.path.as_deref() else { return anyhow!("can't find lazyrunner's own path") };
+        let mut command = std::process::Command::new(path);
+        command.arg("run").arg("--root").arg(root);
+        if start {
+            command.arg("--start");
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.exec().into()
+        }
+        #[cfg(not(unix))]
+        {
+            match command.status() {
+                Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+                Err(error) => error.into(),
             }
         }
     }
