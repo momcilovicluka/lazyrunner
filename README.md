@@ -1,8 +1,44 @@
 # lazyrunner
 
-A terminal UI that runs your project's .NET APIs and npm frontends side by side, the lazygit way: it builds what
-changed, starts everything on the right ports, tells you when each app is up, and keeps their logs in columns you can
-scroll, search and zoom. One command instead of a row of terminal tabs.
+[![CI](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml/badge.svg)](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml)
+[![Latest release](https://img.shields.io/github/v/release/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/releases/latest)
+
+**Run your entire local development stack from one terminal.**
+
+lazyrunner is a Rust terminal UI for running .NET APIs and npm frontends side by side. It builds what changed, starts
+everything on the right ports, tells you when each app is up, and keeps live logs in columns you can scroll, search
+and zoom.
+
+Inspired by lazygit: one command instead of a row of terminal tabs.
+
+> [!IMPORTANT]
+> lazyrunner is source-available, not open source. Personal/non-profit use is allowed under the
+> [lazyrunner License](LICENSE). Commercial use needs written permission.
+
+## Features
+
+- **One terminal for your stack** — run backend and frontend apps side by side.
+- **Smart builds** — .NET builds run one at a time and skip unchanged work.
+- **Live logs** — follow, search, and zoom each app's output.
+- **Process management** — start/stop/restart apps while cleaning up child processes.
+- **Project profiles** — keep stack setup in a shareable `.lazyrunner.json`.
+- **Keyboard-first workflow** — fast controls inspired by lazygit.
+
+## Quick start
+
+Install lazyrunner, open a repository with your apps, then:
+
+```sh
+lazyrunner profile init --save
+lazyrunner
+```
+
+Review the generated profile before the first run. See [Set up a project](#set-up-a-project) for profile details.
+
+Windows binaries are published on the [releases page](https://github.com/momcilovicluka/lazyrunner/releases). Linux
+and macOS currently build from source.
+
+## Preview
 
 ```
  ◆ Orders :58201 ● 12 ms up in 3s ┬ ■ Billing :58202 ● 9 ms up in 3s ┬ ■ Shop :58301 ● 4 ms ┬ ■ Docs ● built, watching
@@ -20,8 +56,6 @@ scroll, search and zoom. One command instead of a row of terminal tabs.
   or even closing the terminal, leaves nothing running.
 - What a project runs is described in a small JSON **profile** - in the repo (`.lazyrunner.json`) or in your own
   folder. `lazyrunner profile init` writes a first one for you.
-
-One binary, nothing else to install. Releases are for Windows for now; Linux and macOS build from source.
 
 ## Install
 
@@ -77,6 +111,14 @@ settings folder, below) for yourself. The first time lazyrunner meets a repo's p
 shows what it would run and asks you to trust it. [projects/README.md](projects/README.md) is the full guide: where
 lazyrunner looks, every field, recipes (watch builds served by an API, per-branch variants, a team's changes to a
 profile), and how to write a profile for any repo - written so an LLM can follow it too.
+
+## Example stacks
+
+- **.NET API + React/Vite frontend**: one `dotnet` app and one `npm` app variant (`dev`, `port`).
+- **Multi-service backend**: multiple `dotnet` apps in one profile, each with its own launch profile and port.
+- **Frontend watch build served by API**: an `npm` watch variant with `servedBy` and `ready.file`.
+
+See [projects/README.md](projects/README.md) for full examples and recipes.
 
 ## Commands
 
@@ -285,6 +327,12 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
   answering.
 - **The terminal is too small:** lazyrunner needs at least 60×15; `z` zooms one column to full width.
 - **The profile is wrong:** `lazyrunner profile check` names each problem and its field.
+
+## Roadmap
+
+- Publish Linux and macOS release binaries.
+- Expand profile recipes for common multi-service setups.
+- Keep improving startup diagnostics and recovery feedback in the UI.
 
 ## Development
 
