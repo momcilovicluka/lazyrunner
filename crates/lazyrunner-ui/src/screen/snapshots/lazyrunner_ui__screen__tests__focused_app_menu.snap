@@ -10,7 +10,7 @@ expression: screen.frame()
                      │  u      Start the focused app  builds it first if it changed     │
                      │  s      Stop the focused app  or cancel its build / npm ci       │
                      │  r      Restart the focused app  rebuild if it changed           │
-                     │  b      Rebuild the focused app  restart with a full build       │
+                     │  b      Build the focused app  full build, then it stays stopped │
                      │  w      Open the focused app in the browser  Swagger for an API  │
                      │  o      Open the focused app's log file  its full output         │
                      │  y      Copy (yank)  the last error with its stack trace, or th… │
@@ -24,7 +24,7 @@ expression: screen.frame()
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
- ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B rebuild
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update

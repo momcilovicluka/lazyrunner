@@ -50,6 +50,7 @@ impl Controller {
 
     /// U, u, and `lazyrunner start`: starts `only` (all when `None`) that isn't running, building first what needs it.
     pub fn start(&mut self, only: Option<&[String]>, force_build: bool) {
+        debug_assert!(self.building.is_some() || !self.build_only, "b's flag outlives its builds");
         if self.building.is_some() {
             self.start_during_build(only);
             return;
@@ -108,9 +109,55 @@ impl Controller {
             self.start_keys = keys;
             self.built.clear();
             self.force_build = force_build;
+            self.build_only = false;
             self.build_queue = apis;
             self.next_build();
         }
+    }
+
+    /// b, B: a full build (never skipped) that leaves the apps stopped; u / U then start them without building
+    /// again. A running app is stopped first, since it locks its own build output. npm apps have no separate build.
+    pub fn build_only(&mut self, only: Option<&[String]>) {
+        if self.building.is_some() {
+            self.add_log("A build is running - press b again once it's done (builds run one at a time)", Hue::Yellow);
+            return;
+        }
+        let kept = if only.is_none() { self.kept_keys(false) } else { Vec::new() }; // B leaves what S leaves
+        let keys: Vec<String> = self
+            .keys()
+            .into_iter()
+            .filter(|key| only.is_none_or(|only| only.contains(key)) && self.builds(key) && !kept.contains(key))
+            .collect();
+        if keys.is_empty() {
+            let text = match only.and_then(|only| only.first()).and_then(|key| self.app(key)) {
+                Some(app) => format!("{} has no separate build - it compiles while it runs (r restarts it).", app.name),
+                None => "Nothing to build: no app here has a separate build step.".to_string(),
+            };
+            self.add_log(text, Hue::DarkGray);
+            return;
+        }
+        let running: Vec<String> = keys.iter().filter(|key| self.is_running(key)).cloned().collect();
+        if !running.is_empty() {
+            let names = self.names(&running);
+            self.add_log(format!("Stopping {names} first - a running app locks its build output"), Hue::DarkGray);
+            self.stop(Some(&running), true);
+        }
+        let stays = if keys.len() == 1 { "it stays" } else { "they stay" };
+        self.add_log(format!("Building {} - {stays} stopped afterwards", self.names(&keys)), Hue::Cyan);
+        if self.ready_pending.is_empty() {
+            // Nothing else is getting ready: an app started during the build counts "Ready in" from now.
+            self.action_started = Some((self.now)());
+            self.timeline.clear();
+        }
+        self.last_build_failed = false;
+        self.code_at_start = self.code.seen();
+        self.fingerprint = build::fingerprint(&self.root, &self.project.source_dir);
+        self.start_keys = Vec::new(); // a cancelled build has nothing to stop
+        self.built.clear();
+        self.force_build = true;
+        self.build_only = true;
+        self.build_queue = keys;
+        self.next_build();
     }
 
     pub fn builds(&self, key: &str) -> bool {
@@ -132,8 +179,12 @@ impl Controller {
                 self.add_log(format!("{name} is already running."), Hue::Gray);
             } else if !self.builds(&key) {
                 self.start_without_build(&key);
+            } else if self.build_only && self.building.as_ref().is_some_and(|job| job.key == key) {
+                self.add_log(format!("{name} is being built only (b) - press u once the build is done"), Hue::Gray);
             } else if self.building.as_ref().is_some_and(|job| job.key == key) {
                 self.add_log(format!("{name} is building right now."), Hue::Gray);
+            } else if self.build_queue.contains(&key) && self.build_only {
+                self.add_log(format!("{name} is being built only (b) - press u once the build is done"), Hue::Gray);
             } else if self.build_queue.contains(&key) {
                 self.add_log(format!("{name} builds and starts after the current build."), Hue::Gray);
             } else {
@@ -281,13 +332,14 @@ impl Controller {
                     self.built.push(key);
                 }
                 BuildStep::Failed => {
-                    self.build_queue.clear();
-                    self.built.clear();
-                    self.ready_pending.clear();
-                    self.add_log("APIs not started - fix the build and press U or R.", Hue::Yellow);
+                    self.build_failed();
                     return;
                 }
             }
+        }
+        if std::mem::take(&mut self.build_only) {
+            self.build_only_done();
+            return;
         }
         let apis = std::mem::take(&mut self.built);
         for key in &apis {
@@ -306,6 +358,31 @@ impl Controller {
         self.code.handled_up_to(self.code_at_start); // what the build picked up; edits saved since still count
     }
 
+    /// A build failed: the rest of the queue is dropped, and nothing starts.
+    fn build_failed(&mut self) {
+        self.build_queue.clear();
+        self.built.clear();
+        if std::mem::take(&mut self.build_only) {
+            // What b stopped left ready_pending then; anything else in it is getting ready on its own.
+            self.add_log("Fix the build and press b or B again - the apps stay stopped.", Hue::Yellow);
+        } else {
+            self.ready_pending.clear();
+            self.add_log("APIs not started - fix the build and press U or R.", Hue::Yellow);
+        }
+    }
+
+    /// b / B's builds are done: the apps stay stopped, and the next start skips their builds (nothing changed).
+    fn build_only_done(&mut self) {
+        let built = std::mem::take(&mut self.built);
+        if !built.is_empty() {
+            let starts = if built.len() == 1 { "u starts it" } else { "U starts them" };
+            let skips = self.setting("skipUnchangedBuilds") && self.fingerprint.is_some();
+            let again = if skips { " without building again" } else { "" };
+            self.add_log(format!("Build done - {starts}{again}"), Hue::Green);
+        }
+        self.code.handled_up_to(self.code_at_start);
+    }
+
     fn build_app(&mut self, key: &str) -> BuildStep {
         let app = self.app(key).expect("a known app").clone();
         let AppKind::Dotnet { project, .. } = &app.kind else { return BuildStep::Skipped };
@@ -313,10 +390,13 @@ impl Controller {
             && build::is_up_to_date(&self.state_dir, &self.root, key, project, self.fingerprint.as_deref());
         if !self.force_build && skip {
             self.add_log(
-                format!("✓ {} unchanged since its last build - skipped (b / B force a rebuild)", app.name),
+                format!("✓ {} unchanged since its last build - skipped (b / B force a full build)", app.name),
                 Hue::Green,
             );
             return BuildStep::Skipped;
+        }
+        if self.force_build {
+            build::remove_stamp(&self.state_dir, key);
         }
         let spec = tools::build_command(&self.root, project);
         let file = Path::new(project).file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
@@ -405,10 +485,7 @@ impl Controller {
             for error in errors.iter().take(MAX_BUILD_ERROR_LINES) {
                 self.add_log(format!("    {}", build::format_error(error)), Hue::Red);
             }
-            self.build_queue.clear();
-            self.built.clear();
-            self.ready_pending.clear();
-            self.add_log("APIs not started - fix the build and press U or R.", Hue::Yellow);
+            self.build_failed();
             return;
         }
         if let AppKind::Dotnet { project, .. } = &app.kind {
@@ -447,6 +524,7 @@ impl Controller {
             self.add_log(format!("■ {name} build cancelled"), Hue::Yellow);
             self.build_queue.clear();
             self.built.clear();
+            self.build_only = false;
             let keys = std::mem::take(&mut self.start_keys);
             self.stop(Some(&keys), true);
         }

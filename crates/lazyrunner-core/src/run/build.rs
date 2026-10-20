@@ -73,6 +73,11 @@ fn stamp_path(state: &Path, key: &str) -> PathBuf {
     state.join(format!("build-{key}.stamp.json"))
 }
 
+/// Forgets an app's last build (a forced build is under way: if it fails, its output can't be trusted).
+pub fn remove_stamp(state: &Path, key: &str) {
+    let _ = std::fs::remove_file(stamp_path(state, key));
+}
+
 /// Whether the last good build of `key` is of these sources and its output is untouched since.
 pub fn is_up_to_date(state: &Path, root: &Path, key: &str, project: &str, fingerprint: Option<&str>) -> bool {
     let Some(fingerprint) = fingerprint else { return false };

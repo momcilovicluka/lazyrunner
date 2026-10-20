@@ -9,7 +9,7 @@ scroll, search and zoom. One command instead of a row of terminal tabs.
  info: Microsoft.Hosting.Lifetime…  │ info: Microsoft.Hosting.Lifetime… │ Local: http://localh… │ Build complete. Watching…
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner  ● all up (4)   ⎇ main   DB shop @ localhost   C:\src\shop
- space start/stop  u/U start  s/S stop  r/R restart  b/B rebuild  d database  w open  x menu  / search  , settings  q quit
+ space start/stop  u/U start  s/S stop  r/R restart  b/B build  d database  w open  x menu  / search  , settings  q quit
  10:27:54 Ready in 9s
 ```
 
@@ -107,7 +107,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `u` / `U` | Start the focused app / start everything (builds first if the code changed) |
 | `s` / `S` | Stop the focused app (or cancel its build or `npm ci`) / stop everything, cancelling a running build |
 | `r` / `R` | Restart the focused app / everything (rebuild if anything changed) |
-| `b` / `B` | Rebuild the focused app / everything: restart with a full build, never skipped |
+| `b` / `B` | Build the focused app / every app that builds (but the ones `S` leaves running): a full build, never skipped, that leaves them **stopped** (a running one is stopped first - it locks its build output). `u` / `U` then start them without building again. npm apps have no separate build step |
 | `!` | Kill whatever holds a port the apps need (offered when a port is taken) |
 | `q` / `Ctrl+C` | Quit: stop everything, back to the prompt |
 
@@ -147,7 +147,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 |-----|---------|
 | `a` | Auto-restart when the git branch changes |
 | `u` | Auto-start when lazyrunner opens |
-| `s` | Stop/Restart all include the npm apps (off: `S` / `R` / `B` leave them running) |
+| `s` | Stop/Restart all include the npm apps (off: `S` / `R` leave them running) |
 | `e` | Restart the .NET apps when code changes: once saving in the watched folder has been quiet for 2 s, rebuild and restart the running ones (npm apps have their own watchers) |
 | `w` | Startup checklist when lazyrunner opens |
 | `r` | Run the startup checklist now (and check for an update) |
@@ -277,7 +277,8 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 ## Troubleshooting
 
 - **Build failed:** the column shows the errors and `o` opens the full log.
-- **A build was skipped but you want a clean one:** `b` (focused app) or `B` (everything).
+- **A build was skipped but you want a clean one:** `b` (focused app) or `B` (everything) builds in full; `u` / `U`
+  then start without building again.
 - **Port already in use:** something else runs the app (an IDE, say). The panel names the process; `!` kills it and
   starts.
 - **An app is quiet:** some apps log to other sinks than the console; the `● … ms` in the title shows it's up and

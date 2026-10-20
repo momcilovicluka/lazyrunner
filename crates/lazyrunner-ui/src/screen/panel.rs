@@ -76,7 +76,7 @@ fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
         ("u/U", "start"),
         ("s/S", "stop"),
         ("r/R", "restart"),
-        ("b/B", "rebuild"),
+        ("b/B", "build"),
         ("d", "database"),
         ("w", "open"),
         ("x", "menu"),
