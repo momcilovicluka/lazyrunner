@@ -16,53 +16,58 @@ scroll, search and zoom. One command instead of a row of terminal tabs.
 - **.NET apps** are built with `dotnet build` (one at a time, skipped when nothing changed) and run with their launch
   profile; the port comes from `launchSettings.json`.
 - **npm apps** run their dev server or watch build; which script runs can differ per branch.
-- Every app runs inside a Windows job object: `q`, or even closing the terminal, leaves nothing running.
+- Every app runs as a process tree lazyrunner owns (a job object on Windows, a process group on Linux and macOS): `q`,
+  or even closing the terminal, leaves nothing running.
 - What a project runs is described in a small JSON **profile** - in the repo (`.lazyrunner.json`) or in your own
   folder. `lazyrunner profile init` writes a first one for you.
 
-Windows only (job objects, Windows Terminal integration). Needs PowerShell 7.
+One binary for Windows, Linux and macOS; nothing else to install.
 
 ## Install
 
-1. **Get the folder:** clone this repo (or unzip it) anywhere, e.g. `Documents\PowerShell\Scripts\lazyrunner`.
-2. **Downloaded as a zip?** Windows blocks downloaded scripts; unblock them once, in that folder:
+**Windows** (PowerShell):
 
-   ```powershell
-   Get-ChildItem -Recurse | Unblock-File
-   ```
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/momcilovicluka/lazyrunner/releases/latest/download/lazyrunner-installer.ps1 | iex"
+```
 
-   If PowerShell refuses to run scripts at all: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
-3. **Run the installer**, ideally from your project's repo root (that project becomes the default when you run
-   lazyrunner elsewhere). Any PowerShell works: from Windows PowerShell 5.1 it installs PowerShell 7 with winget if
-   needed, then continues there.
+**macOS and Linux:**
 
-   ```powershell
-   cd C:\src\shop
-   & "$HOME\Documents\PowerShell\Scripts\lazyrunner\install.ps1"
-   ```
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/momcilovicluka/lazyrunner/releases/latest/download/lazyrunner-installer.sh | sh
+```
 
-   It checks for git, the .NET SDK and npm, writes `lazyrunner.config.json` next to `lazyrunner.ps1`, unblocks the
-   scripts, and adds the `lazyrunner` and `lr` aliases to your PowerShell profile. Optional switches: `-AutoStart off`,
-   `-AutoRestart on`, `-StopFrontend off`, `-Frontend off`, `-Notifications off`, `-StartupChecklist off`,
-   `-AutoUpdate off`, `-Theme dracula`.
-4. **Open a new terminal** and run `lazyrunner` (or `lr`) in your repo.
+Both put `lazyrunner` in `~/.local/bin` (on Windows `%USERPROFILE%\.local\bin`) and add it to your PATH. Or with a
+package manager:
+
+```sh
+brew install momcilovicluka/tap/lazyrunner                                      # Homebrew (macOS, Linux)
+scoop bucket add lazyrunner https://github.com/momcilovicluka/lazyrunner         # Scoop (Windows)
+scoop install lazyrunner/lazyrunner
+winget install momcilovicluka.lazyrunner                                         # winget (Windows)
+cargo install --locked --git https://github.com/momcilovicluka/lazyrunner lazyrunner   # from source
+```
+
+Then open a new terminal and run `lazyrunner` in your repo. A shorter name: add an alias of your own
+(`Set-Alias lr lazyrunner` in your PowerShell profile, `alias lr=lazyrunner` in your shell's).
 
 **Updating:** lazyrunner updates itself. When it opens, its startup checklist (or a quiet check when the checklist is
-off) looks at the release branch, installs a higher `VERSION`, reopens on it and shows what's new; `lazyrunner update`
-does the same on demand. A git clone fast-forwards, never over local changes or commits of your own; a folder from a
-zip is refreshed from a cached clone, and your `lazyrunner.config.json` and own files (themes) stay. `,` then `v` (or
-`"autoUpdate": false`) turns it off; `lazyrunner version` shows the version and where updates come from.
+off, in the background) asks the GitHub releases for the latest version, installs a higher one, reopens on it and shows
+what's new; `lazyrunner update` does the same on demand. Downloads come over HTTPS only, and the release's SHA-256
+catches a broken download. `,` then `v` (or `"autoUpdate": false`) turns it
+off; `lazyrunner version` shows the version and where updates come from. Installed with Homebrew, Scoop or winget,
+lazyrunner leaves updating to them (`brew upgrade`, `scoop update`, `winget upgrade`).
 
-**Requirements:** Windows, PowerShell 7+, git; the .NET SDK for .NET apps and Node.js / npm for npm apps (nvm-windows
-works). Any terminal works; Windows Terminal is best (tab colours and progress).
+**Requirements:** git; the .NET SDK for .NET apps and Node.js / npm for npm apps (nvm works). Any terminal works;
+Windows Terminal is best (tab colours and progress).
 
 ## Set up a project
 
 lazyrunner needs a profile that says what your project runs. In your repo:
 
-```powershell
+```sh
 lazyrunner profile init          # prints a first profile from what it finds: .NET projects with a launch profile, npm dev scripts
-lazyrunner profile init -Save    # writes it to .lazyrunner.json
+lazyrunner profile init --save   # writes it to .lazyrunner.json
 lazyrunner profile check         # checks it against the repo: projects, launch profiles, scripts, ports
 ```
 
@@ -81,11 +86,11 @@ A small one looks like this:
 }
 ```
 
-Commit `.lazyrunner.json` to share it with your team, or keep it in `%APPDATA%\lazyrunner\projects\` for yourself.
-The first time lazyrunner meets a repo's profile (and whenever it changes) it shows what it would run and asks you to
-trust it. [projects/README.md](projects/README.md) is the full guide: where lazyrunner looks, every field, recipes
-(watch builds served by an API, per-branch variants, a team's changes to a profile), and how to write a profile for
-any repo - written so an LLM can follow it too.
+Commit `.lazyrunner.json` to share it with your team, or keep it in your own profiles folder (`projects` in the
+settings folder, below) for yourself. The first time lazyrunner meets a repo's profile (and whenever it changes) it
+shows what it would run and asks you to trust it. [projects/README.md](projects/README.md) is the full guide: where
+lazyrunner looks, every field, recipes (watch builds served by an API, per-branch variants, a team's changes to a
+profile), and how to write a profile for any repo - written so an LLM can follow it too.
 
 ## Commands
 
@@ -95,13 +100,13 @@ lazyrunner start      the same, but always starts; if lazyrunner is open in anot
 lazyrunner stop       stop everything in the open lazyrunner (also cancels a running build)
 lazyrunner restart    stop, rebuild if anything changed, run again
 lazyrunner profile …  init / check a project profile (above)
-lazyrunner update     update lazyrunner now (asks for a git login if needed)
+lazyrunner update     update lazyrunner now (also when auto-update is off)
 lazyrunner version    the installed version, where updates come from, and what's new in it
 lazyrunner help
 ```
 
-`lazyrunner start` in another project's checkout while lazyrunner is open makes it reopen there, with that project's
-apps and settings.
+`lazyrunner start` in another checkout of the same project while lazyrunner is open switches it there; in another
+project's checkout it reopens there, with that project's apps and settings.
 
 ## Keys
 
@@ -157,7 +162,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `s` | Stop/Restart all include the npm apps (off: `S` / `R` / `B` leave them running) |
 | `e` | Restart the .NET apps when code changes: once saving in the watched folder has been quiet for 2 s, rebuild and restart the running ones (npm apps have their own watchers) |
 | `w` | Startup checklist when lazyrunner opens |
-| `r` | Run the startup checklist now |
+| `r` | Run the startup checklist now (and check for an update) |
 | `p` | Reload the project profile (reopens lazyrunner) |
 | `v` | Auto-update lazyrunner when it opens |
 | `c` | What's new: the changelog |
@@ -178,25 +183,27 @@ focused app's build or take it out of the queue, and `q`.
   .NET apps, and error / warning counters.
 - **Builds** show real progress: projects done out of those in the dependency graph (`23/41`), warnings counted
   instead of flooding the column.
-- **Log lines** are coloured by level, and every app's full output is saved to
-  `%LOCALAPPDATA%\lazyrunner\<project>\logs\<app>.log`, so `o` lets you search all of it.
-- **The terminal tab** title and progress show the overall state; **Windows notifications** cover a failed build, a
+- **Log lines** are coloured by level, and every app's full output is saved to `<project>/logs/<app>.log` in the
+  state folder (below), so `o` lets you search all of it.
+- **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
   crash, and a slow start finishing.
 - **After "Ready"**, the log shows a startup timeline per app.
 
 ## Startup checklist
 
-When lazyrunner opens, a short splash checks git, the .NET SDK and Node.js / npm, whether the apps' ports are free,
-whether the active database's server answers, each npm app's packages against its `package-lock.json`, and which
-project and branch it runs. Problems also go to the panel log. Turn it off with `,` then `w`.
+When lazyrunner opens, a short splash checks for a lazyrunner update, git, the .NET SDK and Node.js / npm, whether the
+apps' ports are free, whether the active database's server answers, each npm app's packages against its
+`package-lock.json`, and which project and branch it runs. Problems also go to the panel log. Turn it off with `,`
+then `w`.
 
 ## Database picker (`d`)
 
-.NET apps that use user secrets read their connection strings from `%APPDATA%\Microsoft\UserSecrets\<id>\secrets.json`.
-lazyrunner lists every SQL connection string there as `database @ server`, never showing passwords. Choosing one makes
-that line active and comments out (`//`) the others with the same key, checks the file is still valid JSON, keeps
-the previous version as `secrets.json.lazyrunner-backup`, and restarts the running .NET apps (no build needed). `n`
-adds an entry: a copy of the selected one with another database name.
+.NET apps that use user secrets read their connection strings from `secrets.json` in the user secrets folder
+(`%APPDATA%\Microsoft\UserSecrets\<id>\` on Windows, `~/.microsoft/usersecrets/<id>/` elsewhere). lazyrunner lists
+every SQL connection string there as `database @ server`, never showing passwords. Choosing one makes that line active
+and comments out (`//`) the others with the same key, checks the file is still valid JSON, keeps the previous version
+as `secrets.json.lazyrunner-backup`, and restarts the running .NET apps (no build needed). `n` adds an entry: a copy
+of the selected one with another database name.
 
 ## npm apps
 
@@ -207,15 +214,16 @@ Automatic restarts leave them alone, since `npm run` watches its own files - unl
 
 ## Themes
 
-`t` cycles through the themes in `themes\`: `default` (your terminal's own palette), `dark`, `light`,
-`high-contrast`, `dracula`, `nord`, `gruvbox`, `catppuccin-mocha`, `tokyo-night` and `solarized-light`. Some also
-recolour the terminal background while lazyrunner runs. Your own: copy a file to `themes\<id>.json` and change it; it
-shows up on the next `t`. [themes/README.md](themes/README.md) describes every field. `NO_COLOR` turns colour off.
+`t` cycles through the built-in themes: `default` (your terminal's own palette), `dark`, `light`, `high-contrast`,
+`dracula`, `nord`, `gruvbox`, `catppuccin-mocha`, `tokyo-night` and `solarized-light`. Some also recolour the terminal
+background while lazyrunner runs. Your own: copy one from [themes/](themes/) to `themes/<id>.json` in the settings
+folder and change it; it shows up on the next `t`. [themes/README.md](themes/README.md) describes every field.
+`NO_COLOR` turns colour off.
 
 ## Configuration
 
-`lazyrunner.config.json` sits next to `lazyrunner.ps1`; the installer creates it and git ignores it. The panel saves
-the `,` settings, the theme and column widths here. Settings that depend on the project live in its section:
+`lazyrunner.config.json` is in the settings folder; lazyrunner writes it when you change a setting. The panel saves the
+`,` settings, the theme and column widths there. Settings that depend on the project live in its section:
 
 ```json
 {
@@ -230,25 +238,32 @@ the `,` settings, the theme and column widths here. Settings that depend on the 
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `repoRoot` | | The project used when you run lazyrunner outside any project (set by the installer) |
+| `repoRoot` | | The project used when you run lazyrunner outside any project |
 | `autoStartOnOpen` | `true` | Build and start everything as soon as lazyrunner opens |
 | `autoRestartOnBranchChange` | `false` | Restart when the git branch changes |
 | `skipUnchangedBuilds` | `true` | Skip `dotnet build` when nothing in the watched folder changed since the last build |
 | `restartOnCodeChange` | `false` | Rebuild + restart the running .NET apps when code changes |
-| `notifications` | `true` | Windows notifications |
+| `notifications` | `true` | Desktop notifications |
 | `startupChecklist` | `true` | The startup checklist |
 | `panelLogLines` | `5` | How many recent events the panel shows |
-| `theme` | `default` | A file name from `themes\` without `.json` |
+| `theme` | `default` | A theme's id (a built-in one, or a file in `themes` without `.json`) |
 | `autoUpdate` | `true` | Install a newer lazyrunner when it opens |
-| `updateRepoUrl` / `updateBranch` | | Where updates come from on this machine, instead of `$UpdateRepo` in `lazyrunner.ps1` |
+| `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.columnWidths` | equal | Relative width per app key (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |
 | `projects.<id>.apps.<key>.includeInAll` | | `false` keeps that app running on Stop all / Restart all |
 | `projects.<id>.frontend` | `true` | `false` leaves out every npm app |
 | `projects.<id>.stopFrontendOnStop` | `true` | Stop/Restart all include the npm apps (`,` then `s`) |
 
-Runtime files live in `%LOCALAPPDATA%\lazyrunner`: `lazyrunner.log`, the trusted repo profiles, and a folder per
-project with its build logs and stamps, per-app logs and timings.
+**Where things live:**
+
+| | Settings (`lazyrunner.config.json`, `projects/`, `themes/`) | State (`lazyrunner.log`, trusted profiles, per-project logs and timings) |
+|---|---|---|
+| Windows | `%APPDATA%\lazyrunner` | `%LOCALAPPDATA%\lazyrunner` |
+| macOS | `~/Library/Application Support/lazyrunner` | `~/Library/Application Support/lazyrunner/state` |
+| Linux | `~/.config/lazyrunner` | `~/.local/state/lazyrunner` |
+
+`LAZYRUNNER_CONFIG_PATH`, `LAZYRUNNER_PROFILES_DIR` and `LAZYRUNNER_STATE_DIR` replace them.
 
 ## Troubleshooting
 
@@ -263,18 +278,47 @@ project with its build logs and stamps, per-app logs and timings.
 
 ## Development
 
-lazyrunner is plain PowerShell 7: `lazyrunner.ps1` and the libraries in `lib\` (`lib\apptypes.ps1` is what a .NET or
-an npm app is). The tests are plain scripts too; [tests/README.md](tests/README.md) lists them.
+lazyrunner is Rust ([Ratatui](https://ratatui.rs)), in `crates/`: `lazyrunner-core` (profiles, settings, apps,
+processes, output, the self-update), `lazyrunner-ui` (the terminal UI) and `lazyrunner` (the binary).
+[docs/parity.md](docs/parity.md) lists everything it does against the PowerShell version (0.1), which it replaces.
+
+```
+cargo run --release                                   # run the project in this folder
+cargo run -- profile check                            # check the profile that applies here
+cargo run --release -- spike --bench 20               # the look-and-feel spike: 20 s of 5 apps x 2000 lines/s, then fps, CPU, memory
+cargo test --workspace                                # unit tests, snapshots of every screen, end-to-end tests
+cargo insta review                                    # look at changed screen snapshots
+LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference   # rewrite the guide's field reference
+dist plan                                             # what a release would build (cargo-dist)
+```
+
+The end-to-end tests run the sample repo with real dotnet, npm and node (skipped without them), and update an installed
+copy of lazyrunner from a local stand-in for GitHub Releases.
 
 ### Releasing
 
-Installs update from `$UpdateRepo` in `lazyrunner.ps1` (the repo URL and its release branch; empty means no updates).
-A release is a higher `VERSION` on that branch - pushing without bumping it updates nobody:
+A release is a tag: pushing `v1.2.3` builds every platform, publishes the GitHub release with its installers, and
+updates the Homebrew tap, the Scoop manifest (`bucket/`) and the winget package (`.github/workflows/release.yml`,
+made by cargo-dist from `dist-workspace.toml`). Installs pick it up the next time they open.
 
-1. Add a section on top of [CHANGELOG.md](CHANGELOG.md): `## [0.2.0] - 2026-10-20` and what changed, under
+1. Add a section on top of [CHANGELOG.md](CHANGELOG.md): `## [0.2.1] - 2026-11-02` and what changed, under
    `### Added` / `### Changed` / `### Fixed`. Installs show it after they update.
-2. Bump `VERSION` (semantic versioning: a new feature 0.2.0, a fix 0.1.1).
-3. Run the tests, commit, and push the branch. Every install picks it up the next time it opens.
+2. Bump `version` under `[workspace.package]` in `Cargo.toml` (semantic versioning: a new feature 0.3.0, a fix 0.2.1).
+3. Run the tests and `dist plan`, commit, then tag and push:
+
+   ```sh
+   git tag v0.2.1
+   git push origin main v0.2.1
+   ```
+
+Once, before the first release:
+
+- The repo is public: the installers and the self-update download from its releases without signing in.
+- A `homebrew-tap` repo next to this one, and a `HOMEBREW_TAP_TOKEN` secret here that can push to it.
+- For winget: a fork of `microsoft/winget-pkgs`, the first version submitted by hand
+  (`wingetcreate new <the x86_64 .zip URL>`), and a `WINGET_TOKEN` secret (a classic token with `public_repo`).
+  Without the secret the release skips winget.
+- `main` lets GitHub Actions push (the Scoop manifest is committed there after each release).
 
 ## License
 

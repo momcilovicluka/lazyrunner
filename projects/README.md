@@ -20,9 +20,10 @@ using `lazyrunner profile init` and `lazyrunner profile check` (below).
 
    With `extends`, each top-level field replaces the base profile's, and `apps` merge by `key`: an app's fields
    replace that app's, a new key adds an app at the end.
-2. **Your profiles**, `%APPDATA%\lazyrunner\projects\<id>.json`: for projects whose repo has no profile, without
-   committing anything there. One with the id of a bundled profile replaces it.
-3. **The bundled ones**, `projects\<id>.json` next to `lazyrunner.ps1`, matched by their `detect.anyFile`.
+2. **Your profiles**, `projects/<id>.json` in lazyrunner's settings folder (`%APPDATA%\lazyrunner` on Windows,
+   `~/.config/lazyrunner` on Linux, `~/Library/Application Support/lazyrunner` on macOS): for projects whose repo has
+   no profile, without committing anything there. One with the id of a bundled profile replaces it.
+3. **The bundled ones**, `projects/<id>.json` next to the lazyrunner binary, matched by their `detect.anyFile`.
 
 The first folder where one of these matches is the repo root. Outside any project, `repoRoot` from
 `lazyrunner.config.json` is used.
@@ -75,7 +76,7 @@ needs `"detect": { "anyFile": ["Shop.sln"] }`: a file only this repo has.)
 `profile.schema.json` is the source of these tables; editors that read `$schema` (VS Code does) check a profile and
 complete it as you type. Paths are relative to the repo root; `/` and `\` both work.
 
-<!-- reference: made from profile.schema.json by projects\Update-Reference.ps1 - change the schema, not this -->
+<!-- reference: made from profile.schema.json (LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference) - change the schema, not this -->
 
 #### The profile
 
@@ -200,7 +201,7 @@ and app types other than `dotnet` and `npm`.
 
 The same steps for a person and for an LLM. Each says what to look for and which field it fills.
 
-1. **Start from `lazyrunner profile init`** in the repo. It prints a first profile from what it finds (`-Save` writes it to
+1. **Start from `lazyrunner profile init`** in the repo. It prints a first profile from what it finds (`--save` writes it to
    `.lazyrunner.json`), with notes on what it guessed and what it left out. The steps below check and complete it; if
    init finds nothing or fails, they are all you need.
 2. **.NET apps** - `*.csproj` files with a `Properties/launchSettings.json`:
@@ -245,7 +246,7 @@ The same steps for a person and for an LLM. Each says what to look for and which
 ```
 lazyrunner profile check                    the profile lazyrunner uses here
 lazyrunner profile check path\to\file.json  a given file (a draft, or one from your profiles folder)
-lazyrunner profile check -Json              the same, as JSON for tools: { file, source, root, ok, problems: [{ level, at, message }] }
+lazyrunner profile check --json             the same, as JSON for tools: { file, source, root, ok, problems: [{ level, at, message }] }
 ```
 
 Which checkout: a `.lazyrunner.json` is checked against its own folder; another file with `detect` against the checkout

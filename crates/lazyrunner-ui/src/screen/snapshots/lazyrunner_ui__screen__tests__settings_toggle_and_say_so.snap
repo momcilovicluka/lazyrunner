@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+
+
+
+
+                     ┌─ Settings (saved) ───────────────────────────────────────────────┐
+                     │  a      [ ] Auto-restart on branch change                        │
+                     │  u      [x] Auto-start when lazyrunner opens                     │
+                     │  s      [x] Stop/Restart all include the frontend                │
+                     │  e      [ ] Restart the APIs when code changes                   │
+                     │  w      [x] Startup checklist when lazyrunner opens              │
+                     │  v      [x] Auto-update lazyrunner when it opens                 │
+                     │  r      Run the startup checklist now (and check for an update)  │
+                     │  c      What's new: the lazyrunner changelog                     │
+                     │  p      Reload the project profile                               │
+                     │ press a letter to toggle, or j k + Enter · Esc / , close         │
+                     └──────────────────────────────────────────────────────────────────┘
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B rebuild
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update

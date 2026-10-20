@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ▸ ◆ Orders  :58201  ○ stopp┳ ■ Billing  :58202 ┬ ■ Shop  :58301  ○ ┬ ■ Docs   ○ stopped┬ ■ Console  :58303  ○
+                            ┃                   │   dev server · dev│   watch build · wa│   live · dev
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+                            ┃                   │                   │                   │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B rebuild
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update

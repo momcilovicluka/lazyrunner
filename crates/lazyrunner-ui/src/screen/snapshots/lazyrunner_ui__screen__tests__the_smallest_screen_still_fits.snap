@@ -1,0 +1,16 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: "screen.render(60, 15)"
+---
+ ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop  :58┬ ■ Docs   ○ ┬ ■ Conso
+────────────────────────────────────────────────────────────
+ lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ l
+ ? keys   : commands   space start/stop   u/U start
+ , settings   a [ ] auto-restart on branch change
+              u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend
+              e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update
+
+ 12:00:00 Starting Orders + Billing
+ 12:00:00 ✓ Orders is up (3.2 s)

@@ -1,0 +1,5 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: "screen.render(50, 10)"
+---
+ lazyrunner: make the terminal a bit bigger (60x15

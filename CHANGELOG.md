@@ -3,6 +3,21 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.2.0] - 2026-10-20
+
+lazyrunner is now one native binary for Windows, Linux and macOS, with the same profiles, keys and screen.
+
+### Added
+- Linux and macOS: apps run in process groups, and nothing lazyrunner started outlives it, even when it crashes
+- Install with one command (`irm …lazyrunner-installer.ps1 | iex` on Windows, `curl …lazyrunner-installer.sh | sh` elsewhere), or with Homebrew, Scoop, winget or `cargo install`
+- Smoother and lighter: 60 frames a second under heavy output at a fraction of the CPU and memory, and nothing redrawn while nothing changes
+- The startup checklist shows the update's download progress; any key skips the checks still running
+
+### Changed
+- Updates come from GitHub Releases: the binary for your platform, checked against its SHA-256, replaces the running one, and lazyrunner reopens on it; installed with Homebrew, Scoop or winget, they update it instead
+- Settings and your profiles live in the OS's settings folder (`%APPDATA%\lazyrunner`, `~/.config/lazyrunner`, `~/Library/Application Support/lazyrunner`), with `themes` for your own themes; the built-in themes and the changelog are part of the binary
+- `updateRepoUrl` takes a GitHub repo; `updateBranch` is gone
+
 ## [0.1.0] - 2026-10-15
 
 The first release.

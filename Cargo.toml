@@ -1,0 +1,39 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
+license-file = "LICENSE"
+repository = "https://github.com/momcilovicluka/lazyrunner"
+publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# Debug builds keep line numbers for backtraces, not full debug info: a binary a fraction of the size, quicker
+# to link, copy and scan (the update tests copy it around).
+[profile.dev]
+debug = "line-tables-only"
+[profile.dev.package."*"]
+debug = false
+
+# The self-update hashes and unpacks the whole binary: fast enough in debug builds (the tests) too.
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.zip]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.zlib-rs]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

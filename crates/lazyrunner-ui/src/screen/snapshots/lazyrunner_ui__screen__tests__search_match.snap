@@ -1,0 +1,33 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ▸ ◆ Orders  :58201  ┳ ■ Billing  :58202  ○┬ ■ Shop  :58301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :58303  ○
+                     ┃                     │   dev server · dev  │   watch build · watc│   live · dev
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+info: Microsoft.Hosti┃                     │                     │                     │
+ng.Lifetime[14]      ┃                     │                     │                     │
+      Now listening o┃                     │                     │                     │
+n: http://localhost:5┃                     │                     │                     │
+8201                 ┃                     │                     │                     │
+warn: an error happen┃                     │                     │                     │
+ed once              ┃Building...          │                     │                     │
+info: Application sta┃error: Billing.cs(3,1│                     │                     │
+rted.                ┃): something is off  │                     │                     │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B rebuild
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update
+ /error   match 1 of 1 (1 = newest) · n older · N newer · Esc clears
+ 12:00:00 Starting Orders + Billing
+ 12:00:00 ✓ Orders is up (3.2 s)
