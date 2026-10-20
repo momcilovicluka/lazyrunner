@@ -14,6 +14,7 @@ use lazyrunner_core::profile::{self, Project, REPO_PROFILE_FILE, trust};
 use lazyrunner_core::run::child::Guard;
 use lazyrunner_ui::project_run::{ProjectOptions, ProjectRun, run_project};
 use lazyrunner_ui::run::Surface;
+use lazyrunner_ui::screen::Exit;
 use lazyrunner_ui::theme::ColorMode;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -33,18 +34,21 @@ fn runtime() -> Result<tokio::runtime::Runtime> {
     Ok(tokio::runtime::Builder::new_multi_thread().enable_all().build()?)
 }
 
-/// Asks the open lazyrunner to do `action`; false when none is open.
-fn send_to_open(paths: &Paths, action: &str) -> bool {
+/// Asks the open lazyrunner to do `action` (on `root`: another worktree switches, another project reopens);
+/// false when none is open.
+fn send_to_open(paths: &Paths, action: &str, root: Option<&Path>) -> bool {
     let Ok(runtime) = runtime() else { return false };
-    runtime
-        .block_on(ipc::request(&control_name(paths), &json!({ "action": action })))
-        .is_ok_and(|answer| answer["ok"] == true)
+    let mut request = json!({ "action": action });
+    if let Some(root) = root {
+        request["root"] = json!(root.display().to_string());
+    }
+    runtime.block_on(ipc::request(&control_name(paths), &request)).is_ok_and(|answer| answer["ok"] == true)
 }
 
 /// `lazyrunner stop` and `lazyrunner restart`.
 pub fn send(action: &str) -> Result<()> {
     let paths = Paths::from_env(&install_dir());
-    if send_to_open(&paths, action) {
+    if send_to_open(&paths, action, None) {
         println!("lazyrunner is open in another terminal - sent it '{action}'.");
     } else {
         println!("lazyrunner is not running.");
@@ -85,18 +89,10 @@ fn find_project(paths: &Paths) -> Result<Project> {
 pub fn start(explicit: bool) -> Result<()> {
     let paths = Paths::from_env(&install_dir());
     let project = find_project(&paths)?;
-    let store = paths.trust_store();
-    let mut ask = |prompt: &str| -> String {
-        print!("{prompt} ");
-        let _ = io::stdout().flush();
-        let mut answer = String::new();
-        let _ = io::stdin().lock().read_line(&mut answer);
-        answer
-    };
-    if !trust::confirm(&project, &store, &mut io::stdout(), &mut ask)? {
+    if !confirm_trust(&project, &paths)? {
         std::process::exit(1);
     }
-    if send_to_open(&paths, "start") {
+    if send_to_open(&paths, "start", project.root.as_deref()) {
         println!("lazyrunner is open in another terminal - sent it 'start'.");
         return Ok(());
     }
@@ -106,6 +102,28 @@ pub fn start(explicit: bool) -> Result<()> {
     let config = ConfigFile::new(&paths.config_file).load(Some(&project.id));
     let start_now = explicit || json::truthy(json::field(&config, "autoStartOnOpen"));
     run(project, paths, None, start_now)
+}
+
+/// The trust question on the terminal (answered already when the profile is trusted as it is).
+fn confirm_trust(project: &Project, paths: &Paths) -> Result<bool> {
+    let mut ask = |prompt: &str| -> String {
+        print!("{prompt} ");
+        let _ = io::stdout().flush();
+        let mut answer = String::new();
+        let _ = io::stdin().lock().read_line(&mut answer);
+        answer
+    };
+    Ok(trust::confirm(project, &paths.trust_store(), &mut io::stdout(), &mut ask)?)
+}
+
+/// The project lazyrunner reopens on (`interactive`: the trust question may be asked; else it has to be trusted).
+fn reopen_project(root: &Path, paths: &Paths, interactive: bool) -> Result<Option<Project>> {
+    let found = profile::find_project_profile(root, &paths.profiles)?
+        .ok_or_else(|| anyhow!("lazyrunner: {} is not a project (no profile matches it).", root.display()))?;
+    let project = profile::resolve(&found, &paths.profiles)?;
+    let trusted =
+        if interactive { confirm_trust(&project, paths)? } else { trust::is_trusted(&project, &paths.trust_store()) };
+    Ok(trusted.then_some(project))
 }
 
 /// The hidden `lazyrunner run --root <dir>` the tests use: no trust question (an untrusted repo profile is an
@@ -125,6 +143,7 @@ fn run(project: Project, paths: Paths, ipc: Option<String>, start_now: bool) -> 
     run_with(project, paths, None, ipc, start_now)
 }
 
+/// Runs the project, and again each time it asks to be reopened (another project, or its profile reloaded).
 fn run_with(
     project: Project,
     paths: Paths,
@@ -132,6 +151,33 @@ fn run_with(
     ipc: Option<String>,
     start_now: bool,
 ) -> Result<()> {
+    let (mut project, mut start_now, mut notes) = (project, start_now, Vec::new());
+    loop {
+        match run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes)? {
+            Exit::Quit => return Ok(()),
+            Exit::Reopen { root, start } => {
+                start_now = start;
+                notes = Vec::new();
+                match reopen_project(&root, &paths, headless.is_none()) {
+                    Ok(Some(next)) => project = next,
+                    Ok(None) => notes.push(format!("{} isn't trusted - kept {}.", root.display(), project.name)),
+                    Err(error) => {
+                        notes.push(format!("✗ Couldn't reopen {}: {error:#} - kept {}.", root.display(), project.name))
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn run_once(
+    project: Project,
+    paths: Paths,
+    headless: Option<(u16, u16)>,
+    ipc: Option<String>,
+    start_now: bool,
+    notes: Vec<String>,
+) -> Result<Exit> {
     let root = project.root.clone().unwrap_or_else(|| PathBuf::from("."));
     let exe = std::env::current_exe().context("can't find lazyrunner's own path")?;
     let guard = match Guard::start(&exe) {
@@ -151,6 +197,7 @@ fn run_with(
         colors: ColorMode::detect(),
         headless: headless.is_some(),
         start_now,
+        notes,
     };
     let run = ProjectRun { project, root, paths, guard };
     let runtime = runtime()?;

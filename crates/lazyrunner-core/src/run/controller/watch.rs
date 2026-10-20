@@ -25,6 +25,8 @@ const BRANCH_SETTLE: Duration = Duration::from_secs(3);
 const CODE_SETTLE: Duration = Duration::from_secs(2);
 const TIMELINE_WIDTH: usize = 24;
 const CELEBRATE_FOR: Duration = Duration::from_secs(4);
+/// A start that took this long gets a notification when it's ready.
+const NOTIFY_READY_AFTER: Duration = Duration::from_secs(20);
 
 /// Saved sources not acted on yet.
 #[derive(Debug, Default)]
@@ -152,6 +154,7 @@ impl Controller {
         state.flash_until = Some(now + Duration::from_secs(3));
         let name = self.apps[index].name.clone();
         self.add_log(format!("✗ {name} exited unexpectedly (code {code_text}) - see its column"), Hue::Red);
+        self.notifications.push((format!("{name} stopped unexpectedly"), format!("Exit code {code_text}")));
         self.ready_pending.clear();
         self.update_metric_roots();
     }
@@ -216,6 +219,11 @@ impl Controller {
         self.add_log(format!("Ready in {}", format_duration(seconds)), Hue::Green);
         self.write_timeline(&pending, seconds);
         self.celebrate = Some((format!("ready in {}", format_duration(seconds)), now + CELEBRATE_FOR));
+        if seconds >= NOTIFY_READY_AFTER.as_secs_f64() {
+            let names = self.names(&pending);
+            let title = format!("{} is ready", self.project.name);
+            self.notifications.push((title, format!("{names} up in {}", format_duration(seconds))));
+        }
     }
 
     /// After "Ready": one line per app, █ building, ▒ starting, · up, over the whole start.
@@ -441,7 +449,13 @@ impl Controller {
             return;
         }
         self.refresh_db_label();
-        self.add_log(format!("Database: {}", entry.label), Hue::Cyan);
+        self.add_log(
+            format!(
+                "Database → {}  ({}; previous file saved as secrets.json.lazyrunner-backup)",
+                entry.label, entry.key
+            ),
+            Hue::Cyan,
+        );
         let running: Vec<String> = self
             .apps
             .iter()

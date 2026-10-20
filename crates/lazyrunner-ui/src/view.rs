@@ -262,6 +262,7 @@ pub fn hue_color(hue: Hue, palette: &Palette) -> Color {
         Hue::DarkYellow => lerp(palette.yellow, palette.bg, 0.35),
         Hue::Red => palette.red,
         Hue::Magenta => palette.magenta,
+        Hue::White => palette.glint,
     }
 }
 

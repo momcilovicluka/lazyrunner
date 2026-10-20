@@ -1,0 +1,247 @@
+//! One list of every panel action. It drives the single-key shortcuts, the : command palette, the x menu and the
+//! ? key reference, so they never drift apart. Keys follow vim and lazygit and are case-sensitive: lowercase acts on
+//! the focused column, uppercase on every app. Safe actions also work while a build runs.
+
+use lazyrunner_core::run::Controller;
+
+use super::Ui;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Run {
+    Toggle,
+    StartFocused,
+    StopFocused,
+    RestartFocused,
+    RebuildFocused,
+    StartAll,
+    StopAll,
+    RestartAll,
+    RebuildAll,
+    KillPortUser,
+    Quit,
+    Database,
+    NpmCi,
+    OpenFocused,
+    OpenAll,
+    OpenLog,
+    Menu,
+    Search,
+    Zoom,
+    Widen,
+    Narrow,
+    EqualWidths,
+    Clear,
+    Theme,
+    Settings,
+    Help,
+    Palette,
+    Setting { name: &'static str, label: &'static str },
+    Checklist,
+    Changelog,
+    ReloadProfile,
+}
+
+#[derive(Clone, Debug)]
+pub struct Action {
+    pub group: &'static str,
+    pub key: String,
+    pub alt: Vec<&'static str>,
+    pub label: String,
+    pub hint: String,
+    pub run: Run,
+    pub safe: bool,
+    pub focused: bool,
+}
+
+fn action(group: &'static str, key: &str, label: &str, hint: &str, run: Run) -> Action {
+    Action {
+        group,
+        key: key.into(),
+        alt: Vec::new(),
+        label: label.into(),
+        hint: hint.into(),
+        run,
+        safe: false,
+        focused: false,
+    }
+}
+
+impl Action {
+    fn safe(mut self) -> Self {
+        self.safe = true;
+        self
+    }
+    fn focused(mut self) -> Self {
+        self.focused = true;
+        self
+    }
+    fn alt(mut self, keys: &[&'static str]) -> Self {
+        self.alt = keys.to_vec();
+        self
+    }
+}
+
+/// Every action shown now (some only when they apply).
+pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
+    let installs = controller.apps.iter().any(|app| app.traits().installs);
+    let mut list = vec![
+        action("Run", "Space", "Start / stop the focused app", "whichever it is not", Run::Toggle).safe().focused(),
+        action("Run", "u", "Start the focused app", "builds it first if it changed", Run::StartFocused)
+            .safe()
+            .focused(),
+        action("Run", "s", "Stop the focused app", "or cancel its build / npm ci", Run::StopFocused).safe().focused(),
+        action("Run", "r", "Restart the focused app", "rebuild if it changed", Run::RestartFocused).focused(),
+        action("Run", "b", "Rebuild the focused app", "restart with a full build", Run::RebuildFocused).focused(),
+        action("Run", "U", "Start all", "build if needed, start whatever is stopped", Run::StartAll),
+        action("Run", "S", "Stop all", "also cancels a running build", Run::StopAll),
+        action("Run", "R", "Restart all", "rebuild if anything changed", Run::RestartAll),
+        action("Run", "B", "Rebuild all", "restart with a full build, never skipped", Run::RebuildAll),
+    ];
+    if !controller.conflicts.is_empty() {
+        list.push(action("Run", "!", "Kill whatever holds a needed port", "", Run::KillPortUser));
+    }
+    list.push(action("Run", "q", "Quit", "stop everything and exit", Run::Quit).alt(&["Q"]));
+    list.push(action("Tools", "d", "Switch database", "connection strings in secrets.json", Run::Database).safe());
+    if installs {
+        list.push(
+            action("Tools", "i", "npm ci (reinstall packages)", "the focused npm app's, in the background", Run::NpmCi)
+                .safe(),
+        );
+    }
+    list.extend([
+        action("Tools", "w", "Open the focused app in the browser", "Swagger for an API", Run::OpenFocused)
+            .safe()
+            .focused(),
+        action("Tools", "W", "Open everything in the browser", "every Swagger and npm app", Run::OpenAll).safe(),
+        action("Tools", "o", "Open the focused app's log file", "its full output", Run::OpenLog).safe().focused(),
+        action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
+        action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
+        action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),
+        action("View", ">", "Widen the focused column", "", Run::Widen).safe(),
+        action("View", "<", "Narrow the focused column", "", Run::Narrow).safe(),
+        action("View", "=", "Equal column widths", "", Run::EqualWidths).safe(),
+        action("View", "Ctrl+L", "Clear output", "", Run::Clear).safe(),
+        action(
+            "View",
+            "t",
+            &format!("Theme: {} → next", ui.theme.name),
+            &format!("{} themes - add your own .json", ui.themes.len()),
+            Run::Theme,
+        )
+        .safe(),
+        action(
+            "Help",
+            ",",
+            "Settings (a u s e w toggles, r checklist)",
+            "auto-restart, auto-start, checklist…",
+            Run::Settings,
+        )
+        .safe(),
+        action("Help", "?", "Key reference", "", Run::Help).safe(),
+        action("Help", ":", "Command palette", "also Ctrl+P", Run::Palette).safe().alt(&["Ctrl+P"]),
+    ]);
+    list
+}
+
+/// The on/off settings and the checklist, in the , menu.
+pub fn settings(controller: &Controller) -> Vec<Action> {
+    let check = |name: &str| if controller.setting(name) { "[x] " } else { "[ ] " };
+    let toggle = |key: &str, name: &'static str, label: &'static str| {
+        action("Settings", key, &format!("{}{label}", check(name)), "", Run::Setting { name, label }).safe()
+    };
+    let mut list = vec![
+        toggle("a", "autoRestartOnBranchChange", "Auto-restart on branch change"),
+        toggle("u", "autoStartOnOpen", "Auto-start when lazyrunner opens"),
+    ];
+    if controller.apps.iter().any(|app| app.traits().frontend) {
+        list.push(toggle("s", "stopFrontendOnStop", "Stop/Restart all include the frontend"));
+    }
+    list.extend([
+        toggle("e", "restartOnCodeChange", "Restart the APIs when code changes"),
+        toggle("w", "startupChecklist", "Startup checklist when lazyrunner opens"),
+        toggle("v", "autoUpdate", "Auto-update lazyrunner when it opens"),
+        action("Settings", "r", "Run the startup checklist now (and check for an update)", "", Run::Checklist),
+        action("Settings", "c", "What's new: the lazyrunner changelog", "", Run::Changelog).safe(),
+    ]);
+    let changed = if controller.profile_changed { " (this branch changed it)" } else { "" };
+    list.push(action("Settings", "p", &format!("Reload the project profile{changed}"), "", Run::ReloadProfile));
+    list
+}
+
+/// The action a key runs.
+pub fn find(ui: &Ui, controller: &Controller, name: &str) -> Option<Action> {
+    actions(ui, controller).into_iter().find(|action| action.key == name || action.alt.contains(&name))
+}
+
+/// The x menu: the actions for the focused app (and npm ci for an npm app).
+pub fn menu(ui: &Ui, controller: &Controller) -> Vec<Action> {
+    let all = actions(ui, controller);
+    let mut items: Vec<Action> = all.iter().filter(|action| action.focused).cloned().collect();
+    let focused_installs = controller.apps.get(ui.focus).is_some_and(|app| app.traits().installs);
+    if focused_installs && let Some(npm) = all.iter().find(|action| action.key == "i") {
+        items.push(npm.clone());
+    }
+    items
+}
+
+/// Fuzzy subsequence match: every typed character in order; consecutive and word-start hits score higher.
+pub fn fuzzy_score(query: &str, text: &str) -> u32 {
+    let text: Vec<char> = text.to_lowercase().chars().collect();
+    let mut score = 0;
+    let mut from = 0;
+    let mut previous: Option<usize> = None;
+    for c in query.to_lowercase().chars().filter(|c| *c != ' ') {
+        let Some(found) = text[from.min(text.len())..].iter().position(|t| *t == c).map(|at| at + from) else {
+            return 0;
+        };
+        score += 1;
+        if previous.is_some_and(|previous| found == previous + 1) {
+            score += 3;
+        }
+        if found == 0 || matches!(text[found - 1], ' ' | '-' | '/' | '(' | '[' | '\\') {
+            score += 2;
+        }
+        previous = Some(found);
+        from = found + 1;
+    }
+    score
+}
+
+/// Every action plus the settings (as ", a" and so on), best matches first.
+pub fn palette(ui: &Ui, controller: &Controller, query: &str) -> Vec<Action> {
+    let mut all: Vec<Action> = actions(ui, controller).into_iter().filter(|action| action.key != ":").collect();
+    all.extend(settings(controller).into_iter().map(|mut setting| {
+        setting.key = format!(", {}", setting.key);
+        setting
+    }));
+    if query.trim().is_empty() {
+        return all;
+    }
+    let mut scored: Vec<(u32, Action)> = all
+        .into_iter()
+        .filter_map(|action| {
+            let label = fuzzy_score(query, &action.label);
+            let score = if label > 0 {
+                label + 10
+            } else {
+                fuzzy_score(query, &format!("{} {} {} {}", action.label, action.group, action.hint, action.key))
+            };
+            (score > 0).then_some((score, action))
+        })
+        .collect();
+    scored.sort_by_key(|(score, _)| std::cmp::Reverse(*score)); // stable: ties keep the list's order
+    scored.into_iter().map(|(_, action)| action).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fuzzy_matching_prefers_word_starts_and_runs() {
+        assert_eq!(fuzzy_score("xyz", "Stop all"), 0);
+        assert!(fuzzy_score("sa", "Stop all") > 0);
+        assert!(fuzzy_score("sto", "Stop all") > fuzzy_score("sto", "restore"));
+        assert!(fuzzy_score("db", "Switch database") > 0);
+    }
+}

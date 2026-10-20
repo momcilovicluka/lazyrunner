@@ -86,6 +86,7 @@ impl Controller {
         self.action_started = Some((self.now)());
         self.timeline.clear();
         self.ready_pending.clear();
+        self.last_build_failed = false;
 
         let direct: Vec<String> = keys.iter().filter(|key| !self.builds(key)).cloned().collect();
         for key in &direct {
@@ -109,7 +110,7 @@ impl Controller {
         }
     }
 
-    fn builds(&self, key: &str) -> bool {
+    pub fn builds(&self, key: &str) -> bool {
         self.app(key).is_some_and(|app| app.traits().builds)
     }
 
@@ -383,6 +384,9 @@ impl Controller {
             self.pane(key, &format!("✗ build failed after {whole}s"), Hue::Red);
             let errors = build::errors(&job.lines);
             self.last_failed_log = Some(log);
+            self.last_build_failed = true;
+            self.notifications
+                .push((format!("{} build failed", app.name), format!("{} errors - see lazyrunner", errors.len())));
             self.add_log(
                 format!("✗ {} build failed after {whole}s ({} errors) - o opens the full log", app.name, errors.len()),
                 Hue::Red,
@@ -411,6 +415,11 @@ impl Controller {
 
     /// Cancels the running build: `drop_only` (s on that app) takes just it out of the start; otherwise the whole
     /// start stops.
+    /// S while building: cancels the build and quietly stops what this start already started.
+    pub fn cancel_start(&mut self) {
+        self.cancel_build(false);
+    }
+
     pub(super) fn cancel_build(&mut self, drop_only: bool) {
         let Some(job) = self.building.take() else { return };
         job.child.kill();
@@ -463,8 +472,23 @@ impl Controller {
         Some(Sha256::digest(text.replace("\r\n", "\n").as_bytes()).iter().map(|b| format!("{b:02X}")).collect())
     }
 
+    /// The npm apps whose package-lock.json changed since their last npm ci (the panel offers i).
+    pub fn lock_changed_keys(&self) -> &[String] {
+        &self.lock_changed
+    }
+
+    /// Whether an npm app's packages match its package-lock.json as lazyrunner's last npm ci installed it (`None`:
+    /// no npm ci from lazyrunner in this checkout to compare with).
+    pub fn lock_in_sync(&self, key: &str) -> Option<bool> {
+        let stamp = crate::json::read(&self.npm_ci_stamp(key))?;
+        if crate::json::text(&stamp["root"]) != self.root.display().to_string() {
+            return None;
+        }
+        Some(self.lock_hash(key).is_some_and(|hash| crate::json::text(&stamp["lockHash"]) == hash))
+    }
+
     /// The npm apps whose package-lock.json differs from the one their last npm ci installed (said once per change).
-    pub(super) fn test_lock_changed(&mut self) {
+    pub fn test_lock_changed(&mut self) {
         let mut changed = Vec::new();
         for app in self.apps.clone().iter().filter(|app| app.traits().installs) {
             let stamp = crate::json::read(&self.npm_ci_stamp(&app.key));
@@ -548,7 +572,9 @@ impl Controller {
 
     /// Which app i installs: one whose lock file changed (the focused one if it is among them), else the focused
     /// one, else one whose node_modules is missing, else the first.
-    fn npm_ci_key(&self, focused: Option<&str>) -> Option<String> {
+    /// The app i reinstalls: one whose package-lock.json changed (the focused one first), else the focused npm app,
+    /// else one without node_modules, else the first.
+    pub fn npm_ci_key(&self, focused: Option<&str>) -> Option<String> {
         let keys: Vec<String> =
             self.apps.iter().filter(|app| app.traits().installs).map(|app| app.key.clone()).collect();
         if !self.lock_changed.is_empty() {
@@ -614,6 +640,7 @@ impl Controller {
             }
             NpmCiEnd::Failed => {
                 self.last_failed_log = Some(log);
+                self.notifications.push(("npm ci failed".into(), format!("See the {name} column in lazyrunner")));
                 self.pane(&key, &format!("✗ npm ci failed after {}s", seconds as u64), Hue::Red);
                 self.add_log(
                     format!("✗ npm ci failed after {}s - o opens the full log{waiting}", seconds as u64),

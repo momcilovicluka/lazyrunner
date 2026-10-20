@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+
+           ┌─ ✧ lazyrunner v0.2.0-dev · startup checklist ────────────────────────────────────────┐
+           │                                                                                      │
+           │    █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                                           │
+           │    █   █▀█ ▄▀  ▀█▀ █▀▄ █ █ █ █ █ █ █▀  █▀▄                                           │
+           │    ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                                           │
+           │                                                                                      │
+           │  ✓ lazyrunner         v0.2.0                                                         │
+           │  ✓ git                2.50                                                           │
+           │  ! .NET SDK           9.0 - the apps want 10.0                                       │
+           │  ⠋ Ports                                                                             │
+           │  · Project                                                                           │
+           │                                                                                      │
+           │  ✦ What's new                                                                        │
+           │    0.2.0                                                                             │
+           │      • A faster lazyrunner                                                           │
+           │                                                                                      │
+           │ checking…                                                                            │
+           └──────────────────────────────────────────────────────────────────────────────────────┘
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B rebuild
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update

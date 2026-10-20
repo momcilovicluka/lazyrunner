@@ -5,6 +5,7 @@
 
 pub mod app;
 pub mod build;
+pub mod checks;
 pub mod child;
 pub mod controller;
 pub mod net;

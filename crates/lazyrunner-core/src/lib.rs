@@ -1,6 +1,7 @@
 //! lazyrunner's core: the apps it runs, their output, and the processes behind them. No terminal code here.
 
 pub mod apptypes;
+pub mod changelog;
 pub mod config;
 pub mod emitter;
 pub mod ipc;

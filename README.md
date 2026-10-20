@@ -274,7 +274,10 @@ lazyrunner is being rewritten in Rust (Ratatui) to run on Windows, Linux and mac
 time and skipped when nothing changed, npm variants, readiness, response times, ports, branch and code watching; each
 app's whole process tree stops with it, and nothing outlives lazyrunner, even when it crashes), has `lazyrunner profile
 check` and `profile init` (the same checks, output and `--json` shape as the PowerShell version; `-Json` and `-Save`
-work too), and a look-and-feel spike (`lazyrunner spike`). The full PowerShell look (overlays, themes, menus) comes next.
+work too), and the PowerShell version's whole screen: the columns, the panel, every key, the `:` palette, `?`, `x`,
+`,`, the database picker, the startup checklist, the changelog, the themes (`t`; your own go in
+`%APPDATA%\lazyrunner\themes`), the tab's title and progress, and desktop notifications.
+[docs/parity.md](docs/parity.md) lists each item against the PowerShell version. Still to come: self-update.
 
 It keeps its settings and your profiles in `%APPDATA%\lazyrunner` (`lazyrunner.config.json`, `projects\`) and its state
 in `%LOCALAPPDATA%\lazyrunner`; on macOS both are in `~/Library/Application Support/lazyrunner`, on Linux in

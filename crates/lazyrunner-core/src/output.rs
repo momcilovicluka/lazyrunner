@@ -49,6 +49,7 @@ pub enum Hue {
     DarkYellow,
     Red,
     Magenta,
+    White,
 }
 
 #[derive(Debug)]
@@ -79,7 +80,10 @@ impl Output {
 
     /// A line in the colour lazyrunner chose for it.
     pub fn push_hued(&mut self, text: &str, hue: Option<Hue>, now: Instant) {
-        let text = strip_ansi(text.trim_end_matches(['\r', '\n'])).replace('\t', "    ");
+        let text = strip_ansi(text.trim_end_matches(['\r', '\n']));
+        // A progress line rewrites itself with \r: keep what the terminal would end up showing.
+        let shown = text.rsplit('\r').next().unwrap_or_default().replace('\t', "    ");
+        let text: String = shown.chars().filter(|c| !c.is_control()).collect();
         let level = Level::of(&text);
         match level {
             Level::Error => self.errors += 1,
@@ -260,6 +264,13 @@ mod tests {
             "a    b link",
             "titles and links go, tabs become spaces"
         );
+    }
+
+    #[test]
+    fn a_progress_line_keeps_what_the_terminal_shows_and_no_control_characters() {
+        let mut output = Output::new(2);
+        output.push("10%\r50%\r100% done\x07", Instant::now());
+        assert_eq!(output.newest_first(0).next().unwrap().text, "100% done");
     }
 
     #[test]

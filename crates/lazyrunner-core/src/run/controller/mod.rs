@@ -111,6 +111,10 @@ pub struct Controller {
     pub celebrate: Option<(String, Instant)>,
     pub profile_changed: bool,
     pub last_failed_log: Option<PathBuf>,
+    /// Whether the last build of the current start failed (the tab turns red).
+    pub last_build_failed: bool,
+    /// Desktop notifications to show (title, message); the UI takes them and shows them when the setting is on.
+    pub notifications: Vec<(String, String)>,
     git_dir: Option<PathBuf>,
     pending_branch: Option<(String, Instant)>,
     config_file: ConfigFile,
@@ -185,6 +189,8 @@ impl Controller {
             celebrate: None,
             profile_changed: false,
             last_failed_log: None,
+            last_build_failed: false,
+            notifications: Vec::new(),
             git_dir: None,
             pending_branch: None,
             config_file,
@@ -449,6 +455,7 @@ impl Controller {
         if self.is_running(key)
             || self.building.as_ref().is_some_and(|job| job.key == key)
             || self.build_queue.iter().any(|k| k == key)
+            || self.npm_ci.as_ref().is_some_and(|job| job.key == key)
         {
             self.stop_focused(key);
         } else {
