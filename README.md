@@ -21,32 +21,18 @@ scroll, search and zoom. One command instead of a row of terminal tabs.
 - What a project runs is described in a small JSON **profile** - in the repo (`.lazyrunner.json`) or in your own
   folder. `lazyrunner profile init` writes a first one for you.
 
-One binary for Windows, Linux and macOS; nothing else to install.
+One binary, nothing else to install. Releases are for Windows for now; Linux and macOS build from source.
 
 ## Install
 
-**Windows** (PowerShell):
+In PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/momcilovicluka/lazyrunner/releases/latest/download/lazyrunner-installer.ps1 | iex"
 ```
 
-**macOS and Linux:**
-
-```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/momcilovicluka/lazyrunner/releases/latest/download/lazyrunner-installer.sh | sh
-```
-
-Both put `lazyrunner` in `~/.local/bin` (on Windows `%USERPROFILE%\.local\bin`) and add it to your PATH. Or with a
-package manager:
-
-```sh
-brew install momcilovicluka/tap/lazyrunner                                      # Homebrew (macOS, Linux)
-scoop bucket add lazyrunner https://github.com/momcilovicluka/lazyrunner         # Scoop (Windows)
-scoop install lazyrunner/lazyrunner
-winget install momcilovicluka.lazyrunner                                         # winget (Windows)
-cargo install --locked --git https://github.com/momcilovicluka/lazyrunner lazyrunner   # from source
-```
+It puts `lazyrunner.exe` in `%USERPROFILE%\.local\bin` and adds that to your PATH. On Linux or macOS, build it from
+source (with [Rust](https://rustup.rs)): `cargo install --locked --git https://github.com/momcilovicluka/lazyrunner lazyrunner`.
 
 Then open a new terminal and run `lazyrunner` in your repo. A shorter name: add an alias of your own
 (`Set-Alias lr lazyrunner` in your PowerShell profile, `alias lr=lazyrunner` in your shell's).
@@ -55,8 +41,7 @@ Then open a new terminal and run `lazyrunner` in your repo. A shorter name: add 
 off, in the background) asks the GitHub releases for the latest version, installs a higher one, reopens on it and shows
 what's new; `lazyrunner update` does the same on demand. Downloads come over HTTPS only, and the release's SHA-256
 catches a broken download. `,` then `v` (or `"autoUpdate": false`) turns it
-off; `lazyrunner version` shows the version and where updates come from. Installed with Homebrew, Scoop or winget,
-lazyrunner leaves updating to them (`brew upgrade`, `scoop update`, `winget upgrade`).
+off; `lazyrunner version` shows the version and where updates come from.
 
 **Requirements:** git; the .NET SDK for .NET apps and Node.js / npm for npm apps (nvm works). Any terminal works;
 Windows Terminal is best (tab colours and progress).
@@ -297,9 +282,9 @@ copy of lazyrunner from a local stand-in for GitHub Releases.
 
 ### Releasing
 
-A release is a tag: pushing `v1.2.3` builds every platform, publishes the GitHub release with its installers, and
-updates the Homebrew tap, the Scoop manifest (`bucket/`) and the winget package (`.github/workflows/release.yml`,
-made by cargo-dist from `dist-workspace.toml`). Installs pick it up the next time they open.
+A release is a tag: pushing `v1.2.3` builds the Windows binary and publishes the GitHub release with it, its
+.sha256 and the PowerShell installer (`.github/workflows/release.yml`, made by cargo-dist from `dist-workspace.toml`;
+after changing that file, `dist generate`). Installs pick it up the next time they open.
 
 1. Add a section on top of [CHANGELOG.md](CHANGELOG.md): `## [0.2.1] - 2026-11-02` and what changed, under
    `### Added` / `### Changed` / `### Fixed`. Installs show it after they update.
@@ -311,14 +296,7 @@ made by cargo-dist from `dist-workspace.toml`). Installs pick it up the next tim
    git push origin main v0.2.1
    ```
 
-Once, before the first release:
-
-- The repo is public: the installers and the self-update download from its releases without signing in.
-- A `homebrew-tap` repo next to this one, and a `HOMEBREW_TAP_TOKEN` secret here that can push to it.
-- For winget: a fork of `microsoft/winget-pkgs`, the first version submitted by hand
-  (`wingetcreate new <the x86_64 .zip URL>`), and a `WINGET_TOKEN` secret (a classic token with `public_repo`).
-  Without the secret the release skips winget.
-- `main` lets GitHub Actions push (the Scoop manifest is committed there after each release).
+The repo has to be public: the installer and the self-update download its releases without signing in.
 
 ## License
 

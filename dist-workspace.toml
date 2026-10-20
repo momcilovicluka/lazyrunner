@@ -1,16 +1,17 @@
 [workspace]
 members = ["cargo:."]
 
-# Config for 'dist'
+# Config for 'dist' (cargo-dist): what a release tag builds and publishes. For now Windows only, with the PowerShell
+# install script; other platforms and the package managers (Homebrew, Scoop, winget) come later.
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.32.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
-installers = ["shell", "powershell", "homebrew"]
+installers = ["powershell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "aarch64-pc-windows-msvc", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = ["x86_64-pc-windows-msvc"]
 # Path that installers should place binaries in
 # Not ~/.cargo/bin: most people who run lazyrunner have no Rust. The XDG bin folder, as uv and others do.
 install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
@@ -22,10 +23,9 @@ install-updater = false
 unix-archive = ".tar.gz"
 windows-archive = ".zip"
 checksum = "sha256"
-# The Homebrew formula goes to this tap (a repo of its own; the HOMEBREW_TAP_TOKEN secret can push to it)
-tap = "momcilovicluka/homebrew-tap"
-publish-jobs = ["homebrew", "./publish-packages"]
+# What goes in the archive next to the binary. Listed here because dist resolves the workspace's inherited
+# license-file against the wrong folder (and fails the build).
+auto-includes = false
+include = ["LICENSE", "README.md", "CHANGELOG.md"]
 # Pull requests only plan the release; nothing is built or uploaded for them
 pr-run-mode = "plan"
-# The Scoop job commits bucket/lazyrunner.json to main
-github-custom-job-permissions = { "publish-packages" = { contents = "write" } }
