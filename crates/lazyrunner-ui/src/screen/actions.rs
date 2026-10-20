@@ -128,8 +128,8 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action(
             "View",
             "t",
-            &format!("Theme: {} → next", ui.theme.name),
-            &format!("{} themes - add your own .json", ui.themes.len()),
+            &format!("Theme picker ({})", ui.theme.name),
+            &format!("preview live, Enter keeps one - {} themes", ui.themes.len()),
             Run::Theme,
         )
         .safe(),

@@ -135,7 +135,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `z` | Zoom: only the focused column |
 | `>` / `<` / `=` | Widen / narrow the focused column / make all equal (saved) |
 | `Ctrl+L` | Clear all columns and the panel log |
-| `t` | Next theme (saved); see [Themes](#themes) |
+| `t` | Theme picker: preview each theme live, `Enter` keeps one (saved), `Esc` undoes; see [Themes](#themes) |
 | `?` | Key reference |
 | `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting |
 
@@ -201,10 +201,13 @@ Automatic restarts leave them alone, since `npm run` watches its own files - unl
 
 ## Themes
 
-`t` cycles through the built-in themes: `default` (your terminal's own palette), `dark`, `light`, `high-contrast`,
-`dracula`, `nord`, `gruvbox`, `catppuccin-mocha`, `tokyo-night` and `solarized-light`. Some also recolour the terminal
-background while lazyrunner runs. Your own: copy one from [themes/](themes/) to `themes/<id>.json` in the settings
-folder and change it; it shows up on the next `t`. [themes/README.md](themes/README.md) describes every field.
+`t` opens the theme picker: a narrow panel on the right, so the rest of the screen shows each theme as you move
+through the list (`↑` `↓`, `PgUp` `PgDn`), the terminal's background included. Typing filters by name, `Enter` keeps
+the selected theme (saved), `Esc` puts back the one you had. Built in: `default` (your terminal's own palette),
+`dark`, `light`, `high-contrast`, `dracula`, `nord`, `gruvbox`, `catppuccin-mocha`, `tokyo-night` and
+`solarized-light`; some also recolour the terminal background while lazyrunner runs. Your own: copy one from
+[themes/](themes/) to `themes/<id>.json` in the settings folder and change it; the picker reads the themes again each
+time it opens, so it shows up straight away. [themes/README.md](themes/README.md) describes every field.
 `NO_COLOR` turns colour off.
 
 ## Configuration

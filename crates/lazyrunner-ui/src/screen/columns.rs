@@ -417,7 +417,7 @@ fn body(ui: &Ui, controller: &Controller, index: usize, cells: usize, rows: usiz
                 break;
             }
             let text = if back.is_some() { pad(text, cells) } else { text.clone() };
-            result.push(fit(vec![Seg { text, fg: color, bg: back }], cells));
+            result.push(fit(vec![Seg { text, fg: color, bg: back, style: None }], cells));
         }
     }
     while result.len() < rows {
