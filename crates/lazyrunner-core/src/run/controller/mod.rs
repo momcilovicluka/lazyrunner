@@ -3,6 +3,7 @@
 //! [`Event`]s; `tick` does the timed things. Nothing here blocks for long: builds, probes and port snapshots run
 //! in tasks of their own, so keys and output keep flowing during a build.
 
+mod handover;
 mod start;
 #[cfg(test)]
 mod tests;
@@ -30,6 +31,8 @@ use crate::config::ConfigFile;
 use crate::output::Hue;
 use crate::paths::Paths;
 use crate::profile::{App, Project};
+
+pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_handover};
 
 /// Entries the panel's log keeps.
 const MAX_LOG_ENTRIES: usize = 200;
@@ -532,6 +535,7 @@ impl Controller {
                 "status": state.status.name(),
                 "up": state.is_up(),
                 "port": self.port(&app.key),
+                "pid": state.child.as_ref().map(|child| child.pid),
                 "lines": state.output.total(),
                 "errors": state.errors,
             })).collect::<Vec<_>>(),

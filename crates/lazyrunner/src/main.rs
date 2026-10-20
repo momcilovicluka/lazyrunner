@@ -72,6 +72,12 @@ enum Command {
         /// Start everything right away.
         #[arg(long)]
         start: bool,
+        /// Take over the running apps another lazyrunner handed over (the file it wrote).
+        #[arg(long)]
+        handover: Option<PathBuf>,
+        /// The handle values it passed on (closed if the file can't be read).
+        #[arg(long, value_delimiter = ',')]
+        handover_handles: Vec<u64>,
     },
     /// Kills what lazyrunner started when lazyrunner itself dies (Linux, macOS).
     #[command(name = "__guard", hide = true)]
@@ -170,9 +176,9 @@ fn run_cli() -> Result<()> {
         Some(Command::Changelog { after }) => update_cli::changelog_after(&after),
         Some(Command::Stop) => start::send("stop"),
         Some(Command::Restart) => start::send("restart"),
-        Some(Command::Run { root, headless, ipc, start }) => {
+        Some(Command::Run { root, headless, ipc, start, handover, handover_handles }) => {
             let size = headless.as_deref().map(parse_size).transpose()?;
-            start::run_root(&root, size, ipc, start)
+            start::run_root(&root, size, ipc, start, handover.map(|file| (file, handover_handles)))
         }
         Some(Command::Guard) => {
             lazyrunner_core::run::child::run_guard();

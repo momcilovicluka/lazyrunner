@@ -19,7 +19,7 @@ use lazyrunner_core::paths::Paths;
 use lazyrunner_core::profile::{self, ProfileDirs, Project};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::child::Guard;
-use lazyrunner_core::run::controller::Setup;
+use lazyrunner_core::run::controller::{Passed, Setup, read_handover};
 use lazyrunner_core::update;
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
@@ -50,6 +50,17 @@ pub struct ProjectOptions {
     pub start_now: bool,
     /// Said in the log at the start (why lazyrunner reopened on this project, say).
     pub notes: Vec<String>,
+    /// The handover file of the lazyrunner this one takes the running apps over from.
+    pub handover: Option<PathBuf>,
+    /// Every handle value it passed on (on the command line too): closed if the file can't be read, so the apps
+    /// stop instead of running on with nobody reading their output.
+    pub handover_handles: Vec<u64>,
+}
+
+/// How a run ended: how to go on, and the running apps handed over to the next lazyrunner, if they were.
+pub struct Finished {
+    pub exit: Exit,
+    pub handover: Option<Passed>,
 }
 
 pub struct ProjectRun {
@@ -60,7 +71,7 @@ pub struct ProjectRun {
 }
 
 /// Runs the project until it quits (or asks to be opened again, on another project or with its profile reloaded).
-pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: ProjectOptions) -> Result<Exit> {
+pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: ProjectOptions) -> Result<Finished> {
     let _timer = TimerResolution::high();
     let (events, mut event_rx) = mpsc::unbounded_channel();
     let ProjectRun { project, root, paths, guard } = run;
@@ -92,7 +103,12 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
     }
     let whats_new = changelog::whats_new(&state_dir);
     let mut quiet: Option<std::sync::mpsc::Receiver<update::Outcome>>;
-    if controller.setting("startupChecklist") {
+    if let Some(file) = &options.handover {
+        // Taking over from the previous lazyrunner: its apps keep running; no checklist, no auto-start.
+        log_whats_new(&mut controller, &whats_new);
+        take_over(&mut controller, file, &options.handover_handles);
+        quiet = None;
+    } else if controller.setting("startupChecklist") {
         let checklist = Checklist::start(&controller, false, &whats_new, options.start_now);
         ui.overlay = Some(Overlay::Checklist(Box::new(checklist)));
         quiet = None;
@@ -180,6 +196,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 controller.tick();
                 update_checklist(&mut ui, &mut controller);
                 poll_quiet_update(&mut quiet, &mut ui, &mut controller);
+                switch_when_idle(&mut ui, &mut controller);
                 dirty = true;
             }
             Some(event) = event_rx.recv() => {
@@ -194,12 +211,34 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             }
         }
         notify(&mut controller, options.headless);
+        if let Some(Exit::Reopen { root, .. }) = &ui.exit
+            && hands_over_to(&controller, &profiles, root)
+            && let Some(why) = controller.handover_blocked()
+        {
+            controller.add_log(format!("{why} - , then p again once it's done (the apps keep running)"), Hue::Yellow);
+            ui.exit = None;
+        }
         if let Some(exit) = ui.exit.clone() {
+            let mut handover = None;
+            if let Exit::Reopen { root, .. } = &exit
+                && hands_over_to(&controller, &profiles, root)
+            {
+                // What already happened first (an exit on its way), then let go, then the output read until then.
+                drain(&mut event_rx, &mut controller);
+                let passed = controller.release_running().and_then(|releasing| {
+                    drain(&mut event_rx, &mut controller);
+                    controller.write_handover(releasing)
+                });
+                match passed {
+                    Ok(passed) => handover = Some(passed),
+                    Err(why) => controller.add_log(format!("✗ Couldn't hand the apps over ({why})"), Hue::Yellow),
+                }
+            }
             if exit == Exit::Quit {
                 controller.add_log("Quitting - stopping everything", Hue::DarkGray);
             }
             controller.shutdown();
-            return Ok(exit);
+            return Ok(Finished { exit, handover });
         }
         if dirty && next_frame.is_none() {
             next_frame = Some(Instant::now() + MIN_GAP);
@@ -239,6 +278,11 @@ fn after_update(ui: &mut Ui, controller: &mut Controller, version: &str, manual:
     let busy = controller.building.is_some()
         || controller.npm_ci.is_some()
         || controller.states.iter().any(|state| state.is_running());
+    if busy && cfg!(windows) {
+        // The new version takes the running apps over: no restart, so it switches as soon as nothing is in the way.
+        ui.switch_to = Some(version.to_string());
+        return;
+    }
     if manual && busy {
         controller.add_log(
             format!(
@@ -250,6 +294,65 @@ fn after_update(ui: &mut Ui, controller: &mut Controller, version: &str, manual:
     }
     let root = controller.root.clone();
     screen::keys::reopen(ui, controller, root, start && !manual, &format!("lazyrunner v{version} installed"));
+}
+
+/// An installed update waiting for a quiet moment (no build, npm ci, overlay, picker or search being typed): then
+/// lazyrunner switches to it, and the new version takes the running apps over.
+fn switch_when_idle(ui: &mut Ui, controller: &mut Controller) {
+    let Some(version) = ui.switch_to.clone() else { return };
+    let typing = ui.search.as_ref().is_some_and(|search| search.typing);
+    let waiting = ui.busy.is_some() || ui.deferred.is_some() || ui.pending_g.is_some();
+    if controller.handover_blocked().is_some() || ui.overlay.is_some() || ui.picker.is_some() || typing || waiting {
+        return;
+    }
+    ui.switch_to = None;
+    controller.add_log(format!("Switching to lazyrunner v{version} - the apps keep running"), Hue::Cyan);
+    let root = controller.root.clone();
+    screen::keys::reopen(ui, controller, root, false, &format!("lazyrunner v{version} installed"));
+}
+
+/// Whether reopening on `root` hands the running apps over instead of stopping them: on Windows, for this same
+/// project and checkout (a reloaded profile, a new version), when its profile there is one this lazyrunner may run without
+/// asking (trusted) and something is running.
+fn hands_over_to(controller: &Controller, profiles: &ProfileDirs, root: &Path) -> bool {
+    if !cfg!(windows) || !controller.states.iter().any(|state| state.is_running()) {
+        return false;
+    }
+    let Ok(Some(found)) = profile::find_project_profile(root, profiles) else { return false };
+    let Ok(next) = profile::resolve(&found, profiles) else { return false };
+    next.id == controller.project.id
+        && profile::trust::is_trusted(&next, &controller.paths().trust_store())
+        && same_path(root, &controller.root)
+}
+
+/// Handles the events waiting (without waiting for more).
+fn drain(event_rx: &mut mpsc::UnboundedReceiver<lazyrunner_core::run::Event>, controller: &mut Controller) {
+    while let Ok(event) = event_rx.try_recv() {
+        controller.handle(event);
+    }
+}
+
+/// Takes over the apps the previous lazyrunner handed over (and starts again the ones whose command changed). If
+/// its file can't be read, the handles it passed on are closed: those apps stop, and U starts them again.
+fn take_over(controller: &mut Controller, file: &Path, handles: &[u64]) {
+    match read_handover(file) {
+        Ok(handover) => {
+            // SAFETY: this process was started for this handover and inherited exactly these handles; nothing else
+            // in it owns them.
+            let restart = unsafe { controller.take_over(handover) };
+            if !restart.is_empty() {
+                controller.start(Some(&restart), false);
+            }
+        }
+        Err(why) => {
+            // SAFETY: the handle values the previous lazyrunner passed on to this one, owned by nothing else here.
+            unsafe { lazyrunner_core::run::child::close_inherited(handles) };
+            controller.add_log(
+                format!("✗ Couldn't take over the running apps ({why}) - they stopped; U starts them again"),
+                Hue::Red,
+            );
+        }
+    }
 }
 
 /// The checklist is off: the same update check, in the background, while the apps start.

@@ -247,3 +247,39 @@ fn restarting_reuses_the_ports_without_a_false_conflict() {
     lazyrunner.quit();
     wait_free(&ports, "q stops the whole trees");
 }
+
+/// The handover (Windows): reloading the profile (, then p) hands the running apps over to the next lazyrunner
+/// instead of stopping them - the same processes keep serving on the same ports - and quitting that one stops them.
+#[test]
+fn reloading_hands_the_running_apps_over_without_restarting_them() {
+    if !cfg!(windows) || skip_without(&["node", "npm"]) {
+        return;
+    }
+    let temp = TempDir::new("handover");
+    let ports = [31397, 31398];
+    let (repo, profile) = two_servers(&temp, ports);
+    let lazyrunner = Lazyrunner::start(&temp, &repo, &profile, json!({ "startupChecklist": false }), &["--start"]);
+    lazyrunner.wait_for("Ready in", Duration::from_secs(60), || lazyrunner.log().contains("Ready in"));
+    let pids = || -> Vec<Option<u64>> {
+        let state = lazyrunner.ask(json!({ "state": true }))["state"].clone();
+        state["apps"].as_array().map_or(Vec::new(), |apps| apps.iter().map(|app| app["pid"].as_u64()).collect())
+    };
+    let before = pids();
+    assert!(before.len() == 2 && before.iter().all(Option::is_some), "both servers have a process: {before:?}");
+
+    let handovers = || lazyrunner.log().lines().filter(|line| line.contains("Took over")).count();
+    // Reload the project profile twice: lazyrunner reopens and hands both servers over each time (the second
+    // handover passes on apps that were themselves taken over).
+    for handover in 1..=2 {
+        lazyrunner.press(", p");
+        lazyrunner.wait_for("the next lazyrunner to take over", Duration::from_secs(60), || handovers() == handover);
+        assert_eq!(pids(), before, "the same processes, not restarted (handover {handover})");
+        let listening = Listening::now();
+        assert!(ports.iter().all(|port| listening.contains(*port)), "both still serving (handover {handover})");
+        let took_over = lazyrunner.log_line("Took over");
+        assert!(took_over.ends_with("from the previous lazyrunner - they kept running"), "{took_over}");
+    }
+
+    lazyrunner.quit();
+    wait_free(&ports, "quitting the next lazyrunner stops the apps it took over");
+}

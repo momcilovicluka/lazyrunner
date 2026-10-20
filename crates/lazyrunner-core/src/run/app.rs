@@ -123,6 +123,20 @@ impl AppState {
         self.log_path = Some(path);
     }
 
+    /// Goes on writing the log file of a run another lazyrunner handed over (instead of starting a new one, which
+    /// `open_log` did at startup: that rotated this run's file to `<key>.prev.log`).
+    pub fn resume_log(&mut self, dir: &Path) {
+        let path = dir.join(format!("{}.log", self.key));
+        let previous = dir.join(format!("{}.prev.log", self.key));
+        let fresh = std::fs::metadata(&path).map_or(true, |meta| meta.len() == 0);
+        self.log = None; // closes the fresh file, so it can be replaced
+        if fresh && previous.exists() {
+            let _ = std::fs::rename(&previous, &path);
+        }
+        self.log = std::fs::OpenOptions::new().create(true).append(true).open(&path).ok().map(BufWriter::new);
+        self.log_path = Some(path);
+    }
+
     pub fn flush_log(&mut self) {
         if let Some(log) = &mut self.log {
             let _ = log.flush();
