@@ -12,7 +12,8 @@ use lazyrunner_core::json;
 use lazyrunner_core::paths::Paths;
 use lazyrunner_core::profile::{self, Project, REPO_PROFILE_FILE, trust};
 use lazyrunner_core::run::child::Guard;
-use lazyrunner_ui::project_run::{ProjectOptions, ProjectRun, run_project};
+use lazyrunner_core::run::controller::Passed;
+use lazyrunner_ui::project_run::{Finished, ProjectOptions, ProjectRun, run_project};
 use lazyrunner_ui::run::Surface;
 use lazyrunner_ui::screen::Exit;
 use lazyrunner_ui::theme::ColorMode;
@@ -136,7 +137,13 @@ fn reopen_project(root: &Path, paths: &Paths, interactive: bool) -> Result<Optio
 
 /// The hidden `lazyrunner run --root <dir>` the tests use: no trust question (an untrusted repo profile is an
 /// error), optionally headless.
-pub fn run_root(root: &Path, headless: Option<(u16, u16)>, ipc: Option<String>, start_now: bool) -> Result<()> {
+pub fn run_root(
+    root: &Path,
+    headless: Option<(u16, u16)>,
+    ipc: Option<String>,
+    start_now: bool,
+    handover: Option<(PathBuf, Vec<u64>)>,
+) -> Result<()> {
     let paths = Paths::from_env(&install_dir());
     let found = profile::find_project_profile(root, &paths.profiles)?
         .ok_or_else(|| anyhow!("lazyrunner: {} is not a project (no profile matches it).", root.display()))?;
@@ -144,11 +151,11 @@ pub fn run_root(root: &Path, headless: Option<(u16, u16)>, ipc: Option<String>, 
     if !trust::is_trusted(&project, &paths.trust_store()) {
         bail!("lazyrunner: {} isn't trusted yet - run lazyrunner in that repo to review it.", project.path.display());
     }
-    run_with(project, paths, headless, ipc, start_now)
+    run_with(project, paths, headless, ipc, start_now, handover)
 }
 
 fn run(project: Project, paths: Paths, ipc: Option<String>, start_now: bool) -> Result<()> {
-    run_with(project, paths, None, ipc, start_now)
+    run_with(project, paths, None, ipc, start_now, None)
 }
 
 /// Runs the project, and again each time it asks to be reopened (another project, or its profile reloaded).
@@ -158,18 +165,27 @@ fn run_with(
     headless: Option<(u16, u16)>,
     ipc: Option<String>,
     start_now: bool,
+    handover: Option<(PathBuf, Vec<u64>)>,
 ) -> Result<()> {
-    let (mut project, mut start_now, mut notes) = (project, start_now, Vec::new());
+    let (mut project, mut start_now, mut notes, mut handover) = (project, start_now, Vec::new(), handover);
     let binary = Binary::now();
     loop {
-        match run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes)? {
+        let Finished { exit, handover: passed } =
+            run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes, handover.take())?;
+        match exit {
             Exit::Quit => return Ok(()),
             Exit::Reopen { root, start } => {
                 start_now = start;
                 notes = Vec::new();
-                if binary.replaced() {
+                if let Some(passed) = passed {
+                    // The next lazyrunner (the new binary after an update, or this one again) takes the running
+                    // apps over. Only comes back when it couldn't be started: the apps stopped, so they start again.
+                    let error = binary.run_next(&root, start, Some(passed), headless, ipc.as_deref());
+                    notes.push(format!("✗ Couldn't start the next lazyrunner ({error:#}) - the apps start again."));
+                    start_now = true;
+                } else if binary.replaced() {
                     // Only comes back when the new binary couldn't be started: this one carries on.
-                    let error = binary.run_again(&root, start);
+                    let error = binary.run_next(&root, start, None, headless, ipc.as_deref());
                     notes.push(format!("✗ Couldn't open the new lazyrunner ({error:#}) - this one carries on."));
                 }
                 match reopen_project(&root, &paths, headless.is_none()) {
@@ -202,25 +218,56 @@ impl Binary {
         lazyrunner_core::update::installed().is_some() || (now.is_some() && now != self.modified)
     }
 
-    /// Opens `root` in the new binary, in this terminal (on Unix in this very process); returns only when it
-    /// couldn't be started.
-    fn run_again(&self, root: &Path, start: bool) -> anyhow::Error {
+    /// Opens `root` in the next lazyrunner - the new binary after an update, or this one taking the running apps
+    /// over - in this terminal (on Unix in this very process; on Windows a process that inherits the handed-over
+    /// apps' handles, and this one exits with it). Returns only when it couldn't be started.
+    fn run_next(
+        &self,
+        root: &Path,
+        start: bool,
+        handover: Option<Passed>,
+        headless: Option<(u16, u16)>,
+        ipc: Option<&str>,
+    ) -> anyhow::Error {
         let Some(path) = self.path.as_deref() else { return anyhow!("can't find lazyrunner's own path") };
         let mut command = std::process::Command::new(path);
         command.arg("run").arg("--root").arg(root);
         if start {
             command.arg("--start");
         }
+        if let Some(passed) = &handover {
+            command.arg("--handover").arg(&passed.file);
+            let values: Vec<String> = passed.handles.iter().map(u64::to_string).collect();
+            command.arg("--handover-handles").arg(values.join(","));
+        }
+        if let Some((width, height)) = headless {
+            command.arg("--headless").arg(format!("{width}x{height}"));
+        }
+        if let Some(ipc) = ipc {
+            command.arg("--ipc").arg(ipc);
+        }
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;
+            drop(handover);
             command.exec().into()
         }
         #[cfg(not(unix))]
         {
-            match command.status() {
-                Ok(status) => std::process::exit(status.code().unwrap_or(1)),
-                Err(error) => error.into(),
+            match command.spawn() {
+                Ok(mut next) => {
+                    drop(handover); // it inherited its own copies of the apps' handles; these are this process's
+                    match next.wait() {
+                        Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+                        Err(error) => error.into(),
+                    }
+                }
+                Err(error) => {
+                    if let Some(passed) = &handover {
+                        let _ = std::fs::remove_file(&passed.file); // nobody will read it
+                    }
+                    error.into()
+                }
             }
         }
     }
@@ -233,7 +280,8 @@ fn run_once(
     ipc: Option<String>,
     start_now: bool,
     notes: Vec<String>,
-) -> Result<Exit> {
+    handover: Option<(PathBuf, Vec<u64>)>,
+) -> Result<Finished> {
     let root = project.root.clone().unwrap_or_else(|| PathBuf::from("."));
     let exe = std::env::current_exe().context("can't find lazyrunner's own path")?;
     let guard = match Guard::start(&exe) {
@@ -254,6 +302,8 @@ fn run_once(
         headless: headless.is_some(),
         start_now,
         notes,
+        handover_handles: handover.as_ref().map(|(_, handles)| handles.clone()).unwrap_or_default(),
+        handover: handover.map(|(file, _)| file),
     };
     let run = ProjectRun { project, root, paths, guard };
     let runtime = runtime()?;

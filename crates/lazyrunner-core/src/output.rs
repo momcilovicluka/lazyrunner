@@ -37,7 +37,7 @@ pub struct OutputLine {
 }
 
 /// The colours lazyrunner gives lines, named as the themes name them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Hue {
     Gray,
     DarkGray,

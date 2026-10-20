@@ -39,7 +39,8 @@ Then open a new terminal and run `lazyrunner` in your repo. A shorter name: add 
 
 **Updating:** lazyrunner updates itself. When it opens, its startup checklist (or a quiet check when the checklist is
 off, in the background) asks the GitHub releases for the latest version, installs a higher one, reopens on it and shows
-what's new; `lazyrunner update` does the same on demand. Downloads come over HTTPS only, and the release's SHA-256
+what's new; `lazyrunner update` does the same on demand. With apps running, the new version takes them over when it
+opens (Windows): they keep running, on the same ports, with their output. Downloads come over HTTPS only, and the release's SHA-256
 catches a broken download. `,` then `v` (or `"autoUpdate": false`) turns it
 off; `lazyrunner version` shows the version and where updates come from.
 
@@ -149,7 +150,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `e` | Restart the .NET apps when code changes: once saving in the watched folder has been quiet for 2 s, rebuild and restart the running ones (npm apps have their own watchers) |
 | `w` | Startup checklist when lazyrunner opens |
 | `r` | Run the startup checklist now (and check for an update) |
-| `p` | Reload the project profile (reopens lazyrunner) |
+| `p` | Reload the project profile (reopens lazyrunner; on Windows the running apps carry on, unless their entry changed) |
 | `v` | Auto-update lazyrunner when it opens |
 | `c` | What's new: the changelog |
 

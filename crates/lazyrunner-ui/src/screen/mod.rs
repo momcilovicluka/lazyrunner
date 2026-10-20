@@ -149,6 +149,8 @@ pub struct Ui {
     pub theme: Theme,
     pub user_themes: Option<PathBuf>,
     pub exit: Option<Exit>,
+    /// An installed lazyrunner version to switch to once nothing is in the way (the apps are handed over to it).
+    pub switch_to: Option<String>,
     /// What's new since the last version this machine ran (shown once, in the checklist).
     pub whats_new: Vec<changelog::Entry>,
     /// Opens a link or a file (the default app); tests swap it for one that only records.
@@ -179,6 +181,7 @@ impl Ui {
             themes,
             user_themes,
             exit: None,
+            switch_to: None,
             whats_new: Vec::new(),
             opener: status::open,
             clipboard: copy::to_clipboard,
