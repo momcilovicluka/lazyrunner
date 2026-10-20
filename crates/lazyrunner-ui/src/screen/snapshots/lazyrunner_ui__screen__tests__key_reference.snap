@@ -14,7 +14,7 @@ expression: screen.frame()
   │   u U         Start · focused / all                    =           Equal column widths                 │
   │   s S         Stop · focused / all                     Ctrl+L      Clear output                        │
   │   r R         Restart · focused / all                  t           Theme picker (Default)              │
-  │   b B         Rebuild · focused / all                Help                                              │
+  │   b B         Build · focused / all                  Help                                              │
   │   q           Quit                                     ,           Settings (a u s e w toggles, r che… │
   │ Tools                                                  ?           Key reference                       │
   │   d           Switch database                          :           Command palette                     │

@@ -16,7 +16,7 @@ expression: screen.frame()
              │ [,]       Settings (a u s e w toggles, r checklist)  auto-restart, auto-start, … │
              │ [, w]     [x] Startup checklist when lazyrunner opens                            │
              │ [/]       Search the focused app's output  n older match, N newer                │
-             │ [B]       Rebuild all  restart with a full build, never skipped                  │
+             │ [b]       Build the focused app  full build, then it stays stopped               │
              │ [, p]     Reload the project profile                                             │
              │ type to search · ↑↓ or Ctrl+N Ctrl+P choose · Enter run · Esc close              │
              └──────────────────────────────────────────────────────────────────────────────────┘
@@ -24,7 +24,7 @@ expression: screen.frame()
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
- ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B rebuild
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update

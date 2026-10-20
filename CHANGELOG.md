@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.7.0] - 2026-10-20
+
+### Changed
+- `b` / `B` build the focused app / every app that builds (a full build, never skipped) and leave them **stopped**, instead of rebuilding and restarting them. A running app is stopped first, since it locks its own build output. `u` / `U` then start them without building again. For the old one-key rebuild and restart, press `b` then `u` (or `r` / `R`, which rebuild what changed). npm apps have no separate build step
+
+### Fixed
+- The bars in `D` no longer run into the next row's: the tallest is ▇ instead of a full block, so each row stands on its own
+
 ## [0.6.0] - 2026-10-20
 
 ### Added

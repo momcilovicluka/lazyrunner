@@ -21,6 +21,8 @@ const COUNT_FROM: usize = 64;
 const ROW_FIXED: usize = 3 + 9 + 9 + 10;
 /// The run count's cells.
 const COUNT_CELLS: usize = 10;
+/// The tallest bar is ▇, not █: a full block touches the bars in the row below and the rows blur together.
+const TALLEST: usize = 6;
 
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
     if controller.durations.is_empty() {
@@ -90,7 +92,7 @@ fn bar_segs(item: &Item, bars: usize) -> Vec<Seg> {
     let mut segs: Vec<Seg> = recent
         .iter()
         .map(|run| {
-            let level = ((run.sec / max * 7.999).floor() as usize).min(7);
+            let level = ((run.sec / max * (TALLEST as f64 + 0.999)).floor() as usize).min(TALLEST);
             seg(SPARKS[level].to_string(), if run.ok { C::DarkCyan } else { C::Red })
         })
         .collect();

@@ -47,6 +47,34 @@ async fn stopping_nothing_says_so_and_stop_all_names_what_it_keeps() {
 }
 
 #[tokio::test]
+async fn b_on_an_app_without_a_separate_build_says_so() {
+    let temp = TempDir::new("controller-build-only");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    sample.build_only(Some(&["shop".to_string()]));
+    assert_eq!(last_log(&sample), "Shop has no separate build - it compiles while it runs (r restarts it).");
+    assert!(sample.building.is_none() && sample.build_queue.is_empty());
+    let npm_temp = TempDir::new("controller-build-only-npm");
+    let (mut npm_only, _npm_rx) = controller(
+        &npm_temp,
+        json!({ "projects": { "sample": { "apps": {
+        "orders": { "enabled": false }, "billing": { "enabled": false } } } } }),
+    );
+    npm_only.build_only(None);
+    assert_eq!(last_log(&npm_only), "Nothing to build: no app here has a separate build step.");
+
+    // B leaves what S leaves: here both .NET apps are out of "all".
+    let kept_temp = TempDir::new("controller-build-only-kept");
+    let (mut kept, _kept_rx) = controller(
+        &kept_temp,
+        json!({ "projects": { "sample": { "apps": {
+        "orders": { "includeInAll": false }, "billing": { "includeInAll": false } } } } }),
+    );
+    kept.build_only(None);
+    assert_eq!(last_log(&kept), "Nothing to build: no app here has a separate build step.");
+    assert!(kept.building.is_none());
+}
+
+#[tokio::test]
 async fn apps_turned_off_on_this_machine_get_no_column() {
     let temp = TempDir::new("controller-off");
     let (controller, _rx) = controller(&temp, json!({ "projects": { "sample": { "frontend": false } } }));

@@ -371,7 +371,7 @@ pub fn run_deferred(ui: &mut Ui, controller: &mut Controller) {
     }
 }
 
-/// Whether `action` starts an app that builds, so lazyrunner fingerprints the source (git status) first.
+/// Whether `action` builds an app, so lazyrunner fingerprints the source (git status) first.
 fn checks_sources(ui: &Ui, controller: &Controller, action: &Run) -> bool {
     if controller.building.is_some() {
         return false;
@@ -380,10 +380,10 @@ fn checks_sources(ui: &Ui, controller: &Controller, action: &Run) -> bool {
     let all = || controller.apps.iter().any(|app| controller.builds(&app.key));
     match action {
         Run::Toggle => focused.is_some_and(|key| !controller.is_running(key) && controller.builds(key)),
-        Run::StartFocused | Run::RestartFocused | Run::RebuildFocused => {
+        Run::StartFocused | Run::RestartFocused | Run::BuildFocused => {
             focused.is_some_and(|key| controller.builds(key))
         }
-        Run::StartAll | Run::RestartAll | Run::RebuildAll => all(),
+        Run::StartAll | Run::RestartAll | Run::BuildAll => all(),
         _ => false,
     }
 }
@@ -396,7 +396,7 @@ fn needs_app(action: &Run) -> bool {
             | Run::StartFocused
             | Run::StopFocused
             | Run::RestartFocused
-            | Run::RebuildFocused
+            | Run::BuildFocused
             | Run::NpmCi
             | Run::OpenFocused
             | Run::OpenLog
@@ -418,11 +418,11 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::StartFocused => controller.start(Some(&only), false),
         Run::StopFocused => controller.stop_focused(&key),
         Run::RestartFocused => controller.restart("requested from the panel", Some(&only), false),
-        Run::RebuildFocused => controller.restart("full rebuild", Some(&only), true),
+        Run::BuildFocused => controller.build_only(Some(&only)),
         Run::StartAll => controller.start(None, false),
         Run::StopAll => controller.stop_all(),
         Run::RestartAll => controller.restart("requested from the panel", None, false),
-        Run::RebuildAll => controller.restart("full rebuild", None, true),
+        Run::BuildAll => controller.build_only(None),
         Run::KillPortUser => controller.resolve_port_conflicts(),
         Run::Quit => ui.exit = Some(Exit::Quit),
         Run::Database => open_picker(ui, controller),

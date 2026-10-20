@@ -24,7 +24,7 @@ info: Application sta┃error: Billing.cs(3,1│                     │        
 rted.                ┃): something is off  │                     │                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
- ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B rebuild
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update

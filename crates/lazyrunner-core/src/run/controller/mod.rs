@@ -139,6 +139,8 @@ pub struct Controller {
     start_keys: Vec<String>,
     built: Vec<String>,
     force_build: bool,
+    /// The builds in the queue are b / B's: the apps stay stopped afterwards.
+    build_only: bool,
     fingerprint: Option<String>,
     lock_changed: Vec<String>,
     lock_warned: HashMap<String, String>,
@@ -218,6 +220,7 @@ impl Controller {
             start_keys: Vec::new(),
             built: Vec::new(),
             force_build: false,
+            build_only: false,
             fingerprint: None,
             lock_changed: Vec::new(),
             lock_warned: HashMap::new(),
@@ -423,7 +426,7 @@ impl Controller {
 
     /// The apps Stop all and Restart all leave running (includeInAll, stopFrontendOnStop). A restart still restarts
     /// one whose branch needs another variant.
-    fn kept_keys(&mut self, for_restart: bool) -> Vec<String> {
+    pub(super) fn kept_keys(&mut self, for_restart: bool) -> Vec<String> {
         let mut kept: Vec<String> = self
             .apps
             .iter()
@@ -500,7 +503,8 @@ impl Controller {
         }
         if self.build_queue.iter().any(|queued| queued == key) {
             self.build_queue.retain(|queued| queued != key);
-            self.add_log(format!("{name} won't be built or started this time"), Hue::Yellow);
+            let what = if self.build_only { "built" } else { "built or started" };
+            self.add_log(format!("{name} won't be {what} this time"), Hue::Yellow);
             return;
         }
         if self.npm_ci.as_ref().is_some_and(|job| job.key == key) {

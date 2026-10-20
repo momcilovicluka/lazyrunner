@@ -163,6 +163,26 @@ fn the_sample_repo_starts_gets_ready_and_stops() {
     let console = std::fs::read_to_string(lazyrunner.state.join("sample").join("logs").join("console.log")).unwrap();
     assert!(console.contains("npm run dev --verbose (live)"), "the variant's label in its column:\n{console}");
 
+    // b on the running Orders: stopped first, a full build, and it stays stopped; u then starts it without one.
+    lazyrunner.press("1 b");
+    lazyrunner.wait_for("the build", Duration::from_secs(300), || lazyrunner.log().contains("Build done"));
+    assert_eq!(lazyrunner.log_line("Stopping Orders"), "Stopping Orders first - a running app locks its build output");
+    assert!(
+        lazyrunner.log_line("✓ Orders built in").contains("projects"),
+        "a real build:
+{}",
+        lazyrunner.log()
+    );
+    assert_eq!(lazyrunner.log_line("Build done"), "Build done - u starts it without building again");
+    let status = || lazyrunner.ask(json!({ "state": true }))["state"]["apps"][0]["status"].clone();
+    assert_eq!(status(), "stopped", "b leaves it stopped");
+    wait_free(&[ORDERS_PORT], "b stops the running Orders");
+    lazyrunner.press("u");
+    lazyrunner.wait_for("Orders again", Duration::from_secs(120), || {
+        lazyrunner.log().matches(&format!("● Orders is listening on :{ORDERS_PORT}")).count() == 2
+    });
+    assert!(lazyrunner.log_line("Orders unchanged").ends_with("skipped (b / B force a full build)"));
+
     // 5 focuses the fifth column.
     lazyrunner.press("5");
     assert!(lazyrunner.frame().contains("▸ ■ Console"), "the Console column has the focus marker");

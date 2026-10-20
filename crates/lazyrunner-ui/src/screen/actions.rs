@@ -12,11 +12,11 @@ pub enum Run {
     StartFocused,
     StopFocused,
     RestartFocused,
-    RebuildFocused,
+    BuildFocused,
     StartAll,
     StopAll,
     RestartAll,
-    RebuildAll,
+    BuildAll,
     KillPortUser,
     Quit,
     Database,
@@ -93,11 +93,11 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             .focused(),
         action("Run", "s", "Stop the focused app", "or cancel its build / npm ci", Run::StopFocused).safe().focused(),
         action("Run", "r", "Restart the focused app", "rebuild if it changed", Run::RestartFocused).focused(),
-        action("Run", "b", "Rebuild the focused app", "restart with a full build", Run::RebuildFocused).focused(),
+        action("Run", "b", "Build the focused app", "full build, then it stays stopped", Run::BuildFocused).focused(),
         action("Run", "U", "Start all", "build if needed, start whatever is stopped", Run::StartAll),
         action("Run", "S", "Stop all", "also cancels a running build", Run::StopAll),
         action("Run", "R", "Restart all", "rebuild if anything changed", Run::RestartAll),
-        action("Run", "B", "Rebuild all", "restart with a full build, never skipped", Run::RebuildAll),
+        action("Run", "B", "Build all", "full build of every app that builds, leaves them stopped", Run::BuildAll),
     ];
     if !controller.conflicts.is_empty() {
         list.push(action("Run", "!", "Kill whatever holds a needed port", "", Run::KillPortUser));
