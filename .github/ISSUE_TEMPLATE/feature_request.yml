@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest an improvement to lazyrunner
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem/use case
+      description: What workflow are you trying to improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you'd like in lazyrunner
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds or other approaches you tried
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Profiles, repo setup, screenshots, or references
