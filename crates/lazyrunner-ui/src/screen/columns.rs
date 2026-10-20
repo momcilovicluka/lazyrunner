@@ -16,7 +16,7 @@ use super::theme::C;
 
 const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const ORBIT: [char; 4] = ['◐', '◓', '◑', '◒'];
-const SPARKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+pub const SPARKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const BLOCKS: [char; 8] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 const DEFAULT_ICON: &str = "■";
 const DEFAULT_WIDTH: f64 = 33.0;

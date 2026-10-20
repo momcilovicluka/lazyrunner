@@ -1,0 +1,24 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: "screen.render(80, 24)"
+---
+  ┌─ Durations ──────────────────────────────────────────────────────────────┐
+  │ Builds                      runs       last    usual                     │
+  │   Api                       ▁▁▁█      2m05s      10s  ▲ +1150%    4 runs │
+  │   Orders                    ▆▆▆█▆█      55s      39s  ▲ +41%      6 runs │
+  │ Starts                      runs       last    usual                     │
+  │   Orders                    █▇██         9s       9s  ≈           4 runs │
+  │   Shop                      ███▂         2s      10s              4 runs │
+  │ Esc closes · j k scroll (1-6 of 8) · usual = median of the earlier succe │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop
+ , settings   a [ ] auto-restart on branch change
+              u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend
+              e [ ] restart APIs on code change   w [x] startup checklist
+              v [x] auto-update
+
+ 12:00:00 No durations yet: they're recorded from the next build, start or npm c

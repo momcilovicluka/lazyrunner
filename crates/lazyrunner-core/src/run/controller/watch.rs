@@ -11,6 +11,7 @@ use super::{Controller, Probe};
 use crate::output::Hue;
 use crate::profile::{self, AppKind, trust};
 use crate::run::app::{Status, push_history};
+use crate::run::history::Kind;
 use crate::run::net::{self, Listening, ProbeResult};
 use crate::run::{Event, format_duration, secrets, tools};
 
@@ -184,6 +185,7 @@ impl Controller {
             if !state.is_running() || state.up_generation == Some(state.generation) || !self.is_ready(index) {
                 continue;
             }
+            let timed = state.started_at.is_some(); // without a start time there is nothing to record
             let up_after = state.started_at.map_or(0.0, |started| (now - started).as_secs_f64());
             let key = self.apps[index].key.clone();
             let generation = state.generation;
@@ -194,6 +196,7 @@ impl Controller {
                 self.timeline.entry(key.clone()).or_default().up_at = Some((now - started).as_secs_f64());
             }
             self.timings.add("start", &key, up_after);
+            let note = if timed { self.record_duration(Kind::Start, &key, up_after, true) } else { String::new() };
             let name = self.apps[index].name.clone();
             let what = match self.port(&key) {
                 Some(port) => format!("is listening on :{port}"),
@@ -205,7 +208,7 @@ impl Controller {
                     format!("is built (served by {server_name} at {url})")
                 }
             };
-            self.add_log(format!("● {name} {what} - up in {}", format_duration(up_after)), Hue::Green);
+            self.add_log(format!("● {name} {what} - up in {}{note}", format_duration(up_after)), Hue::Green);
         }
         // Ready once every app this start launched is up in its current run, and nothing is still building.
         if self.building.is_some() || !self.build_queue.is_empty() || self.ready_pending.is_empty() {

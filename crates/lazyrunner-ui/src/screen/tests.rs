@@ -13,6 +13,7 @@ use lazyrunner_core::profile::{ProfileDirs, import};
 use lazyrunner_core::run::app::Status as AppStatus;
 use lazyrunner_core::run::checks::Status;
 use lazyrunner_core::run::controller::Setup;
+use lazyrunner_core::run::history::Kind;
 use lazyrunner_core::run::{Controller, Event};
 use lazyrunner_core::testing::{TempDir, sample_profile, sample_repo};
 use ratatui::Terminal;
@@ -281,6 +282,35 @@ async fn changelog_view() {
     screen.press("j j");
     insta::assert_snapshot!(screen.frame());
     screen.press("q");
+    assert!(screen.ui.overlay.is_none());
+}
+
+// ---------------------------------------------------------------- D (durations)
+
+#[tokio::test]
+async fn durations_view() {
+    let mut screen = screen("snap-durations", json!({}));
+    screen.press("D");
+    assert!(screen.ui.overlay.is_none(), "nothing recorded yet");
+    assert!(screen.controller.log.back().is_some_and(|entry| entry.text.starts_with("No durations yet")));
+    let durations = &mut screen.controller.durations;
+    for (seconds, ok) in [(40.0, true), (38.0, true), (36.0, true), (52.0, false), (41.0, true), (55.0, true)] {
+        durations.add(Kind::Build, "orders", "Orders", seconds, ok);
+    }
+    for (seconds, ok) in [(10.0, true), (10.0, true), (10.0, true), (125.0, true)] {
+        durations.add(Kind::Build, "api", "Api", seconds, ok); // over 10x slower: the whole percentage shows
+    }
+    for seconds in [9.0, 8.0, 10.0, 9.0] {
+        durations.add(Kind::Start, "orders", "Orders", seconds, true);
+    }
+    for (seconds, ok) in [(10.0, true), (10.0, true), (10.0, true), (2.0, false)] {
+        durations.add(Kind::Start, "shop", "Shop", seconds, ok); // failed fast: not "faster"
+    }
+    durations.add(Kind::NpmCi, "shop", "A shop frontend with a very long name indeed", 61.0, true);
+    screen.press("D");
+    insta::assert_snapshot!(screen.frame());
+    insta::assert_snapshot!("durations_view_80_columns", screen.render(80, 24));
+    screen.press("D");
     assert!(screen.ui.overlay.is_none());
 }
 

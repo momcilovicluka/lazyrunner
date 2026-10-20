@@ -6,6 +6,7 @@ pub mod actions;
 pub mod checklist;
 pub mod columns;
 pub mod copy;
+pub mod durations;
 pub mod keys;
 pub mod overlays;
 pub mod panel;
@@ -66,6 +67,10 @@ pub enum Overlay {
         lines: Vec<Line>,
         top: usize,
     },
+    /// `D`: how long builds, starts and npm ci took over their last runs.
+    Durations {
+        top: usize,
+    },
     /// `t`: the theme picker; `original` is the theme Esc puts back.
     Themes {
         query: String,
@@ -83,6 +88,7 @@ impl Overlay {
             Self::Settings { .. } => "settings",
             Self::Checklist(_) => "checklist",
             Self::Changelog { .. } => "changelog",
+            Self::Durations { .. } => "durations",
             Self::Themes { .. } => "themes",
         }
     }
@@ -283,6 +289,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         _ if ui.picker.is_some() => return overlays::picker(ui, width, rows),
         Some(Overlay::Palette { .. }) => return overlays::palette(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
+        Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         _ => {}

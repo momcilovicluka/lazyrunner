@@ -23,6 +23,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::app::{AppState, Status};
 use super::build::Timings;
 use super::child::{Child, Guard};
+use super::history::{Durations, Kind};
 use super::net::{Listening, ProbeResult};
 use super::watcher::CodeWatcher;
 use super::{Event, Tag};
@@ -142,6 +143,8 @@ pub struct Controller {
     lock_changed: Vec<String>,
     lock_warned: HashMap<String, String>,
     timings: Timings,
+    /// How long builds, starts and npm ci took over their last runs (D).
+    pub durations: Durations,
     probes: HashMap<String, Probe>,
     listening_due: Option<Instant>,
     listening_in_flight: bool,
@@ -179,6 +182,7 @@ impl Controller {
         watch::spawn_metrics(Arc::clone(&metric_roots), events.clone());
         let mut controller = Self {
             timings: Timings::load(&state_dir),
+            durations: Durations::load(&state_dir),
             project,
             apps,
             states,
@@ -232,6 +236,9 @@ impl Controller {
             metric_roots,
             now: Instant::now,
         };
+        if let Some(problem) = controller.durations.problem.take() {
+            controller.add_log(problem, Hue::Yellow);
+        }
         if controller._watcher.is_none() && root.join(&controller.project.source_dir).is_dir() {
             let dir = root.join(&controller.project.source_dir);
             controller.add_log(
@@ -304,6 +311,16 @@ impl Controller {
 
     pub fn timing_estimate(&self, kind: &str, key: &str) -> Option<f64> {
         self.timings.estimate(kind, key)
+    }
+
+    /// Records a finished run in the durations history. Returns what a successful run's log line adds when it was
+    /// notably off its usual (" · 18% slower than usual (36s)").
+    fn record_duration(&mut self, kind: Kind, key: &str, seconds: f64, ok: bool) -> String {
+        let label = self.app(key).map_or_else(|| key.to_string(), |app| app.name.clone());
+        if let Some(why) = self.durations.add(kind, key, &label, seconds, ok) {
+            self.add_log(format!("Couldn't save the durations history - {why}"), Hue::Yellow);
+        }
+        if ok { self.durations.note(kind, key) } else { String::new() }
     }
 
     pub fn is_busy(&self) -> bool {
