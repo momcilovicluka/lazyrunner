@@ -120,6 +120,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
 | `y` | Copy the focused app's last error with its stack trace (a failed build's errors with full paths), or the search match |
+| `D` | **Durations**: how long each build, app start and `npm ci` took over its last runs (below) |
 | `x` | Menu of everything you can do with the focused app |
 | `,` | **Settings** menu (below) |
 
@@ -193,6 +194,23 @@ as `secrets.json.lazyrunner-backup`, and restarts the running .NET apps (no buil
 of the selected one with another database name; `y` copies the highlighted line as it is in the file,
 password included.
 
+## Durations (`D`)
+
+Every build, app start and `npm ci` is timed and kept (the last 40 of each) in `history.json` in the project's state
+folder. `D` shows them in a box, grouped:
+
+| Column | Meaning |
+|---|---|
+| bars | One bar per run, scaled to the item's slowest; red = it failed |
+| last | The latest run (red when it failed) |
+| usual | Median of the up to 10 successful runs before it (once there are 3) |
+| ▲ / ▼ | The latest run 15% (and a second) or more slower (red) / faster (green) than usual; `≈` closer; nothing after a failed run |
+
+When a run finishes notably off its usual, its log line says so, e.g.
+`✓ Orders built in 52s (41 projects) · 37% slower than usual (38s)`. A cancelled build or `npm ci` isn't recorded; an
+unreadable `history.json` is kept as `history.json.bad` and a new one starts.
+`j` `k` scroll, `Esc` / `q` / `D` close.
+
 ## npm apps
 
 Which script an npm app runs is decided on every start from its `package.json` (the profile's variants), so a branch
@@ -248,7 +266,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 
 **Where things live:**
 
-| | Settings (`lazyrunner.config.json`, `projects/`, `themes/`) | State (`lazyrunner.log`, trusted profiles, per-project logs and timings) |
+| | Settings (`lazyrunner.config.json`, `projects/`, `themes/`) | State (`lazyrunner.log`, trusted profiles, per-project logs, timings and durations) |
 |---|---|---|
 | Windows | `%APPDATA%\lazyrunner` | `%LOCALAPPDATA%\lazyrunner` |
 | macOS | `~/Library/Application Support/lazyrunner` | `~/Library/Application Support/lazyrunner/state` |

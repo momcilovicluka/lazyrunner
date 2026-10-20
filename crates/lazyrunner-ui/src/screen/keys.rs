@@ -253,6 +253,19 @@ fn find_match(ui: &mut Ui, controller: &mut Controller, older: bool) {
 
 // ---------------------------------------------------------------- overlays
 
+/// Scrolls a box of lines (the drawing keeps `top` in range).
+fn scroll_box(top: &mut usize, name: &str) {
+    match name {
+        "j" | "DownArrow" => *top += 1,
+        "k" | "UpArrow" => *top = top.saturating_sub(1),
+        "Ctrl+D" | "PageDown" => *top += 10,
+        "Ctrl+U" | "PageUp" => *top = top.saturating_sub(10),
+        "g" | "Home" => *top = 0,
+        "G" | "End" => *top = usize::MAX / 2,
+        _ => {}
+    }
+}
+
 fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
     let palette_len = match &ui.overlay {
         Some(Overlay::Palette { query, .. }) => actions::palette(ui, controller, query).len(),
@@ -264,13 +277,11 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Themes { .. }) => super::theme_picker::key(ui, controller, name, key),
         Some(Overlay::Changelog { top, .. }) => match name {
             "Escape" | "q" | "c" => ui.overlay = None,
-            "j" | "DownArrow" => *top += 1,
-            "k" | "UpArrow" => *top = top.saturating_sub(1),
-            "Ctrl+D" | "PageDown" => *top += 10,
-            "Ctrl+U" | "PageUp" => *top = top.saturating_sub(10),
-            "g" | "Home" => *top = 0,
-            "G" | "End" => *top = usize::MAX / 2,
-            _ => {}
+            _ => scroll_box(top, name),
+        },
+        Some(Overlay::Durations { top }) => match name {
+            "Escape" | "q" | "D" => ui.overlay = None,
+            _ => scroll_box(top, name),
         },
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
@@ -420,6 +431,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenAll => open_all(ui, controller),
         Run::OpenLog => open_log(ui, controller),
         Run::Copy => super::copy::copy(ui, controller),
+        Run::Durations => super::durations::open(ui, controller),
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => ui.search = Some(Search { typing: true, key, ..Search::default() }),
         Run::Zoom => ui.zoom = !ui.zoom,

@@ -266,6 +266,18 @@ fn reloading_hands_the_running_apps_over_without_restarting_them() {
     };
     let before = pids();
     assert!(before.len() == 2 && before.iter().all(Option::is_some), "both servers have a process: {before:?}");
+    // Both starts are in the durations history (D), as the log said them.
+    let history = std::fs::read_to_string(lazyrunner.state.join("two").join("history.json")).unwrap_or_default();
+    let history: Value = serde_json::from_str(&history).unwrap_or_default();
+    let starts: Vec<&str> = history
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|item| item["kind"] == "start")
+        .filter_map(|item| item["key"].as_str())
+        .collect();
+    assert_eq!(starts.len(), 2, "both starts recorded: {history}");
+    assert!(lazyrunner.log_line("is listening on").contains(" - up in "), "{}", lazyrunner.log());
 
     let handovers = || lazyrunner.log().lines().filter(|line| line.contains("Took over")).count();
     // Reload the project profile twice: lazyrunner reopens and hands both servers over each time (the second

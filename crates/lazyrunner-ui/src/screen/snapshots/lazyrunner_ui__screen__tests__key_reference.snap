@@ -22,8 +22,9 @@ expression: screen.frame()
   │   w W         Open in the browser · focused / all      h l Tab     focus another column                │
   │   o           Open the focused app's log file          1-5         jump to a column                    │
   │   y           Copy (yank)                              j k ↑ ↓     scroll a line                       │
-  │   x           Menu for the focused app                 ^u ^d ^b ^f half page / page (PgUp PgDn)        │
-  │ View                                                   gg G        oldest / follow new output          │
-  │   /           Search the focused app's output          n N Esc     search: older / newer / clear       │
+  │   D           Durations                                ^u ^d ^b ^f half page / page (PgUp PgDn)        │
+  │   x           Menu for the focused app                 gg G        oldest / follow new output          │
+  │ View                                                   n N Esc     search: older / newer / clear       │
+  │   /           Search the focused app's output                                                          │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

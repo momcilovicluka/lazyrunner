@@ -12,6 +12,7 @@ use crate::profile::{AppKind, join};
 use crate::run::app::Status;
 use crate::run::build::{self, ToolLine};
 use crate::run::child::Child;
+use crate::run::history::Kind;
 use crate::run::net::Listening;
 use crate::run::{Tag, format_duration, tools};
 
@@ -384,6 +385,7 @@ impl Controller {
         let app = self.app(key).expect("a known app").clone();
         let whole = seconds as u64;
         if code != Some(0) {
+            self.record_duration(Kind::Build, key, seconds, false);
             self.pane(key, &format!("✗ build failed after {whole}s"), Hue::Red);
             let errors = build::errors(&job.lines);
             let full: Vec<String> = errors
@@ -413,8 +415,9 @@ impl Controller {
             build::save_stamp(&self.state_dir, &self.root, key, project, self.fingerprint.as_deref());
         }
         self.timings.add("build", key, seconds);
+        let note = self.record_duration(Kind::Build, key, seconds, true);
         let warnings = if job.warnings > 0 { format!(", {} warnings", job.warnings) } else { String::new() };
-        let summary = format!("built in {whole}s ({} projects{warnings})", job.done);
+        let summary = format!("built in {whole}s ({} projects{warnings}){note}", job.done);
         self.pane(key, &format!("✓ {summary}"), Hue::Green);
         self.add_log(format!("✓ {} {summary}", app.name), Hue::Green);
         self.build_queue.retain(|queued| queued != key);
@@ -648,6 +651,7 @@ impl Controller {
                 );
             }
             NpmCiEnd::Failed => {
+                self.record_duration(Kind::NpmCi, &key, seconds, false);
                 self.last_failed_log = Some(log);
                 self.notifications.push(("npm ci failed".into(), format!("See the {name} column in lazyrunner")));
                 self.pane(&key, &format!("✗ npm ci failed after {}s", seconds as u64), Hue::Red);
@@ -662,8 +666,10 @@ impl Controller {
                 let _ = crate::config::write(&self.npm_ci_stamp(&key), &stamp);
                 self.lock_changed.retain(|changed| *changed != key);
                 self.timings.add("npmci", &key, seconds);
-                self.pane(&key, &format!("✓ npm ci done in {}", format_duration(seconds)), Hue::Green);
-                self.add_log(format!("✓ npm ci done in {}", format_duration(seconds)), Hue::Green);
+                let note = self.record_duration(Kind::NpmCi, &key, seconds, true);
+                let done = format!("✓ npm ci done in {}{note}", format_duration(seconds));
+                self.pane(&key, &done, Hue::Green);
+                self.add_log(done, Hue::Green);
                 if job.start_after {
                     self.start(Some(&[key]), false);
                 }
