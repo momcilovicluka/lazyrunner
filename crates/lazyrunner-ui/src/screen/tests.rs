@@ -311,14 +311,56 @@ async fn gg_jumps_to_the_oldest_line_and_g_alone_does_nothing() {
     assert_eq!(screen.controller.states[0].scroll, 0);
 }
 
+// ---------------------------------------------------------------- t (the theme picker)
+
+fn saved_theme(screen: &Screen) -> Option<String> {
+    screen.controller.config["theme"].as_str().map(str::to_string).filter(|id| id != "default")
+}
+
 #[tokio::test]
-async fn the_next_theme_is_saved_and_named() {
-    let mut screen = screen("keys-theme", json!({}));
+async fn the_theme_picker_previews_without_saving_and_enter_keeps_one() {
+    let mut screen = screen("themes-keep", json!({}));
     screen.press("t");
-    let id = screen.controller.config["theme"].as_str().unwrap().to_string();
-    assert_ne!(id, "default");
-    assert_eq!(screen.ui.theme.id, id);
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Themes { .. })));
+    assert_eq!(screen.ui.theme.id, "default", "it opens on the theme in use");
+    screen.press("Down");
+    let previewed = screen.ui.theme.id.clone();
+    assert_ne!(previewed, "default", "moving applies the next theme at once");
+    assert_eq!(saved_theme(&screen), None, "a preview isn't saved");
+    insta::assert_snapshot!(screen.frame());
+    screen.press("Enter");
+    assert!(screen.ui.overlay.is_none());
+    assert_eq!(saved_theme(&screen).as_deref(), Some(previewed.as_str()));
     assert!(screen.last_log().starts_with(&format!("Theme: {}", screen.ui.theme.name)), "{}", screen.last_log());
+    assert!(screen.last_log().ends_with("(saved)"));
+}
+
+#[tokio::test]
+async fn esc_puts_back_the_theme_the_picker_opened_with() {
+    let mut screen = screen("themes-undo", json!({ "theme": "nord" }));
+    screen.press("t Down Down Esc");
+    assert_eq!(screen.ui.theme.id, "nord");
+    assert_eq!(saved_theme(&screen).as_deref(), Some("nord"));
+    assert!(screen.ui.overlay.is_none());
+}
+
+#[tokio::test]
+async fn typing_filters_the_themes_and_previews_the_first_match() {
+    let mut screen = screen("themes-filter", json!({}));
+    screen.press("t d r a c");
+    assert_eq!(screen.ui.theme.id, "dracula");
+    screen.press("Enter");
+    assert_eq!(saved_theme(&screen).as_deref(), Some("dracula"));
+}
+
+#[tokio::test]
+async fn with_nothing_matching_enter_keeps_the_theme_it_opened_with() {
+    let mut screen = screen("themes-none", json!({}));
+    screen.press("t Down z z z z z");
+    assert!(screen.frame().contains("no matching theme"));
+    screen.press("Enter");
+    assert_eq!(screen.ui.theme.id, "default");
+    assert_eq!(saved_theme(&screen), None);
 }
 
 #[tokio::test]

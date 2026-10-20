@@ -53,7 +53,7 @@ pub fn key_name(key: &KeyEvent) -> String {
     }
 }
 
-fn typed(key: &KeyEvent) -> Option<char> {
+pub(super) fn typed(key: &KeyEvent) -> Option<char> {
     match key.code {
         // AltGr arrives as Ctrl+Alt on Windows: @ [ ] { } \ | on many layouts.
         KeyCode::Char(c)
@@ -261,6 +261,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
     match &mut ui.overlay {
         Some(Overlay::Checklist(list)) => list.skip = true,
         Some(Overlay::Help) => ui.overlay = None, // any key closes the reference
+        Some(Overlay::Themes { .. }) => super::theme_picker::key(ui, controller, name, key),
         Some(Overlay::Changelog { top, .. }) => match name {
             "Escape" | "q" | "c" => ui.overlay = None,
             "j" | "DownArrow" => *top += 1,
@@ -436,7 +437,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             controller.log.clear();
             ui.search = None;
         }
-        Run::Theme => switch_theme(ui, controller),
+        Run::Theme => super::theme_picker::open(ui, controller),
         Run::Settings => ui.overlay = Some(Overlay::Settings { index: 0 }),
         Run::Help => ui.overlay = Some(Overlay::Help),
         Run::Palette => ui.overlay = Some(Overlay::Palette { query: String::new(), index: 0 }),
@@ -480,24 +481,6 @@ fn resize(controller: &mut Controller, key: &str, delta: f64) {
         widths.insert(app.key.clone(), json!(width));
     }
     controller.set_setting("columnWidths", Value::Object(widths));
-}
-
-/// t: the next theme (the folder is read again first, so a new or edited theme shows up).
-fn switch_theme(ui: &mut Ui, controller: &mut Controller) {
-    let (themes, warnings) = super::theme::load(ui.user_themes.as_deref());
-    for warning in warnings {
-        controller.add_log(warning, Hue::Yellow);
-    }
-    ui.themes = themes;
-    let current = controller.config["theme"].as_str().unwrap_or("default").to_string();
-    let position = ui.themes.iter().position(|theme| theme.id == current).map_or(0, |at| at + 1) % ui.themes.len();
-    let next = ui.themes[position].id.clone();
-    controller.set_setting("theme", json!(next));
-    ui.set_theme(&next);
-    let description =
-        if ui.theme.description.is_empty() { String::new() } else { format!(" - {}", ui.theme.description) };
-    let no_color = if super::theme::no_color() { " (NO_COLOR is set, so colours stay off)" } else { "" };
-    controller.add_log(format!("Theme: {}{description}{no_color} (saved)", ui.theme.name), Hue::Cyan);
 }
 
 // ---------------------------------------------------------------- opening things

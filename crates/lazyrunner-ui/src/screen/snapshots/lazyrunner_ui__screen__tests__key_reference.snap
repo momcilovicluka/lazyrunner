@@ -13,7 +13,7 @@ expression: screen.frame()
   │   Space       Start / stop the focused app             > <         Widen / narrow the focused column   │
   │   u U         Start · focused / all                    =           Equal column widths                 │
   │   s S         Stop · focused / all                     Ctrl+L      Clear output                        │
-  │   r R         Restart · focused / all                  t           Theme: Default → next               │
+  │   r R         Restart · focused / all                  t           Theme picker (Default)              │
   │   b B         Rebuild · focused / all                Help                                              │
   │   q           Quit                                     ,           Settings (a u s e w toggles, r che… │
   │ Tools                                                  ?           Key reference                       │

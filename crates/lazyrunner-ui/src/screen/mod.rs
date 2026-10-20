@@ -14,6 +14,7 @@ pub mod status;
 #[cfg(test)]
 mod tests;
 pub mod theme;
+pub mod theme_picker;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -29,6 +30,8 @@ use seg::{Seg, seg as s};
 use theme::{C, Theme};
 
 const MIN_SIZE: (u16, u16) = (60, 15);
+/// The theme picker's panel: a third of the width, within these.
+const THEME_PANEL: (usize, usize) = (30, 40);
 /// The PowerShell version redrew every 100 ms; its frame-counted animations (spinners, glints, blinking cursors)
 /// keep that pace here at any frame rate.
 const ANIMATION_TICK: Duration = Duration::from_millis(100);
@@ -47,12 +50,28 @@ pub struct Search {
 }
 
 pub enum Overlay {
-    Palette { query: String, index: usize },
+    Palette {
+        query: String,
+        index: usize,
+    },
     Help,
-    Menu { index: usize },
-    Settings { index: usize },
+    Menu {
+        index: usize,
+    },
+    Settings {
+        index: usize,
+    },
     Checklist(Box<checklist::Checklist>),
-    Changelog { lines: Vec<Line>, top: usize },
+    Changelog {
+        lines: Vec<Line>,
+        top: usize,
+    },
+    /// `t`: the theme picker; `original` is the theme Esc puts back.
+    Themes {
+        query: String,
+        index: usize,
+        original: String,
+    },
 }
 
 impl Overlay {
@@ -64,6 +83,7 @@ impl Overlay {
             Self::Settings { .. } => "settings",
             Self::Checklist(_) => "checklist",
             Self::Changelog { .. } => "changelog",
+            Self::Themes { .. } => "themes",
         }
     }
 }
@@ -209,7 +229,7 @@ impl Ui {
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
         let typing = self.search.as_ref().is_some_and(|search| search.typing)
-            || matches!(self.overlay, Some(Overlay::Palette { .. }) | Some(Overlay::Checklist(_)))
+            || matches!(self.overlay, Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. }))
             || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
         typing
             || self.busy.is_some()
@@ -261,9 +281,31 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Palette { .. }) => return overlays::palette(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
+        Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         _ => {}
     }
     columns::rows(ui, controller, width, rows)
+}
+
+/// The theme picker in a narrow panel on the right; the columns keep the rest, so they show the theme.
+fn with_theme_picker(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let panel = (width / 3).clamp(THEME_PANEL.0, THEME_PANEL.1);
+    let main = width.saturating_sub(panel + 1);
+    let mut columns = columns::rows(ui, controller, main, rows);
+    let saved = controller.config["theme"].as_str().unwrap_or("default").to_string();
+    let mut picker = theme_picker::rows(ui, &saved, panel, rows);
+    columns.resize(rows, Vec::new());
+    picker.resize(rows, Vec::new());
+    columns
+        .into_iter()
+        .zip(picker)
+        .map(|(left, right)| {
+            let mut row = columns::fit(left, main);
+            row.push(s("┃", C::FocusBorder));
+            row.extend(columns::fit(right, panel));
+            row
+        })
+        .collect()
 }
 
 /// The frame as plain text (tests, the frame dump).

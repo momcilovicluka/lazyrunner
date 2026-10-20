@@ -2,6 +2,7 @@
 //! cut to the width it has.
 
 use ratatui::buffer::Buffer;
+use ratatui::style::Style;
 use serde_json::Value;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -13,14 +14,21 @@ pub struct Seg {
     pub text: String,
     pub fg: C,
     pub bg: Option<C>,
+    /// A style of its own instead of the theme's for `fg` / `bg` (the theme picker's swatches show other themes).
+    pub style: Option<Style>,
 }
 
 pub fn seg(text: impl Into<String>, fg: C) -> Seg {
-    Seg { text: text.into(), fg, bg: None }
+    Seg { text: text.into(), fg, bg: None, style: None }
 }
 
 pub fn on(text: impl Into<String>, fg: C, bg: C) -> Seg {
-    Seg { text: text.into(), fg, bg: Some(bg) }
+    Seg { text: text.into(), fg, bg: Some(bg), style: None }
+}
+
+/// Text in a style of its own, whatever theme is showing.
+pub fn styled(text: impl Into<String>, style: Style) -> Seg {
+    Seg { text: text.into(), fg: C::Gray, bg: None, style: Some(style) }
 }
 
 /// The cells a row takes.
@@ -84,7 +92,13 @@ pub fn draw(buf: &mut Buffer, x: u16, y: u16, cells: u16, segs: &[Seg], theme: &
             }
             continue;
         }
-        let (next, _) = buf.set_stringn(cx, y, &seg.text, usize::from(right - cx), theme.style(seg.fg, seg.bg));
+        let (next, _) = buf.set_stringn(
+            cx,
+            y,
+            &seg.text,
+            usize::from(right - cx),
+            seg.style.unwrap_or_else(|| theme.style(seg.fg, seg.bg)),
+        );
         cx = next;
     }
 }
