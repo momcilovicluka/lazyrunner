@@ -9,21 +9,21 @@ expression: screen.frame()
 
 
   ┌─ Keys · lazyrunner v<version> ─────────────────────────────────────────────────────────────────────────────┐
-  │ Run                                                    > <         Widen / narrow the focused column   │
-  │   Space       Start / stop the focused app             =           Equal column widths                 │
-  │   u U         Start · focused / all                    Ctrl+L      Clear output                        │
-  │   s S         Stop · focused / all                     t           Theme: Default → next               │
-  │   r R         Restart · focused / all                Help                                              │
-  │   b B         Rebuild · focused / all                  ,           Settings (a u s e w toggles, r che… │
-  │   q           Quit                                     ?           Key reference                       │
-  │ Tools                                                  :           Command palette                     │
-  │   d           Switch database                        Navigate                                          │
-  │   i           npm ci (reinstall packages)              h l Tab     focus another column                │
-  │   w W         Open in the browser · focused / all      1-5         jump to a column                    │
-  │   o           Open the focused app's log file          j k ↑ ↓     scroll a line                       │
+  │ Run                                                    z           Zoom the focused column             │
+  │   Space       Start / stop the focused app             > <         Widen / narrow the focused column   │
+  │   u U         Start · focused / all                    =           Equal column widths                 │
+  │   s S         Stop · focused / all                     Ctrl+L      Clear output                        │
+  │   r R         Restart · focused / all                  t           Theme: Default → next               │
+  │   b B         Rebuild · focused / all                Help                                              │
+  │   q           Quit                                     ,           Settings (a u s e w toggles, r che… │
+  │ Tools                                                  ?           Key reference                       │
+  │   d           Switch database                          :           Command palette                     │
+  │   i           npm ci (reinstall packages)            Navigate                                          │
+  │   w W         Open in the browser · focused / all      h l Tab     focus another column                │
+  │   o           Open the focused app's log file          1-5         jump to a column                    │
+  │   y           Copy (yank)                              j k ↑ ↓     scroll a line                       │
   │   x           Menu for the focused app                 ^u ^d ^b ^f half page / page (PgUp PgDn)        │
   │ View                                                   gg G        oldest / follow new output          │
   │   /           Search the focused app's output          n N Esc     search: older / newer / clear       │
-  │   z           Zoom the focused column                                                                  │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

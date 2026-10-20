@@ -118,6 +118,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `i` | `npm ci` for an npm app, in the background (it stops the app first and starts it again after) |
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
+| `y` | Copy the focused app's last error with its stack trace (a failed build's errors with full paths), or the search match |
 | `x` | Menu of everything you can do with the focused app |
 | `,` | **Settings** menu (below) |
 
@@ -188,7 +189,8 @@ then `w`.
 every SQL connection string there as `database @ server`, never showing passwords. Choosing one makes that line active
 and comments out (`//`) the others with the same key, checks the file is still valid JSON, keeps the previous version
 as `secrets.json.lazyrunner-backup`, and restarts the running .NET apps (no build needed). `n` adds an entry: a copy
-of the selected one with another database name.
+of the selected one with another database name; `y` copies the highlighted line as it is in the file,
+password included.
 
 ## npm apps
 
