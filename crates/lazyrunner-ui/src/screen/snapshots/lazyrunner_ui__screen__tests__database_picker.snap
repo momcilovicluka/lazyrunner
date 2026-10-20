@@ -13,7 +13,7 @@ expression: screen.frame()
      │ secrets.json · 2 connection strings · active one marked ●                                        │
      │    Shop @ dev-sql                                                                                │
      │  ● ShopLocal @ localhost   (active)                                                              │
-     │ j k choose · Enter switch + restart the APIs · n new · / filter · Esc close                      │
+     │ j k choose · Enter switch + restart the APIs · n new · y copy row · / filter · Esc close         │
      └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 

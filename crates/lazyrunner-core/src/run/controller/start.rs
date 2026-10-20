@@ -17,6 +17,8 @@ use crate::run::{Tag, format_duration, tools};
 
 /// A build cannot start (no dotnet, say): it fails like a failed build.
 const MAX_BUILD_ERROR_LINES: usize = 6;
+/// `y` copies at most this many errors of a failed build.
+const MAX_COPIED_BUILD_ERRORS: usize = 200;
 /// How long a stopped app's port may stay held.
 const STOP_SETTLE: std::time::Duration = std::time::Duration::from_secs(3);
 
@@ -318,6 +320,7 @@ impl Controller {
         let spec = tools::build_command(&self.root, project);
         let file = Path::new(project).file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
         self.pane(key, &format!("──── ⚙ {} · dotnet build {file} ────", clock()), Hue::Cyan);
+        self.failed_build_errors.remove(key);
         let total = build::project_count(&self.root.join(project));
         self.next_job += 1;
         let id = self.next_job;
@@ -383,6 +386,12 @@ impl Controller {
         if code != Some(0) {
             self.pane(key, &format!("✗ build failed after {whole}s"), Hue::Red);
             let errors = build::errors(&job.lines);
+            let full: Vec<String> = errors
+                .iter()
+                .map(|line| crate::output::strip_ansi(line).trim().to_string())
+                .take(MAX_COPIED_BUILD_ERRORS)
+                .collect();
+            self.failed_build_errors.insert(key.to_string(), full);
             self.last_failed_log = Some(log);
             self.last_build_failed = true;
             self.notifications

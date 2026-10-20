@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.3.0] - 2026-10-20
+
+### Added
+- `y` copies the focused app's last error with its stack trace, ready to paste into a ticket or a chat; after a failed build, its errors with their full paths. With a search match (`/`), it copies that line and the indented lines that belong to it
+- `y` in the database picker copies the highlighted line as it is in secrets.json, password included
+
 ## [0.2.0] - 2026-10-20
 
 lazyrunner is now one native binary for Windows, Linux and macOS, with the same profiles, keys and screen.

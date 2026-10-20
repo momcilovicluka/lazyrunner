@@ -24,6 +24,7 @@ pub enum Run {
     OpenFocused,
     OpenAll,
     OpenLog,
+    Copy,
     Menu,
     Search,
     Zoom,
@@ -114,6 +115,9 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             .focused(),
         action("Tools", "W", "Open everything in the browser", "every Swagger and npm app", Run::OpenAll).safe(),
         action("Tools", "o", "Open the focused app's log file", "its full output", Run::OpenLog).safe().focused(),
+        action("Tools", "y", "Copy (yank)", "the last error with its stack trace, or the search match", Run::Copy)
+            .safe()
+            .focused(),
         action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
         action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
         action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),

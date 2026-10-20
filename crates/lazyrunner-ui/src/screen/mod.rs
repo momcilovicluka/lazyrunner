@@ -5,6 +5,7 @@
 pub mod actions;
 pub mod checklist;
 pub mod columns;
+pub mod copy;
 pub mod keys;
 pub mod overlays;
 pub mod panel;
@@ -132,6 +133,8 @@ pub struct Ui {
     pub whats_new: Vec<changelog::Entry>,
     /// Opens a link or a file (the default app); tests swap it for one that only records.
     pub opener: fn(&str) -> bool,
+    /// Copies to the clipboard (`y`); tests swap it for one that only records.
+    pub clipboard: copy::Clipboard,
     bars: HashMap<String, (f64, Instant)>,
 }
 
@@ -158,6 +161,7 @@ impl Ui {
             exit: None,
             whats_new: Vec::new(),
             opener: status::open,
+            clipboard: copy::to_clipboard,
             bars: HashMap::new(),
         };
         let wanted = controller.config["theme"].as_str().unwrap_or("default").to_string();

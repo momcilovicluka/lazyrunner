@@ -5,7 +5,6 @@ expression: screen.frame()
 
 
 
-
                      ┌─ Orders ─────────────────────────────────────────────────────────┐
                      │  Space  Start / stop the focused app  whichever it is not        │
                      │  u      Start the focused app  builds it first if it changed     │
@@ -14,6 +13,7 @@ expression: screen.frame()
                      │  b      Rebuild the focused app  restart with a full build       │
                      │  w      Open the focused app in the browser  Swagger for an API  │
                      │  o      Open the focused app's log file  its full output         │
+                     │  y      Copy (yank)  the last error with its stack trace, or th… │
                      │  /      Search the focused app's output  n older match, N newer  │
                      │  z      Zoom the focused column                                  │
                      │ press a key, or j k + Enter · Esc / x close                      │

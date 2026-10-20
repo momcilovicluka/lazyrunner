@@ -125,7 +125,7 @@ pub fn picker(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let footer = if picker.filtering {
         "type to filter · Enter keeps it · Esc clears it".to_string()
     } else {
-        format!("j k choose · Enter switch + restart the APIs · n new · / filter · Esc close{more}")
+        format!("j k choose · Enter switch + restart the APIs · n new · y copy row · / filter · Esc close{more}")
     };
     boxed(&format!("Database · {key}{group_info}"), lines, &footer, cells, rows, 96)
 }

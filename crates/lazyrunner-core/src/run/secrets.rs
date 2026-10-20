@@ -104,6 +104,14 @@ pub fn active_label(text: &str) -> Option<String> {
     })
 }
 
+/// Line `index` of the file as it is there, and the key it sets: `y` in the picker copies it. `None` when that line
+/// isn't a connection string (the file changed since it was read).
+pub fn line_at(text: &str, index: usize) -> Option<(String, String)> {
+    let line = lines(text).into_iter().nth(index)?;
+    let key = LINE.captures(&line)?["key"].to_string();
+    Some((key, line))
+}
+
 fn lines(text: &str) -> Vec<String> {
     text.split('\n').map(|line| line.strip_suffix('\r').unwrap_or(line).to_string()).collect()
 }

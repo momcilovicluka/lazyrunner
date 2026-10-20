@@ -1,6 +1,7 @@
 //! Snapshot tests of every screen (insta: `cargo insta review` after a deliberate change), and the keys that
 //! change what the screen shows. The sample project, without starting anything: the apps' states are set by hand.
 
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -30,6 +31,23 @@ struct Screen {
     controller: Controller,
     ui: Ui,
 }
+
+thread_local! {
+    /// What `y` copied in this test (each test runs on its own thread).
+    static COPIED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// The tests' clipboard: records instead of touching the real one.
+fn record(text: &str) -> Result<(), String> {
+    COPIED.with(|copied| copied.borrow_mut().push(text.to_string()));
+    Ok(())
+}
+
+fn copied() -> Vec<String> {
+    COPIED.with(|copied| copied.borrow().clone())
+}
+
+const NEWLINE: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 
 fn opened(_: &str) -> bool {
     true
@@ -65,6 +83,7 @@ fn screen(label: &str, config: Value) -> Screen {
     let started = Instant::now();
     let (mut ui, _) = Ui::new(&controller, None, started);
     ui.opener = opened;
+    ui.clipboard = record;
     ui.now = started + Duration::from_secs(10);
     Screen { temp, _events: rx, controller, ui }
 }
@@ -237,7 +256,7 @@ async fn startup_checklist() {
     let mut screen = screen("snap-checklist", json!({}));
     let item = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
     let items = vec![
-        item("lazyrunner", Status::Ok, "v0.2.0"),
+        item("lazyrunner", Status::Ok, &format!("v{}", lazyrunner_core::changelog::VERSION)),
         item("git", Status::Ok, "2.50"),
         item(".NET SDK", Status::Warn, "9.0 - the apps want 10.0"),
         item("Ports", Status::Running, ""),
@@ -366,4 +385,103 @@ async fn a_match_lands_in_the_middle_even_when_lines_wrap() {
     screen.press("/ n e e d l e Enter");
     let frame = screen.frame();
     assert!(frame.lines().any(|line| line.starts_with("needle")), "the match is on screen:\n{frame}");
+}
+
+// ---------------------------------------------------------------- y (copy)
+
+impl Screen {
+    /// Lines in the first column (Orders), as an app printed them.
+    fn output(&mut self, lines: &[&str]) {
+        let at = self.ui.now - Duration::from_secs(5);
+        for line in lines {
+            self.controller.states[0].output.push(line, at);
+        }
+    }
+}
+
+const ERROR_ENTRY: [&str; 6] = [
+    "info: Microsoft.Hosting.Lifetime[0]",
+    "fail: Shop.Orders.OrdersController[0]",
+    "      An unhandled exception has occurred while executing the request.",
+    "      System.NullReferenceException: Object reference not set to an instance of an object.",
+    "         at Shop.Orders.OrdersController.Get() in C:\\src\\Orders\\OrdersController.cs:line 12",
+    "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
+];
+
+#[tokio::test]
+async fn y_copies_the_last_error_with_its_stack_trace() {
+    let mut screen = screen("copy-error", json!({}));
+    screen.output(&ERROR_ENTRY);
+    screen.press("y");
+    assert_eq!(copied(), [ERROR_ENTRY[1..5].join(NEWLINE)]);
+    assert_eq!(screen.last_log(), "Copied the last error from Orders (4 lines) to the clipboard");
+}
+
+#[tokio::test]
+async fn y_copies_the_search_match_with_its_indented_lines() {
+    let mut screen = screen("copy-search", json!({}));
+    screen.output(&ERROR_ENTRY);
+    screen.press("/ N u l l R e f Enter y");
+    assert_eq!(copied(), [ERROR_ENTRY[3..5].join(NEWLINE)], "the match and the stack frame below it");
+    assert_eq!(screen.last_log(), "Copied the search match from Orders (2 lines) to the clipboard");
+}
+
+#[tokio::test]
+async fn y_copies_a_failed_builds_errors_with_their_full_paths() {
+    let mut screen = screen("copy-build", json!({}));
+    screen.output(&[
+        "──── ⚙ 10:00:00 · dotnet build Orders.csproj ────",
+        "OrdersController.cs(3,1): error CS1002: ; expected",
+    ]);
+    let at = screen.ui.now;
+    screen.controller.states[0].output.push_hued("✗ build failed after 3s", Some(Hue::Red), at);
+    let full = "C:\\src\\Orders\\OrdersController.cs(3,1): error CS1002: ; expected [C:\\src\\Orders\\Orders.csproj]";
+    screen.controller.failed_build_errors.insert("orders".into(), vec![full.into()]);
+    screen.press("y");
+    assert_eq!(copied(), [full]);
+    assert_eq!(screen.last_log(), "Copied the last error from Orders (1 line) to the clipboard");
+}
+
+#[tokio::test]
+async fn y_says_when_there_is_nothing_to_copy_or_the_clipboard_refuses() {
+    let mut screen = screen("copy-nothing", json!({}));
+    screen.output(&["info: Now listening on: http://localhost:58201"]);
+    screen.press("y");
+    assert!(copied().is_empty());
+    assert_eq!(screen.last_log(), "Nothing to copy: no error in Orders's output (/ finds a line to copy).");
+    screen.output(&ERROR_ENTRY);
+    screen.ui.clipboard = |_| Err("the clipboard is busy".into());
+    screen.press("y");
+    assert_eq!(screen.last_log(), "Couldn't copy to the clipboard: the clipboard is busy");
+}
+
+#[tokio::test]
+async fn y_in_the_database_picker_copies_the_line_as_it_is_in_secrets_json() {
+    let mut screen = screen("copy-picker", json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{\n  //\"DefaultConnection\": \"Server=dev-sql;Database=Shop;User Id=x;Password=p\",\n  \"DefaultConnection\": \"Server=localhost;Database=ShopLocal;Trusted_Connection=True\"\n}\n";
+    std::fs::write(&path, secrets).unwrap();
+    let groups = lazyrunner_core::run::secrets::groups(secrets);
+    let picker = Picker {
+        path: path.clone(),
+        groups,
+        group: 0,
+        index: 0,
+        top: 0,
+        filter: String::new(),
+        filtering: false,
+        new_name: None,
+    };
+    screen.ui.picker = Some(picker);
+    screen.press("y");
+    assert_eq!(copied(), ["//\"DefaultConnection\": \"Server=dev-sql;Database=Shop;User Id=x;Password=p\","]);
+    assert_eq!(
+        screen.last_log(),
+        "Copied the Shop @ dev-sql row from secrets.json (password included) to the clipboard"
+    );
+    assert!(screen.ui.picker.is_some(), "the picker stays open");
+    std::fs::write(&path, "{\n}\n").unwrap();
+    screen.press("y");
+    assert_eq!(copied().len(), 1, "nothing copied from a file that changed");
+    assert_eq!(screen.last_log(), "secrets.json changed since the picker opened - press d again to copy that row.");
 }

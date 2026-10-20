@@ -113,6 +113,9 @@ pub struct Controller {
     pub last_failed_log: Option<PathBuf>,
     /// Whether the last build of the current start failed (the tab turns red).
     pub last_build_failed: bool,
+    /// The errors of each app's last failed build, with their full paths (`y` copies them; the columns show them
+    /// shortened). Gone once that app builds again.
+    pub failed_build_errors: HashMap<String, Vec<String>>,
     /// Desktop notifications to show (title, message); the UI takes them and shows them when the setting is on.
     pub notifications: Vec<(String, String)>,
     git_dir: Option<PathBuf>,
@@ -190,6 +193,7 @@ impl Controller {
             profile_changed: false,
             last_failed_log: None,
             last_build_failed: false,
+            failed_build_errors: HashMap::new(),
             notifications: Vec::new(),
             git_dir: None,
             pending_branch: None,

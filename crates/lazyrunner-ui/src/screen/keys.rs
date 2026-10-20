@@ -388,6 +388,7 @@ fn needs_app(action: &Run) -> bool {
             | Run::NpmCi
             | Run::OpenFocused
             | Run::OpenLog
+            | Run::Copy
             | Run::Search
             | Run::Widen
             | Run::Narrow
@@ -417,6 +418,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenFocused => open_focused(ui, controller, &key),
         Run::OpenAll => open_all(ui, controller),
         Run::OpenLog => open_log(ui, controller),
+        Run::Copy => super::copy::copy(ui, controller),
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => ui.search = Some(Search { typing: true, key, ..Search::default() }),
         Run::Zoom => ui.zoom = !ui.zoom,
@@ -655,6 +657,12 @@ fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEve
     let count = picker.entries().len();
     match name {
         "n" | "+" | "Insert" => picker.new_name = Some(String::new()),
+        "y" => {
+            if let Some(entry) = picker.entries().get(picker.index).cloned() {
+                let path = picker.path.clone();
+                super::copy::copy_row(ui.clipboard, controller, &path, &entry);
+            }
+        }
         "/" => picker.filtering = true,
         "Escape" | "q" | "d" => {
             if picker.filter.is_empty() {
