@@ -1,5 +1,6 @@
 name: rust
 
+# Windows only for now (lazyrunner ships for Windows first); Linux and macOS come back with their releases.
 on:
   push:
     branches: [main, rust]
@@ -13,7 +14,7 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -24,11 +25,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

@@ -9,12 +9,12 @@ lazyrunner is now one native binary for Windows, Linux and macOS, with the same 
 
 ### Added
 - Linux and macOS: apps run in process groups, and nothing lazyrunner started outlives it, even when it crashes
-- Install with one command (`irm …lazyrunner-installer.ps1 | iex` on Windows, `curl …lazyrunner-installer.sh | sh` elsewhere), or with Homebrew, Scoop, winget or `cargo install`
+- Install with one command in PowerShell (`irm …lazyrunner-installer.ps1 | iex`); on Linux and macOS, `cargo install` builds it
 - Smoother and lighter: 60 frames a second under heavy output at a fraction of the CPU and memory, and nothing redrawn while nothing changes
 - The startup checklist shows the update's download progress; any key skips the checks still running
 
 ### Changed
-- Updates come from GitHub Releases: the binary for your platform, checked against its SHA-256, replaces the running one, and lazyrunner reopens on it; installed with Homebrew, Scoop or winget, they update it instead
+- Updates come from GitHub Releases: the binary for your platform, checked against its SHA-256, replaces the running one, and lazyrunner reopens on it
 - Settings and your profiles live in the OS's settings folder (`%APPDATA%\lazyrunner`, `~/.config/lazyrunner`, `~/Library/Application Support/lazyrunner`), with `themes` for your own themes; the built-in themes and the changelog are part of the binary
 - `updateRepoUrl` takes a GitHub repo; `updateBranch` is gone
 
