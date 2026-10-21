@@ -239,6 +239,25 @@ async fn settings_toggle_and_say_so() {
     assert_eq!(screen.last_log(), "Auto-restart on branch change: on (saved)");
     assert!(screen.controller.setting(Toggle::AutoRestartOnBranchChange));
     assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { .. })), "settings stay open");
+    screen.press("f");
+    assert_eq!(screen.last_log(), "Reduced motion / flair: on (saved)");
+    assert!(screen.controller.setting(Toggle::ReducedMotion));
+}
+
+#[tokio::test]
+async fn reduced_motion_keeps_a_search_cursor_and_starting_status_static() {
+    let mut screen = screen("reduced-motion", json!({ "reducedMotion": true }));
+    screen.running();
+    screen.press("/ e");
+    let first = screen.frame();
+    screen.ui.now += Duration::from_millis(600);
+    let second = screen.frame();
+    assert!(first.contains("/e▏"), "{}", first);
+    assert!(second.contains("/e▏"), "{}", second);
+    assert!(first.contains(" :58202  ●"), "{}", first);
+    assert!(second.contains(" :58202  ●"), "{}", second);
+    assert!(!first.contains(" :58202  ○"), "{}", first);
+    assert!(!second.contains(" :58202  ○"), "{}", second);
 }
 
 #[tokio::test]

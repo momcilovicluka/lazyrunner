@@ -2,6 +2,7 @@
 //! tab's title), the tab and taskbar progress (OSC 9;4: green, red, yellow in Windows Terminal), desktop
 //! notifications, and opening links and files.
 
+use lazyrunner_core::config::Toggle;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::Status;
 
@@ -33,7 +34,13 @@ pub fn summary(controller: &Controller) -> Summary {
         .count();
     let mut tools = Vec::new();
     if let Some(job) = &controller.building {
-        tools.push(format!("building {}…", controller.app(&job.key).map_or("", |app| app.name.as_str())));
+        let app = controller.app(&job.key).map_or("", |app| app.name.as_str());
+        if controller.setting(Toggle::ReducedMotion) && job.total > 0 {
+            let done = job.done.min(job.total);
+            tools.push(format!("building {app} ({}%)", done * 100 / job.total));
+        } else {
+            tools.push(format!("building {app}…"));
+        }
     }
     if controller.npm_ci.is_some() {
         tools.push("npm ci…".to_string());

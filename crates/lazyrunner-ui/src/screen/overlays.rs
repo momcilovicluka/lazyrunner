@@ -300,10 +300,16 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
     boxed(&format!("Keys · lazyrunner v{VERSION}"), lines, footer, cells, rows, inner)
 }
 
-fn icon(status: Status, tick: u64) -> String {
+fn icon(status: Status, tick: u64, animated: bool) -> String {
     match status {
         Status::Pending => "·".into(),
-        Status::Running => spinner(tick).to_string(),
+        Status::Running => {
+            if animated {
+                spinner(tick).to_string()
+            } else {
+                "●".into()
+            }
+        }
         Status::Ok => "✓".into(),
         Status::Warn => "!".into(),
         Status::Fail => "✗".into(),
@@ -327,6 +333,7 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some(Overlay::Checklist(list)) = &ui.overlay else { return Vec::new() };
     let list: &Checklist = list;
     let tick = ui.tick();
+    let animated = !ui.reduced_motion;
     let room = rows.saturating_sub(3);
     let news = changelog::wrap(&list.news, cells.saturating_sub(8).clamp(20, 84).saturating_sub(3));
     let passed = list.items.iter().filter(|item| matches!(item.status, Status::Ok | Status::Skip)).count();
@@ -340,7 +347,7 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         .map(|item| {
             let detail_color = if item.status == Status::Ok { C::Gray } else { status_color(item.status) };
             vec![
-                seg(format!(" {} ", icon(item.status, tick)), status_color(item.status)),
+                seg(format!(" {} ", icon(item.status, tick, animated)), status_color(item.status)),
                 seg(format!("{:<19}", item.name), C::White),
                 seg(item.detail.clone(), detail_color),
             ]
@@ -354,7 +361,11 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let news_rows = if news.is_empty() { 1 } else { news.len().min(WHATS_NEW_MAX_LINES) + 3 };
     if checks.len() + news_rows + LOGO.len() + 2 <= room {
         lines.push(Vec::new());
-        let sweep = (tick % (LOGO[0].chars().count() as u64 + 15)) as i64 - 6; // the light's column: left to right, then a pause
+        let sweep = if animated {
+            (tick % (LOGO[0].chars().count() as u64 + 15)) as i64 - 6 // the light's column: left to right, then a pause
+        } else {
+            -99
+        };
         for row in LOGO {
             let mut segs = vec![seg("   ", C::Gray)];
             for (i, c) in row.chars().enumerate() {
@@ -390,7 +401,7 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         }
         lines.push(Vec::new());
     }
-    let sparkle = SPARKLE[(tick / 3) as usize % 2];
+    let sparkle = if animated { SPARKLE[(tick / 3) as usize % 2] } else { SPARKLE[0] };
     boxed(&format!("{sparkle} lazyrunner v{VERSION} · startup checklist"), lines, &list.footer, cells, rows, 84)
 }
 
