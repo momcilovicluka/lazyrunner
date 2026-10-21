@@ -123,3 +123,23 @@ fn dotnet_framework() -> String {
 pub fn has_tools(tools: &[&str]) -> bool {
     tools.iter().all(|tool| crate::run::tools::find_on_path(tool).is_some())
 }
+
+/// A clock tests move by hand: set a controller's `now` to `clock::now`, then `clock::advance`. Per thread (each
+/// test runs on its own).
+pub mod clock {
+    use std::cell::Cell;
+    use std::time::{Duration, Instant};
+
+    thread_local! {
+        static START: Instant = Instant::now();
+        static AHEAD: Cell<Duration> = const { Cell::new(Duration::ZERO) };
+    }
+
+    pub fn now() -> Instant {
+        START.with(|start| *start) + AHEAD.with(Cell::get)
+    }
+
+    pub fn advance(by: Duration) {
+        AHEAD.with(|ahead| ahead.set(ahead.get() + by));
+    }
+}

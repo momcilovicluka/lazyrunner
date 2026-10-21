@@ -93,8 +93,8 @@ mod tests {
     fn powershell_flags_still_work() {
         let args = ["lazyrunner", "profile", "check", "-Json", "x.json"].map(OsString::from);
         assert_eq!(powershell_flags(args.into_iter()), ["lazyrunner", "profile", "check", "--json", "x.json"]);
-        let other = ["lazyrunner", "spike", "-json"].map(OsString::from);
-        assert_eq!(powershell_flags(other.into_iter()), ["lazyrunner", "spike", "-json"], "only after profile");
+        let other = ["lazyrunner", "version", "-json"].map(OsString::from);
+        assert_eq!(powershell_flags(other.into_iter()), ["lazyrunner", "version", "-json"], "only after profile");
     }
 
     #[test]

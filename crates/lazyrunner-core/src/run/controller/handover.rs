@@ -18,7 +18,6 @@ use crate::output::Hue;
 use crate::run::Tag;
 use crate::run::app::Status;
 use crate::run::child::{self, Child, Handles, Released};
-use crate::run::tools;
 
 /// The handover file's format; a lazyrunner reads this version and older ones (fields it doesn't find are empty).
 pub const HANDOVER_VERSION: u32 = 1;
@@ -105,7 +104,9 @@ impl Controller {
 
     /// A fingerprint of what an app runs here (its command, folder and label): another one means it changed.
     fn command_of(&self, index: usize) -> String {
-        let command = tools::server_command(&self.root, &self.apps[index], &self.apps)
+        let command = self
+            .commands
+            .server(&self.root, &self.apps[index], &self.apps)
             .map(|command| {
                 format!("{:?}|{:?}|{:?}|{}", command.spec.program, command.spec.args, command.spec.dir, command.label)
             })

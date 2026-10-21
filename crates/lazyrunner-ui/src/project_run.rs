@@ -13,22 +13,23 @@ use anyhow::Result;
 use crossterm::event::{Event, EventStream, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use lazyrunner_core::changelog;
+use lazyrunner_core::config::Toggle;
 use lazyrunner_core::ipc;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::paths::Paths;
 use lazyrunner_core::profile::{self, ProfileDirs, Project};
-use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::child::Guard;
 use lazyrunner_core::run::controller::{Passed, Setup, read_handover};
+use lazyrunner_core::run::{Command, Controller, Origin};
 use lazyrunner_core::update;
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::sleep_until;
 
 use crate::keys;
-use crate::run::{Surface, TimerResolution};
 use crate::screen::checklist::{Checklist, StillChecking};
 use crate::screen::{self, Exit, Overlay, Ui, status};
+use crate::terminal::{Surface, TimerResolution};
 use crate::theme::{ColorMode, downsample};
 
 /// While something animates: the animations step every 100 ms, so 30 frames a second is plenty.
@@ -111,7 +112,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         log_whats_new(&mut controller, &whats_new);
         take_over(&mut controller, file, &options.handover_handles);
         quiet = None;
-    } else if controller.setting("startupChecklist") {
+    } else if controller.setting(Toggle::StartupChecklist) {
         let checklist = Checklist::start(&controller, false, &whats_new, options.start_now);
         ui.overlay = Some(Overlay::Checklist(Box::new(checklist)));
         quiet = None;
@@ -387,7 +388,7 @@ fn take_over(controller: &mut Controller, file: &Path, handles: &[u64]) {
 
 /// The checklist is off: the same update check, in the background, while the apps start.
 fn quiet_update(controller: &Controller) -> Option<std::sync::mpsc::Receiver<update::Outcome>> {
-    if !controller.setting("autoUpdate") {
+    if !controller.setting(Toggle::AutoUpdate) {
         return None;
     }
     let (config, state_dir) = (controller.config.clone(), controller.paths().state_dir.clone());
@@ -457,7 +458,7 @@ fn notify(controller: &mut Controller, headless: bool) {
         return;
     }
     let notifications = std::mem::take(&mut controller.notifications);
-    if headless || !controller.setting("notifications") {
+    if headless || !controller.setting(Toggle::Notifications) {
         return;
     }
     for (title, message) in notifications {
@@ -536,7 +537,8 @@ fn same_project(controller: &Controller, dirs: &ProfileDirs, root: &Path) -> boo
     other.id == own.id && other.hash == own.hash && other.source == own.source
 }
 
-/// `{"keys": "U"}`, `{"dump": true}` (answered after the next frame), `{"state": true}`, `{"action": "start" | "stop"
+/// `{"keys": "U"}`, `{"dump": true}` (answered after the next frame), `{"state": true}`, `{"command": <Command>}`
+/// (lazyrunner_core::run::Command, e.g. `{"command": {"restart": "orders"}}`), `{"action": "start" | "stop"
 /// | "restart" | "quit", "root"?: "<dir>"}`, `{"quit": true}`. True when the answer needs a moment to get out before
 /// lazyrunner exits.
 fn control(
@@ -567,6 +569,17 @@ fn control(
         dumps.push(request.reply);
         return false;
     }
+    if let Some(command) = body.get("command") {
+        let answer = match serde_json::from_value::<Command>(command.clone()) {
+            Ok(command) => match controller.execute(command, Origin::CommandLine) {
+                Ok(()) => json!({ "ok": true }),
+                Err(why) => json!({ "ok": false, "error": why }),
+            },
+            Err(error) => json!({ "ok": false, "error": format!("not a command lazyrunner knows - {error}") }),
+        };
+        let _ = request.reply.send(answer);
+        return false;
+    }
     if body.get("state").is_some() {
         let mut state = controller.state_json();
         state["focus"] = json!(ui.focus);
@@ -593,27 +606,22 @@ fn control(
         controller.start(None, false);
         return false;
     }
-    let known = match action {
-        Some("start") => {
-            controller.start(None, false);
-            true
-        }
-        Some("stop") => {
-            controller.stop_all();
-            true
-        }
-        Some("restart") => {
-            controller.restart("requested from the command line", None, false);
-            true
-        }
-        Some("quit") => {
-            let _ = request.reply.send(json!({ "ok": true }));
-            ui.exit = Some(Exit::Quit);
-            return true;
-        }
-        _ => false,
+    if action == Some("quit") {
+        let _ = request.reply.send(json!({ "ok": true }));
+        ui.exit = Some(Exit::Quit);
+        return true;
+    }
+    let command = match action {
+        Some("start") => Some(Command::StartAll),
+        Some("stop") => Some(Command::StopAll),
+        Some("restart") => Some(Command::RestartAll),
+        _ => None,
     };
-    let answer = if known { json!({ "ok": true }) } else { json!({ "ok": false, "error": "unknown request" }) };
+    let answer = match command.map(|command| controller.execute(command, Origin::CommandLine)) {
+        Some(Ok(())) => json!({ "ok": true }),
+        Some(Err(why)) => json!({ "ok": false, "error": why }),
+        None => json!({ "ok": false, "error": "unknown request" }),
+    };
     let _ = request.reply.send(answer);
     false
 }

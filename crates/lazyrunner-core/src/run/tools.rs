@@ -49,6 +49,31 @@ pub struct ServerCommand {
     pub script: Option<String>,
 }
 
+/// What the controller runs for an app: its server, its build, its npm ci. `Tools` runs dotnet and npm; tests put
+/// quick scripts in their place (`Controller::commands`) to drive builds and restarts without those tools.
+pub trait Commands: Send + Sync {
+    fn server(&self, root: &Path, app: &App, active: &[App]) -> Result<ServerCommand>;
+    fn build(&self, root: &Path, project: &str) -> Spec;
+    fn npm_ci(&self, dir: &Path) -> Result<Spec>;
+}
+
+/// The real tools: dotnet and npm.
+pub struct Tools;
+
+impl Commands for Tools {
+    fn server(&self, root: &Path, app: &App, active: &[App]) -> Result<ServerCommand> {
+        server_command(root, app, active)
+    }
+
+    fn build(&self, root: &Path, project: &str) -> Spec {
+        build_command(root, project)
+    }
+
+    fn npm_ci(&self, dir: &Path) -> Result<Spec> {
+        npm_ci_command(dir)
+    }
+}
+
 pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCommand> {
     match &app.kind {
         AppKind::Dotnet { project, launch_profile, .. } => {

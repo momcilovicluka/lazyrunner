@@ -6,6 +6,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::json;
@@ -15,27 +16,73 @@ pub const PROJECT_KEYS: [&str; 4] = ["columnWidths", "apps", "frontend", "stopFr
 const WRITE_ATTEMPTS: usize = 10;
 const WRITE_RETRY: Duration = Duration::from_millis(40);
 
+/// The on/off settings lazyrunner reads: their names in lazyrunner.config.json and their defaults, in one list,
+/// so a name can't be mistyped where it is read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Toggle {
+    AutoStartOnOpen,
+    AutoRestartOnBranchChange,
+    StopFrontendOnStop,
+    SkipUnchangedBuilds,
+    Notifications,
+    RestartOnCodeChange,
+    StartupChecklist,
+    AutoUpdate,
+}
+
+impl Toggle {
+    pub const ALL: [Toggle; 8] = [
+        Toggle::AutoStartOnOpen,
+        Toggle::AutoRestartOnBranchChange,
+        Toggle::StopFrontendOnStop,
+        Toggle::SkipUnchangedBuilds,
+        Toggle::Notifications,
+        Toggle::RestartOnCodeChange,
+        Toggle::StartupChecklist,
+        Toggle::AutoUpdate,
+    ];
+
+    /// Its name in the settings file.
+    pub fn key(self) -> &'static str {
+        match self {
+            Toggle::AutoStartOnOpen => "autoStartOnOpen",
+            Toggle::AutoRestartOnBranchChange => "autoRestartOnBranchChange",
+            Toggle::StopFrontendOnStop => "stopFrontendOnStop",
+            Toggle::SkipUnchangedBuilds => "skipUnchangedBuilds",
+            Toggle::Notifications => "notifications",
+            Toggle::RestartOnCodeChange => "restartOnCodeChange",
+            Toggle::StartupChecklist => "startupChecklist",
+            Toggle::AutoUpdate => "autoUpdate",
+        }
+    }
+
+    pub fn default_on(self) -> bool {
+        !matches!(self, Toggle::AutoRestartOnBranchChange | Toggle::RestartOnCodeChange)
+    }
+
+    /// Whether it is on in these settings (defaults included, as `ConfigFile::load` gives them).
+    pub fn read(self, config: &Value) -> bool {
+        json::truthy(json::field(config, self.key()))
+    }
+}
+
 /// Used for any setting missing from the file.
 pub fn defaults() -> Map<String, Value> {
-    let Value::Object(defaults) = json!({
+    let Value::Object(mut defaults) = json!({
         "repoRoot": "",
         "frontend": true,
-        "autoStartOnOpen": true,
-        "autoRestartOnBranchChange": false,
-        "stopFrontendOnStop": true,
-        "skipUnchangedBuilds": true,
-        "notifications": true,
         "columnWidths": {},
         "panelLogLines": 5,
-        "restartOnCodeChange": false,
-        "startupChecklist": true,
         "theme": "default",
-        "autoUpdate": true,
         "updateRepoUrl": "",
         "updateBranch": "",
     }) else {
         unreachable!("an object literal")
     };
+    for toggle in Toggle::ALL {
+        defaults.insert(toggle.key().into(), Value::Bool(toggle.default_on()));
+    }
     defaults
 }
 
@@ -126,6 +173,19 @@ pub fn write(path: &Path, value: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_toggle_has_its_own_name_and_a_default() {
+        let names: std::collections::HashSet<&str> = Toggle::ALL.iter().map(|toggle| toggle.key()).collect();
+        assert_eq!(names.len(), Toggle::ALL.len());
+        for toggle in Toggle::ALL {
+            assert_eq!(serde_json::to_value(toggle).unwrap(), json!(toggle.key()), "commands name it as the file does");
+        }
+        let defaults = defaults();
+        assert_eq!(defaults["autoStartOnOpen"], true);
+        assert_eq!(defaults["restartOnCodeChange"], false);
+        assert_eq!(defaults["autoRestartOnBranchChange"], false);
+    }
 
     fn file(name: &str) -> ConfigFile {
         let dir = std::env::temp_dir().join(format!("lazyrunner-config-{}-{name}", std::process::id()));

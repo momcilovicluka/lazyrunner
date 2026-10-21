@@ -1,13 +1,9 @@
-//! lazyrunner's terminal UI: the look (theme, widgets, logo), the screen model, and the event loop that draws it.
+//! lazyrunner's terminal UI: the screen of a running project, the event loop that draws it, and where frames go.
 
 pub mod dump;
 pub mod keys;
-pub mod logo;
-pub mod model;
 pub mod panics;
 pub mod project_run;
-pub mod run;
 pub mod screen;
+pub mod terminal;
 pub mod theme;
-pub mod view;
-pub mod widgets;

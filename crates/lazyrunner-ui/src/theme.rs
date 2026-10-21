@@ -1,4 +1,4 @@
-//! Colours: one palette, drawn in truecolor where the terminal has it and in the xterm 256-colour palette where not.
+//! Colour depth: truecolor where the terminal has it, the xterm 256-colour palette where not (`downsample`).
 
 use ratatui::buffer::Buffer;
 use ratatui::style::Color;
@@ -25,52 +25,6 @@ impl ColorMode {
         let says_truecolor = matches!(get("COLORTERM").as_deref(), Some("truecolor" | "24bit"));
         let known_truecolor = get("WT_SESSION").is_some() || get("TERM_PROGRAM").as_deref() == Some("vscode");
         if says_truecolor || known_truecolor || cfg!(windows) { Self::TrueColor } else { Self::Ansi256 }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Palette {
-    pub bg: Color,
-    pub text: Color,
-    pub dim: Color,
-    pub faint: Color,
-    pub accent: Color,
-    pub accent2: Color,
-    pub green: Color,
-    pub yellow: Color,
-    pub red: Color,
-    pub magenta: Color,
-    pub cyan: Color,
-    /// What fresh output and light sweeps start from.
-    pub glint: Color,
-}
-
-/// The default look (a night palette; P3 brings the theme files over).
-pub const NIGHT: Palette = Palette {
-    bg: Color::Rgb(0x1a, 0x1b, 0x26),
-    text: Color::Rgb(0xc0, 0xca, 0xf5),
-    dim: Color::Rgb(0x73, 0x7a, 0xa2),
-    faint: Color::Rgb(0x41, 0x48, 0x68),
-    accent: Color::Rgb(0x7a, 0xa2, 0xf7),
-    accent2: Color::Rgb(0xbb, 0x9a, 0xf7),
-    green: Color::Rgb(0x9e, 0xce, 0x6a),
-    yellow: Color::Rgb(0xe0, 0xaf, 0x68),
-    red: Color::Rgb(0xf7, 0x76, 0x8e),
-    magenta: Color::Rgb(0xbb, 0x9a, 0xf7),
-    cyan: Color::Rgb(0x7d, 0xcf, 0xff),
-    glint: Color::Rgb(0xff, 0xff, 0xff),
-};
-
-/// Mixes `from` towards `to` by `t` (0..1). Non-RGB colours switch halfway.
-pub fn lerp(from: Color, to: Color, t: f32) -> Color {
-    let t = t.clamp(0.0, 1.0);
-    match (from, to) {
-        (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => {
-            let mix = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8;
-            Color::Rgb(mix(r1, r2), mix(g1, g2), mix(b1, b2))
-        }
-        _ if t < 0.5 => from,
-        _ => to,
     }
 }
 
@@ -134,14 +88,5 @@ mod tests {
         assert_eq!(to_ansi256(Color::Rgb(255, 0, 0)), Color::Indexed(196));
         assert_eq!(to_ansi256(Color::Rgb(0x1a, 0x1b, 0x26)), Color::Indexed(234), "near-black greys use the grey ramp");
         assert_eq!(to_ansi256(Color::Yellow), Color::Yellow, "named colours stay");
-    }
-
-    #[test]
-    fn lerp_runs_from_one_colour_to_the_other() {
-        let (black, white) = (Color::Rgb(0, 0, 0), Color::Rgb(255, 255, 255));
-        assert_eq!(lerp(black, white, 0.0), black);
-        assert_eq!(lerp(black, white, 1.0), white);
-        assert_eq!(lerp(black, white, 0.5), Color::Rgb(128, 128, 128));
-        assert_eq!(lerp(black, white, 7.0), white, "clamped");
     }
 }

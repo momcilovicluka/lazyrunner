@@ -1,25 +1,14 @@
 //! Starting: apps that need no build start at once; the ones that build go through the build queue one at a
 //! time (skipped when nothing changed) and start together once all are built. Also npm ci and port conflicts.
 
-use std::path::Path;
-use std::time::Instant;
-
-use sha2::{Digest, Sha256};
-
-use super::{Conflict, Controller, Timeline, ToolJob};
+use super::{Conflict, Controller, Timeline};
 use crate::output::Hue;
-use crate::profile::{AppKind, join};
 use crate::run::app::Status;
-use crate::run::build::{self, ToolLine};
+use crate::run::build;
 use crate::run::child::Child;
-use crate::run::history::Kind;
 use crate::run::net::Listening;
-use crate::run::{Tag, format_duration, tools};
+use crate::run::{Tag, tools};
 
-/// A build cannot start (no dotnet, say): it fails like a failed build.
-const MAX_BUILD_ERROR_LINES: usize = 6;
-/// `y` copies at most this many errors of a failed build.
-const MAX_COPIED_BUILD_ERRORS: usize = 200;
 /// How long a stopped app's port may stay held.
 const STOP_SETTLE: std::time::Duration = std::time::Duration::from_secs(3);
 
@@ -40,11 +29,11 @@ impl Controller {
         state.is_running() && variants && state.script.as_deref() != self.mode(key).map(|mode| mode.script.as_str())
     }
 
-    fn since_start(&self) -> Option<f64> {
+    pub(super) fn since_start(&self) -> Option<f64> {
         self.action_started.map(|started| ((self.now)() - started).as_secs_f64())
     }
 
-    fn timeline_entry(&mut self, key: &str) -> &mut Timeline {
+    pub(super) fn timeline_entry(&mut self, key: &str) -> &mut Timeline {
         self.timeline.entry(key.to_string()).or_default()
     }
 
@@ -118,51 +107,6 @@ impl Controller {
         }
     }
 
-    /// b, B: a full build (never skipped) that leaves the apps stopped; u / U then start them without building
-    /// again. A running app is stopped first, since it locks its own build output. npm apps have no separate build.
-    pub fn build_only(&mut self, only: Option<&[String]>) {
-        if self.building.is_some() {
-            self.add_log("A build is running - press b again once it's done (builds run one at a time)", Hue::Yellow);
-            return;
-        }
-        let kept = if only.is_none() { self.kept_keys(false) } else { Vec::new() }; // B leaves what S leaves
-        let keys: Vec<String> = self
-            .keys()
-            .into_iter()
-            .filter(|key| only.is_none_or(|only| only.contains(key)) && self.builds(key) && !kept.contains(key))
-            .collect();
-        if keys.is_empty() {
-            let text = match only.and_then(|only| only.first()).and_then(|key| self.app(key)) {
-                Some(app) => format!("{} has no separate build - it compiles while it runs (r restarts it).", app.name),
-                None => "Nothing to build: no app here has a separate build step.".to_string(),
-            };
-            self.add_log(text, Hue::DarkGray);
-            return;
-        }
-        let running: Vec<String> = keys.iter().filter(|key| self.is_running(key)).cloned().collect();
-        if !running.is_empty() {
-            let names = self.names(&running);
-            self.add_log(format!("Stopping {names} first - a running app locks its build output"), Hue::DarkGray);
-            self.stop(Some(&running), true);
-        }
-        let stays = if keys.len() == 1 { "it stays" } else { "they stay" };
-        self.add_log(format!("Building {} - {stays} stopped afterwards", self.names(&keys)), Hue::Cyan);
-        if self.ready_pending.is_empty() {
-            // Nothing else is getting ready: an app started during the build counts "Ready in" from now.
-            self.action_started = Some((self.now)());
-            self.timeline.clear();
-        }
-        self.last_build_failed = false;
-        self.code_at_start = self.code.seen();
-        self.fingerprint = build::fingerprint(&self.root, &self.project.source_dir);
-        self.start_keys = Vec::new(); // a cancelled build has nothing to stop
-        self.built.clear();
-        self.force_build = true;
-        self.build_only = true;
-        self.build_queue = keys;
-        self.next_build();
-    }
-
     /// Right after a stop the old servers can hold their ports a moment longer (killing a tree is asynchronous).
     /// Then the start waits for them on the tick instead of blocking, for up to `STOP_SETTLE` after the stop; past
     /// that a port still held is a conflict.
@@ -214,7 +158,7 @@ impl Controller {
         self.app(key).is_some_and(|app| app.traits().builds)
     }
 
-    fn skip_reason(&self, key: &str) -> (String, String) {
+    pub(super) fn skip_reason(&self, key: &str) -> (String, String) {
         let app = self.app(key).expect("a known app");
         (app.name.clone(), crate::apptypes::no_mode_reason(&self.root, app, &self.apps))
     }
@@ -246,7 +190,7 @@ impl Controller {
         }
     }
 
-    fn start_without_build(&mut self, key: &str) {
+    pub(super) fn start_without_build(&mut self, key: &str) {
         self.update_modes();
         let variants = self.app(key).is_some_and(|app| app.traits().variants);
         if variants && self.mode(key).is_none() {
@@ -280,7 +224,7 @@ impl Controller {
         let now = (self.now)();
         self.states[index].reset_for_start();
         let app = self.apps[index].clone();
-        let command = tools::server_command(&self.root, &app, &self.apps);
+        let command = self.commands.server(&self.root, &app, &self.apps);
         let generation = self.states[index].generation;
         let started = command.and_then(|command| {
             let header = format!("──── ▶ {} · {} · {} ────", clock(), self.branch, command.label);
@@ -376,216 +320,6 @@ impl Controller {
         self.start(None, false);
     }
 
-    // ---------------------------------------------------------------- builds
-
-    /// Builds the next app in the queue; once all are built, starts them.
-    pub(super) fn next_build(&mut self) {
-        while let Some(key) = self.build_queue.first().cloned() {
-            match self.build_app(&key) {
-                BuildStep::Started => return,
-                BuildStep::Skipped => {
-                    self.build_queue.remove(0);
-                    self.built.push(key);
-                }
-                BuildStep::Failed => {
-                    self.build_failed();
-                    return;
-                }
-            }
-        }
-        if std::mem::take(&mut self.build_only) {
-            self.build_only_done();
-            return;
-        }
-        let apis = std::mem::take(&mut self.built);
-        for key in &apis {
-            self.start_app(key);
-        }
-        if !apis.is_empty() {
-            let names = self.names(&apis);
-            self.add_log(format!("Starting {names}"), Hue::Cyan);
-        }
-        let started: Vec<String> = apis.into_iter().filter(|key| self.is_running(key)).collect();
-        for key in started {
-            if !self.ready_pending.contains(&key) {
-                self.ready_pending.push(key);
-            }
-        }
-        self.code.handled_up_to(self.code_at_start); // what the build picked up; edits saved since still count
-    }
-
-    /// A build failed: the rest of the queue is dropped, and nothing starts.
-    fn build_failed(&mut self) {
-        self.build_queue.clear();
-        self.built.clear();
-        if std::mem::take(&mut self.build_only) {
-            // What b stopped left ready_pending then; anything else in it is getting ready on its own.
-            self.add_log("Fix the build and press b or B again - the apps stay stopped.", Hue::Yellow);
-        } else {
-            self.ready_pending.clear();
-            self.add_log("APIs not started - fix the build and press U or R.", Hue::Yellow);
-        }
-    }
-
-    /// b / B's builds are done: the apps stay stopped, and the next start skips their builds (nothing changed).
-    fn build_only_done(&mut self) {
-        let built = std::mem::take(&mut self.built);
-        if !built.is_empty() {
-            let starts = if built.len() == 1 { "u starts it" } else { "U starts them" };
-            let skips = self.setting("skipUnchangedBuilds") && self.fingerprint.is_some();
-            let again = if skips { " without building again" } else { "" };
-            self.add_log(format!("Build done - {starts}{again}"), Hue::Green);
-        }
-        self.code.handled_up_to(self.code_at_start);
-    }
-
-    fn build_app(&mut self, key: &str) -> BuildStep {
-        let app = self.app(key).expect("a known app").clone();
-        let AppKind::Dotnet { project, .. } = &app.kind else { return BuildStep::Skipped };
-        let skip = self.setting("skipUnchangedBuilds")
-            && build::is_up_to_date(&self.state_dir, &self.root, key, project, self.fingerprint.as_deref());
-        if !self.force_build && skip {
-            self.add_log(
-                format!("✓ {} unchanged since its last build - skipped (b / B force a full build)", app.name),
-                Hue::Green,
-            );
-            return BuildStep::Skipped;
-        }
-        if self.force_build {
-            build::remove_stamp(&self.state_dir, key);
-        }
-        let spec = tools::build_command(&self.root, project);
-        let file = Path::new(project).file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
-        self.pane(key, &format!("──── ⚙ {} · dotnet build {file} ────", clock()), Hue::Cyan);
-        self.failed_build_errors.remove(key);
-        let total = build::project_count(&self.root.join(project));
-        self.next_job += 1;
-        let id = self.next_job;
-        match Child::spawn(
-            &spec,
-            Tag::Build { key: key.to_string(), job: id },
-            self.events.clone(),
-            self.guard.as_ref(),
-        ) {
-            Ok(child) => {
-                let started = (self.now)();
-                if let Some(since) = self.since_start() {
-                    self.timeline_entry(key).build_from = Some(since);
-                }
-                self.building = Some(ToolJob {
-                    key: key.to_string(),
-                    id,
-                    child,
-                    started,
-                    lines: Vec::new(),
-                    done: 0,
-                    total,
-                    warnings: 0,
-                    start_after: false,
-                });
-                BuildStep::Started
-            }
-            Err(error) => {
-                self.pane(key, &format!("✗ {error}"), Hue::Red);
-                self.add_log(format!("✗ {} build failed: dotnet couldn't start ({error})", app.name), Hue::Red);
-                BuildStep::Failed
-            }
-        }
-    }
-
-    pub(super) fn build_output(&mut self, key: &str, id: u64, line: &str) {
-        let Some(job) = self.building.as_mut().filter(|job| job.key == key && job.id == id) else { return };
-        job.lines.push(line.to_string());
-        let text = crate::output::strip_ansi(line);
-        match build::tool_line(&text, true) {
-            ToolLine::Warning => job.warnings += 1,
-            ToolLine::Built(project) => {
-                job.done += 1;
-                self.pane(key, &format!("  ✓ {project}"), Hue::DarkGreen);
-            }
-            ToolLine::Shown(text, hue) => self.pane(key, &text, hue),
-        }
-    }
-
-    pub(super) fn build_exited(&mut self, key: &str, id: u64, code: Option<i32>) {
-        if !self.building.as_ref().is_some_and(|job| job.key == key && job.id == id) {
-            return; // a cancelled build
-        }
-        let job = self.building.take().expect("checked above");
-        let seconds = ((self.now)() - job.started).as_secs_f64();
-        let log = self.state_dir.join(format!("build-{key}.log"));
-        let _ = std::fs::write(&log, job.lines.join("\n") + "\n");
-        if let Some(since) = self.since_start() {
-            self.timeline_entry(key).build_to = Some(since);
-        }
-        let app = self.app(key).expect("a known app").clone();
-        let whole = seconds as u64;
-        if code != Some(0) {
-            self.record_duration(Kind::Build, key, seconds, false);
-            self.pane(key, &format!("✗ build failed after {whole}s"), Hue::Red);
-            let errors = build::errors(&job.lines);
-            let full: Vec<String> = errors
-                .iter()
-                .map(|line| crate::output::strip_ansi(line).trim().to_string())
-                .take(MAX_COPIED_BUILD_ERRORS)
-                .collect();
-            self.failed_build_errors.insert(key.to_string(), full);
-            self.last_failed_log = Some(log);
-            self.last_build_failed = true;
-            self.notifications
-                .push((format!("{} build failed", app.name), format!("{} errors - see lazyrunner", errors.len())));
-            self.add_log(
-                format!("✗ {} build failed after {whole}s ({} errors) - o opens the full log", app.name, errors.len()),
-                Hue::Red,
-            );
-            for error in errors.iter().take(MAX_BUILD_ERROR_LINES) {
-                self.add_log(format!("    {}", build::format_error(error)), Hue::Red);
-            }
-            self.build_failed();
-            return;
-        }
-        if let AppKind::Dotnet { project, .. } = &app.kind {
-            build::save_stamp(&self.state_dir, &self.root, key, project, self.fingerprint.as_deref());
-        }
-        self.timings.add("build", key, seconds);
-        let note = self.record_duration(Kind::Build, key, seconds, true);
-        let warnings = if job.warnings > 0 { format!(", {} warnings", job.warnings) } else { String::new() };
-        let summary = format!("built in {whole}s ({} projects{warnings}){note}", job.done);
-        self.pane(key, &format!("✓ {summary}"), Hue::Green);
-        self.add_log(format!("✓ {} {summary}", app.name), Hue::Green);
-        self.build_queue.retain(|queued| queued != key);
-        self.built.push(key.to_string());
-        self.next_build();
-    }
-
-    /// Cancels the running build: `drop_only` (s on that app) takes just it out of the start; otherwise the whole
-    /// start stops.
-    /// S while building: cancels the build and quietly stops what this start already started.
-    pub fn cancel_start(&mut self) {
-        self.cancel_build(false);
-    }
-
-    pub(super) fn cancel_build(&mut self, drop_only: bool) {
-        let Some(job) = self.building.take() else { return };
-        job.child.kill();
-        let key = job.key.clone();
-        let name = self.app(&key).map(|app| app.name.clone()).unwrap_or_default();
-        let _ = std::fs::write(self.state_dir.join(format!("build-{key}.log")), job.lines.join("\n") + "\n");
-        self.pane(&key, "■ build cancelled", Hue::Yellow);
-        if drop_only {
-            self.add_log(format!("■ {name} build cancelled (s) - it stays stopped"), Hue::Yellow);
-            self.build_queue.retain(|queued| *queued != key);
-            self.next_build();
-        } else {
-            self.add_log(format!("■ {name} build cancelled"), Hue::Yellow);
-            self.build_queue.clear();
-            self.built.clear();
-            self.build_only = false;
-            let keys = std::mem::take(&mut self.start_keys);
-            self.stop(Some(&keys), true);
-        }
-    }
-
     // ---------------------------------------------------------------- after a database switch
 
     /// The APIs read secrets.json only when they start, and run with --no-build: restarting the processes is enough.
@@ -605,251 +339,11 @@ impl Controller {
             }
         }
     }
-
-    // ---------------------------------------------------------------- npm ci
-
-    fn npm_ci_stamp(&self, key: &str) -> std::path::PathBuf {
-        self.state_dir.join(format!("npm-ci.{key}.stamp.json"))
-    }
-
-    fn lock_hash(&self, key: &str) -> Option<String> {
-        let AppKind::Npm { dir, .. } = &self.app(key)?.kind else { return None };
-        let text = std::fs::read_to_string(self.root.join(dir).join("package-lock.json")).ok()?;
-        Some(Sha256::digest(text.replace("\r\n", "\n").as_bytes()).iter().map(|b| format!("{b:02X}")).collect())
-    }
-
-    /// The npm apps whose package-lock.json changed since their last npm ci (the panel offers i).
-    pub fn lock_changed_keys(&self) -> &[String] {
-        &self.lock_changed
-    }
-
-    /// Whether an npm app's packages match its package-lock.json as lazyrunner's last npm ci installed it (`None`:
-    /// no npm ci from lazyrunner in this checkout to compare with).
-    pub fn lock_in_sync(&self, key: &str) -> Option<bool> {
-        let stamp = crate::json::read(&self.npm_ci_stamp(key))?;
-        if crate::json::text(&stamp["root"]) != self.root.display().to_string() {
-            return None;
-        }
-        Some(self.lock_hash(key).is_some_and(|hash| crate::json::text(&stamp["lockHash"]) == hash))
-    }
-
-    /// The npm apps whose package-lock.json differs from the one their last npm ci installed (said once per change).
-    pub fn test_lock_changed(&mut self) {
-        let mut changed = Vec::new();
-        for app in self.apps.clone().iter().filter(|app| app.traits().installs) {
-            let stamp = crate::json::read(&self.npm_ci_stamp(&app.key));
-            let (Some(stamp), Some(hash)) = (stamp, self.lock_hash(&app.key)) else { continue };
-            let same_root = crate::json::text(&stamp["root"]) == self.root.display().to_string();
-            if !same_root || crate::json::text(&stamp["lockHash"]) == hash {
-                continue;
-            }
-            changed.push(app.key.clone());
-            if self.lock_warned.get(&app.key) == Some(&hash) {
-                continue;
-            }
-            self.lock_warned.insert(app.key.clone(), hash);
-            if let AppKind::Npm { dir, .. } = &app.kind {
-                let lock = join(dir, "package-lock.json");
-                self.add_log(
-                    format!("{lock} changed since the last npm ci - press i to reinstall its packages"),
-                    Hue::Yellow,
-                );
-            }
-        }
-        self.lock_changed = changed;
-    }
-
-    /// i: npm ci for an npm app (the focused one, or the one whose lock file changed), in the background.
-    pub fn npm_ci(&mut self, focused: Option<&str>) {
-        let Some(key) = self.npm_ci_key(focused) else {
-            self.add_log(
-                "There is no npm app (the project has none, or lazyrunner.config.json turns them off).",
-                Hue::Yellow,
-            );
-            return;
-        };
-        if let Some(job) = &self.npm_ci {
-            let name = self.app(&job.key).map(|app| app.name.clone()).unwrap_or_default();
-            self.add_log(format!("npm ci is already running ({name})."), Hue::Gray);
-            return;
-        }
-        let app = self.app(&key).expect("a known app").clone();
-        let AppKind::Npm { dir, .. } = &app.kind else { return };
-        let folder = self.root.join(dir);
-        if !folder.join("package-lock.json").is_file() {
-            self.add_log(format!("No package-lock.json in {} - npm ci needs one.", folder.display()), Hue::Yellow);
-            return;
-        }
-        let was_running = self.is_running(&key);
-        if was_running {
-            self.stop(Some(std::slice::from_ref(&key)), true); // a running dev server locks files in node_modules
-        }
-        self.pane(&key, &format!("──── ⚙ {} · npm ci ────", clock()), Hue::Cyan);
-        let beside = if self.building.is_some() { " (next to the build)" } else { "" };
-        self.add_log(format!("Running npm ci for {}…{beside}", app.name), Hue::Cyan);
-        stop_nx_daemon(&folder);
-        // node_modules is about to be rewritten: until npm ci succeeds it isn't known to be in sync.
-        let _ = std::fs::remove_file(self.npm_ci_stamp(&key));
-        let spawned = tools::npm_ci_command(&folder).and_then(|spec| {
-            Ok(Child::spawn(
-                &spec,
-                Tag::NpmCi { key: key.clone(), job: self.next_job + 1 },
-                self.events.clone(),
-                self.guard.as_ref(),
-            )?)
-        });
-        match spawned {
-            Ok(child) => {
-                let started = (self.now)();
-                self.next_job += 1;
-                self.npm_ci = Some(ToolJob {
-                    key,
-                    id: self.next_job,
-                    child,
-                    started,
-                    lines: Vec::new(),
-                    done: 0,
-                    total: 0,
-                    warnings: 0,
-                    start_after: was_running,
-                });
-            }
-            Err(error) => self.add_log(format!("✗ npm ci couldn't start: {error}"), Hue::Red),
-        }
-    }
-
-    /// Which app i installs: one whose lock file changed (the focused one if it is among them), else the focused
-    /// one, else one whose node_modules is missing, else the first.
-    /// The app i reinstalls: one whose package-lock.json changed (the focused one first), else the focused npm app,
-    /// else one without node_modules, else the first.
-    pub fn npm_ci_key(&self, focused: Option<&str>) -> Option<String> {
-        let keys: Vec<String> =
-            self.apps.iter().filter(|app| app.traits().installs).map(|app| app.key.clone()).collect();
-        if !self.lock_changed.is_empty() {
-            return Some(
-                focused
-                    .filter(|key| self.lock_changed.iter().any(|k| k == key))
-                    .map_or_else(|| self.lock_changed[0].clone(), str::to_string),
-            );
-        }
-        if let Some(focused) = focused.filter(|key| keys.iter().any(|k| k == key)) {
-            return Some(focused.to_string());
-        }
-        let missing = keys.iter().find(|key| {
-            self.app(key).is_some_and(|app| matches!(&app.kind, AppKind::Npm { dir, .. } if !self.root.join(dir).join("node_modules").exists()))
-        });
-        missing.or(keys.first()).cloned()
-    }
-
-    pub(super) fn npm_ci_output(&mut self, key: &str, id: u64, line: &str) {
-        let Some(job) = self.npm_ci.as_mut().filter(|job| job.key == key && job.id == id) else { return };
-        job.lines.push(line.to_string());
-        match build::tool_line(&crate::output::strip_ansi(line), false) {
-            ToolLine::Shown(text, hue) => {
-                if hue == Hue::Yellow {
-                    job.warnings += 1;
-                }
-                self.pane(key, &text, hue);
-            }
-            ToolLine::Warning | ToolLine::Built(_) => {}
-        }
-    }
-
-    pub(super) fn npm_ci_exited(&mut self, key: &str, id: u64, code: Option<i32>) {
-        if self.npm_ci.as_ref().is_some_and(|job| job.key == key && job.id == id) {
-            self.complete_npm_ci(if code == Some(0) { NpmCiEnd::Ok } else { NpmCiEnd::Failed });
-        }
-    }
-
-    /// S (when Stop all includes its app), s on its app and q cancel it.
-    pub(super) fn stop_npm_ci(&mut self) {
-        if let Some(job) = &self.npm_ci {
-            job.child.kill();
-            self.complete_npm_ci(NpmCiEnd::Cancelled);
-        }
-    }
-
-    fn complete_npm_ci(&mut self, end: NpmCiEnd) {
-        let Some(job) = self.npm_ci.take() else { return };
-        let key = job.key.clone();
-        let name = self.app(&key).map(|app| app.name.clone()).unwrap_or_default();
-        let log = self.state_dir.join(format!("npm-ci-{key}.log"));
-        let _ = std::fs::write(&log, job.lines.join("\n") + "\n");
-        let seconds = ((self.now)() - job.started).as_secs_f64();
-        let waiting =
-            if job.start_after { format!(" - {name} was waiting for it and stays stopped") } else { String::new() };
-        match end {
-            NpmCiEnd::Cancelled => {
-                self.pane(&key, "■ npm ci cancelled - node_modules may be incomplete, press i again", Hue::Yellow);
-                self.add_log(
-                    format!("■ npm ci cancelled - node_modules may be incomplete, press i again{waiting}"),
-                    Hue::Yellow,
-                );
-            }
-            NpmCiEnd::Failed => {
-                self.record_duration(Kind::NpmCi, &key, seconds, false);
-                self.last_failed_log = Some(log);
-                self.notifications.push(("npm ci failed".into(), format!("See the {name} column in lazyrunner")));
-                self.pane(&key, &format!("✗ npm ci failed after {}s", seconds as u64), Hue::Red);
-                self.add_log(
-                    format!("✗ npm ci failed after {}s - o opens the full log{waiting}", seconds as u64),
-                    Hue::Red,
-                );
-            }
-            NpmCiEnd::Ok => {
-                let stamp =
-                    serde_json::json!({ "root": self.root.display().to_string(), "lockHash": self.lock_hash(&key) });
-                let _ = crate::config::write(&self.npm_ci_stamp(&key), &stamp);
-                self.lock_changed.retain(|changed| *changed != key);
-                self.timings.add("npmci", &key, seconds);
-                let note = self.record_duration(Kind::NpmCi, &key, seconds, true);
-                let done = format!("✓ npm ci done in {}{note}", format_duration(seconds));
-                self.pane(&key, &done, Hue::Green);
-                self.add_log(done, Hue::Green);
-                if job.start_after {
-                    self.start(Some(&[key]), false);
-                }
-            }
-        }
-    }
-}
-
-enum BuildStep {
-    Started,
-    Skipped,
-    Failed,
-}
-
-enum NpmCiEnd {
-    Ok,
-    Failed,
-    Cancelled,
 }
 
 /// The time of day, as pane headers show it.
-fn clock() -> String {
+pub(super) fn clock() -> String {
     chrono::Local::now().format("%H:%M:%S").to_string()
-}
-
-/// Workspace tools can leave a daemon running from node_modules (Nx does), which keeps files locked while npm ci
-/// replaces them; stop it first when there is one.
-fn stop_nx_daemon(dir: &Path) {
-    let nx = dir.join("node_modules").join("nx").join("bin").join("nx.js");
-    let Some(node) = tools::find_on_path("node").filter(|_| nx.is_file()) else { return };
-    let mut command = std::process::Command::new(node);
-    command.arg(nx).args(["daemon", "--stop"]).current_dir(dir);
-    command.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
-    let Ok(mut process) = command.spawn() else {
-        return;
-    };
-    let deadline = Instant::now() + std::time::Duration::from_secs(10);
-    while Instant::now() < deadline {
-        if !matches!(process.try_wait(), Ok(None)) {
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-    let _ = process.kill();
 }
 
 /// Kills another program's process tree (what holds a port lazyrunner needs); true when it is gone.

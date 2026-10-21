@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Controller, Probe};
+use crate::config::Toggle;
 use crate::output::Hue;
 use crate::profile::{self, AppKind, trust};
 use crate::run::app::{Status, push_history};
@@ -359,7 +360,7 @@ impl Controller {
         self.update_modes();
         self.test_lock_changed();
         let running: Vec<String> = self.keys().into_iter().filter(|key| self.is_running(key)).collect();
-        if !self.setting("autoRestartOnBranchChange") {
+        if !self.setting(Toggle::AutoRestartOnBranchChange) {
             self.add_log(format!("Branch changed {previous} → {branch} (auto-restart is off, press R)"), Hue::Yellow);
             return;
         }
@@ -418,7 +419,7 @@ impl Controller {
         if self.code.count == self.code.handled {
             return;
         }
-        if !self.setting("restartOnCodeChange") {
+        if !self.setting(Toggle::RestartOnCodeChange) {
             self.code.handled();
             return;
         }

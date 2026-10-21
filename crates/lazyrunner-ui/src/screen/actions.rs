@@ -2,6 +2,7 @@
 //! ? key reference, so they never drift apart. Keys follow vim and lazygit and are case-sensitive: lowercase acts on
 //! the focused column, uppercase on every app. Safe actions also work while a build runs.
 
+use lazyrunner_core::config::Toggle;
 use lazyrunner_core::run::Controller;
 
 use super::Ui;
@@ -37,7 +38,7 @@ pub enum Run {
     Settings,
     Help,
     Palette,
-    Setting { name: &'static str, label: &'static str },
+    Setting { toggle: Toggle, label: &'static str },
     Checklist,
     Changelog,
     ReloadProfile,
@@ -156,23 +157,69 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
     list
 }
 
+/// An on/off setting in the , menu: its letter there, its label, and the panel's shorter one.
+pub(crate) struct MenuToggle {
+    pub letter: &'static str,
+    pub toggle: Toggle,
+    pub label: &'static str,
+    pub short: &'static str,
+}
+
+const MENU_TOGGLES: [MenuToggle; 6] = [
+    MenuToggle {
+        letter: "a",
+        toggle: Toggle::AutoRestartOnBranchChange,
+        label: "Auto-restart on branch change",
+        short: "auto-restart on branch change",
+    },
+    MenuToggle {
+        letter: "u",
+        toggle: Toggle::AutoStartOnOpen,
+        label: "Auto-start when lazyrunner opens",
+        short: "auto-start when lazyrunner opens",
+    },
+    MenuToggle {
+        letter: "s",
+        toggle: Toggle::StopFrontendOnStop,
+        label: "Stop/Restart all include the frontend",
+        short: "stop/restart all include frontend",
+    },
+    MenuToggle {
+        letter: "e",
+        toggle: Toggle::RestartOnCodeChange,
+        label: "Restart the APIs when code changes",
+        short: "restart APIs on code change",
+    },
+    MenuToggle {
+        letter: "w",
+        toggle: Toggle::StartupChecklist,
+        label: "Startup checklist when lazyrunner opens",
+        short: "startup checklist",
+    },
+    MenuToggle {
+        letter: "v",
+        toggle: Toggle::AutoUpdate,
+        label: "Auto-update lazyrunner when it opens",
+        short: "auto-update",
+    },
+];
+
+/// The , menu's toggles that apply here (whether Stop/Restart all include the frontend only with one).
+pub(crate) fn menu_toggles(controller: &Controller) -> impl Iterator<Item = &'static MenuToggle> {
+    let frontend = controller.apps.iter().any(|app| app.traits().frontend);
+    MENU_TOGGLES.iter().filter(move |item| frontend || item.toggle != Toggle::StopFrontendOnStop)
+}
+
 /// The on/off settings and the checklist, in the , menu.
 pub fn settings(controller: &Controller) -> Vec<Action> {
-    let check = |name: &str| if controller.setting(name) { "[x] " } else { "[ ] " };
-    let toggle = |key: &str, name: &'static str, label: &'static str| {
-        action("Settings", key, &format!("{}{label}", check(name)), "", Run::Setting { name, label }).safe()
-    };
-    let mut list = vec![
-        toggle("a", "autoRestartOnBranchChange", "Auto-restart on branch change"),
-        toggle("u", "autoStartOnOpen", "Auto-start when lazyrunner opens"),
-    ];
-    if controller.apps.iter().any(|app| app.traits().frontend) {
-        list.push(toggle("s", "stopFrontendOnStop", "Stop/Restart all include the frontend"));
-    }
+    let mut list: Vec<Action> = menu_toggles(controller)
+        .map(|item| {
+            let check = if controller.setting(item.toggle) { "[x] " } else { "[ ] " };
+            let run = Run::Setting { toggle: item.toggle, label: item.label };
+            action("Settings", item.letter, &format!("{check}{}", item.label), "", run).safe()
+        })
+        .collect();
     list.extend([
-        toggle("e", "restartOnCodeChange", "Restart the APIs when code changes"),
-        toggle("w", "startupChecklist", "Startup checklist when lazyrunner opens"),
-        toggle("v", "autoUpdate", "Auto-update lazyrunner when it opens"),
         action("Settings", "r", "Run the startup checklist now (and check for an update)", "", Run::Checklist),
         action("Settings", "c", "What's new: the lazyrunner changelog", "", Run::Changelog).safe(),
     ]);

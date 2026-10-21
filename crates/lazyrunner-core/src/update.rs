@@ -222,7 +222,7 @@ impl Drop for Running {
 /// Checks and, when a higher version is out, installs it. `force`: even with "autoUpdate" off (`lazyrunner update`).
 pub fn update(config: &Value, state_dir: &Path, force: bool, progress: &mut Progress) -> Outcome {
     let version = changelog::VERSION;
-    if !force && !json::truthy(json::field(config, "autoUpdate")) {
+    if !force && !crate::config::Toggle::AutoUpdate.read(config) {
         return Outcome::new(Status::Skip, format!("v{version} · auto-update off (, then v turns it on)"));
     }
     let Some(source) = source(config) else {

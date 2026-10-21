@@ -4,25 +4,26 @@ description = "Runs your project's apps side by side in one terminal"
 homepage = "https://github.com/momcilovicluka/lazyrunner"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license-file.workspace = true
 repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-anyhow = "1.0.104"
+anyhow.workspace = true
 clap = { version = "4.6.7", features = ["derive", "env"] }
-lazyrunner-core = { path = "../lazyrunner-core" }
-lazyrunner-ui = { path = "../lazyrunner-ui" }
-ratatui = "0.30.2"
-serde_json = "1.0.154"
-sha2 = "0.11.1"
-tokio = { version = "1.53.3", features = ["full"] }
+lazyrunner-core.workspace = true
+lazyrunner-ui.workspace = true
+ratatui.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
 
 [dev-dependencies]
-flate2 = "1.1.10"
-lazyrunner-core = { path = "../lazyrunner-core", features = ["test-support"] }
-tar = "0.4.46"
-zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
+flate2.workspace = true
+lazyrunner-core = { workspace = true, features = ["test-support"] }
+tar.workspace = true
+zip.workspace = true
 
 [package.metadata.dist]
 # The workspace is publish = false (nothing goes to crates.io), but the binary ships in GitHub Releases.

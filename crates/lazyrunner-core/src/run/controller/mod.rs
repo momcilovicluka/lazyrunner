@@ -3,7 +3,9 @@
 //! [`Event`]s; `tick` does the timed things. Nothing here blocks for long: builds, probes and port snapshots run
 //! in tasks of their own, so keys and output keep flowing during a build.
 
+mod builds;
 mod handover;
+mod npm_ci;
 mod start;
 #[cfg(test)]
 mod tests;
@@ -28,7 +30,7 @@ use super::net::{Listening, ProbeResult};
 use super::watcher::CodeWatcher;
 use super::{Event, Tag};
 use crate::apptypes::{self, Mode};
-use crate::config::ConfigFile;
+use crate::config::{ConfigFile, Toggle};
 use crate::output::Hue;
 use crate::paths::Paths;
 use crate::profile::{App, Project};
@@ -172,6 +174,8 @@ pub struct Controller {
     code_at_start: u64,
     _watcher: Option<CodeWatcher>,
     metric_roots: Arc<Mutex<Vec<(String, u32)>>>,
+    /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
+    pub(crate) commands: Arc<dyn super::tools::Commands>,
     pub(crate) now: fn() -> Instant,
 }
 
@@ -255,6 +259,7 @@ impl Controller {
             code_at_start: 0,
             _watcher: watcher,
             metric_roots,
+            commands: Arc::new(super::tools::Tools),
             now: Instant::now,
         };
         if let Some(problem) = controller.durations.problem.take() {
@@ -574,9 +579,14 @@ impl Controller {
         }
     }
 
-    /// A setting as true or false.
-    pub fn setting(&self, name: &str) -> bool {
-        crate::json::truthy(crate::json::field(&self.config, name))
+    /// An on/off setting.
+    pub fn setting(&self, toggle: Toggle) -> bool {
+        toggle.read(&self.config)
+    }
+
+    /// Turns an on/off setting on or off (saved).
+    pub fn set_toggle(&mut self, toggle: Toggle, on: bool) {
+        self.set_setting(toggle.key(), json!(on));
     }
 
     // ---------------------------------------------------------------- for tests and the control channel
