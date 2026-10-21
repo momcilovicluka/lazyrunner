@@ -43,6 +43,8 @@ const PROGRESS_BAR_CELLS: usize = 10;
 /// A step that takes longer than this shows its seconds.
 const SHOW_SECONDS_AFTER: Duration = Duration::from_secs(3);
 const CHUNK: usize = 64 * 1024;
+/// The new binary has this long to answer `--version` (a first run is slow while antivirus scans it).
+const SMOKE_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// The version this process installed, if it did (the UI reopens on it).
 static INSTALLED: Mutex<Option<String>> = Mutex::new(None);
@@ -440,7 +442,47 @@ fn install(source: &Source, release: &Release, state_dir: &Path, progress: &mut 
     progress.step(&format!("installing v{}…", release.version), None, None);
     let binary = scratch.0.join(binary_name());
     extract(&archive, &binary).map_err(|error| format!("couldn't unpack {asset} - {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o755))
+            .map_err(|error| format!("couldn't make the new lazyrunner runnable - {error}"))?;
+    }
+    runs(&binary)?;
     self_replace::self_replace(&binary).map_err(|error| format!("couldn't replace lazyrunner - {error}"))
+}
+
+/// The new binary must run before it replaces this one: a damaged, blocked or wrong-platform one would end the
+/// session that switches to it (and the apps handed over to it), and then stay in place.
+fn runs(binary: &Path) -> Result<(), String> {
+    let mut child = std::process::Command::new(binary)
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|error| format!("the new lazyrunner doesn't start - {error}"))?;
+    let started = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < SMOKE_TIMEOUT => std::thread::sleep(Duration::from_millis(50)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("the new lazyrunner didn't answer --version".into());
+            }
+        }
+    };
+    let mut printed = String::new();
+    if let Some(mut stdout) = child.stdout.take() {
+        let _ = stdout.read_to_string(&mut printed);
+    }
+    if status.success() && printed.starts_with("lazyrunner ") {
+        Ok(())
+    } else {
+        Err(format!("the new lazyrunner doesn't run properly ({status})"))
+    }
 }
 
 fn download(url: &str, to: &Path, source: &Source, progress: &mut Progress) -> Result<(), String> {

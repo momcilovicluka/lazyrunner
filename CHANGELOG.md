@@ -3,6 +3,21 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.7.1] - 2026-10-21
+
+### Changed
+- The startup checklist runs its checks side by side and moves on sooner when everything is fine, so the apps start seconds earlier. When only the update check is left (offline it can take 20 s), the apps start anyway after 2 s and the check goes on in the background; a version it installs takes the running apps over as soon as nothing is in the way
+- An update only replaces lazyrunner once the new binary has shown it runs (`--version`): a damaged or blocked download leaves the installed one as it was
+
+### Fixed
+- Restarting no longer freezes the screen while the old servers let go of their ports, and `!` no longer pauses before starting
+- `!` only kills what still holds the port, never a process that has since taken the old one's PID
+- A panic in a background task no longer tears down the screen while lazyrunner carries on; it is reported in the log instead
+- If the running apps can't be handed over (for example the disk is full), the next lazyrunner starts them again and says why, instead of leaving them stopped
+- A column's log is only moved to `.prev.log` when it has something in it, so opening lazyrunner twice in a row (after an update) keeps the last real run's log; one that can't be moved is added to rather than wiped. Column logs start over past 32 MB, and `lazyrunner.log` past 8 MB
+- A cancelled or failed `npm ci` no longer counts as installed, and a port snapshot that never comes back no longer stops readiness for good
+- Output no longer redraws the screen more often than 30 times a second
+
 ## [0.7.0] - 2026-10-20
 
 ### Changed

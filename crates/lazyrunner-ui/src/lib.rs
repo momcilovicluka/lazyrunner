@@ -4,6 +4,7 @@ pub mod dump;
 pub mod keys;
 pub mod logo;
 pub mod model;
+pub mod panics;
 pub mod project_run;
 pub mod run;
 pub mod screen;

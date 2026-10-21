@@ -172,6 +172,18 @@ fn a_download_that_doesnt_match_its_checksum_is_not_installed() {
 }
 
 #[test]
+fn a_binary_that_doesnt_run_is_not_installed() {
+    let temp = TempDir::new("update-broken");
+    let installed = install(&temp);
+    let before = fs::read(&installed).unwrap();
+    let broken = b"not a program at all".to_vec();
+    let repo = serve(Release { tag: "v99.1.0".into(), files: release_files(&temp, &broken, None) });
+    let printed = update(&temp, &installed, &repo);
+    assert!(printed.contains("v99.1.0 is out, but not installed: the new lazyrunner doesn't"), "{printed}");
+    assert_eq!(fs::read(&installed).unwrap(), before, "lazyrunner is left as it was");
+}
+
+#[test]
 fn the_same_or_an_older_release_changes_nothing() {
     let temp = TempDir::new("update-same");
     let installed = install(&temp);

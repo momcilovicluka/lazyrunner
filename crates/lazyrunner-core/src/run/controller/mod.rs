@@ -37,6 +37,8 @@ pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_h
 
 /// Entries the panel's log keeps.
 const MAX_LOG_ENTRIES: usize = 200;
+/// lazyrunner.log starts over at startup past this size (the old one becomes lazyrunner.prev.log).
+const LOG_FILE_CAP: u64 = 8 * 1024 * 1024;
 
 /// A line in the panel's log (and lazyrunner.log).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -153,8 +155,15 @@ pub struct Controller {
     /// When the snapshot in `listening` was asked for (an app started after that isn't in it yet).
     listening_at: Option<Instant>,
     listening_asked_at: Option<Instant>,
+    /// The log said the ports couldn't be listed (once).
+    listening_warned: bool,
     /// When apps were last stopped: their ports can take a moment to free.
     last_stop: Option<Instant>,
+    /// A start waiting for the ports of just-stopped servers to free (only, force_build): tried again on the tick.
+    /// Starts parked meanwhile join it (`None` = everything).
+    waiting_start: Option<(Option<Vec<String>>, bool)>,
+    /// The parked start is being tried again (it said it waits already).
+    retrying_start: bool,
     next_job: u64,
     slow_tick_due: Option<Instant>,
     db_due: Option<Instant>,
@@ -175,9 +184,15 @@ impl Controller {
         let apps = project.active_apps(&config, &config_file.path)?;
         let state_dir = paths.project_state(&project.id)?;
         let log_path = paths.state_dir.join("lazyrunner.log");
+        if std::fs::metadata(&log_path).is_ok_and(|meta| meta.len() > LOG_FILE_CAP) {
+            let _ = std::fs::rename(&log_path, log_path.with_extension("prev.log"));
+        }
         let mut states: Vec<AppState> = apps.iter().map(|app| AppState::new(&app.key)).collect();
+        let mut log_problems = Vec::new();
         for state in &mut states {
-            state.open_log(&state_dir.join("logs"));
+            if let Err(error) = state.open_log(&state_dir.join("logs")) {
+                log_problems.push(format!("! {}'s output isn't saved to a log file ({error})", state.key));
+            }
         }
         let watcher = super::watcher::watch(&root.join(&project.source_dir), events.clone());
         let metric_roots = Arc::new(Mutex::new(Vec::new()));
@@ -229,7 +244,10 @@ impl Controller {
             listening_in_flight: false,
             listening_at: None,
             listening_asked_at: None,
+            listening_warned: false,
             last_stop: None,
+            waiting_start: None,
+            retrying_start: false,
             next_job: 0,
             slow_tick_due: None,
             db_due: None,
@@ -240,6 +258,9 @@ impl Controller {
             now: Instant::now,
         };
         if let Some(problem) = controller.durations.problem.take() {
+            controller.add_log(problem, Hue::Yellow);
+        }
+        for problem in log_problems {
             controller.add_log(problem, Hue::Yellow);
         }
         if controller._watcher.is_none() && root.join(&controller.project.source_dir).is_dir() {
@@ -371,6 +392,11 @@ impl Controller {
             Event::Exited { tag: Tag::Build { key, job }, code } => self.build_exited(&key, job, code),
             Event::Exited { tag: Tag::NpmCi { key, job }, code } => self.npm_ci_exited(&key, job, code),
             Event::Listening(listening) => {
+                if let Some(problem) = listening.problem.as_ref().filter(|_| !self.listening_warned) {
+                    self.listening_warned = true;
+                    let text = format!("! Couldn't list the listening ports ({problem}) - readiness may lag");
+                    self.add_log(text, Hue::Yellow);
+                }
                 self.listening = listening;
                 self.listening_in_flight = false;
                 self.listening_at = self.listening_asked_at;
@@ -406,6 +432,18 @@ impl Controller {
             self.keys().into_iter().filter(|key| only.is_none_or(|only| only.contains(key))).collect();
         if only.is_none() {
             self.conflicts.clear();
+        }
+        match only {
+            None => self.waiting_start = None,
+            Some(only) => {
+                // Stopped now: no longer waiting to start (the others still are).
+                if let Some((Some(parked), _)) = &mut self.waiting_start {
+                    parked.retain(|key| !only.contains(key));
+                    if parked.is_empty() {
+                        self.waiting_start = None;
+                    }
+                }
+            }
         }
         self.ready_pending.retain(|key| !keys.contains(key));
         for key in &keys {
