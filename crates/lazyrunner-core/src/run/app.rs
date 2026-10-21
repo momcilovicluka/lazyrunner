@@ -2,8 +2,8 @@
 //! written to its log file), and its live numbers.
 
 use std::collections::VecDeque;
-use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
@@ -19,6 +19,11 @@ pub const MAX_PANE_LINES: usize = 5000;
 /// Samples kept for the sparklines.
 pub const HISTORY: usize = 30;
 const ERROR_FLASH: Duration = Duration::from_millis(1500);
+/// A column's log file starts over (the old one becomes `<key>.prev.log`) past this size.
+#[cfg(not(test))]
+const LOG_CAP: u64 = 32 * 1024 * 1024;
+#[cfg(test)]
+const LOG_CAP: u64 = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -60,6 +65,8 @@ pub struct AppState {
     /// The level of the last ASP.NET log entry: its indented lines take its colour.
     last_level: String,
     log: Option<BufWriter<File>>,
+    /// What the log file holds (so it starts over at `LOG_CAP`).
+    log_bytes: u64,
     pub log_path: Option<PathBuf>,
     pub cpu: Option<f32>,
     pub memory_mb: Option<f32>,
@@ -91,6 +98,7 @@ impl AppState {
             flash_until: None,
             last_level: "info".into(),
             log: None,
+            log_bytes: 0,
             log_path: None,
             cpu: None,
             memory_mb: None,
@@ -112,15 +120,31 @@ impl AppState {
         self.is_running() && self.up_generation == Some(self.generation)
     }
 
-    /// Opens the column's log file (the previous run's becomes `<key>.prev.log`).
-    pub fn open_log(&mut self, dir: &Path) {
-        let _ = std::fs::create_dir_all(dir);
+    /// Opens the column's log file. The previous run's becomes `<key>.prev.log` - when it has anything in it, so
+    /// opening lazyrunner twice in a row (an update) keeps the last real run's. One that can't be moved aside (open
+    /// in an editor) is added to rather than wiped.
+    pub fn open_log(&mut self, dir: &Path) -> io::Result<()> {
         let path = dir.join(format!("{}.log", self.key));
-        if path.exists() {
-            let _ = std::fs::rename(&path, dir.join(format!("{}.prev.log", self.key)));
-        }
-        self.log = File::create(&path).ok().map(BufWriter::new);
-        self.log_path = Some(path);
+        self.log_path = Some(path.clone());
+        self.log = None;
+        std::fs::create_dir_all(dir)?;
+        let previous = std::fs::metadata(&path).map_or(0, |meta| meta.len());
+        let moved = previous == 0 || std::fs::rename(&path, dir.join(format!("{}.prev.log", self.key))).is_ok();
+        let file = if moved { File::create(&path)? } else { OpenOptions::new().append(true).open(&path)? };
+        self.log_bytes = if moved { 0 } else { previous };
+        self.log = Some(BufWriter::new(file));
+        Ok(())
+    }
+
+    /// A log file past `LOG_CAP` starts over; the full one becomes `<key>.prev.log`.
+    fn start_log_over(&mut self) {
+        let Some(path) = self.log_path.clone() else { return };
+        self.log = None; // flushed and closed, so it can be moved
+        let moved = std::fs::rename(&path, path.with_extension("prev.log")).is_ok();
+        // One that can't be moved (open in a viewer) goes on growing rather than being wiped; it tries again later.
+        let file = if moved { File::create(&path) } else { OpenOptions::new().append(true).open(&path) };
+        self.log = file.ok().map(BufWriter::new);
+        self.log_bytes = 0;
     }
 
     /// Goes on writing the log file of a run another lazyrunner handed over (instead of starting a new one, which
@@ -133,7 +157,8 @@ impl AppState {
         if fresh && previous.exists() {
             let _ = std::fs::rename(&previous, &path);
         }
-        self.log = std::fs::OpenOptions::new().create(true).append(true).open(&path).ok().map(BufWriter::new);
+        self.log = OpenOptions::new().create(true).append(true).open(&path).ok().map(BufWriter::new);
+        self.log_bytes = std::fs::metadata(&path).map_or(0, |meta| meta.len());
         self.log_path = Some(path);
     }
 
@@ -151,6 +176,10 @@ impl AppState {
         }
         if let Some(log) = &mut self.log {
             let _ = writeln!(log, "{text}");
+            self.log_bytes += text.len() as u64 + 1;
+            if self.log_bytes > LOG_CAP {
+                self.start_log_over();
+            }
         }
     }
 
@@ -303,13 +332,41 @@ mod tests {
     fn the_log_file_gets_every_line_and_the_last_run_is_kept() {
         let dir = crate::testing::TempDir::new("pane-log");
         let mut state = AppState::new("shop");
-        state.open_log(dir.path());
+        state.open_log(dir.path()).unwrap();
         state.add_line("first run", Hue::Gray, Instant::now());
         state.flush_log();
-        state.open_log(dir.path());
+        state.open_log(dir.path()).unwrap();
         state.add_line("second run", Hue::Gray, Instant::now());
         state.flush_log();
         assert_eq!(std::fs::read_to_string(dir.join("shop.log")).unwrap(), "second run\n");
         assert!(std::fs::read_to_string(dir.join("shop.prev.log")).unwrap().contains("first run"));
+    }
+
+    #[test]
+    fn opening_again_without_output_keeps_the_last_real_run() {
+        let dir = crate::testing::TempDir::new("pane-log-empty");
+        let mut state = AppState::new("shop");
+        state.open_log(dir.path()).unwrap();
+        state.add_line("the run that crashed", Hue::Gray, Instant::now());
+        state.flush_log();
+        state.open_log(dir.path()).unwrap(); // lazyrunner opens again (an update), nothing runs
+        state.open_log(dir.path()).unwrap(); // and again
+        assert!(std::fs::read_to_string(dir.join("shop.prev.log")).unwrap().contains("the run that crashed"));
+    }
+
+    #[test]
+    fn a_log_file_past_its_cap_starts_over() {
+        let dir = crate::testing::TempDir::new("pane-log-cap");
+        let mut state = AppState::new("shop");
+        state.open_log(dir.path()).unwrap();
+        for n in 0..10 {
+            state.add_line(&format!("line {n} of a chatty app"), Hue::Gray, Instant::now());
+        }
+        state.flush_log();
+        let current = std::fs::read_to_string(dir.join("shop.log")).unwrap();
+        let previous = std::fs::read_to_string(dir.join("shop.prev.log")).unwrap();
+        assert!(current.len() as u64 <= LOG_CAP, "{current:?}");
+        assert!(current.ends_with("line 9 of a chatty app\n"), "{current:?}");
+        assert!(previous.contains("of a chatty app"), "the full one is kept: {previous:?}");
     }
 }

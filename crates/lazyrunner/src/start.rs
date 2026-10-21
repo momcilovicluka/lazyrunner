@@ -143,6 +143,7 @@ pub fn run_root(
     ipc: Option<String>,
     start_now: bool,
     handover: Option<(PathBuf, Vec<u64>)>,
+    notes: Vec<String>,
 ) -> Result<()> {
     let paths = Paths::from_env(&install_dir());
     let found = profile::find_project_profile(root, &paths.profiles)?
@@ -151,11 +152,11 @@ pub fn run_root(
     if !trust::is_trusted(&project, &paths.trust_store()) {
         bail!("lazyrunner: {} isn't trusted yet - run lazyrunner in that repo to review it.", project.path.display());
     }
-    run_with(project, paths, headless, ipc, start_now, handover)
+    run_with(project, paths, headless, ipc, start_now, handover, notes)
 }
 
 fn run(project: Project, paths: Paths, ipc: Option<String>, start_now: bool) -> Result<()> {
-    run_with(project, paths, None, ipc, start_now, None)
+    run_with(project, paths, None, ipc, start_now, None, Vec::new())
 }
 
 /// Runs the project, and again each time it asks to be reopened (another project, or its profile reloaded).
@@ -166,26 +167,27 @@ fn run_with(
     ipc: Option<String>,
     start_now: bool,
     handover: Option<(PathBuf, Vec<u64>)>,
+    notes: Vec<String>,
 ) -> Result<()> {
-    let (mut project, mut start_now, mut notes, mut handover) = (project, start_now, Vec::new(), handover);
+    let (mut project, mut start_now, mut notes, mut handover) = (project, start_now, notes, handover);
     let binary = Binary::now();
     loop {
-        let Finished { exit, handover: passed } =
+        let Finished { exit, handover: passed, notes: carried } =
             run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes, handover.take())?;
         match exit {
             Exit::Quit => return Ok(()),
             Exit::Reopen { root, start } => {
                 start_now = start;
-                notes = Vec::new();
+                notes = carried;
                 if let Some(passed) = passed {
                     // The next lazyrunner (the new binary after an update, or this one again) takes the running
                     // apps over. Only comes back when it couldn't be started: the apps stopped, so they start again.
-                    let error = binary.run_next(&root, start, Some(passed), headless, ipc.as_deref());
+                    let error = binary.run_next(&root, start, Some(passed), &notes, headless, ipc.as_deref());
                     notes.push(format!("✗ Couldn't start the next lazyrunner ({error:#}) - the apps start again."));
                     start_now = true;
                 } else if binary.replaced() {
                     // Only comes back when the new binary couldn't be started: this one carries on.
-                    let error = binary.run_next(&root, start, None, headless, ipc.as_deref());
+                    let error = binary.run_next(&root, start, None, &notes, headless, ipc.as_deref());
                     notes.push(format!("✗ Couldn't open the new lazyrunner ({error:#}) - this one carries on."));
                 }
                 match reopen_project(&root, &paths, headless.is_none()) {
@@ -226,6 +228,7 @@ impl Binary {
         root: &Path,
         start: bool,
         handover: Option<Passed>,
+        notes: &[String],
         headless: Option<(u16, u16)>,
         ipc: Option<&str>,
     ) -> anyhow::Error {
@@ -234,6 +237,9 @@ impl Binary {
         command.arg("run").arg("--root").arg(root);
         if start {
             command.arg("--start");
+        }
+        for note in notes {
+            command.arg("--note").arg(note);
         }
         if let Some(passed) = &handover {
             command.arg("--handover").arg(&passed.file);
@@ -310,10 +316,12 @@ fn run_once(
     let result = match headless {
         Some((width, height)) => {
             let mut terminal = Terminal::new(TestBackend::new(width, height))?;
+            lazyrunner_ui::panics::keep_off_screen();
             runtime.block_on(run_project(&mut terminal as &mut dyn Surface, run, options))
         }
         None => {
             let mut terminal = ratatui::try_init().context("this needs a terminal")?;
+            lazyrunner_ui::panics::keep_off_screen(); // after ratatui's hook, which it keeps for this thread
             let result = runtime.block_on(run_project(&mut terminal as &mut dyn Surface, run, options));
             ratatui::restore();
             result

@@ -40,8 +40,8 @@ Then open a new terminal and run `lazyrunner` in your repo. A shorter name: add 
 **Updating:** lazyrunner updates itself. When it opens, its startup checklist (or a quiet check when the checklist is
 off, in the background) asks the GitHub releases for the latest version, installs a higher one, reopens on it and shows
 what's new; `lazyrunner update` does the same on demand. With apps running, the new version takes them over when it
-opens (Windows): they keep running, on the same ports, with their output. Downloads come over HTTPS only, and the release's SHA-256
-catches a broken download. `,` then `v` (or `"autoUpdate": false`) turns it
+opens (Windows): they keep running, on the same ports, with their output. Downloads come over HTTPS only, the release's SHA-256
+catches a broken download, and the new binary has to run before it replaces the old one. `,` then `v` (or `"autoUpdate": false`) turns it
 off; `lazyrunner version` shows the version and where updates come from.
 
 **Requirements:** git; the .NET SDK for .NET apps and Node.js / npm for npm apps (nvm works). Any terminal works;
@@ -181,8 +181,9 @@ focused app's build or take it out of the queue, and `q`.
 
 When lazyrunner opens, a short splash checks for a lazyrunner update, git, the .NET SDK and Node.js / npm, whether the
 apps' ports are free, whether the active database's server answers, each npm app's packages against its
-`package-lock.json`, and which project and branch it runs. Problems also go to the panel log. Turn it off with `,`
-then `w`.
+`package-lock.json`, and which project and branch it runs. The checks run side by side. The apps don't wait long for
+the update check: once everything else is done it gets 2 s more, then goes on in the background (an update it installs
+is switched to when nothing is in the way). Problems also go to the panel log. Turn it off with `,` then `w`.
 
 ## Database picker (`d`)
 

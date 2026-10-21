@@ -16,6 +16,8 @@ use crate::run::net::{self, Listening, ProbeResult};
 use crate::run::{Event, format_duration, secrets, tools};
 
 const LISTENING_EVERY: Duration = Duration::from_secs(1);
+/// A port snapshot that hasn't come back by then never will (its task died): ask again.
+const LISTENING_STALL: Duration = Duration::from_secs(10);
 const SLOW_TICK_EVERY: Duration = Duration::from_secs(1);
 const DB_LABEL_EVERY: Duration = Duration::from_secs(5);
 const PROBE_EVERY: Duration = Duration::from_secs(5);
@@ -104,6 +106,12 @@ impl Controller {
     /// A fresh snapshot of the listening ports, in the background (`now`: don't wait for the next second).
     pub(super) fn request_listening(&mut self, now: bool) {
         let at = (self.now)();
+        let stalled = self.listening_in_flight
+            && self.listening_asked_at.is_some_and(|asked| at.saturating_duration_since(asked) >= LISTENING_STALL);
+        if stalled {
+            self.listening_in_flight = false;
+            self.add_log("The port snapshot didn't come back - asking again", Hue::DarkGray);
+        }
         if self.listening_in_flight || (!now && self.listening_due.is_some_and(|due| at < due)) {
             return;
         }
@@ -119,6 +127,11 @@ impl Controller {
     /// The timed work: call it a few times a second.
     pub fn tick(&mut self) {
         let now = (self.now)();
+        if let Some((only, force_build)) = self.waiting_start.take() {
+            self.retrying_start = true;
+            self.start(only.as_deref(), force_build); // parks again while the ports are still held
+            self.retrying_start = false;
+        }
         self.request_listening(false);
         self.watch_states();
         self.schedule_probes(now);

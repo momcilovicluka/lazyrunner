@@ -78,6 +78,9 @@ enum Command {
         /// The handle values it passed on (closed if the file can't be read).
         #[arg(long, value_delimiter = ',')]
         handover_handles: Vec<u64>,
+        /// Something the lazyrunner that opened this one had to say: shown first in the log.
+        #[arg(long = "note")]
+        notes: Vec<String>,
     },
     /// Kills what lazyrunner started when lazyrunner itself dies (Linux, macOS).
     #[command(name = "__guard", hide = true)]
@@ -176,9 +179,9 @@ fn run_cli() -> Result<()> {
         Some(Command::Changelog { after }) => update_cli::changelog_after(&after),
         Some(Command::Stop) => start::send("stop"),
         Some(Command::Restart) => start::send("restart"),
-        Some(Command::Run { root, headless, ipc, start, handover, handover_handles }) => {
+        Some(Command::Run { root, headless, ipc, start, handover, handover_handles, notes }) => {
             let size = headless.as_deref().map(parse_size).transpose()?;
-            start::run_root(&root, size, ipc, start, handover.map(|file| (file, handover_handles)))
+            start::run_root(&root, size, ipc, start, handover.map(|file| (file, handover_handles)), notes)
         }
         Some(Command::Guard) => {
             lazyrunner_core::run::child::run_guard();

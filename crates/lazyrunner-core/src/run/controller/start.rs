@@ -51,6 +51,9 @@ impl Controller {
     /// U, u, and `lazyrunner start`: starts `only` (all when `None`) that isn't running, building first what needs it.
     pub fn start(&mut self, only: Option<&[String]>, force_build: bool) {
         debug_assert!(self.building.is_some() || !self.build_only, "b's flag outlives its builds");
+        if self.wait_for_ports(only, force_build) {
+            return;
+        }
         if self.building.is_some() {
             self.start_during_build(only);
             return;
@@ -160,6 +163,53 @@ impl Controller {
         self.next_build();
     }
 
+    /// Right after a stop the old servers can hold their ports a moment longer (killing a tree is asynchronous).
+    /// Then the start waits for them on the tick instead of blocking, for up to `STOP_SETTLE` after the stop; past
+    /// that a port still held is a conflict.
+    fn wait_for_ports(&mut self, only: Option<&[String]>, force_build: bool) -> bool {
+        let settling = self.last_stop.is_some_and(|at| (self.now)().saturating_duration_since(at) < STOP_SETTLE);
+        if !settling {
+            return false;
+        }
+        self.update_modes(); // this checkout's ports (a branch can change an npm app's variant)
+        let ports: Vec<u16> = self
+            .keys()
+            .into_iter()
+            .filter(|key| only.is_none_or(|only| only.contains(key)) && !self.is_running(key))
+            .filter_map(|key| self.port(&key))
+            .collect();
+        if ports.is_empty() {
+            return false;
+        }
+        let listening = Listening::now();
+        let held: Vec<String> =
+            ports.iter().filter(|port| listening.contains(**port)).map(|port| format!(":{port}")).collect();
+        if held.is_empty() {
+            return false;
+        }
+        if !self.retrying_start {
+            self.add_log(format!("Waiting for {} to be let go…", held.join(" ")), Hue::DarkGray);
+        }
+        self.park_start(only, force_build);
+        true
+    }
+
+    /// Parks a start until the ports are free; one parked already takes its apps in too.
+    pub(super) fn park_start(&mut self, only: Option<&[String]>, force_build: bool) {
+        self.waiting_start = Some(match (self.waiting_start.take(), only) {
+            (Some((Some(mut parked), parked_force)), Some(only)) => {
+                for key in only {
+                    if !parked.contains(key) {
+                        parked.push(key.clone());
+                    }
+                }
+                (Some(parked), parked_force || force_build)
+            }
+            (Some((_, parked_force)), _) => (None, parked_force || force_build),
+            (None, only) => (only.map(<[String]>::to_vec), force_build),
+        });
+    }
+
     pub fn builds(&self, key: &str) -> bool {
         self.app(key).is_some_and(|app| app.traits().builds)
     }
@@ -262,18 +312,7 @@ impl Controller {
 
     /// Whether anything else holds a port these apps need (each said in the log).
     fn find_port_conflicts(&mut self, keys: &[String]) -> bool {
-        let mut listening = Listening::now();
-        let recently_stopped = self.last_stop.is_some_and(|at| (self.now)() - at < STOP_SETTLE);
-        let held =
-            |listening: &Listening| keys.iter().any(|key| self.port(key).is_some_and(|port| listening.contains(port)));
-        if recently_stopped && held(&listening) {
-            // Killing a tree is asynchronous: give the old server a moment to let go of its port.
-            let deadline = Instant::now() + STOP_SETTLE;
-            while held(&listening) && Instant::now() < deadline {
-                std::thread::sleep(std::time::Duration::from_millis(50));
-                listening = Listening::now();
-            }
-        }
+        let listening = Listening::now();
         self.conflicts = keys
             .iter()
             .filter_map(|key| {
@@ -292,13 +331,30 @@ impl Controller {
         !self.conflicts.is_empty()
     }
 
-    /// !: kills what holds the ports, then starts.
+    /// !: kills what holds the ports (if it still does), then starts once they are free.
     pub fn resolve_port_conflicts(&mut self) {
         let conflicts = std::mem::take(&mut self.conflicts);
         if conflicts.is_empty() {
             return;
         }
+        let listening = Listening::now();
         for conflict in conflicts {
+            // The conflict may be minutes old: kill only what still holds the port, never a reused PID.
+            match listening.ports.get(&conflict.port) {
+                Some(owner) if owner.pid == conflict.pid => {}
+                Some(owner) => {
+                    let text = format!(
+                        "Port {} is held by {} (PID {}) now - checking again",
+                        conflict.port, owner.name, owner.pid
+                    );
+                    self.add_log(text, Hue::DarkGray);
+                    continue;
+                }
+                None => {
+                    self.add_log(format!("Port {} is free now", conflict.port), Hue::DarkGray);
+                    continue;
+                }
+            }
             if conflict.pid <= 4 {
                 let text =
                     format!("Port {} belongs to the system (PID {}); free it manually.", conflict.port, conflict.pid);
@@ -316,7 +372,7 @@ impl Controller {
                 self.add_log(text, Hue::Red);
             }
         }
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        self.last_stop = Some((self.now)()); // what was killed lets go of its ports in a moment: the start waits
         self.start(None, false);
     }
 
@@ -632,6 +688,8 @@ impl Controller {
         let beside = if self.building.is_some() { " (next to the build)" } else { "" };
         self.add_log(format!("Running npm ci for {}…{beside}", app.name), Hue::Cyan);
         stop_nx_daemon(&folder);
+        // node_modules is about to be rewritten: until npm ci succeeds it isn't known to be in sync.
+        let _ = std::fs::remove_file(self.npm_ci_stamp(&key));
         let spawned = tools::npm_ci_command(&folder).and_then(|spec| {
             Ok(Child::spawn(
                 &spec,

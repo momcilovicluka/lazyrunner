@@ -18,18 +18,24 @@ pub struct Owner {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Listening {
     pub ports: HashMap<u16, Owner>,
+    /// Why the ports couldn't be listed (then `ports` is empty, which isn't "nothing listens").
+    pub problem: Option<String>,
 }
 
 impl Listening {
     /// A snapshot of this machine's listening TCP ports (blocking: a few milliseconds).
     pub fn now() -> Self {
+        let all = match listeners::get_all() {
+            Ok(all) => all,
+            Err(error) => return Self { ports: HashMap::new(), problem: Some(error.to_string()) },
+        };
         let mut ports = HashMap::new();
-        for listener in listeners::get_all().unwrap_or_default() {
+        for listener in all {
             if listener.protocol == listeners::Protocol::TCP && listener.state == listeners::SocketState::Listen {
                 ports.insert(listener.socket.port(), Owner { pid: listener.process.pid, name: listener.process.name });
             }
         }
-        Self { ports }
+        Self { ports, problem: None }
     }
 
     pub fn contains(&self, port: u16) -> bool {

@@ -75,6 +75,22 @@ async fn b_on_an_app_without_a_separate_build_says_so() {
 }
 
 #[tokio::test]
+async fn parked_starts_join_and_a_stop_only_drops_its_own_apps() {
+    let temp = TempDir::new("controller-parked");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    let keys = |names: &[&str]| names.iter().map(|name| name.to_string()).collect::<Vec<_>>();
+    sample.park_start(Some(&keys(&["orders"])), false);
+    sample.park_start(Some(&keys(&["shop", "orders"])), true);
+    assert_eq!(sample.waiting_start, Some((Some(keys(&["orders", "shop"])), true)), "both wait, forced");
+    sample.stop(Some(&keys(&["shop"])), true);
+    assert_eq!(sample.waiting_start, Some((Some(keys(&["orders"])), true)), "shop was stopped: orders still waits");
+    sample.park_start(None, false);
+    assert_eq!(sample.waiting_start, Some((None, true)), "everything");
+    sample.stop(None, true);
+    assert_eq!(sample.waiting_start, None);
+}
+
+#[tokio::test]
 async fn apps_turned_off_on_this_machine_get_no_column() {
     let temp = TempDir::new("controller-off");
     let (controller, _rx) = controller(&temp, json!({ "projects": { "sample": { "frontend": false } } }));

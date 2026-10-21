@@ -1,6 +1,6 @@
 //! The startup checklist's checks: the tools, the ports, the database server, the frontend packages, the project
-//! and the branch. Each check runs on its own (in a background thread, one after the other) and says ok, warn,
-//! fail or skip, with a detail.
+//! and the branch. Each check runs on its own (each in a thread of its own, side by side) and says ok, warn, fail
+//! or skip, with a detail.
 
 use std::io::Read;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -39,10 +39,12 @@ pub type Report<'a> = &'a mut dyn FnMut(&str);
 pub struct Check {
     pub name: String,
     pub run: Box<dyn FnOnce(Report) -> Outcome + Send>,
+    /// The apps needn't wait for it at startup (the update check): it may finish after the checklist closes.
+    pub background: bool,
 }
 
 fn check(name: impl Into<String>, run: impl FnOnce() -> Outcome + Send + 'static) -> Check {
-    Check { name: name.into(), run: Box::new(move |_: Report| run()) }
+    Check { name: name.into(), run: Box::new(move |_: Report| run()), background: false }
 }
 
 /// The first line a tool prints for `args`, when it runs and succeeds.
@@ -97,6 +99,7 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
             };
             (status, outcome.detail)
         }),
+        background: true,
     });
     checks.push(check("git", || match version_of("git") {
         Some(version) => (Status::Ok, version.trim_start_matches("git version ").to_string()),

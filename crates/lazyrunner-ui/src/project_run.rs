@@ -27,7 +27,7 @@ use tokio::time::sleep_until;
 
 use crate::keys;
 use crate::run::{Surface, TimerResolution};
-use crate::screen::checklist::Checklist;
+use crate::screen::checklist::{Checklist, StillChecking};
 use crate::screen::{self, Exit, Overlay, Ui, status};
 use crate::theme::{ColorMode, downsample};
 
@@ -61,6 +61,8 @@ pub struct ProjectOptions {
 pub struct Finished {
     pub exit: Exit,
     pub handover: Option<Passed>,
+    /// What the next lazyrunner says first in its log (it may be another process: a new version).
+    pub notes: Vec<String>,
 }
 
 pub struct ProjectRun {
@@ -103,6 +105,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
     }
     let whats_new = changelog::whats_new(&state_dir);
     let mut quiet: Option<std::sync::mpsc::Receiver<update::Outcome>>;
+    let mut still_checking: Option<StillChecking> = None;
     if let Some(file) = &options.handover {
         // Taking over from the previous lazyrunner: its apps keep running; no checklist, no auto-start.
         log_whats_new(&mut controller, &whats_new);
@@ -120,12 +123,16 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
 
     let mut dumps: Vec<oneshot::Sender<Value>> = Vec::new();
     let mut next_frame = Some(started);
+    // When the last frame was drawn: output, ticks and the like redraw at most once a FRAME.
+    let mut last_frame = started;
     let mut last_dump: Option<Instant> = None;
     let mut tick = tokio::time::interval(TICK);
     let far = started + Duration::from_secs(365 * 24 * 3600);
 
     loop {
         let mut dirty = false;
+        // A key or a resize is drawn right away; everything else waits for the next frame slot.
+        let mut urgent = false;
         tokio::select! {
             biased;
             event = terminal_events.next() => match event {
@@ -133,8 +140,12 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                     ui.now = Instant::now();
                     screen::keys::press(&mut ui, &mut controller, key);
                     dirty = true;
+                    urgent = true;
                 }
-                Some(Ok(Event::Resize(..))) => dirty = true,
+                Some(Ok(Event::Resize(..))) => {
+                    dirty = true;
+                    urgent = true;
+                }
                 Some(Ok(_)) => {}
                 Some(Err(error)) => {
                     controller.shutdown();
@@ -152,7 +163,8 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             _ = sleep_until(next_frame.unwrap_or(far).into()), if next_frame.is_some() => {
                 let now = Instant::now();
                 ui.now = now;
-                update_checklist(&mut ui, &mut controller);
+                last_frame = now;
+                update_checklist(&mut ui, &mut controller, &mut still_checking);
                 let dump_due = options.frame_dump.is_some() && last_dump.is_none_or(|at| now - at >= FRAME_DUMP_EVERY);
                 let text = surface.render(&mut |frame| {
                     screen::draw(frame, &mut ui, &controller);
@@ -194,8 +206,12 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             _ = tick.tick() => {
                 ui.now = Instant::now();
                 controller.tick();
-                update_checklist(&mut ui, &mut controller);
+                update_checklist(&mut ui, &mut controller, &mut still_checking);
                 poll_quiet_update(&mut quiet, &mut ui, &mut controller);
+                poll_still_checking(&mut still_checking, &mut ui, &mut controller);
+                for panic in crate::panics::take() {
+                    controller.add_log(format!("✗ Internal error in {panic} - lazyrunner carries on"), Hue::Red);
+                }
                 switch_when_idle(&mut ui, &mut controller);
                 dirty = true;
             }
@@ -218,8 +234,9 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             controller.add_log(format!("{why} - , then p again once it's done (the apps keep running)"), Hue::Yellow);
             ui.exit = None;
         }
-        if let Some(exit) = ui.exit.clone() {
+        if let Some(mut exit) = ui.exit.clone() {
             let mut handover = None;
+            let mut notes = Vec::new();
             if let Exit::Reopen { root, .. } = &exit
                 && hands_over_to(&controller, &profiles, root)
             {
@@ -231,17 +248,27 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 });
                 match passed {
                     Ok(passed) => handover = Some(passed),
-                    Err(why) => controller.add_log(format!("✗ Couldn't hand the apps over ({why})"), Hue::Yellow),
+                    Err(why) => {
+                        // The apps stop with this lazyrunner: the next one starts them again, and says why.
+                        let note = format!("✗ Couldn't hand the running apps over ({why}) - starting them again");
+                        controller.add_log(note.clone(), Hue::Yellow);
+                        notes.push(note);
+                        if let Exit::Reopen { start, .. } = &mut exit {
+                            *start = true;
+                        }
+                    }
                 }
             }
             if exit == Exit::Quit {
                 controller.add_log("Quitting - stopping everything", Hue::DarkGray);
             }
             controller.shutdown();
-            return Ok(Finished { exit, handover });
+            return Ok(Finished { exit, handover, notes });
         }
-        if dirty && next_frame.is_none() {
-            next_frame = Some(Instant::now() + MIN_GAP);
+        if dirty {
+            let soonest = Instant::now() + MIN_GAP;
+            let slot = if urgent { soonest } else { (last_frame + FRAME).max(soonest) };
+            next_frame = Some(next_frame.map_or(slot, |planned| planned.min(slot)));
         }
     }
 }
@@ -258,13 +285,16 @@ fn begin(controller: &mut Controller, start_now: bool) {
     }
 }
 
-fn update_checklist(ui: &mut Ui, controller: &mut Controller) {
+fn update_checklist(ui: &mut Ui, controller: &mut Controller, still_checking: &mut Option<StillChecking>) {
     let Some(Overlay::Checklist(checklist)) = &mut ui.overlay else { return };
     if !checklist.update(ui.now, controller) {
         return;
     }
+    let Some(Overlay::Checklist(checklist)) = ui.overlay.take() else { return };
     let (manual, start_after, updated_to) = (checklist.manual, checklist.start_after, checklist.updated_to.clone());
-    ui.overlay = None;
+    if let Some(still) = checklist.still_checking() {
+        *still_checking = Some(still); // a checklist opened by hand (, r) never has one: keeps the startup's
+    }
     if let Some(version) = updated_to {
         after_update(ui, controller, &version, manual, start_after);
     } else if !manual {
@@ -367,6 +397,20 @@ fn quiet_update(controller: &Controller) -> Option<std::sync::mpsc::Receiver<upd
         let _ = sender.send(update::update(&config, &state_dir, false, &mut update::Progress::new(&mut quiet)));
     });
     Some(receiver)
+}
+
+/// The update check the startup didn't wait for: its outcome in the log; a version it installed is switched to
+/// once nothing is in the way (the new version takes the running apps over).
+fn poll_still_checking(still_checking: &mut Option<StillChecking>, ui: &mut Ui, controller: &mut Controller) {
+    let Some(checking) = still_checking else { return };
+    let Some(updated_to) = checking.poll(controller) else { return };
+    *still_checking = None;
+    match updated_to {
+        // Not mid-typing or in a menu: it switches once nothing is in the way.
+        Some(version) if cfg!(windows) => ui.switch_to = Some(version),
+        Some(version) => after_update(ui, controller, &version, true, false),
+        None => {}
+    }
 }
 
 /// Its outcome in the log; what it installed reopens lazyrunner, or waits for , then p while apps run.
