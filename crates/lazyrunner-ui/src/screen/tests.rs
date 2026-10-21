@@ -23,6 +23,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use super::checklist::{Checklist, Item};
+use super::mouse::{self, Target};
 use super::{Exit, Overlay, Picker, Ui, draw, keys, text};
 
 const SIZE: (u16, u16) = (110, 32);
@@ -117,6 +118,24 @@ impl Screen {
     }
 
     /// Orders up with some output, Billing still starting, the rest stopped.
+    /// Where a target is on the screen (a frame is drawn first, as the mouse sees the last one).
+    fn spot(&mut self, target: Target) -> (u16, u16) {
+        self.frame();
+        let hit =
+            self.ui.hits.iter().find(|hit| hit.target == target).unwrap_or_else(|| panic!("no {target:?} on screen"));
+        (hit.x, hit.y)
+    }
+
+    fn click(&mut self, target: Target) {
+        let (x, y) = self.spot(target);
+        self.click_at(x, y);
+    }
+
+    fn click_at(&mut self, x: u16, y: u16) {
+        let now = self.ui.now;
+        mouse::click_at(&mut self.ui, &mut self.controller, x, y, now);
+    }
+
     fn running(&mut self) {
         let at = self.ui.now - Duration::from_secs(5);
         let orders: &[&str] = &[
@@ -557,4 +576,111 @@ async fn y_in_the_database_picker_copies_the_line_as_it_is_in_secrets_json() {
     screen.press("y");
     assert_eq!(copied().len(), 1, "nothing copied from a file that changed");
     assert_eq!(screen.last_log(), "secrets.json changed since the picker opened - press d again to copy that row.");
+}
+
+// ---------------------------------------------------------------- the mouse
+
+#[tokio::test]
+async fn a_click_on_a_title_focuses_its_column_and_a_double_click_zooms_it() {
+    let mut screen = screen("mouse-title", json!({}));
+    screen.running();
+    screen.click(Target::Title(2));
+    assert_eq!((screen.ui.focus, screen.ui.zoom), (2, false));
+    screen.click(Target::Title(2));
+    assert!(screen.ui.zoom, "a double click zooms");
+    screen.click(Target::Output(2));
+    assert_eq!(screen.ui.focus, 2, "a third click is a single one again");
+    assert!(screen.ui.zoom);
+}
+
+#[tokio::test]
+async fn the_wheel_scrolls_the_column_under_the_pointer() {
+    let mut screen = screen("mouse-wheel", json!({}));
+    for n in 0..40 {
+        screen.controller.states[1].output.push(&format!("billing line {n}"), screen.ui.now);
+    }
+    let (x, y) = screen.spot(Target::Output(1));
+    mouse::wheel_at(&mut screen.ui, &mut screen.controller, x, y, true);
+    assert_eq!(screen.controller.states[1].scroll, 3, "the column under the pointer");
+    assert_eq!(screen.controller.states[0].scroll, 0);
+    assert_eq!(screen.ui.focus, 0, "the focus stays");
+    mouse::wheel_at(&mut screen.ui, &mut screen.controller, x, y, false);
+    assert_eq!(screen.controller.states[1].scroll, 0);
+}
+
+#[tokio::test]
+async fn in_a_menu_a_click_picks_an_item_a_double_click_runs_it_and_a_click_outside_closes_it() {
+    let mut screen = screen("mouse-menu", json!({}));
+    screen.press(",");
+    screen.click(Target::Item(1));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { index: 1 })), "picked, not run");
+    assert!(screen.controller.setting(Toggle::AutoStartOnOpen), "still on");
+    screen.click(Target::Item(1));
+    assert!(!screen.controller.setting(Toggle::AutoStartOnOpen), "a double click runs it: auto-start toggled");
+    screen.press("Esc ,");
+    let (_, y) = screen.spot(Target::Item(0));
+    screen.click_at(0, y); // the margin beside the box
+    assert!(screen.ui.overlay.is_none(), "closed");
+}
+
+#[tokio::test]
+async fn a_setting_in_the_panel_toggles_on_a_click() {
+    let mut screen = screen("mouse-setting", json!({}));
+    assert!(!screen.controller.setting(Toggle::AutoRestartOnBranchChange));
+    screen.click(Target::Setting(Toggle::AutoRestartOnBranchChange));
+    assert!(screen.controller.setting(Toggle::AutoRestartOnBranchChange));
+    assert!(screen.last_log().starts_with("Auto-restart on branch change: on"), "{}", screen.last_log());
+}
+
+#[tokio::test]
+async fn a_long_column_has_a_scrollbar_bright_while_scrolled_back() {
+    let mut screen = screen("snap-scrollbar", json!({}));
+    screen.running();
+    for n in 0..120 {
+        screen.controller.states[0].output.push(&format!("orders line {n}"), screen.ui.now - Duration::from_secs(5));
+    }
+    screen.controller.states[0].scroll = 60;
+    insta::assert_snapshot!(screen.frame());
+}
+
+#[tokio::test]
+async fn clicks_while_a_new_database_name_is_typed_add_nothing() {
+    let mut screen = screen("mouse-picker-name", json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{
+  \"DefaultConnection\": \"Server=localhost;Database=ShopLocal;Trusted_Connection=True\"
+}
+";
+    std::fs::write(&path, secrets).unwrap();
+    let groups = lazyrunner_core::run::secrets::groups(secrets);
+    let picker = Picker {
+        path: path.clone(),
+        groups,
+        group: 0,
+        index: 0,
+        top: 0,
+        filter: String::new(),
+        filtering: false,
+        new_name: Some("ShopCopy".into()),
+    };
+    screen.ui.picker = Some(picker);
+    screen.click(Target::Item(0));
+    screen.click(Target::Item(0)); // a double click: not an Enter that adds the name
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), secrets, "secrets.json untouched");
+    assert!(screen.ui.picker.as_ref().is_some_and(|picker| picker.new_name.is_some()), "still typing");
+    screen.click_at(0, 0); // outside
+    assert!(screen.ui.picker.is_none(), "closed");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), secrets);
+}
+
+#[tokio::test]
+async fn the_click_that_closes_a_box_and_the_next_one_are_not_a_double_click() {
+    let mut screen = screen("mouse-close-then-click", json!({}));
+    let (x, y) = screen.spot(Target::Title(1));
+    screen.press(",");
+    screen.click_at(x, y); // outside the box: closes it
+    assert!(screen.ui.overlay.is_none());
+    screen.click_at(x, y);
+    assert_eq!(screen.ui.focus, 1, "a single click focuses");
+    assert!(!screen.ui.zoom, "not a double click on the title");
 }

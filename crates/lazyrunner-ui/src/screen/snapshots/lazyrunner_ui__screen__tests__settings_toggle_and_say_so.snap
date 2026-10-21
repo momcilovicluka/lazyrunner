@@ -5,7 +5,6 @@ expression: screen.frame()
 
 
 
-
                      ┌─ Settings (saved) ───────────────────────────────────────────────┐
                      │  a      [ ] Auto-restart on branch change                        │
                      │  u      [x] Auto-start when lazyrunner opens                     │
@@ -13,6 +12,7 @@ expression: screen.frame()
                      │  e      [ ] Restart the APIs when code changes                   │
                      │  w      [x] Startup checklist when lazyrunner opens              │
                      │  v      [x] Auto-update lazyrunner when it opens                 │
+                     │  m      [x] Mouse: click and scroll (off: select text)           │
                      │  r      Run the startup checklist now (and check for an update)  │
                      │  c      What's new: the lazyrunner changelog                     │
                      │  p      Reload the project profile                               │
@@ -27,4 +27,4 @@ expression: screen.frame()
  ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
-              w [x] startup checklist   v [x] auto-update
+              w [x] startup checklist   v [x] auto-update   m [x] mouse

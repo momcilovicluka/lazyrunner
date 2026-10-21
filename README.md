@@ -195,7 +195,16 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `r` | Run the startup checklist now (and check for an update) |
 | `p` | Reload the project profile (reopens lazyrunner; on Windows the running apps carry on, unless their entry changed) |
 | `v` | Auto-update lazyrunner when it opens |
+| `m` | The mouse (below); off, the terminal selects text again |
 | `c` | What's new: the changelog |
+
+### Mouse
+
+A click focuses a column; a double click on its title zooms it (again: back). The wheel scrolls the column under the
+pointer, whichever has the focus. In the menus, the command palette and the database and theme pickers a click picks
+an item and a double click runs it; a click outside a box closes it. A setting in the panel toggles on a click. Moving
+the pointer does nothing (and costs nothing). While the mouse is on, the terminal leaves text selection to
+lazyrunner, which has none: `,` then `m` turns it off (in Windows Terminal, Shift + drag selects either way).
 
 ### During a build
 
@@ -215,6 +224,8 @@ focused app's build or take it out of the queue, and `q`.
   instead of flooding the column.
 - **Log lines** are coloured by level, and every app's full output is saved to `<project>/logs/<app>.log` in the
   state folder (below), so `o` lets you search all of it.
+- **A scrollbar** on the right of a column with more output than fits shows where the lines on screen are; it is
+  bright while the column is scrolled back (`G` follows new output again).
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
   crash, and a slow start finishing.
 - **After "Ready"**, the log shows a startup timeline per app.
@@ -300,6 +311,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `panelLogLines` | `5` | How many recent events the panel shows |
 | `theme` | `default` | A theme's id (a built-in one, or a file in `themes` without `.json`) |
 | `autoUpdate` | `true` | Install a newer lazyrunner when it opens |
+| `mouse` | `true` | Clicks and the wheel (off: the terminal selects text) |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.columnWidths` | equal | Relative width per app key (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |

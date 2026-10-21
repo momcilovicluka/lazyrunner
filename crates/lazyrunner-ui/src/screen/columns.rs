@@ -11,7 +11,8 @@ use lazyrunner_core::run::format_duration;
 use unicode_width::UnicodeWidthStr;
 
 use super::Ui;
-use super::seg::{Seg, on, pad, seg, take_cells, width};
+use super::mouse::Target;
+use super::seg::{Seg, aim, on, pad, seg, take_cells, width};
 use super::theme::C;
 
 const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -120,14 +121,23 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
     let keys: Vec<usize> = if ui.zoom { vec![ui.focus] } else { (0..count).collect() };
     let widths = widths(controller, &keys, total.saturating_sub(keys.len() - 1));
     if let Some(cells) = keys.iter().position(|&index| index == ui.focus).map(|at| widths[at]) {
-        ui.focus_cells = cells;
+        // The text's width: a scrollbar takes the last cell.
+        let scrollable = controller.states[ui.focus].output.len() > rows.saturating_sub(2);
+        ui.focus_cells = cells.saturating_sub(usize::from(scrollable));
     }
     let columns: Vec<Vec<Vec<Seg>>> = keys
         .iter()
         .zip(&widths)
         .map(|(&index, &cells)| {
-            let mut column = vec![title(ui, controller, index, cells), info(controller, index, cells)];
-            column.extend(body(ui, controller, index, cells, rows.saturating_sub(2)));
+            let mut column = vec![
+                aim(title(ui, controller, index, cells), Target::Title(index)),
+                aim(info(controller, index, cells), Target::Title(index)),
+            ];
+            column.extend(
+                body(ui, controller, index, cells, rows.saturating_sub(2))
+                    .into_iter()
+                    .map(|row| aim(row, Target::Output(index))),
+            );
             column
         })
         .collect();
@@ -384,10 +394,13 @@ fn bright(color: C) -> C {
 
 /// Output rows, newest at the bottom, wrapped to the width. New lines fade in; search matches are highlighted
 /// (the current one in the focus colours, the others yellow).
-fn body(ui: &Ui, controller: &Controller, index: usize, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+fn body(ui: &Ui, controller: &Controller, index: usize, column: usize, rows: usize) -> Vec<Vec<Seg>> {
     let state = &controller.states[index];
     let search = ui.search.as_ref().filter(|search| !search.query.is_empty() && search.key == state.key);
     let total = state.output.len();
+    // More lines than rows: the last cell is a scrollbar.
+    let scrollable = total > rows && rows > 0 && column > 1;
+    let cells = if scrollable { column - 1 } else { column };
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
     for (offset, line) in state.output.newest_first(state.scroll).enumerate() {
         if result.len() >= rows {
@@ -417,14 +430,31 @@ fn body(ui: &Ui, controller: &Controller, index: usize, cells: usize, rows: usiz
                 break;
             }
             let text = if back.is_some() { pad(text, cells) } else { text.clone() };
-            result.push(fit(vec![Seg { text, fg: color, bg: back, style: None }], cells));
+            result.push(fit(vec![Seg { text, fg: color, bg: back, style: None, target: None }], cells));
         }
     }
     while result.len() < rows {
         result.push(vec![seg(" ".repeat(cells), C::Gray)]);
     }
     result.reverse();
+    if scrollable {
+        add_scrollbar(&mut result, total, state.scroll);
+    }
     result
+}
+
+/// The scrollbar: where the lines on screen are among all the column keeps (by lines, not wrapped rows); bright
+/// while scrolled back.
+fn add_scrollbar(rows: &mut [Vec<Seg>], total: usize, scroll: usize) {
+    let height = rows.len();
+    let thumb = (height * height / total).clamp(1, height);
+    let newest_shown = total.saturating_sub(scroll).max(1); // the lines up to this one end at the bottom row
+    let bottom = (newest_shown * height).div_ceil(total).clamp(thumb, height); // at the top it keeps its size
+    let top = bottom.saturating_sub(thumb);
+    let color = if scroll > 0 { C::Cyan } else { C::DarkGray };
+    for (at, row) in rows.iter_mut().enumerate() {
+        row.push(if (top..bottom).contains(&at) { seg("▐", color) } else { seg(" ", C::Gray) });
+    }
 }
 
 /// Cuts text into pieces of `cells` cells.

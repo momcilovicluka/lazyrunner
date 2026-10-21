@@ -15,6 +15,7 @@ pub fn keep_off_screen() {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         if std::thread::current().id() == ui_thread {
+            crate::terminal::release_mouse();
             previous(info); // restores the terminal and says what happened
         } else if let Ok(mut panics) = PANICS.lock() {
             panics.push(describe(info));

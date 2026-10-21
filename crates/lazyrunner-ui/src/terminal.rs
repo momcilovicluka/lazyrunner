@@ -1,9 +1,11 @@
 //! Where frames go: the real terminal, or an in-memory one for tests and headless runs (`Surface`); and the timer
 //! resolution smooth animation needs on Windows (`TimerResolution`).
 
-use std::io::Stdout;
+use std::io::{self, Stdout};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Result, anyhow};
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate};
 use crossterm::{execute, queue};
 use ratatui::backend::{CrosstermBackend, TestBackend};
@@ -34,6 +36,46 @@ impl Surface for Terminal<TestBackend> {
     fn render(&mut self, draw: &mut dyn FnMut(&mut Frame), want_text: bool) -> Result<Option<String>> {
         let frame = self.draw(|frame| draw(frame)).map_err(|error| anyhow!("{error}"))?;
         Ok(want_text.then(|| dump::text(frame.buffer)))
+    }
+}
+
+/// Whether lazyrunner has the terminal's mouse (so a panic can give it back).
+static MOUSE: AtomicBool = AtomicBool::new(false);
+
+/// The terminal's mouse: lazyrunner's while the mouse setting is on (`, m`; off, the terminal selects text again),
+/// and given back when lazyrunner closes, so the shell after it doesn't get mouse codes.
+pub struct MouseCapture {
+    /// A real terminal (headless runs have none).
+    live: bool,
+}
+
+impl MouseCapture {
+    pub fn new(live: bool) -> Self {
+        Self { live }
+    }
+
+    pub fn set(&mut self, on: bool) {
+        if !self.live || MOUSE.load(Ordering::Relaxed) == on {
+            return;
+        }
+        let done =
+            if on { execute!(io::stdout(), EnableMouseCapture) } else { execute!(io::stdout(), DisableMouseCapture) };
+        if done.is_ok() {
+            MOUSE.store(on, Ordering::Relaxed);
+        }
+    }
+}
+
+impl Drop for MouseCapture {
+    fn drop(&mut self) {
+        self.set(false);
+    }
+}
+
+/// Gives the mouse back if lazyrunner has it (the panic hook).
+pub fn release_mouse() {
+    if MOUSE.swap(false, Ordering::Relaxed) {
+        let _ = execute!(io::stdout(), DisableMouseCapture);
     }
 }
 

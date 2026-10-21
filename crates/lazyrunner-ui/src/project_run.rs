@@ -29,7 +29,7 @@ use tokio::time::sleep_until;
 use crate::keys;
 use crate::screen::checklist::{Checklist, StillChecking};
 use crate::screen::{self, Exit, Overlay, Ui, status};
-use crate::terminal::{Surface, TimerResolution};
+use crate::terminal::{MouseCapture, Surface, TimerResolution};
 use crate::theme::{ColorMode, downsample};
 
 /// While something animates: the animations step every 100 ms, so 30 frames a second is plenty.
@@ -101,6 +101,8 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         controller.add_log(warning, Hue::Yellow);
     }
     let mut outside = Outside::new(!options.headless);
+    let mut mouse = MouseCapture::new(!options.headless);
+    mouse.set(controller.setting(Toggle::Mouse));
     for note in &options.notes {
         controller.add_log(note.clone(), Hue::Yellow);
     }
@@ -146,6 +148,15 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 Some(Ok(Event::Resize(..))) => {
                     dirty = true;
                     urgent = true;
+                }
+                // A moving pointer, drags and releases are dropped here, before anything redraws.
+                Some(Ok(Event::Mouse(event))) if screen::mouse::wanted(&event) => {
+                    ui.now = Instant::now();
+                    if screen::mouse::handle(&mut ui, &mut controller, event) {
+                        dirty = true;
+                        // A click shows at once; the wheel's notches wait for the next frame slot.
+                        urgent = matches!(event.kind, crossterm::event::MouseEventKind::Down(_));
+                    }
                 }
                 Some(Ok(_)) => {}
                 Some(Err(error)) => {
@@ -228,6 +239,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             }
         }
         notify(&mut controller, options.headless);
+        mouse.set(controller.setting(Toggle::Mouse));
         if let Some(Exit::Reopen { root, .. }) = &ui.exit
             && hands_over_to(&controller, &profiles, root)
             && let Some(why) = controller.handover_blocked()
@@ -537,7 +549,8 @@ fn same_project(controller: &Controller, dirs: &ProfileDirs, root: &Path) -> boo
     other.id == own.id && other.hash == own.hash && other.source == own.source
 }
 
-/// `{"keys": "U"}`, `{"dump": true}` (answered after the next frame), `{"state": true}`, `{"command": <Command>}`
+/// `{"keys": "U"}`, `{"click": [x, y]}`, `{"wheel": [x, y, 1 | -1]}`, `{"dump": true}` (answered after the next
+/// frame), `{"state": true}`, `{"command": <Command>}`
 /// (lazyrunner_core::run::Command, e.g. `{"command": {"restart": "orders"}}`), `{"action": "start" | "stop"
 /// | "restart" | "quit", "root"?: "<dir>"}`, `{"quit": true}`. True when the answer needs a moment to get out before
 /// lazyrunner exits.
@@ -567,6 +580,23 @@ fn control(
     }
     if body.get("dump").is_some() {
         dumps.push(request.reply);
+        return false;
+    }
+    if let Some(at) = body.get("click").or_else(|| body.get("wheel")) {
+        let cell = |index: usize| at.get(index).and_then(Value::as_u64).and_then(|value| u16::try_from(value).ok());
+        let answer = match (cell(0), cell(1)) {
+            (Some(x), Some(y)) if body.get("click").is_some() => {
+                screen::mouse::click_at(ui, controller, x, y, Instant::now());
+                json!({ "ok": true, "target": format!("{:?}", screen::mouse::target_at(ui, x, y)) })
+            }
+            (Some(x), Some(y)) => {
+                let back = at.get(2).and_then(Value::as_i64).unwrap_or(1) > 0;
+                screen::mouse::wheel_at(ui, controller, x, y, back);
+                json!({ "ok": true })
+            }
+            _ => json!({ "ok": false, "error": "wants [x, y] (a wheel also 1 back or -1)" }),
+        };
+        let _ = request.reply.send(answer);
         return false;
     }
     if let Some(command) = body.get("command") {
