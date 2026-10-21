@@ -27,6 +27,6 @@ expression: screen.frame()
  ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
-              w [x] startup checklist   v [x] auto-update   m [x] mouse
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
 
  12:00:00 No durations yet: they're recorded from the next build, start or npm ci.

@@ -165,7 +165,7 @@ pub(crate) struct MenuToggle {
     pub short: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 7] = [
+const MENU_TOGGLES: [MenuToggle; 8] = [
     MenuToggle {
         letter: "a",
         toggle: Toggle::AutoRestartOnBranchChange,
@@ -207,6 +207,12 @@ const MENU_TOGGLES: [MenuToggle; 7] = [
         toggle: Toggle::Mouse,
         label: "Mouse: click and scroll (off: select text)",
         short: "mouse",
+    },
+    MenuToggle {
+        letter: "f",
+        toggle: Toggle::ReducedMotion,
+        label: "Reduced motion: no blinking, spinners or fades",
+        short: "reduced motion",
     },
 ];
 

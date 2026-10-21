@@ -239,6 +239,25 @@ async fn settings_toggle_and_say_so() {
     assert_eq!(screen.last_log(), "Auto-restart on branch change: on (saved)");
     assert!(screen.controller.setting(Toggle::AutoRestartOnBranchChange));
     assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { .. })), "settings stay open");
+    screen.press("f");
+    assert_eq!(screen.last_log(), "Reduced motion: no blinking, spinners or fades: on (saved)");
+    assert!(screen.controller.setting(Toggle::ReducedMotion));
+}
+
+#[tokio::test]
+async fn reduced_motion_keeps_a_search_cursor_and_starting_status_static() {
+    let mut screen = screen("reduced-motion", json!({ "reducedMotion": true }));
+    screen.running();
+    screen.press("/ e");
+    let first = screen.frame();
+    screen.ui.now += Duration::from_millis(600);
+    let second = screen.frame();
+    assert!(first.contains("/e▏"), "{}", first);
+    assert!(second.contains("/e▏"), "{}", second);
+    assert!(first.contains(" :58202  ●"), "{}", first);
+    assert!(second.contains(" :58202  ●"), "{}", second);
+    assert!(!first.contains(" :58202  ○"), "{}", first);
+    assert!(!second.contains(" :58202  ○"), "{}", second);
 }
 
 #[tokio::test]
@@ -683,4 +702,16 @@ async fn the_click_that_closes_a_box_and_the_next_one_are_not_a_double_click() {
     screen.click_at(x, y);
     assert_eq!(screen.ui.focus, 1, "a single click focuses");
     assert!(!screen.ui.zoom, "not a double click on the title");
+}
+
+#[tokio::test]
+async fn with_reduced_motion_nothing_animates_and_new_lines_dont_flash() {
+    for (reduced, animating) in [(false, true), (true, false)] {
+        let mut screen = screen("reduced-motion-frames", json!({ "reducedMotion": reduced }));
+        screen.running(); // Billing is starting: its dot pulses
+        let now = screen.ui.now;
+        screen.controller.states[0].output.push("a brand new line", now);
+        screen.frame();
+        assert_eq!(screen.ui.is_animating(&screen.controller), animating, "reduced motion: {reduced}");
+    }
 }

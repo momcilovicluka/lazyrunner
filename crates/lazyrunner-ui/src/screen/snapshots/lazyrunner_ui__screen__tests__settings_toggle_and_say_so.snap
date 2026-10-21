@@ -13,6 +13,7 @@ expression: screen.frame()
                      │  w      [x] Startup checklist when lazyrunner opens              │
                      │  v      [x] Auto-update lazyrunner when it opens                 │
                      │  m      [x] Mouse: click and scroll (off: select text)           │
+                     │  f      [ ] Reduced motion: no blinking, spinners or fades       │
                      │  r      Run the startup checklist now (and check for an update)  │
                      │  c      What's new: the lazyrunner changelog                     │
                      │  p      Reload the project profile                               │
@@ -21,10 +22,9 @@ expression: screen.frame()
 
 
 
-
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
  ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
-              w [x] startup checklist   v [x] auto-update   m [x] mouse
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion

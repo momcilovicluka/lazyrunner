@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use lazyrunner_core::changelog::{self, Line};
+use lazyrunner_core::config::Toggle;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::secrets::Entry;
 use ratatui::Frame;
@@ -167,6 +168,8 @@ pub struct Ui {
     pub opener: fn(&str) -> bool,
     /// Copies to the clipboard (`y`); tests swap it for one that only records.
     pub clipboard: copy::Clipboard,
+    /// The reducedMotion setting (`, f`), read at every frame: nothing blinks, spins, glides or fades.
+    pub reduced_motion: bool,
     bars: HashMap<String, (f64, Instant)>,
 }
 
@@ -197,6 +200,7 @@ impl Ui {
             whats_new: Vec::new(),
             opener: status::open,
             clipboard: copy::to_clipboard,
+            reduced_motion: controller.setting(Toggle::ReducedMotion),
             bars: HashMap::new(),
         };
         let wanted = controller.config["theme"].as_str().unwrap_or("default").to_string();
@@ -238,11 +242,15 @@ impl Ui {
 
     /// The text cursor of a prompt, blinking.
     pub fn cursor(&self) -> &'static str {
-        if self.tick() % 10 < 5 { "▏" } else { " " }
+        if self.reduced_motion || self.tick() % 10 < 5 { "▏" } else { " " }
     }
 
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
+        if self.reduced_motion {
+            // Nothing moves: keys, output and the tick redraw what changed (the busy frame still has to show).
+            return self.busy.is_some();
+        }
         let typing = self.search.as_ref().is_some_and(|search| search.typing)
             || matches!(self.overlay, Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. }))
             || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
@@ -265,6 +273,7 @@ impl Ui {
 
 /// Draws the whole screen.
 pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
+    ui.reduced_motion = controller.setting(Toggle::ReducedMotion);
     let area = frame.area();
     let buf = frame.buffer_mut();
     buf.set_style(area, Style::reset());

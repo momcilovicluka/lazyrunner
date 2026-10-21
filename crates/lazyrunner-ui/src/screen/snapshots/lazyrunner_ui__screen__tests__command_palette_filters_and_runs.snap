@@ -17,7 +17,7 @@ expression: screen.frame()
              │ [, w]     [x] Startup checklist when lazyrunner opens                            │
              │ [/]       Search the focused app's output  n older match, N newer                │
              │ [b]       Build the focused app  full build, then it stays stopped               │
-             │ [, p]     Reload the project profile                                             │
+             │ [, f]     [ ] Reduced motion: no blinking, spinners or fades                     │
              │ type to search · ↑↓ or Ctrl+N Ctrl+P choose · Enter run · Esc close              │
              └──────────────────────────────────────────────────────────────────────────────────┘
 
@@ -27,4 +27,4 @@ expression: screen.frame()
  ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
-              w [x] startup checklist   v [x] auto-update   m [x] mouse
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
