@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.9.1] - 2026-10-21
+
+### Changed
+- A build's percentage shows in the header and the terminal tab title whether reduced motion is on or not (`building WebAPI 56%`): they have no progress bar. The column title keeps its bar and project count in both modes, so reduced motion only takes the motion away
+
 ## [0.9.0] - 2026-10-21
 
 ### Added

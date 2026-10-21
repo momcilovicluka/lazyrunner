@@ -217,10 +217,9 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
         if kind == "build" && job.total > 0 {
             let done = job.done.min(job.total);
             let bar = bar(ui, done as f64 / job.total as f64, &format!("build:{key}"), animated);
-            let percent = if !animated { format!(" ({:>3}%)", done * 100 / job.total) } else { String::new() };
             return vec![seg(
                 format!(
-                    "{} building {bar}{done}/{}{percent} · {}",
+                    "{} building {bar}{done}/{} · {}",
                     if animated { spinner(tick) } else { '●' },
                     job.total,
                     format_duration(elapsed)
