@@ -146,7 +146,7 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action(
             "Help",
             ",",
-            "Settings (a u s e w toggles, r checklist)",
+            "Settings (on/off toggles, r checklist)",
             "auto-restart, auto-start, checklist…",
             Run::Settings,
         )

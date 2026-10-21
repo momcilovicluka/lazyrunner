@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.9.2] - 2026-10-21
+
+### Added
+- Screenshots in the README: lazyrunner's real screens for a made-up shop project, drawn by `cargo run -p lazyrunner-ui --example screenshots` (run it after visible changes)
+
+### Fixed
+- The settings entry in the command palette and the key reference no longer lists only some of the toggles' letters
+
 ## [0.9.1] - 2026-10-21
 
 ### Changed

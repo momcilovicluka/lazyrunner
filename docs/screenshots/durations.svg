@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1456" height="782" viewBox="0 0 1456 782" font-family="'Cascadia Mono', 'Cascadia Code', Consolas, 'DejaVu Sans Mono', Menlo, monospace" font-size="14">
+<rect width="100%" height="100%" rx="10" fill="#1e1e2e"/>
+<rect width="100%" height="34" rx="10" fill="#000000" fill-opacity="0.28"/>
+<circle cx="22" cy="17" r="6" fill="#ff5f57"/><circle cx="42" cy="17" r="6" fill="#febc2e"/><circle cx="62" cy="17" r="6" fill="#28c840"/>
+<text x="728" y="22" fill="#cdd6f4" fill-opacity="0.6" font-size="13" text-anchor="middle">lazyrunner — shop</text>
+<text x="291.2" y="223.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┌─</text>
+<text x="308.0" y="223.7" fill="#ffffff" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Durations </text>
+<text x="400.4" y="223.7" fill="#94e2d5" textLength="764.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">──────────────────────────────────────────────────────────────────────────────────────────┐</text>
+<text x="291.2" y="241.7" fill="#94e2d5" textLength="688.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ Builds                                    last 20 runs             last    usual</text>
+<text x="1148.0" y="241.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="259.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="308.0" y="259.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Billing                                 </text>
+<text x="660.8" y="259.7" fill="#89dceb" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▇▇▇▇▇▇</text>
+<text x="828.8" y="259.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       9s</text>
+<text x="904.4" y="259.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       9s  ≈           6 runs</text>
+<text x="1148.0" y="259.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="277.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="308.0" y="277.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Orders                                  </text>
+<text x="660.8" y="277.7" fill="#89dceb" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▅▅▅</text>
+<text x="686.0" y="277.7" fill="#f38ba8" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▅</text>
+<text x="694.4" y="277.7" fill="#89dceb" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▅▅▇</text>
+<text x="828.8" y="277.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      34s</text>
+<text x="904.4" y="277.7" fill="#6c7086" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      21s</text>
+<text x="980.0" y="277.7" fill="#f38ba8" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ▲ +59%  </text>
+<text x="1064.0" y="277.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    7 runs</text>
+<text x="1148.0" y="277.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="295.7" fill="#94e2d5" textLength="688.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ Starts                                    last 20 runs             last    usual</text>
+<text x="1148.0" y="295.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="313.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="308.0" y="313.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Orders                                  </text>
+<text x="660.8" y="313.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▇▇▇▇▇</text>
+<text x="828.8" y="313.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       4s</text>
+<text x="904.4" y="313.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       4s  ≈           5 runs</text>
+<text x="1148.0" y="313.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="331.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="308.0" y="331.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Shop                                    </text>
+<text x="660.8" y="331.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▇▇▅▅▅</text>
+<text x="828.8" y="331.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       3s</text>
+<text x="904.4" y="331.7" fill="#6c7086" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       5s</text>
+<text x="980.0" y="331.7" fill="#a6e3a1" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ▼ -24%  </text>
+<text x="1064.0" y="331.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    5 runs</text>
+<text x="1148.0" y="331.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="349.7" fill="#94e2d5" textLength="688.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ npm ci                                    last 20 runs             last    usual</text>
+<text x="1148.0" y="349.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="367.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="308.0" y="367.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Shop                                    </text>
+<text x="660.8" y="367.7" fill="#89dceb" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▇▇▇</text>
+<text x="828.8" y="367.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      47s</text>
+<text x="904.4" y="367.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">        –              3 runs</text>
+<text x="1148.0" y="367.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="385.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="308.0" y="385.7" fill="#6c7086" textLength="840.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Esc closes · usual = median of the earlier successful runs · red = failed                           </text>
+<text x="1148.0" y="385.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="291.2" y="403.7" fill="#94e2d5" textLength="873.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">└──────────────────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="14.0" y="583.7" fill="#6c7086" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Catppuccin Mocha </text>
+<rect x="14.0" y="588.0" width="100.8" height="18" fill="#94e2d5"/>
+<text x="14.0" y="601.7" fill="#11111b" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> lazyrunner </text>
+<text x="114.8" y="601.7" fill="#a6e3a1" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● all up (5)</text>
+<text x="232.4" y="601.7" fill="#f5c2e7" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ⎇ feature/checkout-v2</text>
+<text x="434.0" y="601.7" fill="#6c7086" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   DB </text>
+<text x="484.4" y="601.7" fill="#f9e2af" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopLocal @ localhost</text>
+<text x="660.8" y="601.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   /work/shop</text>
+<text x="14.0" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ?</text>
+<text x="30.8" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> keys  </text>
+<text x="89.6" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> :</text>
+<text x="106.4" y="619.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> commands  </text>
+<text x="198.8" y="619.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> space</text>
+<text x="249.2" y="619.7" fill="#cdd6f4" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> start/stop  </text>
+<text x="358.4" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> u/U</text>
+<text x="392.0" y="619.7" fill="#cdd6f4" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> start  </text>
+<text x="459.2" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> s/S</text>
+<text x="492.8" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop  </text>
+<text x="551.6" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r/R</text>
+<text x="585.2" y="619.7" fill="#cdd6f4" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> restart  </text>
+<text x="669.2" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> b/B</text>
+<text x="702.8" y="619.7" fill="#cdd6f4" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> build  </text>
+<text x="770.0" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> d</text>
+<text x="786.8" y="619.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> database  </text>
+<text x="879.2" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> w</text>
+<text x="896.0" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> open  </text>
+<text x="954.8" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> x</text>
+<text x="971.6" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> menu  </text>
+<text x="1030.4" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> /</text>
+<text x="1047.2" y="619.7" fill="#cdd6f4" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> search  </text>
+<text x="1122.8" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ,</text>
+<text x="1139.6" y="619.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> settings  </text>
+<text x="1232.0" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> q</text>
+<text x="1248.8" y="619.7" fill="#cdd6f4" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> quit                  </text>
+<text x="14.0" y="637.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ,</text>
+<text x="30.8" y="637.7" fill="#6c7086" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> settings</text>
+<text x="106.4" y="637.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   a </text>
+<text x="148.4" y="637.7" fill="#6c7086" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] auto-restart on branch change</text>
+<text x="425.6" y="637.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   u </text>
+<text x="467.6" y="637.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
+<text x="492.8" y="637.7" fill="#cdd6f4" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> auto-start when lazyrunner opens</text>
+<text x="770.0" y="637.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   s </text>
+<text x="812.0" y="637.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
+<text x="837.2" y="637.7" fill="#cdd6f4" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop/restart all include frontend                                      </text>
+<text x="106.4" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   e </text>
+<text x="148.4" y="655.7" fill="#6c7086" textLength="260.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] restart APIs on code change</text>
+<text x="408.8" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   w </text>
+<text x="450.8" y="655.7" fill="#6c7086" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] startup checklist</text>
+<text x="627.2" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   v </text>
+<text x="669.2" y="655.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
+<text x="694.4" y="655.7" fill="#cdd6f4" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> auto-update</text>
+<text x="795.2" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   m </text>
+<text x="837.2" y="655.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
+<text x="862.4" y="655.7" fill="#cdd6f4" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> mouse</text>
+<text x="912.8" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   f </text>
+<text x="954.8" y="655.7" fill="#6c7086" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] reduced motion</text>
+<text x="14.0" y="691.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="691.7" fill="#a6e3a1" textLength="294.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ Orders built in 21s (14 projects)</text>
+<text x="14.0" y="709.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="709.7" fill="#a6e3a1" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ Billing built in 9s (6 projects)</text>
+<text x="14.0" y="727.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="727.7" fill="#94e2d5" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Starting Orders + Billing</text>
+<text x="14.0" y="745.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="745.7" fill="#a6e3a1" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● Orders is listening on :58201 - up in 4s</text>
+<text x="14.0" y="763.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="763.7" fill="#a6e3a1" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Ready in 38s</text>
+</svg>
