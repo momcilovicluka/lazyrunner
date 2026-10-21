@@ -30,10 +30,11 @@ pub enum Toggle {
     StartupChecklist,
     AutoUpdate,
     Mouse,
+    ReducedMotion,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 9] = [
+    pub const ALL: [Toggle; 10] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -43,6 +44,7 @@ impl Toggle {
         Toggle::StartupChecklist,
         Toggle::AutoUpdate,
         Toggle::Mouse,
+        Toggle::ReducedMotion,
     ];
 
     /// Its name in the settings file.
@@ -57,11 +59,12 @@ impl Toggle {
             Toggle::StartupChecklist => "startupChecklist",
             Toggle::AutoUpdate => "autoUpdate",
             Toggle::Mouse => "mouse",
+            Toggle::ReducedMotion => "reducedMotion",
         }
     }
 
     pub fn default_on(self) -> bool {
-        !matches!(self, Toggle::AutoRestartOnBranchChange | Toggle::RestartOnCodeChange)
+        !matches!(self, Toggle::AutoRestartOnBranchChange | Toggle::RestartOnCodeChange | Toggle::ReducedMotion)
     }
 
     /// Whether it is on in these settings (defaults included, as `ConfigFile::load` gives them).
@@ -188,6 +191,7 @@ mod tests {
         assert_eq!(defaults["autoStartOnOpen"], true);
         assert_eq!(defaults["restartOnCodeChange"], false);
         assert_eq!(defaults["autoRestartOnBranchChange"], false);
+        assert_eq!(defaults["reducedMotion"], false);
     }
 
     fn file(name: &str) -> ConfigFile {

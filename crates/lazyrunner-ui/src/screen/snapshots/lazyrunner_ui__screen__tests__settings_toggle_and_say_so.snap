@@ -15,10 +15,10 @@ expression: screen.frame()
                      │  m      [x] Mouse: click and scroll (off: select text)           │
                      │  r      Run the startup checklist now (and check for an update)  │
                      │  c      What's new: the lazyrunner changelog                     │
+                     │  f      [ ] Reduced motion / flair (disable blinking labels and… │
                      │  p      Reload the project profile                               │
                      │ press a letter to toggle, or j k + Enter · Esc / , close         │
                      └──────────────────────────────────────────────────────────────────┘
-
 
 
 

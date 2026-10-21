@@ -4,6 +4,7 @@
 use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
+use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::{Hue, Level, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
@@ -64,7 +65,9 @@ fn tool<'a>(
 /// The app's colour for its title chip; it flashes red for a moment when an error line arrives.
 pub fn tone(ui: &Ui, controller: &Controller, index: usize) -> C {
     let state = &controller.states[index];
-    if state.flash_until.is_some_and(|until| ui.now < until) && ui.tick() % 4 < 2 {
+    if state.flash_until.is_some_and(|until| ui.now < until)
+        && (controller.setting(Toggle::ReducedMotion) || ui.tick() % 4 < 2)
+    {
         return C::Red;
     }
     if tool(controller, &state.key).is_some() {
@@ -191,16 +194,16 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
 }
 
 /// A progress bar that glides towards its target and shimmers while it waits; `id` keeps its position.
-pub fn bar(ui: &mut Ui, fraction: f64, id: &str) -> String {
+pub fn bar(ui: &mut Ui, fraction: f64, id: &str, animated: bool) -> String {
     const WIDTH: usize = 10;
     let target = fraction.clamp(0.0, 1.0);
-    let shown = ui.glide(id, target);
+    let shown = if animated { ui.glide(id, target) } else { target };
     let cells = shown * WIDTH as f64;
     let full = cells.floor() as usize;
     let partial =
         if full < WIDTH { BLOCKS[((cells - full as f64) * 8.0) as usize % 8].to_string() } else { String::new() };
     let mut filled: Vec<char> = vec!['█'; full];
-    if full > 1 && shown < 1.0 {
+    if animated && full > 1 && shown < 1.0 {
         filled[ui.tick() as usize % full] = '▓'; // a light glint runs along the bar
     }
     let rest = WIDTH.saturating_sub(full + partial.chars().count());
@@ -211,18 +214,31 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
     let state = &controller.states[index];
     let key = state.key.clone();
     let tick = ui.tick();
+    let animated = !controller.setting(Toggle::ReducedMotion);
     if let Some((kind, job)) = tool(controller, &key) {
         let elapsed = ui.now.saturating_duration_since(job.started).as_secs_f64();
         if kind == "build" && job.total > 0 {
             let done = job.done.min(job.total);
-            let bar = bar(ui, done as f64 / job.total as f64, &format!("build:{key}"));
+            let bar = bar(ui, done as f64 / job.total as f64, &format!("build:{key}"), animated);
+            let percent = if !animated { format!(" ({:>3}%)", done * 100 / job.total) } else { String::new() };
             return vec![seg(
-                format!("{} building {bar}{done}/{} · {}", spinner(tick), job.total, format_duration(elapsed)),
+                format!(
+                    "{} building {bar}{done}/{}{percent} · {}",
+                    if animated { spinner(tick) } else { '●' },
+                    job.total,
+                    format_duration(elapsed)
+                ),
                 C::Yellow,
             )];
         }
         let estimate = controller.timing_estimate(kind, &key);
-        let frame = if kind == "npmci" { ORBIT[tick as usize % ORBIT.len()] } else { spinner(tick) };
+        let frame = if !animated {
+            '●'
+        } else if kind == "npmci" {
+            ORBIT[tick as usize % ORBIT.len()]
+        } else {
+            spinner(tick)
+        };
         let verb = if kind != "npmci" {
             "building"
         } else if job.start_after {
@@ -230,7 +246,8 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
         } else {
             "npm ci"
         };
-        let bar = estimate.map_or(String::new(), |estimate| bar(ui, elapsed / estimate, &format!("{kind}:{key}")));
+        let bar =
+            estimate.map_or(String::new(), |estimate| bar(ui, elapsed / estimate, &format!("{kind}:{key}"), animated));
         let eta = estimate.map_or(String::new(), |estimate| format!(" / ~{}", format_duration(estimate)));
         return vec![seg(format!("{frame} {verb} {bar}{}{eta}", format_duration(elapsed)), C::Yellow)];
     }
@@ -261,9 +278,10 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
             let elapsed =
                 state.started_at.map_or(0.0, |started| ui.now.saturating_duration_since(started).as_secs_f64());
             let estimate = controller.timing_estimate("start", &key);
-            let dot = if tick % 6 < 3 { '●' } else { '○' };
+            let dot = if animated && tick % 6 >= 3 { '○' } else { '●' };
             let verb = controller.apps[index].traits().start_verb;
-            let bar = estimate.map_or(String::new(), |estimate| bar(ui, elapsed / estimate, &format!("start:{key}")));
+            let bar = estimate
+                .map_or(String::new(), |estimate| bar(ui, elapsed / estimate, &format!("start:{key}"), animated));
             let eta = estimate.map_or(String::new(), |estimate| format!(" / ~{}", format_duration(estimate)));
             vec![seg(format!("{dot} {verb} {bar}{}{eta}", format_duration(elapsed)), C::Yellow)]
         }

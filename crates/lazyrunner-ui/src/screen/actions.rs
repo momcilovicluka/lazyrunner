@@ -228,6 +228,17 @@ pub fn settings(controller: &Controller) -> Vec<Action> {
     list.extend([
         action("Settings", "r", "Run the startup checklist now (and check for an update)", "", Run::Checklist),
         action("Settings", "c", "What's new: the lazyrunner changelog", "", Run::Changelog).safe(),
+        action(
+            "Settings",
+            "f",
+            &format!(
+                "{}Reduced motion / flair (disable blinking labels and loaders)",
+                if controller.setting(Toggle::ReducedMotion) { "[x] " } else { "[ ] " }
+            ),
+            "",
+            Run::Setting { toggle: Toggle::ReducedMotion, label: "Reduced motion / flair" },
+        )
+        .safe(),
     ]);
     let changed = if controller.profile_changed { " (this branch changed it)" } else { "" };
     list.push(action("Settings", "p", &format!("Reload the project profile{changed}"), "", Run::ReloadProfile));
