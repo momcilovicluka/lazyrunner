@@ -7,6 +7,7 @@ pub mod app;
 pub mod build;
 pub mod checks;
 pub mod child;
+pub mod command;
 pub mod controller;
 pub mod history;
 pub mod net;
@@ -16,6 +17,7 @@ pub mod watcher;
 
 use std::path::PathBuf;
 
+pub use command::{Command, Origin};
 pub use controller::Controller;
 
 /// What a child process is, for the controller.

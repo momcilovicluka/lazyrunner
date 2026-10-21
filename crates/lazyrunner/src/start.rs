@@ -14,8 +14,8 @@ use lazyrunner_core::profile::{self, Project, REPO_PROFILE_FILE, trust};
 use lazyrunner_core::run::child::Guard;
 use lazyrunner_core::run::controller::Passed;
 use lazyrunner_ui::project_run::{Finished, ProjectOptions, ProjectRun, run_project};
-use lazyrunner_ui::run::Surface;
 use lazyrunner_ui::screen::Exit;
+use lazyrunner_ui::terminal::Surface;
 use lazyrunner_ui::theme::ColorMode;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -109,7 +109,7 @@ pub fn start(explicit: bool) -> Result<()> {
         bail!("lazyrunner: needs an interactive terminal (input or output is redirected).");
     }
     let config = ConfigFile::new(&paths.config_file).load(Some(&project.id));
-    let start_now = explicit || json::truthy(json::field(&config, "autoStartOnOpen"));
+    let start_now = explicit || lazyrunner_core::config::Toggle::AutoStartOnOpen.read(&config);
     run(project, paths, None, start_now)
 }
 

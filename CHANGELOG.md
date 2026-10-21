@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.7.2] - 2026-10-21
+
+### Changed
+- Groundwork for the next features, with nothing to see in use: the look-and-feel prototype is gone (the hidden `spike` and `emit` commands with it, about 2,300 lines), the two largest source files are split up, the on/off settings are one typed list, and keys, the command line and the control channel now share one set of commands (the control channel also takes them directly - start, stop, restart, build, npm ci, kill a port's holder, a setting - e.g. `{"command": {"restart": "orders"}}`), ready for the mouse and an agent channel
+- Builds, failed builds, build only, restarts and port waits are now tested with quick scripts in place of dotnet and npm, and a clock the tests move by hand
+
 ## [0.7.1] - 2026-10-21
 
 ### Changed

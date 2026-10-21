@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lazyrunner_core::changelog::Line;
+use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::paths::Paths;
 use lazyrunner_core::profile::{ProfileDirs, import};
@@ -217,7 +218,7 @@ async fn settings_toggle_and_say_so() {
     insta::assert_snapshot!(screen.frame());
     screen.press("a");
     assert_eq!(screen.last_log(), "Auto-restart on branch change: on (saved)");
-    assert!(screen.controller.setting("autoRestartOnBranchChange"));
+    assert!(screen.controller.setting(Toggle::AutoRestartOnBranchChange));
     assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { .. })), "settings stay open");
 }
 

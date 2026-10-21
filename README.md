@@ -344,7 +344,6 @@ processes, output, the self-update), `lazyrunner-ui` (the terminal UI) and `lazy
 ```
 cargo run --release                                   # run the project in this folder
 cargo run -- profile check                            # check the profile that applies here
-cargo run --release -- spike --bench 20               # the look-and-feel spike: 20 s of 5 apps x 2000 lines/s, then fps, CPU, memory
 cargo test --workspace                                # unit tests, snapshots of every screen, end-to-end tests
 cargo insta review                                    # look at changed screen snapshots
 LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference   # rewrite the guide's field reference

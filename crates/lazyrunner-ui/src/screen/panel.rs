@@ -105,18 +105,9 @@ fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
 /// Every on/off setting, always visible (, opens the menu where the letter shown toggles it); wraps onto more
 /// rows when the window is narrow.
 fn settings_rows(controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
-    let mut settings = vec![
-        ("a", "auto-restart on branch change", controller.setting("autoRestartOnBranchChange")),
-        ("u", "auto-start when lazyrunner opens", controller.setting("autoStartOnOpen")),
-    ];
-    if controller.apps.iter().any(|app| app.traits().frontend) {
-        settings.push(("s", "stop/restart all include frontend", controller.setting("stopFrontendOnStop")));
-    }
-    settings.extend([
-        ("e", "restart APIs on code change", controller.setting("restartOnCodeChange")),
-        ("w", "startup checklist", controller.setting("startupChecklist")),
-        ("v", "auto-update", controller.setting("autoUpdate")),
-    ]);
+    let settings: Vec<(&str, &str, bool)> = super::actions::menu_toggles(controller)
+        .map(|item| (item.letter, item.short, controller.setting(item.toggle)))
+        .collect();
     let mut rows = Vec::new();
     let mut current = vec![seg(" ,", C::Cyan), seg(" settings", C::DarkGray)];
     let mut used = 11;

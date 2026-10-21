@@ -100,7 +100,7 @@ pub fn in_stop_all(config: &Value, app: &App) -> bool {
         return truthy(setting);
     }
     if app.traits().frontend {
-        return truthy(field(config, "stopFrontendOnStop"));
+        return crate::config::Toggle::StopFrontendOnStop.read(config);
     }
     true
 }

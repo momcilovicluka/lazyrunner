@@ -7,8 +7,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lazyrunner_core::changelog;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::profile::AppKind;
-use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::secrets;
+use lazyrunner_core::run::{Command, Controller, Origin};
 use serde_json::{Map, Value, json};
 
 use super::actions::{self, Action, Run};
@@ -412,21 +412,20 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
     if key.is_empty() && needs_app(action) {
         return;
     }
-    let only = [key.clone()];
     match action {
-        Run::Toggle => controller.toggle(&key),
-        Run::StartFocused => controller.start(Some(&only), false),
-        Run::StopFocused => controller.stop_focused(&key),
-        Run::RestartFocused => controller.restart("requested from the panel", Some(&only), false),
-        Run::BuildFocused => controller.build_only(Some(&only)),
-        Run::StartAll => controller.start(None, false),
-        Run::StopAll => controller.stop_all(),
-        Run::RestartAll => controller.restart("requested from the panel", None, false),
-        Run::BuildAll => controller.build_only(None),
-        Run::KillPortUser => controller.resolve_port_conflicts(),
+        Run::Toggle => execute(controller, Command::ToggleApp(key)),
+        Run::StartFocused => execute(controller, Command::Start(key)),
+        Run::StopFocused => execute(controller, Command::Stop(key)),
+        Run::RestartFocused => execute(controller, Command::Restart(key)),
+        Run::BuildFocused => execute(controller, Command::Build(key)),
+        Run::StartAll => execute(controller, Command::StartAll),
+        Run::StopAll => execute(controller, Command::StopAll),
+        Run::RestartAll => execute(controller, Command::RestartAll),
+        Run::BuildAll => execute(controller, Command::BuildAll),
+        Run::KillPortUser => execute(controller, Command::KillPortUser),
         Run::Quit => ui.exit = Some(Exit::Quit),
         Run::Database => open_picker(ui, controller),
-        Run::NpmCi => controller.npm_ci(Some(&key)),
+        Run::NpmCi => execute(controller, Command::NpmCi(key)),
         Run::OpenFocused => open_focused(ui, controller, &key),
         Run::OpenAll => open_all(ui, controller),
         Run::OpenLog => open_log(ui, controller),
@@ -453,9 +452,9 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Settings => ui.overlay = Some(Overlay::Settings { index: 0 }),
         Run::Help => ui.overlay = Some(Overlay::Help),
         Run::Palette => ui.overlay = Some(Overlay::Palette { query: String::new(), index: 0 }),
-        Run::Setting { name, label } => {
-            let on = !controller.setting(name);
-            controller.set_setting(name, json!(on));
+        Run::Setting { toggle, label } => {
+            let on = !controller.setting(*toggle);
+            execute(controller, Command::SetToggle { toggle: *toggle, on });
             controller.add_log(format!("{label}: {} (saved)", if on { "on" } else { "off" }), Hue::Cyan);
         }
         Run::Checklist => {
@@ -474,6 +473,13 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             let start = controller.states.iter().any(|state| state.is_running());
             reopen(ui, controller, controller.root.clone(), start, "reloading the project profile");
         }
+    }
+}
+
+/// A key's command (it names the focused app, which exists; anything refused goes to the log anyway).
+fn execute(controller: &mut Controller, command: Command) {
+    if let Err(why) = controller.execute(command, Origin::Panel) {
+        controller.add_log(format!("✗ {why}"), Hue::Red);
     }
 }
 

@@ -95,7 +95,7 @@ pub fn version() -> Result<()> {
     let paths = Paths::from_env(&install_dir());
     let config = ConfigFile::new(&paths.config_file).load(None);
     say(Hue::Cyan, &format!("lazyrunner v{} ({})", changelog::VERSION, update::TARGET));
-    let on = lazyrunner_core::json::truthy(lazyrunner_core::json::field(&config, "autoUpdate"));
+    let on = lazyrunner_core::config::Toggle::AutoUpdate.read(&config);
     let from = match update::source(&config) {
         Some(source) => format!("updates from {}, auto-update {}", source.url, if on { "on" } else { "off" }),
         None => "no release repo configured".to_string(),

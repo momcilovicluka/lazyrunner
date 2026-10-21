@@ -91,6 +91,20 @@ async fn parked_starts_join_and_a_stop_only_drops_its_own_apps() {
 }
 
 #[tokio::test]
+async fn commands_must_name_an_app_this_project_has() {
+    use crate::config::Toggle;
+    use crate::run::{Command, Origin};
+    let temp = TempDir::new("controller-commands");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    let refused = sample.execute(Command::Restart("nope".into()), Origin::Agent).unwrap_err();
+    assert!(refused.contains("no app 'nope'") && refused.contains("orders"), "{refused}");
+    sample.execute(Command::StopAll, Origin::Agent).unwrap();
+    assert_eq!(last_log(&sample), "Nothing was running.");
+    sample.execute(Command::SetToggle { toggle: Toggle::AutoUpdate, on: false }, Origin::Agent).unwrap();
+    assert!(!sample.setting(Toggle::AutoUpdate), "saved");
+}
+
+#[tokio::test]
 async fn apps_turned_off_on_this_machine_get_no_column() {
     let temp = TempDir::new("controller-off");
     let (controller, _rx) = controller(&temp, json!({ "projects": { "sample": { "frontend": false } } }));
@@ -113,4 +127,158 @@ async fn variants_decide_ports_and_a_missing_script_skips_the_app() {
         [expected.as_str(), "Already running."],
         "as PowerShell: nothing else to start"
     );
+}
+
+/// The controller with quick scripts in place of dotnet and npm: builds, failures, restarts and waits, without
+/// those tools.
+mod scripted {
+    use std::path::Path;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use serde_json::json;
+    use tokio::sync::mpsc::UnboundedReceiver;
+
+    use super::controller;
+    use crate::profile::App;
+    use crate::run::child::Spec;
+    use crate::run::history::Kind;
+    use crate::run::tools::{Commands, ServerCommand};
+    use crate::run::{Controller, Event, Tag};
+    use crate::testing::{CONSOLE_PORT, TempDir, clock};
+
+    /// A build prints its project's line and exits 0 (1 for the projects named in `failing`); a server just waits.
+    struct Scripts {
+        failing: Vec<&'static str>,
+    }
+
+    fn shell(script: String, dir: &Path) -> Spec {
+        let (program, flag) = if cfg!(windows) { ("cmd", "/C") } else { ("sh", "-c") };
+        Spec { program: program.into(), args: vec![flag.into(), script.into()], dir: dir.to_path_buf() }
+    }
+
+    impl Commands for Scripts {
+        fn server(&self, root: &Path, app: &App, _: &[App]) -> anyhow::Result<ServerCommand> {
+            let wait = if cfg!(windows) { "ping -n 30 127.0.0.1 >nul" } else { "sleep 30" };
+            Ok(ServerCommand {
+                spec: shell(wait.into(), root),
+                label: format!("{} (a script)", app.name),
+                script: None,
+            })
+        }
+
+        fn build(&self, root: &Path, project: &str) -> Spec {
+            let name =
+                Path::new(project).file_stem().map(|stem| stem.to_string_lossy().into_owned()).unwrap_or_default();
+            let code = i32::from(self.failing.iter().any(|failing| project.contains(failing)));
+            let script = if cfg!(windows) {
+                format!("echo   {name} -^> bin\\{name}.dll& exit /b {code}")
+            } else {
+                format!("echo '  {name} -> bin/{name}.dll'; exit {code}")
+            };
+            shell(script, root)
+        }
+
+        fn npm_ci(&self, dir: &Path) -> anyhow::Result<Spec> {
+            Ok(shell("echo added 1 package".into(), dir))
+        }
+    }
+
+    fn scripted(label: &str, failing: Vec<&'static str>) -> (TempDir, Controller, UnboundedReceiver<Event>) {
+        let temp = TempDir::new(label);
+        let (mut controller, events) = controller(&temp, json!({ "skipUnchangedBuilds": false }));
+        controller.commands = Arc::new(Scripts { failing });
+        (temp, controller, events)
+    }
+
+    fn keys(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| name.to_string()).collect()
+    }
+
+    fn log(controller: &Controller) -> String {
+        controller.log.iter().map(|entry| entry.text.as_str()).collect::<Vec<_>>().join("\n")
+    }
+
+    /// Handles the controller's events until `done`.
+    async fn run_until(
+        controller: &mut Controller,
+        events: &mut UnboundedReceiver<Event>,
+        done: impl Fn(&Controller) -> bool,
+    ) {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        while !done(controller) {
+            match tokio::time::timeout_at(deadline, events.recv()).await {
+                Ok(Some(event)) => controller.handle(event),
+                _ => panic!("timed out; the log:\n{}", log(controller)),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_start_builds_one_app_at_a_time_then_starts_them() {
+        let (_temp, mut sample, mut events) = scripted("scripted-start", Vec::new());
+        sample.start(Some(&keys(&["orders", "billing"])), false);
+        assert_eq!(sample.building.as_ref().map(|job| job.key.as_str()), Some("orders"), "one at a time");
+        assert_eq!(sample.build_queue, keys(&["orders", "billing"]));
+        run_until(&mut sample, &mut events, |c| c.is_running("orders") && c.is_running("billing")).await;
+        let log = log(&sample);
+        assert!(log.contains("✓ Orders built in") && log.contains("✓ Billing built in"), "{log}");
+        assert!(log.contains("Starting Orders + Billing"), "{log}");
+        assert_eq!(sample.durations.item(Kind::Build, "billing").map(|item| item.runs.len()), Some(1));
+    }
+
+    #[tokio::test]
+    async fn a_failed_build_starts_nothing_and_says_how_to_go_on() {
+        let (_temp, mut sample, mut events) = scripted("scripted-failed", vec!["Orders"]);
+        sample.start(Some(&keys(&["orders", "billing"])), false);
+        run_until(&mut sample, &mut events, |c| c.building.is_none()).await;
+        assert!(!sample.is_running("orders") && !sample.is_running("billing"));
+        assert!(sample.build_queue.is_empty(), "billing isn't built either");
+        let log = log(&sample);
+        assert!(log.contains("✗ Orders build failed"), "{log}");
+        assert!(log.contains("APIs not started - fix the build and press U or R."), "{log}");
+        let runs = &sample.durations.item(Kind::Build, "orders").unwrap().runs;
+        assert!(!runs[0].ok, "recorded as failed");
+    }
+
+    #[tokio::test]
+    async fn b_builds_and_leaves_the_app_stopped() {
+        let (_temp, mut sample, mut events) = scripted("scripted-b", Vec::new());
+        sample.build_only(Some(&keys(&["orders"])));
+        run_until(&mut sample, &mut events, |c| c.building.is_none()).await;
+        assert!(!sample.is_running("orders"));
+        assert!(log(&sample).contains("Build done - u starts it"), "{}", log(&sample));
+    }
+
+    #[tokio::test]
+    async fn the_exit_of_a_run_that_was_restarted_is_ignored() {
+        let (_temp, mut sample, _events) = scripted("scripted-generation", Vec::new());
+        sample.start(Some(&keys(&["shop"])), false);
+        let index = sample.index("shop").unwrap();
+        let first = sample.states[index].generation;
+        sample.restart("a test", Some(&keys(&["shop"])), false);
+        assert!(sample.is_running("shop"));
+        assert_ne!(sample.states[index].generation, first);
+        sample.handle(Event::Exited { tag: Tag::App { key: "shop".into(), generation: first }, code: Some(1) });
+        assert!(sample.is_running("shop"), "the old run's exit doesn't stop the new one");
+    }
+
+    #[tokio::test]
+    async fn a_start_waits_for_a_port_only_as_long_as_a_stop_may_take() {
+        let Ok(holder) = std::net::TcpListener::bind(("127.0.0.1", CONSOLE_PORT)) else {
+            eprintln!("skipped: something else holds port {CONSOLE_PORT}");
+            return;
+        };
+        let (_temp, mut sample, _events) = scripted("scripted-port-wait", Vec::new());
+        sample.now = clock::now;
+        sample.last_stop = Some(clock::now()); // something just stopped: its port may still be held
+        sample.start(Some(&keys(&["console"])), false);
+        assert!(sample.waiting_start.is_some(), "it waits for the port");
+        assert!(!sample.is_running("console"));
+        clock::advance(Duration::from_secs(4));
+        sample.tick();
+        assert!(sample.waiting_start.is_none(), "no longer than a stop may take");
+        assert!(log(&sample).contains(&format!("Port {CONSOLE_PORT} is already used by")), "{}", log(&sample));
+        drop(holder);
+    }
 }
