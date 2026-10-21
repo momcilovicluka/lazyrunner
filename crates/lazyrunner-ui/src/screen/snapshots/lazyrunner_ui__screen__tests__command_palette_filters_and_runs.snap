@@ -13,7 +13,7 @@ expression: screen.frame()
              │ [, e]     [ ] Restart the APIs when code changes                                 │
              │ [i]       npm ci (reinstall packages)  the focused npm app's, in the background  │
              │ [, r]     Run the startup checklist now (and check for an update)                │
-             │ [,]       Settings (a u s e w toggles, r checklist)  auto-restart, auto-start, … │
+             │ [,]       Settings (on/off toggles, r checklist)  auto-restart, auto-start, che… │
              │ [, w]     [x] Startup checklist when lazyrunner opens                            │
              │ [/]       Search the focused app's output  n older match, N newer                │
              │ [b]       Build the focused app  full build, then it stays stopped               │

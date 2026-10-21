@@ -40,14 +40,21 @@ and macOS currently build from source.
 
 ## Preview
 
-```
- ◆ Orders :58201 ● 12 ms up in 3s ┬ ■ Billing :58202 ● 9 ms up in 3s ┬ ■ Shop :58301 ● 4 ms ┬ ■ Docs ● built, watching
- info: Microsoft.Hosting.Lifetime…  │ info: Microsoft.Hosting.Lifetime… │ Local: http://localh… │ Build complete. Watching…
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- lazyrunner  ● all up (4)   ⎇ main   DB shop @ localhost   C:\src\shop
- space start/stop  u/U start  s/S stop  r/R restart  b/B build  d database  w open  x menu  / search  , settings  q quit
- 10:27:54 Ready in 9s
-```
+![lazyrunner running a shop project: two .NET APIs and three npm apps in columns, each with its port, response time,
+CPU and memory; below them the panel with the branch, the database, the keys, the settings and the log](docs/screenshots/overview.svg)
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/palette.svg" alt="The command palette, filtered by typing 'start'"></td>
+    <td><img src="docs/screenshots/durations.svg" alt="The durations box: builds, starts and npm ci over their last runs, with the usual time and the trend"></td>
+    <td><img src="docs/screenshots/themes.svg" alt="The theme picker beside the columns, previewing Catppuccin Mocha"></td>
+  </tr>
+  <tr>
+    <td align="center"><code>:</code> the command palette</td>
+    <td align="center"><code>D</code> how long builds and starts took</td>
+    <td align="center"><code>t</code> themes, previewed live</td>
+  </tr>
+</table>
 
 - **.NET apps** are built with `dotnet build` (one at a time, skipped when nothing changed) and run with their launch
   profile; the port comes from `launchSettings.json`.
@@ -361,6 +368,7 @@ cargo run -- profile check                            # check the profile that a
 cargo test --workspace                                # unit tests, snapshots of every screen, end-to-end tests
 cargo insta review                                    # look at changed screen snapshots
 LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference   # rewrite the guide's field reference
+cargo run -p lazyrunner-ui --example screenshots      # redraw the screenshots above (docs/screenshots) after visible changes
 dist plan                                             # what a release would build (cargo-dist)
 ```
 

@@ -302,6 +302,14 @@ impl Controller {
         }
     }
 
+    /// An app answering in `ms`, as if a probe had come back (screenshots and tests have no server to probe).
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn answered(&mut self, key: &str, ms: u64) {
+        let now = (self.now)();
+        let last = Some(ProbeResult { ok: true, code: 200, ms });
+        self.probes.insert(key.to_string(), Probe { in_flight: false, last, next_at: Some(now + PROBE_EVERY) });
+    }
+
     pub(super) fn probe_result(&mut self, key: &str, generation: u64, result: ProbeResult) {
         let now = (self.now)();
         let Some(index) = self.index(key) else { return };

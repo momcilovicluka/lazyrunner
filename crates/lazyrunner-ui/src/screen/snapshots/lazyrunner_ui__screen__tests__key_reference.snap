@@ -15,7 +15,7 @@ expression: screen.frame()
   │   s S         Stop · focused / all                     Ctrl+L      Clear output                        │
   │   r R         Restart · focused / all                  t           Theme picker (Default)              │
   │   b B         Build · focused / all                  Help                                              │
-  │   q           Quit                                     ,           Settings (a u s e w toggles, r che… │
+  │   q           Quit                                     ,           Settings (on/off toggles, r checkl… │
   │ Tools                                                  ?           Key reference                       │
   │   d           Switch database                          :           Command palette                     │
   │   i           npm ci (reinstall packages)            Navigate                                          │
