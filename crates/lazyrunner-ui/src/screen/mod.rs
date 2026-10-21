@@ -168,6 +168,7 @@ pub struct Ui {
     pub opener: fn(&str) -> bool,
     /// Copies to the clipboard (`y`); tests swap it for one that only records.
     pub clipboard: copy::Clipboard,
+    /// The reducedMotion setting (`, f`), read at every frame: nothing blinks, spins, glides or fades.
     pub reduced_motion: bool,
     bars: HashMap<String, (f64, Instant)>,
 }
@@ -199,7 +200,7 @@ impl Ui {
             whats_new: Vec::new(),
             opener: status::open,
             clipboard: copy::to_clipboard,
-            reduced_motion: false,
+            reduced_motion: controller.setting(Toggle::ReducedMotion),
             bars: HashMap::new(),
         };
         let wanted = controller.config["theme"].as_str().unwrap_or("default").to_string();
@@ -246,13 +247,18 @@ impl Ui {
 
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
+        if self.reduced_motion {
+            // Nothing moves: keys, output and the tick redraw what changed (the busy frame still has to show).
+            return self.busy.is_some();
+        }
         let typing = self.search.as_ref().is_some_and(|search| search.typing)
             || matches!(self.overlay, Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. }))
             || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
         typing
             || self.busy.is_some()
-            || ((!self.reduced_motion) && (controller.building.is_some() || controller.npm_ci.is_some()))
-            || ((!self.reduced_motion) && controller.celebrate.is_some())
+            || controller.building.is_some()
+            || controller.npm_ci.is_some()
+            || controller.celebrate.is_some()
             || controller.states.iter().any(|state| {
                 let fresh = state
                     .output

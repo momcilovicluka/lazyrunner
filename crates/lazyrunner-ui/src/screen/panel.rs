@@ -40,7 +40,7 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let tick = ui.tick();
     let busy = controller.building.is_some() || controller.npm_ci.is_some();
-    let reduced = controller.setting(Toggle::ReducedMotion);
+    let reduced = ui.reduced_motion;
     let chip = if !reduced && busy && tick % 8 < 4 { C::Blue } else { C::Cyan };
     let summary = match &controller.celebrate {
         Some((text, _)) => {
@@ -170,7 +170,7 @@ fn notice(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         ];
     }
     if let Some(busy) = ui.busy {
-        let marker = if controller.setting(Toggle::ReducedMotion) { '●' } else { super::columns::spinner(ui.tick()) };
+        let marker = if ui.reduced_motion { '●' } else { super::columns::spinner(ui.tick()) };
         return vec![seg(format!(" {marker} {busy}"), C::Yellow)];
     }
     let focused = controller.apps.get(ui.focus).map(|app| app.key.as_str());

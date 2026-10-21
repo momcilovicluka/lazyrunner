@@ -196,6 +196,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `p` | Reload the project profile (reopens lazyrunner; on Windows the running apps carry on, unless their entry changed) |
 | `v` | Auto-update lazyrunner when it opens |
 | `m` | The mouse (below); off, the terminal selects text again |
+| `f` | Reduced motion: nothing blinks, spins, glides or fades; builds show a percentage instead |
 | `c` | What's new: the changelog |
 
 ### Mouse
@@ -312,6 +313,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `theme` | `default` | A theme's id (a built-in one, or a file in `themes` without `.json`) |
 | `autoUpdate` | `true` | Install a newer lazyrunner when it opens |
 | `mouse` | `true` | Clicks and the wheel (off: the terminal selects text) |
+| `reducedMotion` | `false` | No blinking, spinners or fades; builds show a percentage |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.columnWidths` | equal | Relative width per app key (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |

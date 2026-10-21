@@ -165,7 +165,7 @@ pub(crate) struct MenuToggle {
     pub short: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 7] = [
+const MENU_TOGGLES: [MenuToggle; 8] = [
     MenuToggle {
         letter: "a",
         toggle: Toggle::AutoRestartOnBranchChange,
@@ -208,6 +208,12 @@ const MENU_TOGGLES: [MenuToggle; 7] = [
         label: "Mouse: click and scroll (off: select text)",
         short: "mouse",
     },
+    MenuToggle {
+        letter: "f",
+        toggle: Toggle::ReducedMotion,
+        label: "Reduced motion: no blinking, spinners or fades",
+        short: "reduced motion",
+    },
 ];
 
 /// The , menu's toggles that apply here (whether Stop/Restart all include the frontend only with one).
@@ -228,17 +234,6 @@ pub fn settings(controller: &Controller) -> Vec<Action> {
     list.extend([
         action("Settings", "r", "Run the startup checklist now (and check for an update)", "", Run::Checklist),
         action("Settings", "c", "What's new: the lazyrunner changelog", "", Run::Changelog).safe(),
-        action(
-            "Settings",
-            "f",
-            &format!(
-                "{}Reduced motion / flair (disable blinking labels and loaders)",
-                if controller.setting(Toggle::ReducedMotion) { "[x] " } else { "[ ] " }
-            ),
-            "",
-            Run::Setting { toggle: Toggle::ReducedMotion, label: "Reduced motion / flair" },
-        )
-        .safe(),
     ]);
     let changed = if controller.profile_changed { " (this branch changed it)" } else { "" };
     list.push(action("Settings", "p", &format!("Reload the project profile{changed}"), "", Run::ReloadProfile));

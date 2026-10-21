@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.9.0] - 2026-10-21
+
+### Added
+- Reduced motion (`,` then `f`, off by default; issue #2): nothing blinks, spins, glides or fades - the busy header, spinners, pulsing dots, progress-bar shimmer, the error flash, the checklist's light sweep and sparkles, the blinking text cursor and new output's white flash all hold still, and the screen only redraws when something changes. Builds show how far they are as a percentage instead (`23/41 ( 56%)`, and in the header and the terminal tab title)
+
 ## [0.8.0] - 2026-10-21
 
 ### Added

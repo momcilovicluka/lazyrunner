@@ -4,7 +4,6 @@
 use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
-use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::{Hue, Level, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
@@ -65,9 +64,7 @@ fn tool<'a>(
 /// The app's colour for its title chip; it flashes red for a moment when an error line arrives.
 pub fn tone(ui: &Ui, controller: &Controller, index: usize) -> C {
     let state = &controller.states[index];
-    if state.flash_until.is_some_and(|until| ui.now < until)
-        && (controller.setting(Toggle::ReducedMotion) || ui.tick() % 4 < 2)
-    {
+    if state.flash_until.is_some_and(|until| ui.now < until) && (ui.reduced_motion || ui.tick() % 4 < 2) {
         return C::Red;
     }
     if tool(controller, &state.key).is_some() {
@@ -214,7 +211,7 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
     let state = &controller.states[index];
     let key = state.key.clone();
     let tick = ui.tick();
-    let animated = !controller.setting(Toggle::ReducedMotion);
+    let animated = !ui.reduced_motion;
     if let Some((kind, job)) = tool(controller, &key) {
         let elapsed = ui.now.saturating_duration_since(job.started).as_secs_f64();
         if kind == "build" && job.total > 0 {
@@ -428,7 +425,9 @@ fn body(ui: &Ui, controller: &Controller, index: usize, column: usize, rows: usi
         let mut color = line_color(line);
         let mut back = None;
         let age = ui.now.saturating_duration_since(line.born);
-        if age < FRESH {
+        if ui.reduced_motion {
+            // New lines show in their own colour at once, no white flash fading out.
+        } else if age < FRESH {
             color = C::White;
         } else if age < SETTLING {
             color = bright(color);
