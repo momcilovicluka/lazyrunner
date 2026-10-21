@@ -158,7 +158,12 @@ fn move_focus(ui: &mut Ui, controller: &Controller, step: isize) {
 }
 
 fn scroll(ui: &Ui, controller: &mut Controller, lines: isize) {
-    if let Some(state) = controller.states.get_mut(ui.focus) {
+    scroll_column(controller, ui.focus, lines);
+}
+
+/// Scrolls a column `lines` back (negative: towards the newest).
+pub fn scroll_column(controller: &mut Controller, index: usize, lines: isize) {
+    if let Some(state) = controller.states.get_mut(index) {
         let max = state.output.len().saturating_sub(1);
         state.scroll = state.scroll.saturating_add_signed(lines).min(max);
     }

@@ -9,7 +9,8 @@ use unicode_width::UnicodeWidthStr;
 use super::actions::{self, Action};
 use super::checklist::Checklist;
 use super::columns::{hue_color, spinner};
-use super::seg::{Seg, limit, on, pad, seg, width};
+use super::mouse::Target;
+use super::seg::{Seg, aim, limit, on, pad, seg, width};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -34,23 +35,37 @@ pub fn boxed(
     let inner = cells.saturating_sub(8).min(max_inner).max(20);
     let left = " ".repeat(cells.saturating_sub(inner + 4) / 2);
     let mut boxed = vec![vec![
-        seg(format!("{left}┌─"), C::Cyan),
+        seg("┌─", C::Cyan),
         seg(format!(" {title} "), C::White),
         seg(format!("{}┐", "─".repeat(inner.saturating_sub(title.width() + 1))), C::Cyan),
     ]];
     for line in lines {
         let segs = limit(&line, inner); // never push the right border out
         let room = inner.saturating_sub(width(&segs));
-        let mut row = vec![seg(format!("{left}│ "), C::Cyan)];
+        // An item takes its whole row, its padding too.
+        let padding = segs
+            .last()
+            .and_then(|last| last.target)
+            .map_or_else(|| seg(" ".repeat(room), C::Gray), |target| seg(" ".repeat(room), C::Gray).at(target));
+        let mut row = vec![seg("│ ", C::Cyan)];
         row.extend(segs);
-        row.push(seg(" ".repeat(room), C::Gray));
+        row.push(padding);
         row.push(seg(" │", C::Cyan));
         boxed.push(row);
     }
     if !footer.is_empty() {
-        boxed.push(vec![seg(format!("{left}│ "), C::Cyan), seg(pad(footer, inner), C::DarkGray), seg(" │", C::Cyan)]);
+        boxed.push(vec![seg("│ ", C::Cyan), seg(pad(footer, inner), C::DarkGray), seg(" │", C::Cyan)]);
     }
-    boxed.push(vec![seg(format!("{left}└{}┘", "─".repeat(inner + 2)), C::Cyan)]);
+    boxed.push(vec![seg(format!("└{}┘", "─".repeat(inner + 2)), C::Cyan)]);
+    // Inside the box a click keeps it open (an item's click picks it); the margin around it is outside.
+    let boxed: Vec<Vec<Seg>> = boxed
+        .into_iter()
+        .map(|row| {
+            let mut framed = vec![seg(left.clone(), C::Gray)];
+            framed.extend(aim(row, Target::Box));
+            framed
+        })
+        .collect();
     let top = rows.saturating_sub(boxed.len()) / 2;
     (0..rows).map(|row| row.checked_sub(top).and_then(|index| boxed.get(index).cloned()).unwrap_or_default()).collect()
 }
@@ -91,11 +106,12 @@ pub fn picker(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     for (index, entry) in entries.iter().enumerate().skip(picker.top).take(visible) {
         let marker = if entry.active { '●' } else { ' ' };
         let text = format!(" {marker} {}{}", entry.label, if entry.active { "   (active)" } else { "" });
-        lines.push(if index == picker.index {
+        let line = if index == picker.index {
             selected(&text, inner)
         } else {
             vec![seg(pad(&text, inner), if entry.active { C::Green } else { C::Gray })]
-        });
+        };
+        lines.push(aim(line, Target::Item(index)));
     }
     let group_info = if picker.groups.len() > 1 {
         format!("  ({}/{}, h l other keys)", picker.group + 1, picker.groups.len())
@@ -149,11 +165,12 @@ pub fn palette(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
     for (i, action) in found.iter().enumerate().skip(first).take(visible) {
         let key = pad(&format!("[{}]", action.key), 9);
         let hint = if action.hint.is_empty() { String::new() } else { format!("  {}", action.hint) };
-        if i == index {
-            lines.push(selected(&format!("{key} {}{hint}", action.label), inner));
+        let line = if i == index {
+            selected(&format!("{key} {}{hint}", action.label), inner)
         } else {
-            lines.push(vec![seg(key, C::Cyan), seg(format!(" {}", action.label), C::White), seg(hint, C::DarkGray)]);
-        }
+            vec![seg(key, C::Cyan), seg(format!(" {}", action.label), C::White), seg(hint, C::DarkGray)]
+        };
+        lines.push(aim(line, Target::Item(i)));
     }
     if found.is_empty() {
         lines.push(vec![seg("no matching command", C::DarkGray)]);
@@ -188,10 +205,10 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             let key = pad(&format!(" {}", item.key), 8);
             let hint = if item.hint.is_empty() { String::new() } else { format!("  {}", item.hint) };
             if i == index {
-                return selected(&format!("{key}{}{hint}", item.label), INNER);
+                return aim(selected(&format!("{key}{}{hint}", item.label), INNER), Target::Item(i));
             }
             let label_color = if item.label.starts_with("[x]") { C::Green } else { C::White };
-            vec![seg(key, C::Cyan), seg(item.label.clone(), label_color), seg(hint, C::DarkGray)]
+            aim(vec![seg(key, C::Cyan), seg(item.label.clone(), label_color), seg(hint, C::DarkGray)], Target::Item(i))
         })
         .collect();
     if matches!(ui.overlay, Some(Overlay::Menu { .. })) {

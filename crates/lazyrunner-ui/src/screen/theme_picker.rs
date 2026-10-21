@@ -9,7 +9,8 @@ use lazyrunner_core::run::Controller;
 use serde_json::json;
 
 use super::actions::fuzzy_score;
-use super::seg::{Seg, on, seg, styled};
+use super::mouse::Target;
+use super::seg::{Seg, aim, on, seg, styled};
 use super::theme::{self, C, Theme};
 use super::{Overlay, Ui, keys};
 
@@ -141,7 +142,7 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         if !theme::no_color() {
             row.extend(SWATCH.iter().map(|&color| styled("■", theme.style(color, None))));
         }
-        lines.push(row);
+        lines.push(aim(row, Target::Item(at)));
     }
     if found.is_empty() {
         lines.push(vec![seg("  no matching theme", C::DarkGray)]);
@@ -151,7 +152,7 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     }
     lines.extend(footer);
     lines.truncate(rows);
-    lines
+    lines.into_iter().map(|line| aim(line, Target::Box)).collect()
 }
 
 /// The name in exactly `cells` characters: cut with … or padded.

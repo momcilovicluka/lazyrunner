@@ -29,10 +29,11 @@ pub enum Toggle {
     RestartOnCodeChange,
     StartupChecklist,
     AutoUpdate,
+    Mouse,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 8] = [
+    pub const ALL: [Toggle; 9] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -41,6 +42,7 @@ impl Toggle {
         Toggle::RestartOnCodeChange,
         Toggle::StartupChecklist,
         Toggle::AutoUpdate,
+        Toggle::Mouse,
     ];
 
     /// Its name in the settings file.
@@ -54,6 +56,7 @@ impl Toggle {
             Toggle::RestartOnCodeChange => "restartOnCodeChange",
             Toggle::StartupChecklist => "startupChecklist",
             Toggle::AutoUpdate => "autoUpdate",
+            Toggle::Mouse => "mouse",
         }
     }
 

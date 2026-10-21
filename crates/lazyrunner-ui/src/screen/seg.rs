@@ -7,6 +7,7 @@ use serde_json::Value;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
+use super::mouse::{Hit, Target};
 use super::theme::{C, Theme};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -16,19 +17,33 @@ pub struct Seg {
     pub bg: Option<C>,
     /// A style of its own instead of the theme's for `fg` / `bg` (the theme picker's swatches show other themes).
     pub style: Option<Style>,
+    /// What a click there means (drawing records where it landed).
+    pub target: Option<Target>,
+}
+
+impl Seg {
+    pub fn at(mut self, target: Target) -> Self {
+        self.target = Some(target);
+        self
+    }
 }
 
 pub fn seg(text: impl Into<String>, fg: C) -> Seg {
-    Seg { text: text.into(), fg, bg: None, style: None }
+    Seg { text: text.into(), fg, bg: None, style: None, target: None }
 }
 
 pub fn on(text: impl Into<String>, fg: C, bg: C) -> Seg {
-    Seg { text: text.into(), fg, bg: Some(bg), style: None }
+    Seg { text: text.into(), fg, bg: Some(bg), style: None, target: None }
 }
 
 /// Text in a style of its own, whatever theme is showing.
 pub fn styled(text: impl Into<String>, style: Style) -> Seg {
-    Seg { text: text.into(), fg: C::Gray, bg: None, style: Some(style) }
+    Seg { text: text.into(), fg: C::Gray, bg: None, style: Some(style), target: None }
+}
+
+/// The row's segments that have no target yet get this one.
+pub fn aim(segs: Vec<Seg>, target: Target) -> Vec<Seg> {
+    segs.into_iter().map(|seg| if seg.target.is_some() { seg } else { seg.at(target) }).collect()
 }
 
 /// The cells a row takes.
@@ -78,8 +93,8 @@ pub fn limit(segs: &[Seg], cells: usize) -> Vec<Seg> {
     out
 }
 
-/// Draws a row at (x, y), cut to `cells`.
-pub fn draw(buf: &mut Buffer, x: u16, y: u16, cells: u16, segs: &[Seg], theme: &Theme) {
+/// Draws a row at (x, y), cut to `cells`; where segments with a target landed goes to `hits`.
+pub fn draw(buf: &mut Buffer, x: u16, y: u16, cells: u16, segs: &[Seg], theme: &Theme, hits: &mut Vec<Hit>) {
     let right = x.saturating_add(cells).min(buf.area.right());
     if y >= buf.area.bottom() {
         return;
@@ -99,6 +114,9 @@ pub fn draw(buf: &mut Buffer, x: u16, y: u16, cells: u16, segs: &[Seg], theme: &
             usize::from(right - cx),
             seg.style.unwrap_or_else(|| theme.style(seg.fg, seg.bg)),
         );
+        if let Some(target) = seg.target {
+            hits.push(Hit { x: cx, y, width: next.saturating_sub(cx), target });
+        }
         cx = next;
     }
 }

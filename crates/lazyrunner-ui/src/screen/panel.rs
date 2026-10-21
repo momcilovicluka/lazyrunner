@@ -1,9 +1,11 @@
 //! The control panel below the columns: a rule with the theme's name, the header (the lazyrunner chip, the
 //! summary, branch, database and folder), the one-line menu, the settings, a notice line, and the log.
 
+use lazyrunner_core::config::Toggle;
 use lazyrunner_core::run::Controller;
 
 use super::columns::hue_color;
+use super::mouse::Target;
 use super::seg::{Seg, on, seg};
 use super::theme::{C, no_color};
 use super::{Ui, status};
@@ -105,13 +107,13 @@ fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
 /// Every on/off setting, always visible (, opens the menu where the letter shown toggles it); wraps onto more
 /// rows when the window is narrow.
 fn settings_rows(controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
-    let settings: Vec<(&str, &str, bool)> = super::actions::menu_toggles(controller)
-        .map(|item| (item.letter, item.short, controller.setting(item.toggle)))
+    let settings: Vec<(&str, &str, bool, Toggle)> = super::actions::menu_toggles(controller)
+        .map(|item| (item.letter, item.short, controller.setting(item.toggle), item.toggle))
         .collect();
     let mut rows = Vec::new();
     let mut current = vec![seg(" ,", C::Cyan), seg(" settings", C::DarkGray)];
     let mut used = 11;
-    for (key, label, on) in settings {
+    for (key, label, on, toggle) in settings {
         let check = if on { "[x]" } else { "[ ]" };
         let length = key.len() + check.len() + label.len() + 6;
         if used + length > cells && current.len() > 1 {
@@ -119,9 +121,11 @@ fn settings_rows(controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
             current.push(seg(" ".repeat(11), C::Gray));
             used = 11;
         }
-        current.push(seg(format!("   {key} "), C::DarkCyan));
-        current.push(seg(check, if on { C::Green } else { C::DarkGray }));
-        current.push(seg(format!(" {label}"), if on { C::Gray } else { C::DarkGray }));
+        current.push(seg("   ", C::DarkCyan));
+        let target = Target::Setting(toggle);
+        current.push(seg(format!("{key} "), C::DarkCyan).at(target));
+        current.push(seg(check, if on { C::Green } else { C::DarkGray }).at(target));
+        current.push(seg(format!(" {label}"), if on { C::Gray } else { C::DarkGray }).at(target));
         used += length;
     }
     rows.push(current);

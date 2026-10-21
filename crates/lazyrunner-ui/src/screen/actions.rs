@@ -165,7 +165,7 @@ pub(crate) struct MenuToggle {
     pub short: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 6] = [
+const MENU_TOGGLES: [MenuToggle; 7] = [
     MenuToggle {
         letter: "a",
         toggle: Toggle::AutoRestartOnBranchChange,
@@ -201,6 +201,12 @@ const MENU_TOGGLES: [MenuToggle; 6] = [
         toggle: Toggle::AutoUpdate,
         label: "Auto-update lazyrunner when it opens",
         short: "auto-update",
+    },
+    MenuToggle {
+        letter: "m",
+        toggle: Toggle::Mouse,
+        label: "Mouse: click and scroll (off: select text)",
+        short: "mouse",
     },
 ];
 

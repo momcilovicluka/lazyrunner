@@ -8,6 +8,7 @@ pub mod columns;
 pub mod copy;
 pub mod durations;
 pub mod keys;
+pub mod mouse;
 pub mod overlays;
 pub mod panel;
 pub mod seg;
@@ -140,6 +141,9 @@ pub struct Ui {
     pub overlay: Option<Overlay>,
     pub picker: Option<Picker>,
     pub pending_g: Option<Instant>,
+    /// Where each clickable thing was in the last frame, and the last click (a second one soon after is a double).
+    pub hits: Vec<mouse::Hit>,
+    pub last_click: Option<(Instant, u16, u16)>,
     pub started: Instant,
     /// The time of the frame being drawn (fixed in tests).
     pub now: Instant,
@@ -176,6 +180,8 @@ impl Ui {
             overlay: None,
             picker: None,
             pending_g: None,
+            hits: Vec::new(),
+            last_click: None,
             started: now,
             now,
             body_rows: 20,
@@ -264,9 +270,10 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     buf.set_style(area, Style::reset());
     let (width, height) = (usize::from(area.width), usize::from(area.height));
     ui.height = height;
+    ui.hits.clear();
     if area.width < MIN_SIZE.0 || area.height < MIN_SIZE.1 {
         let hint = format!(" lazyrunner: make the terminal a bit bigger ({}x{} at least)", MIN_SIZE.0, MIN_SIZE.1);
-        seg::draw(buf, area.x, area.y, area.width, &[s(hint, C::Yellow)], &ui.theme);
+        seg::draw(buf, area.x, area.y, area.width, &[s(hint, C::Yellow)], &ui.theme, &mut ui.hits);
         return;
     }
     let rows: Vec<Vec<Seg>> = if matches!(ui.overlay, Some(Overlay::Help)) {
@@ -279,7 +286,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
         rows
     };
     for (y, row) in rows.iter().enumerate().take(height) {
-        seg::draw(buf, area.x, area.y + y as u16, area.width, row, &ui.theme);
+        seg::draw(buf, area.x, area.y + y as u16, area.width, row, &ui.theme, &mut ui.hits);
     }
 }
 
@@ -311,8 +318,9 @@ fn with_theme_picker(ui: &mut Ui, controller: &Controller, width: usize, rows: u
         .zip(picker)
         .map(|(left, right)| {
             let mut row = columns::fit(left, main);
-            row.push(s("┃", C::FocusBorder));
-            row.extend(columns::fit(right, panel));
+            // The whole panel is the picker's: a click on its blank space or border keeps it open.
+            row.push(s("┃", C::FocusBorder).at(mouse::Target::Box));
+            row.extend(seg::aim(columns::fit(right, panel), mouse::Target::Box));
             row
         })
         .collect()

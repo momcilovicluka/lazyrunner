@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.8.0] - 2026-10-21
+
+### Added
+- The mouse (on by default; `,` then `m` turns it off so the terminal selects text again): a click focuses a column and a double click on its title zooms it, the wheel scrolls the column under the pointer (the focus stays), a click picks an item in a list (the menus, the command palette, the database and theme pickers) and a double click runs it, a click outside a box closes it, and a setting in the panel toggles on a click. A moving pointer costs nothing: only clicks and the wheel redraw
+- Scrollbars: a column with more output than fits shows where its visible lines are, bright while it is scrolled back
+
 ## [0.7.2] - 2026-10-21
 
 ### Changed

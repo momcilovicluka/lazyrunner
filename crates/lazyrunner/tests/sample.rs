@@ -218,6 +218,23 @@ fn two_servers(temp: &TempDir, ports: [u16; 2]) -> (PathBuf, PathBuf) {
 }
 
 #[test]
+fn a_click_on_a_column_title_focuses_it() {
+    let temp = TempDir::new("click");
+    let (repo, profile) = two_servers(&temp, [31395, 31396]);
+    let lazyrunner = Lazyrunner::start(&temp, &repo, &profile, json!({ "startupChecklist": false }), &[]);
+    let focus = || lazyrunner.ask(json!({ "state": true }))["state"]["focus"].as_u64();
+    lazyrunner.wait_for("the first frame", Duration::from_secs(30), || lazyrunner.frame().contains("two"));
+    assert_eq!(focus(), Some(0));
+    // The second column starts after the first column's border on the title row.
+    let title = lazyrunner.frame().lines().next().unwrap_or_default().to_string();
+    let border = title.chars().position(|c| matches!(c, '┳' | '┬')).expect("two columns");
+    let answer = lazyrunner.ask(json!({ "click": [border + 3, 0] }));
+    assert_eq!(answer["target"], "Some(Title(1))", "{answer}");
+    assert_eq!(focus(), Some(1));
+    lazyrunner.quit();
+}
+
+#[test]
 fn nothing_survives_when_lazyrunner_is_killed() {
     if skip_without(&["node", "npm"]) {
         return;
