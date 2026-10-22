@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.11.0] - 2026-10-22
+
+### Added
+- Clickable links: URLs and places in files in the columns' output (a build error's `Orders.cs(12,5)`, a .NET stack frame's `in …\Checkout.cs:line 42`, a node or jest frame's `src/cart.ts:12:5`) are underlined, and a click opens a URL in the browser or the file at its line in your editor - VS Code, else Rider, else the default app, or what `"editor"` says. A bare file name is looked for in the project, outside build output and packages
+
 ## [0.10.0] - 2026-10-22
 
 ### Added

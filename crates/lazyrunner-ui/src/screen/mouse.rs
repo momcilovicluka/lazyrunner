@@ -32,6 +32,8 @@ pub enum Target {
     Box,
     /// An on/off setting in the panel.
     Setting(Toggle),
+    /// A link in a column's output: the column, and the link (in `Ui::links`).
+    Link { column: usize, link: usize },
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -134,6 +136,10 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
             }
         }
         Some(Target::Output(index)) => ui.focus = index,
+        Some(Target::Link { column, link }) => {
+            ui.focus = column;
+            super::links::open(ui, controller, link);
+        }
         Some(Target::Setting(_)) if double => {} // the first click toggled it
         Some(Target::Setting(toggle)) => {
             let label = super::actions::menu_toggles(controller)
@@ -161,7 +167,7 @@ fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direc
         None if ui.picker.is_some() => return press(ui, controller, arrow),
         None => {}
     }
-    if let Some(Target::Output(index) | Target::Title(index)) = target {
+    if let Some(Target::Output(index) | Target::Title(index) | Target::Link { column: index, .. }) = target {
         keys::scroll_column(controller, index, WHEEL_LINES * direction);
     }
 }

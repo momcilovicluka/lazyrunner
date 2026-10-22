@@ -88,6 +88,7 @@ pub fn defaults() -> Map<String, Value> {
         "panelLogLines": 5,
         "theme": "default",
         "gitTool": "lazygit",
+        "editor": "auto",
         "updateRepoUrl": "",
         "updateBranch": "",
     }) else {

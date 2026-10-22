@@ -5,6 +5,7 @@ pub mod changelog;
 pub mod config;
 pub mod ipc;
 pub mod json;
+pub mod links;
 pub mod metrics;
 pub mod output;
 pub mod paths;

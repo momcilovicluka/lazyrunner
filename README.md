@@ -234,6 +234,10 @@ focused app's build or take it out of the queue, and `q`.
   instead of flooding the column.
 - **Log lines** are coloured by level, and every app's full output is saved to `<project>/logs/<app>.log` in the
   state folder (below), so `o` lets you search all of it.
+- **Links** in output are underlined: URLs, and places in files - a build error's `Orders.cs(12,5)`, a .NET stack
+  frame's `in …\Checkout.cs:line 42`, a node or jest frame's `src/cart.ts:12:5`. A click opens a URL in the browser
+  and a file at its line in your editor (`"editor"`); a bare file name is looked for in the project, outside build
+  output and `node_modules`.
 - **A scrollbar** on the right of a column with more output than fits shows where the lines on screen are; it is
   bright while the column is scrolled back (`G` follows new output again).
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
@@ -334,6 +338,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `reducedMotion` | `false` | No blinking, spinners, glides or fades |
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
+| `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.columnWidths` | equal | Relative width per app key (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |
