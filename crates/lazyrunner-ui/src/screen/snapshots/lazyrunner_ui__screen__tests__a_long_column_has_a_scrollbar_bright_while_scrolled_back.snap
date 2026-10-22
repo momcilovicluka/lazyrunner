@@ -4,7 +4,6 @@ expression: screen.frame()
 ---
  ▸ ◆ Orders  :58201  ┳ ■ Billing  :58202  ○┬ ■ Shop  :58301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :58303  ○
  ⏸ ↑60 · G follows   ┃                     │   dev server · dev  │   watch build · watc│   live · dev
-orders line 42       ┃                     │                     │                     │
 orders line 43       ┃                     │                     │                     │
 orders line 44       ┃                     │                     │                     │
 orders line 45       ┃                     │                     │                     │
@@ -28,6 +27,7 @@ orders line 59       ┃): something is off  │                     │        
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside
 
  12:00:00 Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

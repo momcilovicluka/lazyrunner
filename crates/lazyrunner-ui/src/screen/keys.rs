@@ -436,6 +436,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenLog => open_log(ui, controller),
         Run::Copy => super::copy::copy(ui, controller),
         Run::Durations => super::durations::open(ui, controller),
+        Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => ui.search = Some(Search { typing: true, key, ..Search::default() }),
         Run::Zoom => ui.zoom = !ui.zoom,

@@ -8,8 +8,7 @@ expression: "screen.render(80, 24)"
   │   Orders                    ▆▅▅▇▆▇      55s      39s  ▲ +41%      6 runs │
   │ Starts                      runs       last    usual                     │
   │   Orders                    ▇▆▇▇         9s       9s  ≈           4 runs │
-  │   Shop                      ▇▇▇▂         2s      10s              4 runs │
-  │ Esc closes · j k scroll (1-6 of 8) · usual = median of the earlier succe │
+  │ Esc closes · j k scroll (1-5 of 8) · usual = median of the earlier succe │
   └──────────────────────────────────────────────────────────────────────────┘
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -20,5 +19,6 @@ expression: "screen.render(80, 24)"
               s [x] stop/restart all include frontend
               e [ ] restart APIs on code change   w [x] startup checklist
               v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside
 
  12:00:00 No durations yet: they're recorded from the next build, start or npm c

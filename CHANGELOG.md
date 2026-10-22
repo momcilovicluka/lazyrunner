@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.10.0] - 2026-10-22
+
+### Added
+- `L`: lazygit without leaving lazyrunner. It takes over this terminal in the project's folder and `q` brings lazyrunner back; the apps keep running and being watched meanwhile, and quitting or an update waits until you're back. With `,` then `g` in Windows Terminal it opens in a pane beside lazyrunner instead. `"gitTool"` picks another tool
+
 ## [0.9.3] - 2026-10-22
 
 ### Changed

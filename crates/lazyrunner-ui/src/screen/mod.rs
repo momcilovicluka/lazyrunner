@@ -141,6 +141,10 @@ pub struct Ui {
     pub search: Option<Search>,
     pub overlay: Option<Overlay>,
     pub picker: Option<Picker>,
+    /// `L` was pressed: the loop opens the git tool.
+    pub git_tool_wanted: bool,
+    /// The git tool has the terminal (its name): nothing is drawn, and quitting or switching versions waits.
+    pub away: Option<String>,
     pub pending_g: Option<Instant>,
     /// Where each clickable thing was in the last frame, and the last click (a second one soon after is a double).
     pub hits: Vec<mouse::Hit>,
@@ -182,6 +186,8 @@ impl Ui {
             search: None,
             overlay: None,
             picker: None,
+            git_tool_wanted: false,
+            away: None,
             pending_g: None,
             hits: Vec::new(),
             last_click: None,

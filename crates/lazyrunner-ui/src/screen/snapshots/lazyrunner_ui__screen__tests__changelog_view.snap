@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-        ┌─ lazyrunner v<version> · changelog ────────────────────────────────────────────────────────────┐
+        ┌─ lazyrunner v<version> · changelog ───────────────────────────────────────────────────────────┐
         │   • change 3                                                                               │
         │   • change 4                                                                               │
         │   • change 5                                                                               │
@@ -18,8 +18,7 @@ expression: screen.frame()
         │   • change 15                                                                              │
         │   • change 16                                                                              │
         │   • change 17                                                                              │
-        │   • change 18                                                                              │
-        │ 3-18 of 40 · j k scroll · Esc closes                                                       │
+        │ 3-17 of 40 · j k scroll · Esc closes                                                       │
         └────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -28,3 +27,4 @@ expression: screen.frame()
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside
