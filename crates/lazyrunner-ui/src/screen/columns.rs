@@ -13,6 +13,7 @@ use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
 
 use super::Ui;
+use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg, take_cells, width};
 use super::theme::C;
@@ -21,7 +22,6 @@ const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '�
 const ORBIT: [char; 4] = ['◐', '◓', '◑', '◒'];
 pub const SPARKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const BLOCKS: [char; 8] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
-const DEFAULT_ICON: &str = "■";
 const DEFAULT_WIDTH: f64 = 33.0;
 const MIN_WIDTH: usize = 12;
 const SLOW_RESPONSE_MS: u64 = 1000;
@@ -221,7 +221,7 @@ fn pane(
 ) -> Vec<Vec<Seg>> {
     let mut pane = vec![
         aim(title(ui, controller, index, cells), Target::Title(index)),
-        aim(info(controller, index, cells), Target::Title(index)),
+        aim(info(controller, index, cells, ui.nerd), Target::Title(index)),
     ];
     pane.extend(
         body(ui, controller, index, cells, rows.saturating_sub(2), found, base)
@@ -243,7 +243,8 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let focused = index == ui.focus;
     let tone = tone(ui, controller, index);
     let marker = if focused { "▸ " } else { "" };
-    let icon = app.icon.as_deref().unwrap_or(DEFAULT_ICON);
+    let kind = if app.traits().builds { Icon::Dotnet } else { Icon::Npm };
+    let icon = app.icon.as_deref().unwrap_or(icons::icon(ui.nerd, kind));
     let chip_fg = if tone == C::DarkGray { C::White } else { C::Black };
     let mut segs = vec![on(format!(" {marker}{icon} {} ", app.name), chip_fg, tone)];
     segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
@@ -380,11 +381,12 @@ fn memory_growing(state: &AppState) -> bool {
 }
 
 /// Second title line: live CPU and memory with sparklines, the response-time trend, requests, errors, the variant.
-fn info(controller: &Controller, index: usize, cells: usize) -> Vec<Seg> {
+fn info(controller: &Controller, index: usize, cells: usize, nerd: bool) -> Vec<Seg> {
     let state = &controller.states[index];
     let mut segs = vec![seg(" ", C::Gray)];
     if state.scroll > 0 {
-        segs.push(seg(format!("⏸ ↑{} · G follows  ", state.scroll), C::Magenta));
+        let pause = icons::icon(nerd, Icon::Pause);
+        segs.push(seg(format!("{pause} ↑{} · G follows  ", state.scroll), C::Magenta));
     }
     let running = state.is_running();
     if running && let Some(cpu) = state.cpu {
@@ -401,7 +403,7 @@ fn info(controller: &Controller, index: usize, cells: usize) -> Vec<Seg> {
         segs.push(seg("  mem ", C::DarkGray));
         segs.push(seg(format!("{:.0} MB", state.memory_mb.unwrap_or_default()), C::Gray));
         if memory_growing(state) {
-            segs.push(seg(" ↗", C::Yellow));
+            segs.push(seg(format!(" {}", icons::icon(nerd, Icon::Growing)), C::Yellow));
         }
     }
     if running && controller.port(&state.key).is_some() && !state.response_history.is_empty() {

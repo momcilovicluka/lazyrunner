@@ -5,6 +5,7 @@ use lazyrunner_core::config::Toggle;
 use lazyrunner_core::run::Controller;
 
 use super::columns::hue_color;
+use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, on, seg};
 use super::theme::{C, no_color};
@@ -58,8 +59,8 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(seg(text, color).at(Target::Tests)); // a click opens T
     }
     segs.extend([
-        seg(format!("   ⎇ {}", controller.branch), C::Magenta),
-        seg("   DB ", C::DarkGray),
+        seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta),
+        seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),
         seg(controller.db_label.clone().unwrap_or_else(|| "n/a".into()), C::Yellow),
         seg(format!("   {}", controller.root.display()), C::DarkGray),
     ]);

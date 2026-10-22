@@ -243,7 +243,7 @@ pub(crate) struct MenuToggle {
     pub short: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 9] = [
+const MENU_TOGGLES: [MenuToggle; 10] = [
     MenuToggle {
         letter: "a",
         toggle: Toggle::AutoRestartOnBranchChange,
@@ -297,6 +297,12 @@ const MENU_TOGGLES: [MenuToggle; 9] = [
         toggle: Toggle::GitBeside,
         label: "L opens the git tool beside lazyrunner (Windows Terminal)",
         short: "git beside",
+    },
+    MenuToggle {
+        letter: "i",
+        toggle: Toggle::NerdIcons,
+        label: "Nerd Font icons (the terminal's font a Nerd Font Mono)",
+        short: "nerd icons",
     },
 ];
 

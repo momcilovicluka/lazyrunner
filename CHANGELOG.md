@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.0.0] - 2026-10-22
+
+lazyrunner 1.0: everything the PowerShell lazybms did, in Rust, for any project a profile describes - builds, runs and watches its .NET and npm apps, with tests, requests, migrations, durations, lazygit and the database picker beside them.
+
+### Added
+- Nerd Font icons (`, i`, `"nerdIcons"`): .NET and Node.js for apps without an icon of their own, a git branch and a database on the status line, a flask, an exchange and a database for the tests, requests and migrations views, and pause and chart marks in a column's numbers - for a terminal whose font is a Nerd Font (a "Mono" one). Off by default
+
 ## [0.20.0] - 2026-10-22
 
 ### Added

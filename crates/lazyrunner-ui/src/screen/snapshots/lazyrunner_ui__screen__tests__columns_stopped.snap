@@ -27,6 +27,6 @@ expression: screen.frame()
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
-              g [ ] git beside
+              g [ ] git beside   i [ ] nerd icons
 
  12:00:00 Ready - press U to start everything (auto-start when lazyrunner opens is off: , then u turns it on).

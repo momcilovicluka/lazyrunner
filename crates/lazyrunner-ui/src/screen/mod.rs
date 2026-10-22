@@ -7,6 +7,7 @@ pub mod checklist;
 pub mod columns;
 pub mod copy;
 pub mod durations;
+pub mod icons;
 pub mod keys;
 pub mod links;
 pub mod migrations;
@@ -220,6 +221,8 @@ pub struct Ui {
     pub clipboard: copy::Clipboard,
     /// The reducedMotion setting (`, f`), read at every frame: nothing blinks, spins, glides or fades.
     pub reduced_motion: bool,
+    /// The nerdIcons setting (`, i`), read at every frame: Nerd Font icons in the chrome.
+    pub nerd: bool,
     bars: HashMap<String, (f64, Instant)>,
 }
 
@@ -259,6 +262,7 @@ impl Ui {
             opener: status::open,
             clipboard: copy::to_clipboard,
             reduced_motion: controller.setting(Toggle::ReducedMotion),
+            nerd: controller.setting(Toggle::NerdIcons),
             bars: HashMap::new(),
         };
         let wanted = controller.config["theme"].as_str().unwrap_or("default").to_string();
@@ -338,6 +342,7 @@ impl Ui {
 /// Draws the whole screen.
 pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.reduced_motion = controller.setting(Toggle::ReducedMotion);
+    ui.nerd = controller.setting(Toggle::NerdIcons);
     let typing = ui.search.as_ref().is_some_and(|search| search.typing);
     if ui.overlay.is_none() && ui.picker.is_none() && !typing {
         ui.overlay = ui.behind.take(); // what was opened from a view closed: the view again
