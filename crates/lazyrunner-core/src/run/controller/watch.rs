@@ -136,6 +136,9 @@ impl Controller {
         self.request_listening(false);
         self.watch_states();
         self.schedule_probes(now);
+        if !self.test_queue.is_empty() {
+            self.pump_tests(); // what waited for a build or npm ci
+        }
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {

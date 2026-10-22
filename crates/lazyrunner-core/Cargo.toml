@@ -20,6 +20,7 @@ jsonschema = { version = "0.58.6", default-features = false }
 listeners = "0.6.1"
 notify = "8"
 regex = "1.13.1"
+roxmltree = "0.21.1"
 self-replace = "1.5.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { workspace = true, features = ["preserve_order"] }

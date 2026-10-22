@@ -12,7 +12,7 @@ use super::Ui;
 
 /// What is copied at most: an entry with a long stack trace, or a build with many errors.
 const MAX_LINES: usize = 200;
-const NEWLINE: &str = if cfg!(windows) { "\r\n" } else { "\n" };
+pub(super) const NEWLINE: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 const BUILD_HEADER: &str = "──── ⚙";
 
 /// Copies text to the system clipboard (the tests swap this for one that only records).
@@ -65,7 +65,7 @@ pub fn copy_row(clipboard: Clipboard, controller: &mut Controller, path: &Path, 
     }
 }
 
-fn put(clipboard: Clipboard, controller: &mut Controller, text: &str, what: &str) {
+pub(super) fn put(clipboard: Clipboard, controller: &mut Controller, text: &str, what: &str) {
     match clipboard(text) {
         Ok(()) => controller.add_log(format!("Copied {what} to the clipboard"), Hue::Cyan),
         Err(error) => controller.add_log(format!("Couldn't copy to the clipboard: {error}"), Hue::Red),

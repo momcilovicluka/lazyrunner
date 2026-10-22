@@ -4,9 +4,9 @@ use tokio::sync::mpsc;
 fn shell(script: &str) -> Spec {
     let dir = std::env::temp_dir();
     if cfg!(windows) {
-        Spec { program: "cmd".into(), args: vec!["/C".into(), script.into()], dir }
+        Spec { program: "cmd".into(), args: vec!["/C".into(), script.into()], dir, env: Vec::new() }
     } else {
-        Spec { program: "sh".into(), args: vec!["-c".into(), script.into()], dir }
+        Spec { program: "sh".into(), args: vec!["-c".into(), script.into()], dir, env: Vec::new() }
     }
 }
 

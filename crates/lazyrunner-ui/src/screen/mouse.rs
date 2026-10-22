@@ -121,6 +121,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
                 }
             }
             Some(Target::Box) => {}
+            Some(Target::Link { link, .. }) => super::links::open(ui, controller, link),
             _ => press(ui, controller, KeyCode::Esc), // outside the box: closes it, as Esc
         }
         return;
@@ -163,6 +164,9 @@ fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direc
             return;
         }
         Some(Overlay::Checklist(_) | Overlay::Help) => return,
+        Some(Overlay::Tests { .. }) if !matches!(target, Some(Target::Item(_))) => {
+            return super::suites::wheel(ui, direction > 0);
+        }
         Some(_) => return press(ui, controller, arrow),
         None if ui.picker.is_some() => return press(ui, controller, arrow),
         None => {}
@@ -180,7 +184,8 @@ fn select(ui: &mut Ui, controller: &mut Controller, index: usize) {
             Overlay::Menu { index }
             | Overlay::Settings { index }
             | Overlay::Palette { index, .. }
-            | Overlay::Themes { index, .. },
+            | Overlay::Themes { index, .. }
+            | Overlay::Tests { index, .. },
         ) => *index,
         _ => ui.picker.as_ref().map_or(index, |picker| picker.index),
     };

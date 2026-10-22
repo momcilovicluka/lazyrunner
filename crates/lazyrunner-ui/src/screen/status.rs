@@ -45,6 +45,7 @@ pub fn summary(controller: &Controller) -> Summary {
     if controller.npm_ci.is_some() {
         tools.push("npm ci…".to_string());
     }
+    tools.extend(super::suites::status(controller));
     let (progress, text, color) = if !tools.is_empty() {
         ("4;100", tools.join(" + "), C::Yellow)
     } else if failed {

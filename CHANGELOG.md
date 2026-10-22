@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.13.0] - 2026-10-22
+
+### Added
+- Tests (`T`): the project's test suites - .NET test projects (`dotnet test`: NUnit, xUnit, MSTest), npm apps whose test script runs jest or vitest, and an Nx workspace's projects with tests. `r` runs the selected suite, `R` all of them, `f` / `F` their failed tests again; up to `"testParallelism"` at once (half the cores by default), in the background while the apps keep running. The .NET suites build together first, in one MSBuild run. The view shows a running suite's output, then its failures with their message and own stack frames (clickable), or its slowest tests; `y` copies the failures, `o` opens the log. The last results are kept across restarts, and each suite's time shows in `D`
+
 ## [0.12.0] - 2026-10-22
 
 ### Added

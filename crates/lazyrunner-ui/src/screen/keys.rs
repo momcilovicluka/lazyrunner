@@ -288,6 +288,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             "Escape" | "q" | "D" => ui.overlay = None,
             _ => scroll_box(top, name),
         },
+        Some(Overlay::Tests { .. }) => super::suites::key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
             "UpArrow" | "Ctrl+P" => *index = index.saturating_sub(1),
@@ -436,6 +437,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenLog => open_log(ui, controller),
         Run::Copy => super::copy::copy(ui, controller),
         Run::Durations => super::durations::open(ui, controller),
+        Run::Tests => super::suites::open(ui, controller),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => ui.search = Some(Search { typing: true, key, ..Search::default() }),

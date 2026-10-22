@@ -8,23 +8,23 @@ expression: screen.frame()
 
 
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
-  │ Run                                                        z           Zoom the focused column         │
-  │   Space       Start / stop the focused app                 > <         Widen / narrow the focused col… │
-  │   u U         Start · focused / all                        =           Equal column widths             │
-  │   s S         Stop · focused / all                         |           Layout: columns → next          │
-  │   r R         Restart · focused / all                      Ctrl+L      Clear output                    │
-  │   b B         Build · focused / all                        t           Theme picker (Default)          │
-  │   q           Quit                                       Help                                          │
-  │ Tools                                                      ,           Settings (on/off toggles, r ch… │
-  │   d           Switch database                              ?           Key reference                   │
-  │   i           npm ci (reinstall packages)                  :           Command palette                 │
-  │   w W         Open in the browser · focused / all        Navigate                                      │
-  │   o           Open the focused app's log file              h l Tab     focus another column            │
-  │   y           Copy (yank)                                  1-5         jump to a column                │
-  │   D           Durations                                    j k ↑ ↓     scroll a line                   │
+  │ Run                                                        /           Search the focused app's output │
+  │   Space       Start / stop the focused app                 z           Zoom the focused column         │
+  │   u U         Start · focused / all                        > <         Widen / narrow the focused col… │
+  │   s S         Stop · focused / all                         =           Equal column widths             │
+  │   r R         Restart · focused / all                      |           Layout: columns → next          │
+  │   b B         Build · focused / all                        Ctrl+L      Clear output                    │
+  │   q           Quit                                         t           Theme picker (Default)          │
+  │ Tools                                                    Help                                          │
+  │   d           Switch database                              ,           Settings (on/off toggles, r ch… │
+  │   i           npm ci (reinstall packages)                  ?           Key reference                   │
+  │   w W         Open in the browser · focused / all          :           Command palette                 │
+  │   o           Open the focused app's log file            Navigate                                      │
+  │   y           Copy (yank)                                  h l Tab     focus another column            │
+  │   D           Durations                                    1-5         jump to a column                │
+  │   T           Tests: run the project's test suites         j k ↑ ↓     scroll a line                   │
   │   L           lazygit: git without leaving lazyrunner      ^u ^d ^b ^f half page / page (PgUp PgDn)    │
   │   x           Menu for the focused app                     gg G        oldest / follow new output      │
   │ View                                                       n N Esc     search: older / newer / clear   │
-  │   /           Search the focused app's output                                                          │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

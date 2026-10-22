@@ -94,12 +94,15 @@ pub fn read(path: &Path) -> Result<Handover, String> {
 }
 
 impl Controller {
-    /// Why the apps can't be handed over right now, if they can't: a build or npm ci would be cut off.
+    /// Why the apps can't be handed over right now, if they can't: a build, npm ci or tests would be cut off.
     pub fn handover_blocked(&self) -> Option<String> {
         if self.building.is_some() || !self.build_queue.is_empty() {
             return Some("a build is running".into());
         }
-        self.npm_ci.as_ref().map(|_| "npm ci is running".into())
+        if self.npm_ci.is_some() {
+            return Some("npm ci is running".into());
+        }
+        self.tests_active().then(|| "tests are running".into())
     }
 
     /// A fingerprint of what an app runs here (its command, folder and label): another one means it changed.
