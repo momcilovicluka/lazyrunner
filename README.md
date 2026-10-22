@@ -47,12 +47,18 @@ CPU and memory; below them the panel with the branch, the database, the keys, th
   <tr>
     <td><img src="docs/screenshots/palette.svg" alt="The command palette, filtered by typing 'start'"></td>
     <td><img src="docs/screenshots/durations.svg" alt="The durations box: builds, starts and npm ci over their last runs, with the usual time and the trend"></td>
-    <td><img src="docs/screenshots/themes.svg" alt="The theme picker beside the columns, previewing Catppuccin Mocha"></td>
   </tr>
   <tr>
     <td align="center"><code>:</code> the command palette</td>
     <td align="center"><code>D</code> how long builds and starts took</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/themes.svg" alt="The theme picker beside the columns, previewing Catppuccin Mocha"></td>
+    <td><img src="docs/screenshots/stacked.svg" alt="The same five apps stacked top to bottom in a narrow terminal, the focused one taking the spare rows"></td>
+  </tr>
+  <tr>
     <td align="center"><code>t</code> themes, previewed live</td>
+    <td align="center"><code>|</code> a narrow terminal stacks the apps</td>
   </tr>
 </table>
 
