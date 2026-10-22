@@ -52,14 +52,18 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
             seg(format!("  {}", summary.text), summary.color)
         }
     };
-    vec![
-        on(" lazyrunner ", C::Black, chip),
-        summary,
+    let mut segs = vec![on(" lazyrunner ", C::Black, chip), summary];
+    if let Some((text, color)) = super::suites::badge(ui, controller) {
+        segs.push(seg("   ", C::Gray));
+        segs.push(seg(text, color).at(Target::Tests)); // a click opens T
+    }
+    segs.extend([
         seg(format!("   ⎇ {}", controller.branch), C::Magenta),
         seg("   DB ", C::DarkGray),
         seg(controller.db_label.clone().unwrap_or_else(|| "n/a".into()), C::Yellow),
         seg(format!("   {}", controller.root.display()), C::DarkGray),
-    ]
+    ]);
+    segs
 }
 
 /// Only what fits on one line; ? and : reach everything else. Lowercase = focused app, uppercase = all.

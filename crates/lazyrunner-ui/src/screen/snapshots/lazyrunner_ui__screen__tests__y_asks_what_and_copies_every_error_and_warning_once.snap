@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+
+
+
+
+
+                 ┌─ Copy from Orders ───────────────────────────────────────────────────────┐
+                 │  y   the last error        with its stack trace, 1 line                  │
+                 │  e   every error           2 distinct entries                            │
+                 │  w   every warning         1 distinct entry                              │
+                 │  a   errors and warnings   3 distinct entries                            │
+                 │  s   the search match      none                                          │
+                 │  o   all of its output     8 lines                                       │
+                 │ press a key (y y: the last error), or j k + Enter · Esc close            │
+                 └──────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside

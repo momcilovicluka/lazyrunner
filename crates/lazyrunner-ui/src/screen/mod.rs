@@ -76,6 +76,10 @@ pub enum Overlay {
     Durations {
         top: usize,
     },
+    /// `y`: what to copy from the focused app's output.
+    Copy {
+        index: usize,
+    },
     /// `i`: npm ci or npm install, for the npm app it installs.
     Install {
         index: usize,
@@ -109,6 +113,7 @@ impl Overlay {
             Self::Tests { .. } => "tests",
             Self::Requests(_) => "requests",
             Self::Install { .. } => "install",
+            Self::Copy { .. } => "copy",
             Self::Themes { .. } => "themes",
         }
     }
@@ -352,6 +357,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
         Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),
+        Some(Overlay::Copy { .. }) => return overlays::copy(ui, controller, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         _ => {}

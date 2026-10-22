@@ -1,7 +1,9 @@
-//! `y`: copies the focused app's last error with its stack trace (a failed build's errors with their full paths), or
-//! the search match with the lines that belong to it - ready to paste into a ticket or a chat. In the database picker
-//! it copies the highlighted secrets.json line.
+//! `y`: copies from the focused app's output - it asks what: the last error with its stack trace (a failed build's
+//! errors with their full paths), every error, every warning, both in order, the search match with the lines that
+//! belong to it, or all of its output - ready to paste into a ticket or a chat. In the database picker it copies the
+//! highlighted secrets.json line.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use lazyrunner_core::output::{Hue, Level, OutputLine};
@@ -12,6 +14,8 @@ use super::Ui;
 
 /// What is copied at most: an entry with a long stack trace, or a build with many errors.
 const MAX_LINES: usize = 200;
+/// What every error, warning or both copy at most: the newest entries up to this many lines.
+const MAX_COLLECTED: usize = 2000;
 pub(super) const NEWLINE: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 const BUILD_HEADER: &str = "──── ⚙";
 
@@ -24,31 +28,82 @@ pub fn to_clipboard(text: &str) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-/// `y` on the columns.
-pub fn copy(ui: &Ui, controller: &mut Controller) {
-    let Some(app) = controller.apps.get(ui.focus) else { return };
-    let (key, name) = (app.key.clone(), app.name.clone());
-    let Some(state) = controller.states.get(ui.focus) else { return };
+/// What `y` copies from the focused app's output.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Pick {
+    LastError,
+    Errors,
+    Warnings,
+    Both,
+    Search,
+    Output,
+}
+
+/// `y`'s choices, as it lists them: the key, and what it copies.
+pub const PICKS: [(Pick, &str, &str); 6] = [
+    (Pick::LastError, "y", "the last error"),
+    (Pick::Errors, "e", "every error"),
+    (Pick::Warnings, "w", "every warning"),
+    (Pick::Both, "a", "errors and warnings"),
+    (Pick::Search, "s", "the search match"),
+    (Pick::Output, "o", "all of its output"),
+];
+
+/// What a pick takes from the focused app's output now: its lines, and how many entries they are (errors and
+/// warnings are separated by an empty line; the others are one entry).
+pub fn gather(ui: &Ui, controller: &Controller, pick: Pick) -> (Vec<String>, usize) {
+    let (Some(app), Some(state)) = (controller.apps.get(ui.focus), controller.states.get(ui.focus)) else {
+        return (Vec::new(), 0);
+    };
     let mut lines: Vec<&OutputLine> = state.output.newest_first(0).collect();
     lines.reverse();
-    let from_search = ui
-        .search
-        .as_ref()
-        .filter(|search| !search.typing && search.key == key)
-        .and_then(|search| search.index)
-        .filter(|&index| index < lines.len());
-    let (block, what) = match from_search {
-        Some(index) => (block(&lines, index), "the search match"),
-        None => (last_error(&lines, controller.failed_build_errors.get(&key)), "the last error"),
+    let one = |lines: Vec<String>| {
+        let count = usize::from(!lines.is_empty());
+        (lines, count)
     };
-    if block.is_empty() {
-        controller
-            .add_log(format!("Nothing to copy: no error in {name}'s output (/ finds a line to copy)."), Hue::DarkGray);
+    match pick {
+        Pick::LastError => one(last_error(&lines, controller.failed_build_errors.get(&app.key))),
+        Pick::Search => {
+            let index = ui
+                .search
+                .as_ref()
+                .filter(|search| !search.typing && search.key == app.key)
+                .and_then(|search| search.index)
+                .filter(|&index| index < lines.len());
+            one(index.map_or_else(Vec::new, |index| block(&lines, index)))
+        }
+        Pick::Output => one(lines.iter().map(|line| line.text.clone()).collect()),
+        Pick::Errors => collect(&lines, |error, _| error),
+        Pick::Warnings => collect(&lines, |error, warning| warning && !error),
+        Pick::Both => collect(&lines, |error, warning| error || warning),
+    }
+}
+
+/// y, then what: copies it, or says there's nothing of it.
+pub fn copy(ui: &Ui, controller: &mut Controller, pick: Pick) {
+    let Some(name) = controller.apps.get(ui.focus).map(|app| app.name.clone()) else { return };
+    let (lines, entries) = gather(ui, controller, pick);
+    if lines.is_empty() {
+        let why = match pick {
+            Pick::LastError => format!("no error in {name}'s output (/ finds a line to copy)"),
+            Pick::Errors => format!("no errors in {name}'s output"),
+            Pick::Warnings => format!("no warnings in {name}'s output"),
+            Pick::Both => format!("no errors or warnings in {name}'s output"),
+            Pick::Search => format!("no search match in {name} (/ finds one)"),
+            Pick::Output => format!("{name} has no output"),
+        };
+        controller.add_log(format!("Nothing to copy: {why}."), Hue::DarkGray);
         return;
     }
-    let count = block.len();
-    let what = format!("{what} from {name} ({count} line{})", if count == 1 { "" } else { "s" });
-    put(ui.clipboard, controller, &block.join(NEWLINE), &what);
+    let label = PICKS.iter().find(|(choice, ..)| *choice == pick).map_or("", |(_, _, label)| *label);
+    let count = lines.iter().filter(|line| !line.is_empty()).count();
+    let lines_said = format!("{count} line{}", if count == 1 { "" } else { "s" });
+    let size = if matches!(pick, Pick::Errors | Pick::Warnings | Pick::Both) {
+        format!("{entries} entr{}, {lines_said}", if entries == 1 { "y" } else { "ies" })
+    } else {
+        lines_said
+    };
+    put(ui.clipboard, controller, &lines.join(NEWLINE), &format!("{label} from {name} ({size})"));
 }
 
 /// `y` in the database picker: the entry's whole line from secrets.json as it is there (without its indentation),
@@ -89,6 +144,16 @@ fn is_error(line: &OutputLine) -> bool {
         || mentions_exception(text)
 }
 
+/// A line that reports a warning: yellow, a .NET warn entry, a compiler or bundler warning.
+fn is_warning(line: &OutputLine) -> bool {
+    let text = line.text.as_str();
+    line.hue == Some(Hue::Yellow)
+        || line.level == Level::Warn
+        || text.starts_with("warn: ")
+        || text.contains(": warning ")
+        || text.contains("[WARNING]")
+}
+
 /// "Exception" as the end of a word (NullReferenceException, Exception:), not "Exceptions".
 fn mentions_exception(text: &str) -> bool {
     text.match_indices("Exception").any(|(at, word)| {
@@ -124,6 +189,46 @@ fn block(lines: &[&OutputLine], start: usize) -> Vec<String> {
             .map(|line| line.text.clone()),
     );
     block
+}
+
+/// The entries `keep` wants (by whether they have an error, a warning), in order, an empty line between them. An
+/// entry printed again (a dev server's rebuild repeats its errors) counts once, at its last place; when there are
+/// more than `MAX_COLLECTED` lines, the newest.
+fn collect(lines: &[&OutputLine], keep: impl Fn(bool, bool) -> bool) -> (Vec<String>, usize) {
+    let mut entries: Vec<Vec<&OutputLine>> = Vec::new();
+    for line in lines {
+        match entries.last_mut() {
+            Some(entry) if continues(&line.text) => entry.push(line),
+            _ => entries.push(vec![line]),
+        }
+    }
+    let mut seen = HashSet::new();
+    let mut picked: Vec<Vec<String>> = Vec::new();
+    let mut total = 0;
+    for entry in entries.iter().rev() {
+        let (error, warning) = (entry.iter().any(|line| is_error(line)), entry.iter().any(|line| is_warning(line)));
+        if !keep(error, warning) {
+            continue;
+        }
+        let texts: Vec<String> = entry.iter().take(MAX_LINES).map(|line| line.text.clone()).collect();
+        if total + texts.len() > MAX_COLLECTED {
+            break;
+        }
+        if seen.insert(texts.join("\n")) {
+            total += texts.len();
+            picked.push(texts);
+        }
+    }
+    picked.reverse();
+    let count = picked.len();
+    let mut out = Vec::new();
+    for (at, entry) in picked.into_iter().enumerate() {
+        if at > 0 {
+            out.push(String::new());
+        }
+        out.extend(entry);
+    }
+    (out, count)
 }
 
 #[cfg(test)]

@@ -257,6 +257,53 @@ pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
     boxed(&format!("Install {app}'s packages"), lines, "c or n, or j k + Enter · Esc / i close", cells, rows, INNER)
 }
 
+/// y: what to copy from the focused app's output, each with how much there is of it now.
+pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    use super::copy::{PICKS, Pick, gather};
+    const INNER: usize = 72;
+    let index = match &mut ui.overlay {
+        Some(Overlay::Copy { index }) => {
+            *index = (*index).min(PICKS.len() - 1);
+            *index
+        }
+        _ => 0,
+    };
+    let lines: Vec<Vec<Seg>> = PICKS
+        .iter()
+        .enumerate()
+        .map(|(i, (pick, key, label))| {
+            let (lines, entries) = gather(ui, controller, *pick);
+            let count = lines.iter().filter(|line| !line.is_empty()).count();
+            let plural =
+                |count: usize, one: &str, many: &str| format!("{count} {}", if count == 1 { one } else { many });
+            let size = match pick {
+                _ if lines.is_empty() => "none".to_string(),
+                Pick::LastError => format!("with its stack trace, {}", plural(count, "line", "lines")),
+                Pick::Errors | Pick::Warnings | Pick::Both => {
+                    format!("{entries} distinct {}", if entries == 1 { "entry" } else { "entries" })
+                }
+                Pick::Search | Pick::Output => plural(count, "line", "lines"),
+            };
+            let key = pad(&format!(" {key}"), 5);
+            let label = pad(label, 22);
+            if i == index {
+                return aim(selected(&format!("{key}{label}{size}"), INNER), Target::Item(i));
+            }
+            let color = if lines.is_empty() { C::DarkGray } else { C::White };
+            aim(vec![seg(key, C::Cyan), seg(label, color), seg(size, C::DarkGray)], Target::Item(i))
+        })
+        .collect();
+    let app = controller.apps.get(ui.focus).map_or(String::new(), |app| app.name.clone());
+    boxed(
+        &format!("Copy from {app}"),
+        lines,
+        "press a key (y y: the last error), or j k + Enter · Esc close",
+        cells,
+        rows,
+        INNER,
+    )
+}
+
 /// The digits that focus a column, for the key reference: "1 2 3", or "1-9" for many columns.
 fn column_digits(count: usize) -> String {
     let count = count.clamp(1, 9);
