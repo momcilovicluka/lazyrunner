@@ -83,6 +83,11 @@ fn screen(label: &str, config: Value) -> Screen {
             only: Some(sample_profile()),
         },
     };
+    // Side by side unless a test says otherwise: SIZE is narrow enough that auto would stack the apps.
+    let mut config = config;
+    if config.get("layout").is_none() {
+        config["layout"] = json!("columns");
+    }
     lazyrunner_core::config::write(&paths.config_file, &config).unwrap();
     let project = import(&sample_profile(), &paths.profiles).unwrap();
     let (events, rx) = mpsc::unbounded_channel();
@@ -605,6 +610,66 @@ async fn y_in_the_database_picker_copies_the_line_as_it_is_in_secrets_json() {
     screen.press("y");
     assert_eq!(copied().len(), 1, "nothing copied from a file that changed");
     assert_eq!(screen.last_log(), "secrets.json changed since the picker opened - press d again to copy that row.");
+}
+
+// ---------------------------------------------------------------- the layout
+
+#[tokio::test]
+async fn a_narrow_terminal_stacks_the_apps_top_to_bottom() {
+    let mut screen = screen("snap-stacked", json!({ "layout": "auto" }));
+    screen.running();
+    insta::assert_snapshot!(screen.frame());
+    assert!(screen.render(130, 32).contains("┬"), "wide enough: side by side");
+}
+
+#[tokio::test]
+async fn stacked_apps_take_the_focused_ones_share_and_keep_it_on_screen() {
+    let mut screen = screen("stacked-focus", json!({ "layout": "stacked", "columnWidths": { "orders": 66 } }));
+    screen.running();
+    screen.frame();
+    let rows = |screen: &Screen, index: usize| {
+        let mut ys: Vec<u16> =
+            screen.ui.hits.iter().filter(|hit| hit.target == Target::Output(index)).map(|hit| hit.y).collect();
+        ys.dedup();
+        ys
+    };
+    assert!(rows(&screen, 0).len() > rows(&screen, 1).len() * 2, "Orders has twice the share");
+    screen.render(110, 18);
+    let last = screen.controller.apps.len() - 1;
+    screen.press("Tab ".repeat(last).trim());
+    let frame = screen.render(110, 18);
+    let title = |screen: &Screen, index: usize| screen.ui.hits.iter().any(|hit| hit.target == Target::Title(index));
+    assert!(title(&screen, last), "the focused app is on screen\n{frame}");
+    assert!(!title(&screen, 0), "the first gave way to it");
+}
+
+#[tokio::test]
+async fn in_stacked_apps_a_click_focuses_the_app_and_the_wheel_scrolls_it() {
+    let mut screen = screen("stacked-mouse", json!({ "layout": "stacked" }));
+    for n in 0..40 {
+        screen.controller.states[2].output.push(&format!("line {n}"), screen.ui.now);
+    }
+    screen.click(Target::Output(2));
+    assert_eq!(screen.ui.focus, 2);
+    let (x, y) = screen.spot(Target::Output(2));
+    mouse::wheel_at(&mut screen.ui, &mut screen.controller, x, y, true);
+    assert_eq!(screen.controller.states[2].scroll, 3);
+}
+
+#[tokio::test]
+async fn the_layout_key_goes_auto_columns_stacked_and_saves_it() {
+    let mut screen = screen("layout-key", json!({ "layout": "auto" }));
+    screen.press("|");
+    assert_eq!(screen.controller.config["layout"], "columns");
+    assert_eq!(screen.last_log(), "Layout: columns side by side (saved)");
+    screen.press("|");
+    assert_eq!(screen.controller.config["layout"], "stacked");
+    assert!(!screen.frame().contains("┬"), "top to bottom at any width");
+    screen.press("|");
+    assert_eq!(screen.controller.config["layout"], "auto");
+    assert_eq!(screen.last_log(), "Layout: auto - stacked when narrower than 120 cells (saved)");
+    let saved = std::fs::read_to_string(screen.temp.join("config.json")).unwrap();
+    assert!(saved.contains("\"layout\": \"auto\""), "{saved}");
 }
 
 // ---------------------------------------------------------------- the mouse

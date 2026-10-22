@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 
 use super::actions::{self, Action, Run};
 use super::checklist::Checklist;
-use super::columns::{chunk, contains_ignore_case};
+use super::columns::{self, chunk, contains_ignore_case};
 use super::overlays::menu_items;
 use super::{Exit, Overlay, Picker, Search, Ui};
 
@@ -446,6 +446,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             controller.set_setting("columnWidths", json!({}));
             controller.add_log("Column widths reset to equal (saved)", Hue::Cyan);
         }
+        Run::Layout => switch_layout(controller),
         Run::Clear => {
             for state in &mut controller.states {
                 state.output.clear();
@@ -505,6 +506,20 @@ fn resize(controller: &mut Controller, key: &str, delta: f64) {
         widths.insert(app.key.clone(), json!(width));
     }
     controller.set_setting("columnWidths", Value::Object(widths));
+}
+
+/// `|`: auto (stacked when narrow) → columns → stacked → auto, saved.
+fn switch_layout(controller: &mut Controller) {
+    let now = columns::layout(&controller.config);
+    let at = columns::LAYOUTS.iter().position(|layout| *layout == now).unwrap_or(0);
+    let next = columns::LAYOUTS[(at + 1) % columns::LAYOUTS.len()];
+    controller.set_setting("layout", json!(next));
+    let what = match next {
+        "columns" => "columns side by side".to_string(),
+        "stacked" => "stacked top to bottom".to_string(),
+        _ => format!("auto - stacked when narrower than {} cells", columns::STACK_BELOW),
+    };
+    controller.add_log(format!("Layout: {what} (saved)"), Hue::Cyan);
 }
 
 // ---------------------------------------------------------------- opening things
