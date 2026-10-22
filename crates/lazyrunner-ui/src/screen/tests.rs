@@ -708,7 +708,7 @@ async fn ctrl_r_reads_the_settings_again_and_plays_its_show() {
     assert_eq!(screen.ui.theme.id, "catppuccin-mocha", "the edited theme");
     assert!(screen.ui.reset_terminal, "the loop sets the terminal up again");
     assert!(screen.ui.is_animating(&screen.controller));
-    screen.ui.now += Duration::from_millis(600); // the stage: the logo, the bar
+    screen.ui.now += Duration::from_millis(400); // the stage: the logo, the bar
     let stage = screen.frame();
     assert!(
         stage.contains("▀▀▀ ▀ ▀ ▀▀▀") && stage.contains("\u{f021} reloading"),
@@ -1201,4 +1201,48 @@ async fn a_click_on_a_link_opens_the_url_or_the_file_at_its_line() {
     assert_eq!(opened[0], "http://localhost:58202/");
     assert!(opened[1].starts_with("myeditor --goto ") && opened[1].ends_with("Checkout.cs:12"), "{opened:?}");
     assert!(screen.last_log().starts_with("Opening Checkout.cs:12 in myeditor"), "{}", screen.last_log());
+}
+
+// ---------------------------------------------------------------- about
+
+fn overlay(screen: &Screen) -> Option<&'static str> {
+    screen.ui.overlay.as_ref().map(Overlay::kind)
+}
+
+#[tokio::test]
+async fn the_about_box_shows_the_version_and_who_makes_it_and_opens_its_links() {
+    let mut screen = screen("about", json!({}));
+    screen.press(", A");
+    assert_eq!(overlay(&screen), Some("about"));
+    let frame = screen.frame();
+    for text in ["v<version> · released", "Luka Momčilović", "README", "License", "Report a bug", "made with ♥"] {
+        assert!(frame.contains(text), "{text}: {frame}");
+    }
+    screen.press("b");
+    let opened = OPENED.with(|opened| opened.borrow().clone());
+    let report = "https://github.com/momcilovicluka/lazyrunner/issues/new?labels=bug&body=lazyrunner%20v";
+    assert!(opened.last().is_some_and(|url| url.starts_with(report)), "{opened:?}");
+    assert_eq!(overlay(&screen), Some("about"), "a page leaves the box open");
+    screen.press("Down Enter");
+    assert_eq!(overlay(&screen), Some("changelog"), "What's new");
+}
+
+#[tokio::test]
+async fn the_palette_finds_the_about_box_and_a_double_click_opens_a_link() {
+    let mut screen = screen("about-palette", json!({}));
+    screen.press(": a b o u t Enter");
+    assert_eq!(overlay(&screen), Some("about"));
+    screen.click(Target::Item(3));
+    screen.click(Target::Item(3));
+    let opened = OPENED.with(|opened| opened.borrow().clone());
+    assert!(opened.last().is_some_and(|url| url.ends_with("/blob/main/LICENSE")), "{opened:?}");
+    screen.press("Esc");
+    assert_eq!(overlay(&screen), None);
+}
+
+#[tokio::test]
+async fn the_about_box_on_a_tall_screen_has_its_logo() {
+    let mut screen = screen("about-tall", json!({ "reducedMotion": true }));
+    screen.press(", A");
+    insta::assert_snapshot!(screen.render(SIZE.0, 44));
 }

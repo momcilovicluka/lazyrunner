@@ -10,6 +10,7 @@ use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{execute, queue};
 use ratatui::backend::{CrosstermBackend, TestBackend};
+use ratatui::layout::Rect;
 use ratatui::{Frame, Terminal};
 
 use crate::dump;
@@ -66,7 +67,11 @@ impl Surface for Terminal<CrosstermBackend<Stdout>> {
 
     fn reset(&mut self) -> Result<()> {
         crossterm::terminal::enable_raw_mode()?;
-        execute!(self.backend_mut(), EnterAlternateScreen, Hide)?;
+        // Out of the alternate screen and into a fresh one: entering it while in it gives Windows' console a second
+        // alternate buffer of a stale size, and lazyrunner then draws in part of the window, over what was there.
+        execute!(self.backend_mut(), LeaveAlternateScreen, EnterAlternateScreen, Hide)?;
+        let (width, height) = crossterm::terminal::size()?;
+        self.resize(Rect::new(0, 0, width, height))?;
         self.clear()?;
         Ok(())
     }

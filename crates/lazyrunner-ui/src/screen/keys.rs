@@ -298,6 +298,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Checklist(list)) => list.skip = true,
         Some(Overlay::Help) => ui.overlay = None, // any key closes the reference
         Some(Overlay::Themes { .. }) => super::theme_picker::key(ui, controller, name, key),
+        Some(Overlay::About { .. }) => super::about::key(ui, controller, name),
         Some(Overlay::Changelog { top, .. }) => match name {
             "Escape" | "q" | "c" => ui.overlay = None,
             _ => scroll_box(top, name),
@@ -562,6 +563,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
                 ui.overlay = Some(Overlay::Changelog { lines, top: 0 });
             }
         }
+        Run::About => super::about::open(ui),
         Run::ReloadProfile => {
             let start = controller.states.iter().any(|state| state.is_running());
             reopen(ui, controller, controller.root.clone(), start, "reloading the project profile");

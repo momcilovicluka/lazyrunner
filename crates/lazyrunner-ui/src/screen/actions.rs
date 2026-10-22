@@ -53,6 +53,7 @@ pub enum Run {
     },
     Checklist,
     Changelog,
+    About,
     ReloadProfile,
 }
 
@@ -324,6 +325,7 @@ pub fn settings(controller: &Controller) -> Vec<Action> {
     list.extend([
         action("Settings", "r", "Run the startup checklist now (and check for an update)", "", Run::Checklist),
         action("Settings", "c", "What's new: the lazyrunner changelog", "", Run::Changelog).safe(),
+        action("Settings", "A", "About lazyrunner: version, contributors, links", "", Run::About).safe(),
     ]);
     let changed = if controller.profile_changed { " (this branch changed it)" } else { "" };
     list.push(action("Settings", "p", &format!("Reload the project profile{changed}"), "", Run::ReloadProfile));
