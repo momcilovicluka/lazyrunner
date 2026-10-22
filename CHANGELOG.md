@@ -3,6 +3,16 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.3.0] - 2026-10-22
+
+### Added
+- The migrations view (M) finds the migrations by itself: the EF Core model snapshots in each .NET app's project and the projects it builds, and their DbContexts - a profile's `"migrations"` is only needed when they're elsewhere (and without `contexts`, its model snapshots name them before dotnet ef is asked)
+- `R` in the migrations view finds the contexts again and checks them all; `r` checks the selected one
+- `checkMigrationsOnOpen` (`, o`, off by default): M checks every context against the database when it opens
+
+### Changed
+- M no longer checks against the database each time it opens, nor after a database or branch switch (the contexts then say "not checked") - unless `checkMigrationsOnOpen` is on
+
 ## [1.2.0] - 2026-10-22
 
 ### Added

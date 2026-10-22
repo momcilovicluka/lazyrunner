@@ -163,6 +163,8 @@ pub struct Controller {
     /// dotnet ef's job, and the ones waiting.
     pub migration_job: Option<EfJob>,
     migration_queue: VecDeque<Work>,
+    /// Whether the contexts `dotnet ef dbcontext list` finds are checked once found.
+    migrations_check: bool,
     /// The HTTP requests the .NET apps served (H).
     pub requests: super::requests::Requests,
     /// The test suites (T), found the first time the tests view opens.
@@ -231,6 +233,7 @@ impl Controller {
             contexts: None,
             migration_job: None,
             migration_queue: VecDeque::new(),
+            migrations_check: false,
             requests: Default::default(),
             suites: None,
             test_build: None,

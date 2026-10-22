@@ -43,8 +43,9 @@ fn contexts(controller: &Controller) -> &[Context] {
     controller.contexts.as_deref().unwrap_or_default()
 }
 
-/// j k choose, l / Enter its migrations, h back, r check again, u apply pending, U apply pending everywhere, m
-/// migrate to the chosen migration, Esc / q / M back; false for a key it doesn't use.
+/// j k choose, l / Enter its migrations, h back, r check the selected context, R find and check them all, u apply
+/// pending, U apply pending everywhere, m migrate to the chosen migration, Esc / q / M back; false for a key it
+/// doesn't use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     let all = contexts(controller).to_vec();
     let Some(Overlay::Migrations { index, picking }) = &mut ui.overlay else { return false };
@@ -79,7 +80,15 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             }
         }
         "h" | "LeftArrow" | "Tab" => *picking = None,
-        "r" => controller.list_migrations(None),
+        "r" => {
+            if let Some(context) = &selected {
+                controller.list_migrations(Some(&context.key()));
+            }
+        }
+        "R" => {
+            *picking = None;
+            controller.reload_migrations();
+        }
         "u" => {
             let keys: Vec<String> = selected.iter().map(Context::key).collect();
             apply_pending(ui, controller, &keys);
@@ -268,7 +277,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let hint = if picking.is_some() {
         " j k choose · m migrate to it (forward or back) · u apply pending · h back · Esc back"
     } else {
-        " j k choose · l its migrations · u apply pending · U apply pending everywhere · r check again · Esc back"
+        " j k choose · l its migrations · r check it · R find and check all · u apply pending · U everywhere · Esc back"
     };
     let note =
         " dotnet ef uses each app's last build (b rebuilds it) and its Development settings - the database d picks";

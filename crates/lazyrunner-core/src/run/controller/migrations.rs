@@ -2,12 +2,14 @@
 //! listing a context's migrations, moving a context to a migration - waiting while an app builds (dotnet ef
 //! --no-build loads the build it would be rewriting).
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
+use std::path::Path;
 use std::time::Instant;
 
 use super::Controller;
+use crate::config::Toggle;
 use crate::output::{Hue, strip_ansi};
-use crate::profile::AppKind;
+use crate::profile::{App, AppKind};
 use crate::run::Tag;
 use crate::run::child::Child;
 use crate::run::migrations::{self, Context, Status};
@@ -42,35 +44,80 @@ impl Controller {
         Some((project, startup))
     }
 
-    /// M: the contexts of the apps with `"migrations"`, checked again (in the background); false, said in the log,
-    /// when no app has any.
+    /// M: the contexts, found the first time; checked against the database each time with `checkMigrationsOnOpen`
+    /// (r and R in the view otherwise). False, said in the log, when there are none.
     pub fn open_migrations(&mut self) -> bool {
-        if self.contexts.is_none() {
-            let mut contexts = Vec::new();
-            let apps: Vec<(String, Vec<String>)> = self
-                .apps
-                .iter()
-                .filter_map(|app| app.migrations.as_ref().map(|setup| (app.key.clone(), setup.contexts.clone())))
-                .collect();
-            for (app, names) in apps {
-                let Some((project, startup)) = self.ef_projects(&app) else { continue };
-                if names.is_empty() {
-                    self.migration_queue.push_back(Work::Find { app: app.clone() });
-                }
-                contexts.extend(names.iter().map(|name| Context::new(&app, name, project.clone(), startup.clone())));
+        let check = self.setting(Toggle::CheckMigrationsOnOpen);
+        if self.contexts.is_some() {
+            if check {
+                self.list_migrations(None);
             }
-            if contexts.is_empty() && self.migration_queue.is_empty() {
-                self.add_log(
-                    "No migrations: give a .NET app \"migrations\" in the profile (its DbContexts, and the project \
-                     with them when it's another one).",
-                    Hue::Yellow,
-                );
-                return false;
-            }
-            self.contexts = Some(contexts);
+            return true;
         }
-        self.list_migrations(None);
+        self.load_migrations(check)
+    }
+
+    /// R: the contexts found again (a branch may add or drop some) and all checked; while dotnet ef is busy, the
+    /// others checked.
+    pub fn reload_migrations(&mut self) -> bool {
+        if self.migrations_active() {
+            self.list_migrations(None);
+            return true;
+        }
+        self.contexts = None;
+        self.load_migrations(true)
+    }
+
+    fn load_migrations(&mut self, check: bool) -> bool {
+        self.migrations_check = check;
+        let contexts = self.find_contexts();
+        if contexts.is_empty() && self.migration_queue.is_empty() {
+            self.add_log(
+                "No migrations: no EF Core model snapshots in the .NET apps' projects or the ones they build - give \
+                 an app \"migrations\" in the profile when they're elsewhere.",
+                Hue::Yellow,
+            );
+            return false;
+        }
+        self.contexts = Some(contexts);
+        if check {
+            self.list_migrations(None);
+        } else {
+            self.pump_migrations();
+        }
         true
+    }
+
+    /// The .NET apps' contexts: those an app's `"migrations"` names, or its project's model snapshots have (else
+    /// `dotnet ef dbcontext list` is queued to find them); then those of the model snapshots in the projects an app
+    /// without it builds - a project once, for the first app that builds it.
+    fn find_contexts(&mut self) -> Vec<Context> {
+        let path_key = |path: &Path| path.display().to_string().to_lowercase();
+        let dotnet: Vec<App> = self.apps.iter().filter(|app| app.traits().builds).cloned().collect();
+        let mut contexts = Vec::new();
+        let mut claimed: HashSet<String> = HashSet::new();
+        for app in dotnet.iter().filter(|app| app.migrations.is_some()) {
+            let Some((project, startup)) = self.ef_projects(&app.key) else { continue };
+            claimed.insert(path_key(&project));
+            let named = app.migrations.as_ref().map(|setup| setup.contexts.clone()).unwrap_or_default();
+            let names = if named.is_empty() { migrations::snapshot_contexts(&project) } else { named };
+            if names.is_empty() {
+                self.migration_queue.push_back(Work::Find { app: app.key.clone() });
+            }
+            contexts.extend(names.iter().map(|name| Context::new(&app.key, name, project.clone(), startup.clone())));
+        }
+        for app in dotnet.iter().filter(|app| app.migrations.is_none()) {
+            let AppKind::Dotnet { project: startup, .. } = &app.kind else { continue };
+            let startup = self.root.join(startup);
+            for (project, names) in migrations::discover(&startup) {
+                if claimed.insert(path_key(&project)) {
+                    let found = names.iter().map(|name| Context::new(&app.key, name, project.clone(), startup.clone()));
+                    contexts.extend(found);
+                }
+            }
+        }
+        contexts.sort_by_key(|context| self.apps.iter().position(|app| app.key == context.app));
+        contexts
     }
 
     pub fn context(&self, key: &str) -> Option<&Context> {
@@ -117,10 +164,19 @@ impl Controller {
         &self.migration_queue
     }
 
-    /// The database was switched or the branch changed: what is applied, and which migrations exist, may differ.
+    /// The database was switched or the branch changed: what is applied, and which migrations exist, may differ -
+    /// checked again with `checkMigrationsOnOpen`, else no longer said to be checked.
     pub(super) fn migrations_changed(&mut self) {
-        if self.contexts.is_some() {
-            self.list_migrations(None);
+        if self.contexts.is_none() {
+            return;
+        }
+        if self.setting(Toggle::CheckMigrationsOnOpen) {
+            return self.list_migrations(None);
+        }
+        for context in self.contexts.iter_mut().flatten() {
+            if matches!(context.status, Status::Ok | Status::Error) {
+                context.status = Status::Idle;
+            }
         }
     }
 
@@ -130,15 +186,19 @@ impl Controller {
             return;
         }
         let Some(work) = self.migration_queue.pop_front() else { return };
-        let (app, context) = match &work {
-            Work::Find { app } => (app.clone(), None),
+        let (app, context, project, startup) = match &work {
+            Work::Find { app } => {
+                let Some((project, startup)) = self.ef_projects(app) else {
+                    return self.fail_migrations(app, &format!("{app} has no \"migrations\" in the profile any more"));
+                };
+                (app.clone(), None, project, startup)
+            }
             Work::List { context } | Work::Update { context, .. } => match self.context(context) {
-                Some(found) => (found.app.clone(), Some(found.name.clone())),
+                Some(found) => {
+                    (found.app.clone(), Some(found.name.clone()), found.project.clone(), found.startup.clone())
+                }
                 None => return self.pump_migrations(),
             },
-        };
-        let Some((project, startup)) = self.ef_projects(&app) else {
-            return self.fail_migrations(&app, &format!("{app} has no \"migrations\" in the profile any more"));
         };
         let name = self.app(&app).map(|app| app.name.clone()).unwrap_or_default();
         if !migrations::built(&startup) {
@@ -266,8 +326,10 @@ impl Controller {
         };
         for name in names {
             let mut context = Context::new(app, &name, project.clone(), startup.clone());
-            context.status = Status::Queued;
-            self.migration_queue.push_back(Work::List { context: context.key() });
+            if self.migrations_check {
+                context.status = Status::Queued;
+                self.migration_queue.push_back(Work::List { context: context.key() });
+            }
             self.contexts.get_or_insert_with(Vec::new).push(context);
         }
     }
@@ -363,6 +425,15 @@ mod tests {
     }
 
     fn sample(temp: &TempDir, contexts: Option<Vec<String>>, built: bool) -> (Controller, UnboundedReceiver<Event>) {
+        sample_with(temp, contexts, built, json!({ "checkMigrationsOnOpen": true }))
+    }
+
+    fn sample_with(
+        temp: &TempDir,
+        contexts: Option<Vec<String>>,
+        built: bool,
+        config: serde_json::Value,
+    ) -> (Controller, UnboundedReceiver<Event>) {
         let repo = sample_repo(&temp.join("repo"));
         if built {
             write(repo.join("services/Orders/bin/Debug/net10.0/Orders.dll"), ""); // a build for --no-build
@@ -370,7 +441,7 @@ mod tests {
         let profiles =
             ProfileDirs { user: temp.join("profiles"), bundled: temp.join("bundled"), only: Some(sample_profile()) };
         let paths = Paths { config_file: temp.join("config.json"), state_dir: temp.join("state"), profiles };
-        crate::config::write(&paths.config_file, &json!({})).unwrap();
+        crate::config::write(&paths.config_file, &config).unwrap();
         let mut project: Project = import(&sample_profile(), &paths.profiles).unwrap();
         project.apps[0].migrations = contexts.map(|contexts| Migrations { project: None, contexts });
         let (events, rx) = tokio::sync::mpsc::unbounded_channel();
@@ -426,6 +497,26 @@ mod tests {
         let none = TempDir::new("migrations-none");
         let (mut plain, _rx) = sample(&none, None, false);
         assert!(!plain.open_migrations());
-        assert!(plain.log.back().unwrap().text.starts_with("No migrations: give a .NET app \"migrations\""));
+        assert!(plain.log.back().unwrap().text.starts_with("No migrations: no EF Core model snapshots"));
+    }
+
+    #[tokio::test]
+    async fn the_model_snapshots_are_found_and_checked_only_when_asked() {
+        let temp = TempDir::new("migrations-snapshots");
+        let (mut sample, mut rx) = sample_with(&temp, None, true, json!({}));
+        let snapshot = sample.root.join("services/Orders/Migrations/ShopDbContextModelSnapshot.cs");
+        std::fs::create_dir_all(snapshot.parent().unwrap()).unwrap();
+        std::fs::write(&snapshot, "[DbContext(typeof(ShopDbContext))]").unwrap();
+        assert!(sample.open_migrations());
+        let context = sample.context("orders:ShopDbContext").expect("found by its model snapshot");
+        assert_eq!(context.status, Status::Idle, "not checked: checkMigrationsOnOpen is off");
+        assert!(!sample.migrations_active());
+        assert!(sample.reload_migrations());
+        let checked =
+            |c: &Controller| c.context("orders:ShopDbContext").is_some_and(|context| context.status == Status::Ok);
+        run_until(&mut sample, &mut rx, checked).await;
+        assert_eq!(sample.context("orders:ShopDbContext").unwrap().items.len(), 2);
+        sample.migrations_changed();
+        assert_eq!(sample.context("orders:ShopDbContext").unwrap().status, Status::Idle, "another database");
     }
 }

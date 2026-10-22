@@ -1,5 +1,6 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
+assertion_line: 329
 expression: screen.frame()
 ---
            ┌─ ✧ lazyrunner v<version> · startup checklist ────────────────────────────────────────────┐
@@ -27,4 +28,4 @@ expression: screen.frame()
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
-              g [ ] git beside   i [ ] nerd icons
+              g [ ] git beside   i [ ] nerd icons   o [ ] check migrations on M

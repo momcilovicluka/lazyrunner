@@ -244,7 +244,7 @@ pub(crate) struct MenuToggle {
     pub short: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 10] = [
+const MENU_TOGGLES: [MenuToggle; 11] = [
     MenuToggle {
         letter: "a",
         toggle: Toggle::AutoRestartOnBranchChange,
@@ -304,6 +304,12 @@ const MENU_TOGGLES: [MenuToggle; 10] = [
         toggle: Toggle::NerdIcons,
         label: "Nerd Font icons (the terminal's font a Nerd Font Mono)",
         short: "nerd icons",
+    },
+    MenuToggle {
+        letter: "o",
+        toggle: Toggle::CheckMigrationsOnOpen,
+        label: "Check the migrations against the database when M opens",
+        short: "check migrations on M",
     },
 ];
 

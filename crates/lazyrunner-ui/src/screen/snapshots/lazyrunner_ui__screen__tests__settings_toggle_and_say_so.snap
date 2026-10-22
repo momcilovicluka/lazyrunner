@@ -1,8 +1,8 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
+assertion_line: 256
 expression: screen.frame()
 ---
-
                      ┌─ Settings (saved) ───────────────────────────────────────────────┐
                      │  a      [ ] Auto-restart on branch change                        │
                      │  u      [x] Auto-start when lazyrunner opens                     │
@@ -14,6 +14,7 @@ expression: screen.frame()
                      │  f      [ ] Reduced motion: no blinking, spinners or fades       │
                      │  g      [ ] L opens the git tool beside lazyrunner (Windows Ter… │
                      │  i      [ ] Nerd Font icons (the terminal's font a Nerd Font Mo… │
+                     │  o      [ ] Check the migrations against the database when M op… │
                      │  r      Run the startup checklist now (and check for an update)  │
                      │  c      What's new: the lazyrunner changelog                     │
                      │  A      About lazyrunner: version, contributors, links           │
@@ -27,4 +28,4 @@ expression: screen.frame()
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
-              g [ ] git beside   i [ ] nerd icons
+              g [ ] git beside   i [ ] nerd icons   o [ ] check migrations on M
