@@ -12,8 +12,8 @@ and zoom.
 Inspired by lazygit: one command instead of a row of terminal tabs.
 
 > [!IMPORTANT]
-> lazyrunner is source-available, not open source. Personal/non-profit use is allowed under the
-> [lazyrunner License](LICENSE). Commercial use needs written permission.
+> lazyrunner is source-available, not open source. It is free to use - personally, for a non-profit, or at work -
+> under the [lazyrunner License](LICENSE). Redistributing it or selling it needs written permission.
 
 ## Features
 
@@ -395,9 +395,10 @@ The repo has to be public: the installer and the self-update download its releas
 
 ## License
 
-lazyrunner is source-available, not open source: free for personal use and for non-profit organisations, under the
-[lazyrunner License](LICENSE). Any use at work or other commercial use needs written permission from the author; ask
-through this repository. Copying, redistributing, or maintaining a separate fork is not allowed.
+lazyrunner is source-available, not open source: free to use as a tool for any purpose - personally, for a
+non-profit, or at work, including for a company - under the [lazyrunner License](LICENSE). Copying, redistributing,
+selling it or offering it as a product or service, and maintaining a separate fork are not allowed without written
+permission from the author; ask through this repository.
 
 Pull requests are welcome. Forking is allowed only to prepare them, and contributions come in under the Contributor
 Agreement in [CONTRIBUTING.md](CONTRIBUTING.md).

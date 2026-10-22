@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.9.3] - 2026-10-22
+
+### Changed
+- The license (lazyrunner License 1.1) allows using lazyrunner at work, including for a company - not only personally and for non-profits - and covers earlier versions too. Redistributing it, selling it or offering it as a product or service still needs written permission
+
 ## [0.9.2] - 2026-10-21
 
 ### Added
