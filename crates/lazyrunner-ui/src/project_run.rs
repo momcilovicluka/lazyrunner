@@ -151,7 +151,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                     dirty = true;
                     urgent = true;
                 }
-                // A moving pointer, drags and releases are dropped here, before anything redraws.
+                // Drags and releases are dropped here; a move redraws only when the pointer gets onto something else.
                 Some(Ok(Event::Mouse(event))) if screen::mouse::wanted(&event) => {
                     ui.now = Instant::now();
                     if screen::mouse::handle(&mut ui, &mut controller, event) {

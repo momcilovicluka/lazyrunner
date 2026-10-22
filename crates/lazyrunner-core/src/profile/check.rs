@@ -25,8 +25,8 @@ pub struct Fields {
 pub const FIELDS: Fields = Fields {
     top: &["$schema", "schemaVersion", "extends", "id", "name", "detect", "watch", "apps"],
     detect: &["anyFile"],
-    dotnet: &["key", "name", "icon", "type", "project", "launchProfile", "swagger"],
-    npm: &["key", "name", "icon", "type", "dir", "variants"],
+    dotnet: &["key", "name", "icon", "type", "project", "launchProfile", "swagger", "tests"],
+    npm: &["key", "name", "icon", "type", "dir", "variants", "tests"],
     variant: &["label", "when", "script", "port", "servedBy", "ready"],
     when: &["packageScript"],
     ready: &["file"],

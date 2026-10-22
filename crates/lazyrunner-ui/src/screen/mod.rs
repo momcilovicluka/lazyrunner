@@ -166,6 +166,8 @@ pub struct Ui {
     /// Starts a program without waiting (the editor for a link); tests swap it for one that only records.
     pub launcher: fn(&std::path::Path, &[String]) -> bool,
     pub last_click: Option<(Instant, u16, u16)>,
+    /// What the mouse pointer is over (the tests view marks it).
+    pub hover: Option<mouse::Target>,
     pub started: Instant,
     /// The time of the frame being drawn (fixed in tests).
     pub now: Instant,
@@ -210,6 +212,7 @@ impl Ui {
             links: Vec::new(),
             launcher: links::launch,
             last_click: None,
+            hover: None,
             started: now,
             now,
             body_rows: 20,

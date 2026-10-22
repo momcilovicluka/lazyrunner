@@ -3,16 +3,16 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
  ⚗ Tests   3 suites · ✓ 2   ✗ 1   – 1
- j k choose · l its tests (run one) · r run · R run all · f / F failed again · s stop · o log · y copy failure
- .NET · dotnet test                         │ Orders.Tests   .NET · dotnet test
- ▸ ✗ Orders.Tests             1 of 3 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   · last run 09:41:07 · 6s
-   ✓ Billing.Tests                 1 passed │
- npm · vitest                               │ ✗ Orders.Tests.CartTests.Totals(2, 3) (41 ms)
-   · Shop                           not run │     Expected 5 but was 6
-                                            │     at Orders.Tests.CartTests.Totals() in C:\work\Orders.Tests\C
-                                            │     artTests.cs:line 42
-                                            │
-                                            │ Skipped (1):
+ j k choose · r run it (a side or an app: all of it) · R run all · l its tests · f / F failed again · s stop ·
+ Backend · dotnet test             1 failed │ Orders.Tests   .NET · dotnet test
+   Orders                          1 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   · last run 09:41:07 · 6s
+   ▸ ✗ Orders.Tests           1 of 3 failed │
+   Billing                         1 passed │ ✗ Orders.Tests.CartTests.Totals(2, 3) (41 ms)
+     ✓ Billing.Tests               1 passed │     Expected 5 but was 6
+ Frontend · vitest · nx test        not run │     at Orders.Tests.CartTests.Totals() in C:\work\Orders.Tests\C
+   Shop                             not run │     artTests.cs:line 42
+     · Shop                         not run │
+     1 project without test files           │ Skipped (1):
                                             │   – Orders.Tests.CartTests.Later
                                             │
                                             │

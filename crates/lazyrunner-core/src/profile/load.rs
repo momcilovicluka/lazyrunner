@@ -217,7 +217,8 @@ fn to_app(app: &Value) -> App {
         let variants = list(field(app, "variants")).into_iter().map(to_variant).collect();
         AppKind::Npm { dir: native(&text(field(app, "dir"))), variants }
     };
-    App { key: text(field(app, "key")), name: text(field(app, "name")), icon: optional("icon"), kind }
+    let tests = list(field(app, "tests")).into_iter().map(text).collect();
+    App { key: text(field(app, "key")), name: text(field(app, "name")), icon: optional("icon"), kind, tests }
 }
 
 fn to_variant(variant: &Value) -> Variant {

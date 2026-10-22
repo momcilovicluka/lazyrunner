@@ -98,6 +98,11 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     if navigation(ui, controller, &name) {
         return;
     }
+    action_key(ui, controller, &name);
+}
+
+/// The action a key runs, as the panel runs it: during a build only the safe ones (S cancels it, q quits).
+fn action_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     let busy = controller.building.is_some();
     if busy && name == "S" {
         controller.cancel_start(); // like the PowerShell version: cancels the build and stops this start's apps
@@ -107,7 +112,7 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         ui.exit = Some(Exit::Quit);
         return;
     }
-    let Some(action) = actions::find(ui, controller, &name) else { return };
+    let Some(action) = actions::find(ui, controller, name) else { return };
     if busy && !action.safe {
         controller.add_log(format!("Building - press S to cancel it first, then: {}", action.label), Hue::Yellow);
         return;
@@ -288,8 +293,17 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             "Escape" | "q" | "D" => ui.overlay = None,
             _ => scroll_box(top, name),
         },
-        Some(Overlay::Tests { .. }) => super::suites::key(ui, controller, name),
-        Some(Overlay::Requests(_)) => super::requests::key(ui, controller, name, key),
+        // The views' own keys first; the rest do what they do on the columns (, settings, d database, ...).
+        Some(Overlay::Tests { .. }) => {
+            if !super::suites::key(ui, controller, name) {
+                action_key(ui, controller, name);
+            }
+        }
+        Some(Overlay::Requests(_)) => {
+            if !super::requests::key(ui, controller, name, key) {
+                action_key(ui, controller, name);
+            }
+        }
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
             "UpArrow" | "Ctrl+P" => *index = index.saturating_sub(1),

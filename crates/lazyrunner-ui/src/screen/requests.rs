@@ -103,9 +103,9 @@ fn summed(view: &View, controller: &Controller) -> Vec<Endpoint> {
 }
 
 /// Tab requests / endpoints, j k choose, e errors only, a app, s sort, / filter by path, y copy, w / Enter open a
-/// GET request, c clear, Esc / q / H back.
-pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
-    let Some(Overlay::Requests(view)) = &mut ui.overlay else { return };
+/// GET request, c clear, Esc / q / H back; false for a key it doesn't use.
+pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) -> bool {
+    let Some(Overlay::Requests(view)) = &mut ui.overlay else { return false };
     if view.typing {
         match name {
             "Escape" => {
@@ -119,7 +119,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             _ => view.filter.extend(super::keys::typed(key)),
         }
         (view.index, view.follow) = (0, true);
-        return;
+        return true;
     }
     let count = match view.tab {
         Tab::Requests => shown(view, controller).len(),
@@ -172,8 +172,9 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             let view = view.clone();
             open_row(ui, controller, &view);
         }
-        _ => {}
+        _ => return false,
     }
+    true
 }
 
 /// Moves the selection; the top row follows new requests, another one stays on its request.

@@ -79,6 +79,9 @@ pub struct App {
     pub name: String,
     pub icon: Option<String>,
     pub kind: AppKind,
+    /// Test suites that belong to it whatever lazyrunner works out (`"tests"`): .NET test projects by path or
+    /// name, Nx projects by name.
+    pub tests: Vec<String>,
 }
 
 /// A loaded profile: checked and turned into what lazyrunner runs. Paths use this OS's separators.
