@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml/badge.svg)](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml)
 [![Latest release](https://img.shields.io/github/v/release/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/releases/latest)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L4L2NNFN1)
 
 **Run your entire local development stack from one terminal.**
 
