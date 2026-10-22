@@ -72,6 +72,13 @@ impl Context {
     }
 
     /// How a context is told from another: its app and its name.
+    /// When it was last checked: the time today, the day and time before (an earlier run's check).
+    pub fn checked(&self) -> Option<String> {
+        let at = self.checked_at?;
+        let format = if at.date_naive() == chrono::Local::now().date_naive() { "%H:%M:%S" } else { "%-d %b %H:%M" };
+        Some(at.format(format).to_string())
+    }
+
     pub fn key(&self) -> String {
         format!("{}:{}", self.app, self.name)
     }
