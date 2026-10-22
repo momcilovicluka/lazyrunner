@@ -34,6 +34,7 @@ pub enum Run {
     Widen,
     Narrow,
     EqualWidths,
+    Layout,
     Clear,
     Theme,
     Settings,
@@ -144,9 +145,17 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
         action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
         action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),
-        action("View", ">", "Widen the focused column", "", Run::Widen).safe(),
-        action("View", "<", "Narrow the focused column", "", Run::Narrow).safe(),
+        action("View", ">", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),
+        action("View", "<", "Narrow the focused column", "shorter when the apps are stacked", Run::Narrow).safe(),
         action("View", "=", "Equal column widths", "", Run::EqualWidths).safe(),
+        action(
+            "View",
+            "|",
+            &format!("Layout: {} → next", super::columns::layout(&controller.config)),
+            "auto (stacked when narrow) / columns side by side / stacked top to bottom",
+            Run::Layout,
+        )
+        .safe(),
         action("View", "Ctrl+L", "Clear output", "", Run::Clear).safe(),
         action(
             "View",

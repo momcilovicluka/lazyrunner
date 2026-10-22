@@ -185,7 +185,8 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `gg` / `G` (`Home` / `End`) | Oldest output / follow new output again |
 | `/`, `n` / `N`, `Esc` | Search the focused column (matches highlighted), older / newer match, clear |
 | `z` | Zoom: only the focused column |
-| `>` / `<` / `=` | Widen / narrow the focused column / make all equal (saved) |
+| `>` / `<` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
+| `\|` | Layout: auto (stacked below 120 cells) → columns side by side → stacked top to bottom (saved) |
 | `Ctrl+L` | Clear all columns and the panel log |
 | `t` | Theme picker: preview each theme live, `Enter` keeps one (saved), `Esc` undoes; see [Themes](#themes) |
 | `?` | Key reference |
@@ -228,6 +229,8 @@ focused app's build or take it out of the queue, and `q`.
   (`23s / ~41s`); a pulsing dot until the app is up; then its URL, response time (`12 ms`, `slow 1.4s`, `not
   responding`) and how long it took to start. The response time comes from requesting the app's Swagger page (`/`
   otherwise) every 5 s.
+- **The layout:** the apps side by side, or top to bottom when the terminal is narrower than 120 cells (a Windows
+  Terminal pane, a laptop screen); `|` picks one for good.
 - **Each column's info line:** CPU and memory of the app's whole process tree with sparklines, requests per second for
   .NET apps, and error / warning counters.
 - **Builds** show real progress: projects done out of those in the dependency graph (`23/41`), warnings counted
@@ -338,9 +341,10 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `reducedMotion` | `false` | No blinking, spinners, glides or fades |
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
+| `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
-| `projects.<id>.columnWidths` | equal | Relative width per app key (`>` / `<` / `=`) |
+| `projects.<id>.columnWidths` | equal | Relative width per app key, or height when stacked (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |
 | `projects.<id>.apps.<key>.includeInAll` | | `false` keeps that app running on Stop all / Restart all |
 | `projects.<id>.frontend` | `true` | `false` leaves out every npm app |
@@ -365,7 +369,8 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
   starts.
 - **An app is quiet:** some apps log to other sinks than the console; the `● … ms` in the title shows it's up and
   answering.
-- **The terminal is too small:** lazyrunner needs at least 60×15; `z` zooms one column to full width.
+- **The terminal is too small:** lazyrunner needs at least 60×15; `z` zooms one column to full width, and `|` stacks
+  the apps top to bottom.
 - **The profile is wrong:** `lazyrunner profile check` names each problem and its field.
 
 ## Roadmap

@@ -1,0 +1,33 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ▸ ◆ Orders  :58201  ● checking…  up in 3s ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:58201
+warn: an error happened once
+info: Application started.
+ ■ Billing  :58202  ○ starting 5s ────────────────────────────────────────────────────────────────────────────
+
+error: Billing.cs(3,1): something is off                                                                     ▐
+ ■ Shop  :58301  ○ stopped ───────────────────────────────────────────────────────────────────────────────────
+   dev server · dev
+
+ ■ Docs   ○ stopped ──────────────────────────────────────────────────────────────────────────────────────────
+   watch build · watch
+
+ ■ Console  :58303  ○ stopped ────────────────────────────────────────────────────────────────────────────────
+   live · dev
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside
+
+ 12:00:00 Starting Orders + Billing
+ 12:00:00 ✓ Orders is up (3.2 s)

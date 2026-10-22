@@ -9,6 +9,7 @@ use lazyrunner_core::output::{Hue, Level, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
 use lazyrunner_core::run::format_duration;
+use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
 
 use super::Ui;
@@ -29,13 +30,35 @@ const FRESH: Duration = Duration::from_millis(400);
 const SETTLING: Duration = Duration::from_millis(1000);
 const SPARK_WIDTH: usize = 10;
 const HISTORY: usize = 30;
+/// Narrower than this, `"layout": "auto"` stacks the apps top to bottom.
+pub const STACK_BELOW: usize = 120;
+/// A stacked app's fewest rows: its title, its numbers and a line of output.
+const MIN_BAND: usize = 3;
+/// The `"layout"` setting's values, in the order `|` goes through them.
+pub const LAYOUTS: [&str; 3] = ["auto", "columns", "stacked"];
 
 pub fn spinner(tick: u64) -> char {
     SPINNER[tick as usize % SPINNER.len()]
 }
 
-/// The relative widths from the settings (33 each by default), as cells adding up to `total`.
-pub fn widths(controller: &Controller, keys: &[usize], total: usize) -> Vec<usize> {
+/// The `"layout"` setting: auto, columns or stacked.
+pub fn layout(config: &Value) -> &'static str {
+    let saved = config["layout"].as_str().unwrap_or_default();
+    LAYOUTS.into_iter().find(|layout| *layout == saved).unwrap_or(LAYOUTS[0])
+}
+
+/// Whether the apps stack top to bottom at this width.
+pub fn stacks(config: &Value, width: usize) -> bool {
+    match layout(config) {
+        "stacked" => true,
+        "columns" => false,
+        _ => width < STACK_BELOW,
+    }
+}
+
+/// The relative sizes from `columnWidths` (33 each by default), as cells adding up to `total`, each `min` at least;
+/// what rounding leaves over goes to the one at `spare`.
+fn shares(controller: &Controller, keys: &[usize], total: usize, min: usize, spare: usize) -> Vec<usize> {
     let configured = &controller.config["columnWidths"];
     let weights: Vec<f64> = keys
         .iter()
@@ -43,10 +66,10 @@ pub fn widths(controller: &Controller, keys: &[usize], total: usize) -> Vec<usiz
         .collect();
     let sum: f64 = weights.iter().sum::<f64>().max(1.0);
     let mut widths: Vec<usize> =
-        weights.iter().map(|weight| ((total as f64 * weight / sum).floor() as usize).max(MIN_WIDTH)).collect();
+        weights.iter().map(|weight| ((total as f64 * weight / sum).floor() as usize).max(min)).collect();
     let used: usize = widths.iter().sum();
-    if let Some(last) = widths.last_mut() {
-        *last = (*last + total).saturating_sub(used).max(1);
+    if let Some(share) = widths.get_mut(spare) {
+        *share = (*share + total).saturating_sub(used).max(1);
     }
     widths
 }
@@ -111,7 +134,7 @@ pub fn fit(segs: Vec<Seg>, cells: usize) -> Vec<Seg> {
     out
 }
 
-/// The body rows: the columns side by side, `rows` high.
+/// The body rows, `rows` high: the apps side by side, or top to bottom (`"layout"`).
 pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> Vec<Vec<Seg>> {
     ui.body_rows = rows.saturating_sub(2);
     let count = controller.apps.len();
@@ -120,29 +143,19 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
     }
     ui.focus = ui.focus.min(count - 1);
     let keys: Vec<usize> = if ui.zoom { vec![ui.focus] } else { (0..count).collect() };
-    let widths = widths(controller, &keys, total.saturating_sub(keys.len() - 1));
+    if keys.len() > 1 && stacks(&controller.config, total) {
+        return stacked(ui, controller, &keys, total, rows);
+    }
+    let widths = shares(controller, &keys, total.saturating_sub(keys.len() - 1), MIN_WIDTH, keys.len() - 1);
     if let Some(cells) = keys.iter().position(|&index| index == ui.focus).map(|at| widths[at]) {
-        // The text's width: a scrollbar takes the last cell.
-        let scrollable = controller.states[ui.focus].output.len() > rows.saturating_sub(2);
-        ui.focus_cells = cells.saturating_sub(usize::from(scrollable));
+        ui.focus_cells = text_cells(controller, ui.focus, cells, rows);
     }
     let base = ui.links.len();
     let mut found = Vec::new();
     let columns: Vec<Vec<Vec<Seg>>> = keys
         .iter()
         .zip(&widths)
-        .map(|(&index, &cells)| {
-            let mut column = vec![
-                aim(title(ui, controller, index, cells), Target::Title(index)),
-                aim(info(controller, index, cells), Target::Title(index)),
-            ];
-            column.extend(
-                body(ui, controller, index, cells, rows.saturating_sub(2), &mut found, base)
-                    .into_iter()
-                    .map(|row| aim(row, Target::Output(index))),
-            );
-            column
-        })
+        .map(|(&index, &cells)| pane(ui, controller, index, cells, rows, &mut found, base))
         .collect();
     ui.links.extend(found);
     // Each border takes the state colour of the column on its left; both borders of the focused column are heavy
@@ -169,6 +182,59 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
             line
         })
         .collect()
+}
+
+/// The apps one below the other, the full width, sharing the height as columns share the width (the focused one
+/// gets what's left over); when not all fit, the ones up to the focused one.
+fn stacked(ui: &mut Ui, controller: &Controller, keys: &[usize], total: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let fits = (rows / MIN_BAND).max(1);
+    let at = keys.iter().position(|&index| index == ui.focus).unwrap_or(0);
+    let first = (at + 1).saturating_sub(fits).min(keys.len().saturating_sub(fits));
+    let shown = &keys[first..keys.len().min(first + fits)];
+    let heights = shares(controller, shown, rows, MIN_BAND, at - first); // the focused app gets the spare rows
+    let base = ui.links.len();
+    let mut found = Vec::new();
+    let mut lines = Vec::with_capacity(rows);
+    for (&index, &band) in shown.iter().zip(&heights) {
+        if index == ui.focus {
+            ui.body_rows = band.saturating_sub(2);
+            ui.focus_cells = text_cells(controller, index, total, band);
+        }
+        lines.extend(pane(ui, controller, index, total, band, &mut found, base));
+    }
+    ui.links.extend(found);
+    lines.truncate(rows);
+    lines.resize(rows, vec![seg(" ".repeat(total), C::Gray)]);
+    lines
+}
+
+/// An app's title, numbers and output, `cells` wide and `rows` high.
+fn pane(
+    ui: &mut Ui,
+    controller: &Controller,
+    index: usize,
+    cells: usize,
+    rows: usize,
+    found: &mut Vec<links::Target>,
+    base: usize,
+) -> Vec<Vec<Seg>> {
+    let mut pane = vec![
+        aim(title(ui, controller, index, cells), Target::Title(index)),
+        aim(info(controller, index, cells), Target::Title(index)),
+    ];
+    pane.extend(
+        body(ui, controller, index, cells, rows.saturating_sub(2), found, base)
+            .into_iter()
+            .map(|row| aim(row, Target::Output(index))),
+    );
+    pane.truncate(rows);
+    pane
+}
+
+/// The width of an app's text in a pane: a scrollbar takes the last cell.
+fn text_cells(controller: &Controller, index: usize, cells: usize, rows: usize) -> usize {
+    let scrollable = controller.states[index].output.len() > rows.saturating_sub(2);
+    cells.saturating_sub(usize::from(scrollable))
 }
 
 fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Vec<Seg> {

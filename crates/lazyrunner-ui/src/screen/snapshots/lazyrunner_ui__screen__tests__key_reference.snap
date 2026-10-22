@@ -7,12 +7,11 @@ expression: screen.frame()
 
 
 
-
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
-  │ Run                                                        /           Search the focused app's output │
-  │   Space       Start / stop the focused app                 z           Zoom the focused column         │
-  │   u U         Start · focused / all                        > <         Widen / narrow the focused col… │
-  │   s S         Stop · focused / all                         =           Equal column widths             │
+  │ Run                                                        z           Zoom the focused column         │
+  │   Space       Start / stop the focused app                 > <         Widen / narrow the focused col… │
+  │   u U         Start · focused / all                        =           Equal column widths             │
+  │   s S         Stop · focused / all                         |           Layout: columns → next          │
   │   r R         Restart · focused / all                      Ctrl+L      Clear output                    │
   │   b B         Build · focused / all                        t           Theme picker (Default)          │
   │   q           Quit                                       Help                                          │
@@ -26,5 +25,6 @@ expression: screen.frame()
   │   L           lazygit: git without leaving lazyrunner      ^u ^d ^b ^f half page / page (PgUp PgDn)    │
   │   x           Menu for the focused app                     gg G        oldest / follow new output      │
   │ View                                                       n N Esc     search: older / newer / clear   │
+  │   /           Search the focused app's output                                                          │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

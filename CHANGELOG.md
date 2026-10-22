@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.12.0] - 2026-10-22
+
+### Added
+- Stacked layout: in a terminal narrower than 120 cells (a Windows Terminal pane, a laptop screen) the apps stack top to bottom, each the full width, sharing the height as columns share the width (`>` and `<` make the focused one taller or shorter). `|` switches between auto, columns side by side and stacked top to bottom, saved as `"layout"`. When not every app fits, the focused one stays on screen
+
 ## [0.11.0] - 2026-10-22
 
 ### Added
