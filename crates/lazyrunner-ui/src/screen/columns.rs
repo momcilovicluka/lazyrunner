@@ -4,6 +4,7 @@
 use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
+use lazyrunner_core::links;
 use lazyrunner_core::output::{Hue, Level, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
@@ -125,6 +126,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
         let scrollable = controller.states[ui.focus].output.len() > rows.saturating_sub(2);
         ui.focus_cells = cells.saturating_sub(usize::from(scrollable));
     }
+    let base = ui.links.len();
+    let mut found = Vec::new();
     let columns: Vec<Vec<Vec<Seg>>> = keys
         .iter()
         .zip(&widths)
@@ -134,13 +137,14 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
                 aim(info(controller, index, cells), Target::Title(index)),
             ];
             column.extend(
-                body(ui, controller, index, cells, rows.saturating_sub(2))
+                body(ui, controller, index, cells, rows.saturating_sub(2), &mut found, base)
                     .into_iter()
                     .map(|row| aim(row, Target::Output(index))),
             );
             column
         })
         .collect();
+    ui.links.extend(found);
     // Each border takes the state colour of the column on its left; both borders of the focused column are heavy
     // lines in the theme's focus colour.
     let separators: Vec<(C, &str, &str)> = (0..keys.len().saturating_sub(1))
@@ -408,7 +412,15 @@ fn bright(color: C) -> C {
 
 /// Output rows, newest at the bottom, wrapped to the width. New lines fade in; search matches are highlighted
 /// (the current one in the focus colours, the others yellow).
-fn body(ui: &Ui, controller: &Controller, index: usize, column: usize, rows: usize) -> Vec<Vec<Seg>> {
+fn body(
+    ui: &Ui,
+    controller: &Controller,
+    index: usize,
+    column: usize,
+    rows: usize,
+    found: &mut Vec<links::Target>,
+    base: usize,
+) -> Vec<Vec<Seg>> {
     let state = &controller.states[index];
     let search = ui.search.as_ref().filter(|search| !search.query.is_empty() && search.key == state.key);
     let total = state.output.len();
@@ -440,13 +452,34 @@ fn body(ui: &Ui, controller: &Controller, index: usize, column: usize, rows: usi
                 (color, back) = (C::Black, Some(C::Yellow));
             }
         }
+        let line_links = if back.is_none() { links::find(&line.text) } else { Vec::new() };
+        let ids: Vec<usize> = line_links
+            .iter()
+            .map(|link| {
+                found.push(link.target.clone());
+                base + found.len() - 1
+            })
+            .collect();
         let chunks = chunk(&line.text, cells);
-        for text in chunks.iter().rev() {
+        let starts: Vec<usize> = chunks
+            .iter()
+            .scan(0, |at, text| {
+                let start = *at;
+                *at += text.len();
+                Some(start)
+            })
+            .collect();
+        for (text, &start) in chunks.iter().zip(&starts).rev() {
             if result.len() >= rows {
                 break;
             }
-            let text = if back.is_some() { pad(text, cells) } else { text.clone() };
-            result.push(fit(vec![Seg { text, fg: color, bg: back, style: None, target: None }], cells));
+            let segs = if line_links.is_empty() {
+                let text = if back.is_some() { pad(text, cells) } else { text.clone() };
+                vec![Seg { text, fg: color, bg: back, style: None, target: None, underline: false }]
+            } else {
+                linked(text, start, &line_links, &ids, color, index)
+            };
+            result.push(fit(segs, cells));
         }
     }
     while result.len() < rows {
@@ -457,6 +490,34 @@ fn body(ui: &Ui, controller: &Controller, index: usize, column: usize, rows: usi
         add_scrollbar(&mut result, total, state.scroll);
     }
     result
+}
+
+/// A piece of a line (its bytes `start..` in the line) in segments: its links underlined and clickable.
+fn linked(text: &str, start: usize, links: &[links::Link], ids: &[usize], color: C, column: usize) -> Vec<Seg> {
+    let end = start + text.len();
+    let mut segs = Vec::new();
+    let mut at = start;
+    for (link, &id) in links.iter().zip(ids) {
+        let (from, to) = (link.start.max(at), link.end.min(end));
+        if from >= to {
+            continue;
+        }
+        let (Some(before), Some(inside)) = (text.get(at - start..from - start), text.get(from - start..to - start))
+        else {
+            return vec![seg(text, color)];
+        };
+        if !before.is_empty() {
+            segs.push(seg(before, color));
+        }
+        let mut part = seg(inside, color).at(Target::Link { column, link: id });
+        part.underline = true;
+        segs.push(part);
+        at = to;
+    }
+    if let Some(rest) = text.get(at - start..).filter(|rest| !rest.is_empty()) {
+        segs.push(seg(rest, color));
+    }
+    segs
 }
 
 /// The scrollbar: where the lines on screen are among all the column keeps (by lines, not wrapped rows); bright

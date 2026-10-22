@@ -8,6 +8,7 @@ pub mod columns;
 pub mod copy;
 pub mod durations;
 pub mod keys;
+pub mod links;
 pub mod mouse;
 pub mod overlays;
 pub mod panel;
@@ -148,6 +149,10 @@ pub struct Ui {
     pub pending_g: Option<Instant>,
     /// Where each clickable thing was in the last frame, and the last click (a second one soon after is a double).
     pub hits: Vec<mouse::Hit>,
+    /// The links on screen in the last frame (what a `Target::Link` points at).
+    pub links: Vec<lazyrunner_core::links::Target>,
+    /// Starts a program without waiting (the editor for a link); tests swap it for one that only records.
+    pub launcher: fn(&std::path::Path, &[String]) -> bool,
     pub last_click: Option<(Instant, u16, u16)>,
     pub started: Instant,
     /// The time of the frame being drawn (fixed in tests).
@@ -190,6 +195,8 @@ impl Ui {
             away: None,
             pending_g: None,
             hits: Vec::new(),
+            links: Vec::new(),
+            launcher: links::launch,
             last_click: None,
             started: now,
             now,
@@ -286,6 +293,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     let (width, height) = (usize::from(area.width), usize::from(area.height));
     ui.height = height;
     ui.hits.clear();
+    ui.links.clear();
     if area.width < MIN_SIZE.0 || area.height < MIN_SIZE.1 {
         let hint = format!(" lazyrunner: make the terminal a bit bigger ({}x{} at least)", MIN_SIZE.0, MIN_SIZE.1);
         seg::draw(buf, area.x, area.y, area.width, &[s(hint, C::Yellow)], &ui.theme, &mut ui.hits);

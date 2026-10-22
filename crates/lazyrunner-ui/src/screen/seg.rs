@@ -2,7 +2,7 @@
 //! cut to the width it has.
 
 use ratatui::buffer::Buffer;
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use serde_json::Value;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -19,6 +19,8 @@ pub struct Seg {
     pub style: Option<Style>,
     /// What a click there means (drawing records where it landed).
     pub target: Option<Target>,
+    /// Underlined: a link.
+    pub underline: bool,
 }
 
 impl Seg {
@@ -29,16 +31,16 @@ impl Seg {
 }
 
 pub fn seg(text: impl Into<String>, fg: C) -> Seg {
-    Seg { text: text.into(), fg, bg: None, style: None, target: None }
+    Seg { text: text.into(), fg, bg: None, style: None, target: None, underline: false }
 }
 
 pub fn on(text: impl Into<String>, fg: C, bg: C) -> Seg {
-    Seg { text: text.into(), fg, bg: Some(bg), style: None, target: None }
+    Seg { text: text.into(), fg, bg: Some(bg), style: None, target: None, underline: false }
 }
 
 /// Text in a style of its own, whatever theme is showing.
 pub fn styled(text: impl Into<String>, style: Style) -> Seg {
-    Seg { text: text.into(), fg: C::Gray, bg: None, style: Some(style), target: None }
+    Seg { text: text.into(), fg: C::Gray, bg: None, style: Some(style), target: None, underline: false }
 }
 
 /// The row's segments that have no target yet get this one.
@@ -107,12 +109,13 @@ pub fn draw(buf: &mut Buffer, x: u16, y: u16, cells: u16, segs: &[Seg], theme: &
             }
             continue;
         }
+        let style = seg.style.unwrap_or_else(|| theme.style(seg.fg, seg.bg));
         let (next, _) = buf.set_stringn(
             cx,
             y,
             &seg.text,
             usize::from(right - cx),
-            seg.style.unwrap_or_else(|| theme.style(seg.fg, seg.bg)),
+            if seg.underline { style.add_modifier(Modifier::UNDERLINED) } else { style },
         );
         if let Some(target) = seg.target {
             hits.push(Hit { x: cx, y, width: next.saturating_sub(cx), target });

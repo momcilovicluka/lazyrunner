@@ -38,6 +38,8 @@ struct Screen {
 thread_local! {
     /// What `y` copied in this test (each test runs on its own thread).
     static COPIED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// What the tests' opener and launcher were asked to open.
+    static OPENED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The tests' clipboard: records instead of touching the real one.
@@ -52,7 +54,14 @@ fn copied() -> Vec<String> {
 
 const NEWLINE: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 
-fn opened(_: &str) -> bool {
+fn opened(target: &str) -> bool {
+    OPENED.with(|opened| opened.borrow_mut().push(target.to_string()));
+    true
+}
+
+fn launched(program: &std::path::Path, args: &[String]) -> bool {
+    let program = program.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+    OPENED.with(|opened| opened.borrow_mut().push(format!("{program} {}", args.join(" "))));
     true
 }
 
@@ -86,6 +95,7 @@ fn screen(label: &str, config: Value) -> Screen {
     let started = Instant::now();
     let (mut ui, _) = Ui::new(&controller, None, started);
     ui.opener = opened;
+    ui.launcher = launched;
     ui.clipboard = record;
     ui.now = started + Duration::from_secs(10);
     Screen { temp, _events: rx, controller, ui }
@@ -714,4 +724,32 @@ async fn with_reduced_motion_nothing_animates_and_new_lines_dont_flash() {
         screen.frame();
         assert_eq!(screen.ui.is_animating(&screen.controller), animating, "reduced motion: {reduced}");
     }
+}
+
+// ---------------------------------------------------------------- links
+
+#[tokio::test]
+async fn a_click_on_a_link_opens_the_url_or_the_file_at_its_line() {
+    let mut screen = screen("links", json!({ "editor": "myeditor --goto {file}:{line}" }));
+    let repo = screen.temp.join("repo");
+    std::fs::create_dir_all(repo.join("services/Orders")).unwrap();
+    std::fs::write(repo.join("services/Orders/Checkout.cs"), "").unwrap();
+    screen.controller.root = repo;
+    let at = screen.ui.now - Duration::from_secs(5);
+    screen.controller.states[0].output.push("Checkout.cs(12,5): error CS1002: ; expected", at);
+    screen.controller.states[1].output.push("  Local:   http://localhost:58202/", at);
+    screen.frame();
+    let spot = |screen: &Screen, column: usize| {
+        let hit = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Link { column: c, .. } if c == column));
+        hit.map(|hit| (hit.x, hit.y)).expect("a link on screen")
+    };
+    let (x, y) = spot(&screen, 1);
+    screen.click_at(x, y);
+    let (x, y) = spot(&screen, 0);
+    screen.ui.now += Duration::from_secs(1); // not a double click
+    screen.click_at(x, y);
+    let opened = OPENED.with(|opened| opened.borrow().clone());
+    assert_eq!(opened[0], "http://localhost:58202/");
+    assert!(opened[1].starts_with("myeditor --goto ") && opened[1].ends_with("Checkout.cs:12"), "{opened:?}");
+    assert!(screen.last_log().starts_with("Opening Checkout.cs:12 in myeditor"), "{}", screen.last_log());
 }
