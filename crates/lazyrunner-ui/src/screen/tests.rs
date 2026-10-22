@@ -538,16 +538,48 @@ const ERROR_ENTRY: [&str; 6] = [
 async fn y_copies_the_last_error_with_its_stack_trace() {
     let mut screen = screen("copy-error", json!({}));
     screen.output(&ERROR_ENTRY);
-    screen.press("y");
+    screen.press("y y");
     assert_eq!(copied(), [ERROR_ENTRY[1..5].join(NEWLINE)]);
     assert_eq!(screen.last_log(), "Copied the last error from Orders (4 lines) to the clipboard");
+}
+
+#[tokio::test]
+async fn y_asks_what_and_copies_every_error_and_warning_once() {
+    let mut screen = screen("copy-all", json!({}));
+    screen.output(&[
+        "warn: Shop.Cache[0]",
+        "      the cache is cold",
+        "fail: Shop.Orders[0]",
+        "      boom",
+        "info: Shop.Orders[0]",
+        "fail: Shop.Orders[0]",
+        "      boom",
+        "src/app.ts(3,1): error TS2322: Type 'string' is not assignable to type 'number'.",
+    ]);
+    screen.press("y");
+    insta::assert_snapshot!(screen.frame());
+    screen.press("e");
+    let errors = [
+        "fail: Shop.Orders[0]",
+        "      boom",
+        "",
+        "src/app.ts(3,1): error TS2322: Type 'string' is not assignable to type 'number'.",
+    ];
+    assert_eq!(copied(), [errors.join(NEWLINE)], "the repeated one once, at its last place");
+    assert_eq!(screen.last_log(), "Copied every error from Orders (2 entries, 3 lines) to the clipboard");
+    screen.press("y w");
+    assert_eq!(copied()[1], ["warn: Shop.Cache[0]", "      the cache is cold"].join(NEWLINE));
+    screen.press("y a");
+    assert!(copied()[2].starts_with("warn: Shop.Cache[0]") && copied()[2].ends_with("type 'number'."), "in order");
+    screen.press("y o");
+    assert_eq!(screen.last_log(), "Copied all of its output from Orders (8 lines) to the clipboard");
 }
 
 #[tokio::test]
 async fn y_copies_the_search_match_with_its_indented_lines() {
     let mut screen = screen("copy-search", json!({}));
     screen.output(&ERROR_ENTRY);
-    screen.press("/ N u l l R e f Enter y");
+    screen.press("/ N u l l R e f Enter y s");
     assert_eq!(copied(), [ERROR_ENTRY[3..5].join(NEWLINE)], "the match and the stack frame below it");
     assert_eq!(screen.last_log(), "Copied the search match from Orders (2 lines) to the clipboard");
 }
@@ -563,7 +595,7 @@ async fn y_copies_a_failed_builds_errors_with_their_full_paths() {
     screen.controller.states[0].output.push_hued("✗ build failed after 3s", Some(Hue::Red), at);
     let full = "C:\\src\\Orders\\OrdersController.cs(3,1): error CS1002: ; expected [C:\\src\\Orders\\Orders.csproj]";
     screen.controller.failed_build_errors.insert("orders".into(), vec![full.into()]);
-    screen.press("y");
+    screen.press("y y");
     assert_eq!(copied(), [full]);
     assert_eq!(screen.last_log(), "Copied the last error from Orders (1 line) to the clipboard");
 }
@@ -572,12 +604,14 @@ async fn y_copies_a_failed_builds_errors_with_their_full_paths() {
 async fn y_says_when_there_is_nothing_to_copy_or_the_clipboard_refuses() {
     let mut screen = screen("copy-nothing", json!({}));
     screen.output(&["info: Now listening on: http://localhost:58201"]);
-    screen.press("y");
+    screen.press("y y");
     assert!(copied().is_empty());
     assert_eq!(screen.last_log(), "Nothing to copy: no error in Orders's output (/ finds a line to copy).");
+    screen.press("y s");
+    assert_eq!(screen.last_log(), "Nothing to copy: no search match in Orders (/ finds one).");
     screen.output(&ERROR_ENTRY);
     screen.ui.clipboard = |_| Err("the clipboard is busy".into());
-    screen.press("y");
+    screen.press("y y");
     assert_eq!(screen.last_log(), "Couldn't copy to the clipboard: the clipboard is busy");
 }
 
@@ -839,6 +873,18 @@ async fn the_pointer_on_an_app_or_a_side_says_a_click_runs_it_and_a_click_does()
     assert!(screen.frame().contains("1 project without test files"));
     screen.press("r");
     assert_eq!(screen.last_log(), "Nothing to run here: these projects have no test files.");
+}
+
+#[tokio::test]
+async fn the_status_line_sums_up_the_tests_and_a_click_on_it_opens_them() {
+    let mut screen = screen("tests-badge", json!({}));
+    assert!(!screen.frame().contains("⚗"), "no results, no summary");
+    with_suites(&mut screen);
+    let frame = screen.frame();
+    let status = frame.lines().find(|line| line.contains(" lazyrunner ")).expect("the status line");
+    assert!(status.contains("⚗ ✓2 ✗1"), "{status}");
+    screen.click(Target::Tests);
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { .. })));
 }
 
 #[tokio::test]

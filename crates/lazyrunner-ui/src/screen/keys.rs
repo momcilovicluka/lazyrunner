@@ -312,6 +312,37 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Copy { index }) => {
+            use super::copy::PICKS;
+            let pick = match name {
+                "Escape" | "q" => {
+                    ui.overlay = None;
+                    None
+                }
+                "j" | "DownArrow" => {
+                    *index = (*index + 1).min(PICKS.len() - 1);
+                    None
+                }
+                "k" | "UpArrow" => {
+                    *index = index.saturating_sub(1);
+                    None
+                }
+                "<" | "Home" => {
+                    *index = 0;
+                    None
+                }
+                ">" | "End" => {
+                    *index = PICKS.len() - 1;
+                    None
+                }
+                "Enter" | "Space" => PICKS.get(*index).map(|(pick, ..)| *pick),
+                other => PICKS.iter().find(|(_, key, _)| *key == other).map(|(pick, ..)| *pick),
+            };
+            if let Some(pick) = pick {
+                ui.overlay = None;
+                super::copy::copy(ui, controller, pick);
+            }
+        }
         Some(Overlay::Install { index }) => match name {
             "Escape" | "q" | "i" => ui.overlay = None,
             "j" | "DownArrow" | ">" => *index = 1,
@@ -479,7 +510,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenFocused => open_focused(ui, controller, &key),
         Run::OpenAll => open_all(ui, controller),
         Run::OpenLog => open_log(ui, controller),
-        Run::Copy => super::copy::copy(ui, controller),
+        Run::Copy => ui.overlay = Some(Overlay::Copy { index: 0 }),
         Run::Durations => super::durations::open(ui, controller),
         Run::Tests => super::suites::open(ui, controller),
         Run::Requests => super::requests::open(ui),

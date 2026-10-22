@@ -36,6 +36,8 @@ pub enum Target {
     Link { column: usize, link: usize },
     /// A test of the suite picked in the tests view, by its place in that list.
     Test(usize),
+    /// The tests' summary on the panel's status line: a click opens the tests view.
+    Tests,
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -148,6 +150,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
             }
         }
         Some(Target::Output(index)) => ui.focus = index,
+        Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::Link { column, link }) => {
             ui.focus = column;
             super::links::open(ui, controller, link);
@@ -197,7 +200,7 @@ fn select(ui: &mut Ui, controller: &mut Controller, index: usize) {
             | Overlay::Tests { index, .. },
         ) => *index,
         Some(Overlay::Requests(view)) => view.index,
-        Some(Overlay::Install { index }) => *index,
+        Some(Overlay::Install { index } | Overlay::Copy { index }) => *index,
         _ => ui.picker.as_ref().map_or(index, |picker| picker.index),
     };
     let arrow = if index > current { KeyCode::Down } else { KeyCode::Up };

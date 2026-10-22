@@ -815,6 +815,21 @@ impl Details<'_> {
     }
 }
 
+/// The tests on the panel's status line, once there are results or a run: "⚗ ✓438 ✗13 !1" (red when something
+/// failed or didn't run), or "⚗ ⠋ testing 6 +10 queued" while they run.
+pub fn badge(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
+    if let Some(running) = status(controller) {
+        return Some((format!("⚗ {} {running}", icon(ui, Status::Running)), C::Yellow));
+    }
+    let totals = controller.test_totals();
+    if totals.ran == 0 {
+        return None;
+    }
+    let errors = if totals.errors > 0 { format!(" !{}", totals.errors) } else { String::new() };
+    let color = if totals.failed > 0 || totals.errors > 0 { C::Red } else { C::Green };
+    Some((format!("⚗ ✓{} ✗{}{errors}", totals.passed, totals.failed), color))
+}
+
 /// What the panel's status says while tests run: "testing 2 +3…" (running, and queued).
 pub fn status(controller: &Controller) -> Option<String> {
     if !controller.tests_active() {

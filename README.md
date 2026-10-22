@@ -174,7 +174,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `i` | Install an npm app's packages in the background: `c` `npm ci`, `n` `npm install` (it stops the app first and starts it again after) |
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
-| `y` | Copy the focused app's last error with its stack trace (a failed build's errors with full paths), or the search match |
+| `y` | Copy from the focused app's output - it asks what: `y` the last error with its stack trace (a failed build's errors with full paths), `e` every error, `w` every warning, `a` both in order (repeats once), `s` the search match, `o` all of it |
 | `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |
 | `H` | **Requests**: the HTTP requests the .NET apps served, per endpoint too (below) |
 | `T` | **Tests**: the project's test suites - run them in the background, see what failed, run one test (below) |
@@ -323,7 +323,9 @@ passed. `y` copies the failures, `o` opens the suite's whole log, `s` stops the 
 `l` opens the selected suite's tests (the failed first, then the skipped and the passed) to pick one: `j` `k` choose,
 the right side shows its message and stack, `r` runs just that test (its result joins the suite's), `y` copies it,
 `h` goes back to the suites. A click picks a test, a double click runs it. The
-last results are kept, so they're still there after a restart, and each suite's time shows in `D`.
+last results are kept, so they're still there after a restart, and each suite's time shows in `D`. The panel's
+status line sums them up - `⚗ ✓438 ✗13` (red when something failed), `⚗ testing 6 +10 queued` while they run - and a
+click on it opens `T`.
 
 ## Durations (`D`)
 

@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.18.0] - 2026-10-22
+
+### Added
+- `y` asks what to copy from the focused app's output, with how much there is of each: `y` the last error with its stack trace (so `y y` is what `y` was), `e` every error, `w` every warning, `a` errors and warnings in order, `s` the search match, `o` all of it. An entry the output repeats (a dev server rebuilding) is copied once
+- The tests on the panel's status line: `⚗ ✓438 ✗13 !1` after a run (red when something failed or didn't run, green when all passed), `⚗ testing 6 +10 queued` while they run; a click on it opens the tests view
+
 ## [0.17.0] - 2026-10-22
 
 ### Added
