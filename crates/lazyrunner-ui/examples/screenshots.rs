@@ -25,6 +25,8 @@ use ratatui::style::{Color, Modifier};
 use serde_json::json;
 
 const SIZE: (u16, u16) = (170, 40);
+/// A Windows Terminal pane or a laptop screen: narrow enough that the apps stack.
+const NARROW: (u16, u16) = (100, 40);
 const THEME: &str = "catppuccin-mocha";
 /// Cell size and font in the SVG (px): a 14 px monospace font is about 8.4 px wide.
 const CELL: (f64, f64) = (8.4, 18.0);
@@ -43,14 +45,19 @@ async fn main() {
         .nth(1)
         .map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/screenshots"), PathBuf::from);
     std::fs::create_dir_all(&out).expect("the screenshots folder");
-    let scenes: [(&str, Scene); 4] =
-        [("overview", overview), ("palette", palette), ("durations", durations), ("themes", themes)];
-    for (name, scene) in scenes {
+    let scenes: [(&str, Scene, (u16, u16)); 5] = [
+        ("overview", overview, SIZE),
+        ("palette", palette, SIZE),
+        ("durations", durations, SIZE),
+        ("themes", themes, SIZE),
+        ("stacked", overview, NARROW),
+    ];
+    for (name, scene, size) in scenes {
         let mut demo = Demo::new(name);
         demo.running();
         scene(&mut demo);
         let path = out.join(format!("{name}.svg"));
-        std::fs::write(&path, demo.svg()).expect("the screenshot");
+        std::fs::write(&path, demo.svg(size)).expect("the screenshot");
         println!("wrote {}", path.display());
     }
 }
@@ -190,8 +197,8 @@ impl Demo {
     }
 
     /// The screen as a terminal window: an SVG of every cell, in the theme's colours.
-    fn svg(&mut self) -> String {
-        let mut terminal = Terminal::new(TestBackend::new(SIZE.0, SIZE.1)).expect("a test terminal");
+    fn svg(&mut self, size: (u16, u16)) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(size.0, size.1)).expect("a test terminal");
         terminal.draw(|frame| screen::draw(frame, &mut self.ui, &self.controller)).expect("a frame");
         let (fg, bg) = self.ui.theme.terminal.clone().unwrap_or((None, None));
         let fg = fg.unwrap_or_else(|| DEFAULT_FG.into());
