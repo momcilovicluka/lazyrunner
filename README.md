@@ -2,6 +2,18 @@
 
 [![CI](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml/badge.svg)](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml)
 [![Latest release](https://img.shields.io/github/v/release/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/releases/latest)
+[![Commits since release](https://img.shields.io/github/commits-since/momcilovicluka/lazyrunner/latest)](https://github.com/momcilovicluka/lazyrunner/commits/main)
+[![Last commit](https://img.shields.io/github/last-commit/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/commits/main)
+[![Downloads](https://img.shields.io/github/downloads/momcilovicluka/lazyrunner/total)](https://github.com/momcilovicluka/lazyrunner/releases)
+[![Stars](https://img.shields.io/github/stars/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/stargazers)
+[![License](https://img.shields.io/badge/license-lazyrunner%20License-lightgrey)](https://github.com/momcilovicluka/lazyrunner/blob/main/LICENSE)
+[![MSRV](https://img.shields.io/badge/rust-1.99%2B-orange?logo=rust)](https://www.rust-lang.org)
+[![Platform](https://img.shields.io/badge/platform-Windows%20release%20%7C%20Linux%2FmacOS%20source-blue)](https://github.com/momcilovicluka/lazyrunner/releases)
+[![Downloads latest](https://img.shields.io/github/downloads/momcilovicluka/lazyrunner/latest/total)](https://github.com/momcilovicluka/lazyrunner/releases/latest)
+[![Issues](https://img.shields.io/github/issues/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/pulls)
+[![Contributors](https://img.shields.io/github/contributors/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/graphs/contributors)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/momcilovicluka/lazyrunner/blob/main/CONTRIBUTING.md)
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L4L2NNFN1)
 
 **Run your entire local development stack from one terminal.**
