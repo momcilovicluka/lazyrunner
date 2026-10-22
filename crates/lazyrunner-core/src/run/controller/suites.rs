@@ -82,12 +82,16 @@ impl Controller {
         let mut suites: Vec<Suite> = Vec::new();
         for suite in found {
             match known.iter().position(|old| old.key == suite.key) {
-                Some(at) => suites.push(known.remove(at)),
+                Some(at) => {
+                    let mut known = known.remove(at);
+                    known.app = suite.app; // the profile may have changed
+                    suites.push(known);
+                }
                 None => suites.push(suite),
             }
         }
         suites.extend(known.into_iter().filter(Suite::is_active));
-        if suites.is_empty() {
+        if suites.iter().all(|suite| suite.untested) {
             self.add_log(
                 "No tests found: .NET projects referencing Microsoft.NET.Test.Sdk, npm apps whose test script runs \
                  jest or vitest, Nx projects with a test target.",
@@ -95,6 +99,14 @@ impl Controller {
             );
         }
         self.suites = Some(suites);
+        self.check_packages();
+    }
+
+    /// Whether each npm and Nx suite's packages are there (when found, before a run, after npm ci).
+    pub(super) fn check_packages(&mut self) {
+        for suite in self.suites.iter_mut().flatten() {
+            suite.needs_packages = crate::run::tools::packages_problem(&suite.runner);
+        }
     }
 
     pub fn suite(&self, key: &str) -> Option<&Suite> {
@@ -148,9 +160,22 @@ impl Controller {
 
     /// r, R, f, F: queues these suites (only their failed tests with `failed_only`).
     pub fn run_tests(&mut self, keys: &[String], failed_only: bool) {
+        self.check_packages();
         let mut queued = Vec::new();
+        // Suites that can't run for want of packages: one line per folder, not one per suite.
+        let mut missing: Vec<(String, usize)> = Vec::new();
         for key in keys {
             let Some(suite) = self.suite(key) else { continue };
+            if suite.untested {
+                continue;
+            }
+            if let Some(problem) = suite.needs_packages.clone() {
+                match missing.iter_mut().find(|(known, _)| *known == problem) {
+                    Some((_, count)) => *count += 1,
+                    None => missing.push((problem, 1)),
+                }
+                continue;
+            }
             let failed: Vec<String> = suite
                 .tests
                 .iter()
@@ -162,9 +187,16 @@ impl Controller {
             }
             queued.extend(self.queue_suite(key, failed_only.then_some(failed)));
         }
+        for (problem, count) in &missing {
+            let suites = if *count == 1 { "1 suite".to_string() } else { format!("{count} suites") };
+            self.add_log(format!("{suites} can't run: {problem} - i installs the packages"), Hue::Yellow);
+        }
         if queued.is_empty() {
-            let why = if failed_only { "No failed tests to run again." } else { "Those tests are already running." };
-            self.add_log(why, Hue::DarkGray);
+            if missing.is_empty() {
+                let why =
+                    if failed_only { "No failed tests to run again." } else { "Those tests are already running." };
+                self.add_log(why, Hue::DarkGray);
+            }
             return;
         }
         let now = (self.now)();
@@ -687,8 +719,10 @@ mod tests {
         let setup = crate::run::controller::Setup { project, root: repo, paths, events, guard: None };
         let mut controller = Controller::new(setup).unwrap();
         controller.commands = Arc::new(Scripts);
-        let npm =
-            |name: &str| Suite::new(format!("npm:{name}"), name, Runner::Npm { dir: temp.join(name), vitest: false });
+        let npm = |name: &str| {
+            std::fs::create_dir_all(temp.join(name).join("node_modules")).unwrap(); // its packages are there
+            Suite::new(format!("npm:{name}"), name, Runner::Npm { dir: temp.join(name), vitest: false })
+        };
         controller.suites = Some(vec![npm("cart"), npm("checkout")]);
         (controller, rx)
     }
@@ -768,6 +802,27 @@ mod tests {
         let cart = sample.suite("npm:cart").unwrap();
         assert_eq!((cart.passed, cart.failed, cart.rerun.len()), (2, 0, 0));
         assert!(log(&sample).contains("✓ cart (1 test again) - 2 passed"), "{}", log(&sample));
+    }
+
+    #[tokio::test]
+    async fn suites_without_packages_are_said_once_and_untested_ones_never_run() {
+        let temp = TempDir::new("suites-packages");
+        let (mut sample, _events) = controller(&temp);
+        let nx = |name: &str| {
+            Suite::new(format!("nx:{name}"), name, Runner::Nx { workspace: temp.join("spa"), project: name.into() })
+        };
+        let mut empty = nx("models");
+        empty.untested = true;
+        sample.suites = Some(vec![nx("core"), nx("settings"), empty]);
+        sample.run_tests(&["nx:core".into(), "nx:settings".into(), "nx:models".into()], false);
+        assert!(!sample.tests_active(), "nothing queued");
+        let log = log(&sample);
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(lines.len(), 1, "one line for the folder: {lines:?}");
+        assert!(lines[0].starts_with("2 suites can't run: "), "{}", lines[0]);
+        assert!(lines[0].ends_with("has no node_modules - i installs the packages"), "{}", lines[0]);
+        assert!(sample.suite("nx:core").unwrap().needs_packages.is_some());
+        assert_eq!(sample.suite("nx:core").unwrap().status, Status::Idle, "not red");
     }
 
     #[tokio::test]

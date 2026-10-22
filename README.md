@@ -297,13 +297,18 @@ isn't among them); the full lines are still in each app's log file.
 
 ## Tests (`T`)
 
-`T` finds the project's test suites and shows them on the left, the selected one on the right:
+`T` finds the project's test suites and lists them on the left - the backend, then the frontend, and in each the
+profile's apps with their suites - the selected one on the right:
 
 - **.NET**: every project referencing `Microsoft.NET.Test.Sdk` (NUnit, xUnit and MSTest alike), run with `dotnet
   test`. The queued ones build together first, in one MSBuild run, so the projects they share build once; then they
   run side by side without building again. An app's build pauses that test build, which runs again after it.
 - **npm**: an npm app whose `test` script runs jest or vitest; in an Nx workspace, each project with tests (`nx test`).
   `npm ci` pauses the suites that run from its folder.
+
+A .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder
+it runs in; an app's `"tests"` in the profile (test project paths or names, Nx project names) says otherwise. Choose
+Backend, Frontend or an app and `r` (or a click on it - the pointer on one says so) runs all of its suites.
 
 `r` runs the selected suite, `R` all of them, `f` / `F` only their failed tests again (the results merge into the last
 full run's). Up to `testParallelism` suites run at once (half the cores by default), in the background: close the view

@@ -163,8 +163,8 @@ pub fn test_command(runner: &Runner, results: &Path, names: &[String]) -> Result
             Ok(Spec { program: dotnet(), args, dir, env: Vec::new() })
         }
         Runner::Npm { dir, vitest } => {
-            if !dir.join("node_modules").exists() {
-                bail!("{} has no node_modules - run npm ci (i) first", dir.display());
+            if let Some(problem) = packages_problem(runner) {
+                bail!("{problem} - i installs them");
             }
             let (program, mut args) = npm_launcher()?;
             args.extend(["test", "--"].map(OsString::from));
@@ -179,10 +179,9 @@ pub fn test_command(runner: &Runner, results: &Path, names: &[String]) -> Result
             Ok(Spec { program, args, dir: dir.clone(), env: Vec::new() })
         }
         Runner::Nx { workspace, project } => {
-            let nx = workspace.join("node_modules").join("nx").join("bin").join("nx.js");
-            if !nx.is_file() {
-                bail!("{} has no Nx in node_modules - run npm ci (i) first", workspace.display());
-            }
+            let Some(nx) = nx_script(workspace) else {
+                bail!("{} - i installs them", packages_problem(runner).unwrap_or_default());
+            };
             let Some(node) = find_on_path("node") else { bail!("node was not found on PATH - install Node.js") };
             let mut args: Vec<OsString> = vec![nx.into_os_string(), "test".into(), project.into()];
             args.extend(["--skip-nx-cache".into(), "--ci".into(), "--json".into(), output.into()]);
@@ -193,6 +192,29 @@ pub fn test_command(runner: &Runner, results: &Path, names: &[String]) -> Result
             Ok(Spec { program: node, args, dir: workspace.clone(), env })
         }
     }
+}
+
+/// Nx's command line in a workspace: where its package.json's `bin` says (Nx 16 and on: dist/bin/nx.js), else
+/// where older ones kept it.
+pub fn nx_script(workspace: &Path) -> Option<PathBuf> {
+    let package = workspace.join("node_modules").join("nx");
+    let manifest = crate::json::read(&package.join("package.json"));
+    let bin =
+        manifest.as_ref().and_then(|manifest| manifest["bin"].as_str().or_else(|| manifest["bin"]["nx"].as_str()));
+    bin.map(|bin| package.join(bin))
+        .into_iter()
+        .chain([package.join("dist").join("bin").join("nx.js"), package.join("bin").join("nx.js")])
+        .find(|script| script.is_file())
+}
+
+/// Why a suite can't run for want of packages (npm, Nx), if it can't.
+pub fn packages_problem(runner: &Runner) -> Option<String> {
+    let folder = runner.npm_dir()?;
+    if !folder.join("node_modules").exists() {
+        return Some(format!("{} has no node_modules", folder.display()));
+    }
+    let nx = matches!(runner, Runner::Nx { .. });
+    (nx && nx_script(folder).is_none()).then(|| format!("{} has no Nx in node_modules", folder.display()))
 }
 
 /// `dotnet build` of the MSBuild project that lists the test projects.
@@ -244,11 +266,26 @@ mod tests {
     }
 
     #[test]
+    fn nx_is_found_where_its_package_json_says_and_missing_packages_are_named() {
+        let dir = TempDir::new("nx-script");
+        let workspace = dir.join("spa");
+        let runner = Runner::Nx { workspace: workspace.clone(), project: "core".into() };
+        assert!(packages_problem(&runner).is_some_and(|why| why.ends_with("has no node_modules")));
+        write(workspace.join("node_modules/.package-lock.json"), "{}");
+        assert!(packages_problem(&runner).is_some_and(|why| why.ends_with("has no Nx in node_modules")));
+        write(workspace.join("node_modules/nx/package.json"), r#"{ "bin": { "nx": "./dist/bin/nx.js" } }"#);
+        write(workspace.join("node_modules/nx/dist/bin/nx.js"), "");
+        assert_eq!(nx_script(&workspace), Some(workspace.join("node_modules/nx/./dist/bin/nx.js")));
+        assert_eq!(packages_problem(&runner), None);
+    }
+
+    #[test]
     fn a_dotnet_app_runs_its_launch_profile_without_building() {
         let app = App {
             key: "orders".into(),
             name: "Orders".into(),
             icon: None,
+            tests: Vec::new(),
             kind: AppKind::Dotnet {
                 project: crate::profile::native("services/Orders/Orders.csproj"),
                 launch_profile: "Orders".into(),

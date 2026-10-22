@@ -53,11 +53,15 @@ impl Hit {
     }
 }
 
-/// The mouse events lazyrunner acts on (a moving pointer, drags and releases are dropped before anything redraws).
+/// The mouse events lazyrunner acts on: clicks, the wheel, and moves (for what the pointer is over); drags and
+/// releases are dropped before anything redraws.
 pub fn wanted(event: &MouseEvent) -> bool {
     matches!(
         event.kind,
-        MouseEventKind::Down(MouseButton::Left) | MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+        MouseEventKind::Down(MouseButton::Left)
+            | MouseEventKind::ScrollUp
+            | MouseEventKind::ScrollDown
+            | MouseEventKind::Moved
     )
 }
 
@@ -75,6 +79,8 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, event: MouseEvent) -> bo
     let target = target_at(ui, x, y);
     ui.pending_g = None;
     match event.kind {
+        // Only a move onto something else redraws.
+        MouseEventKind::Moved => return std::mem::replace(&mut ui.hover, target) != target,
         MouseEventKind::ScrollUp => wheel(ui, controller, target, 1),
         MouseEventKind::ScrollDown => wheel(ui, controller, target, -1),
         MouseEventKind::Down(MouseButton::Left) => {

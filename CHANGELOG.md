@@ -3,6 +3,17 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.16.0] - 2026-10-22
+
+### Added
+- The tests view groups its suites: Backend and Frontend, and in each the profile's apps with their suites. A .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in; an app's new `"tests"` in the profile names its suites when that guess is wrong. `r` on Backend, Frontend or an app runs all of its suites, and so does a click - the mouse pointer on one says so
+
+### Fixed
+- In the tests and requests views the keys they don't use work as they do on the columns again: `,` opens the settings, `?` the key reference, `:` the command palette, `d` the database picker, and so on
+- Nx test suites run with Nx 16 and later (lazyrunner looked for Nx's script where older versions kept it, said "run npm ci first" though the packages were there, and didn't stop the Nx daemon before npm ci)
+- Only real test files (`*.spec.ts`, `*.test.js`, ...) make an Nx project a suite - not its `tsconfig.spec.json`; projects with a test target but no test files show as one dim line, with nothing to run
+- Suites whose packages are missing say "needs packages" and stay as they were, with one line in the log per folder instead of a red "didn't start" for each suite
+
 ## [0.15.0] - 2026-10-22
 
 ### Added

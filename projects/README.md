@@ -107,6 +107,7 @@ An ASP.NET (or any dotnet run) project. lazyrunner builds it with dotnet build, 
 | `project` | path | yes | The .csproj to build and run. Example: `"services/Orders/Orders.csproj"`. |
 | `launchProfile` | string | yes | A profile in the project's Properties/launchSettings.json. Its applicationUrl gives the port. Example: `"Orders"`. |
 | `swagger` | string |  | Optional. The Swagger UI path: lazyrunner probes <swagger>/index.html for the response time, and w opens it. Without it lazyrunner probes /. Example: `"/swagger"`. |
+| `tests` | array of strings |  | Optional. Test suites that belong to this app in the tests view (T), whatever lazyrunner works out: .NET test projects by path from the repo root or by name, Nx projects by name. Without it a .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in. Example: `["tests/Orders.Tests/Orders.Tests.csproj"]`. |
 
 #### An npm app ("type": "npm")
 
@@ -120,6 +121,7 @@ A folder with package.json, run with npm run <script>. It needs no build from la
 | `type` | `"npm"` | yes | The app type: what lazyrunner does with the app follows from it. |
 | `dir` | path | yes | The folder with package.json. Example: `"web/shop"`. |
 | `variants` | array of objects | yes | How it runs, chosen again on every start: the first variant whose when.packageScript package.json has. One without when always applies, so only the last can leave it out. Example: `[{"script":"dev","port":5173}]`. |
+| `tests` | array of strings |  | Optional. Test suites that belong to this app in the tests view (T), whatever lazyrunner works out: .NET test projects by path from the repo root or by name, Nx projects by name. Without it a .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in. Example: `["admin","shared-ui"]`. |
 
 #### A dev-server variant
 

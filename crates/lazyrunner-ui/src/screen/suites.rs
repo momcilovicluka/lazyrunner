@@ -39,52 +39,182 @@ const FRAMEWORK: [&str; 7] =
 /// T: opens the view and looks for the suites (again, to find new ones).
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
     controller.find_suites();
-    ui.overlay = Some(Overlay::Tests { index: 0, scroll: 0, picking: None });
+    ui.overlay = Some(Overlay::Tests { index: FIRST_SUITE, scroll: 0, picking: None });
+}
+
+/// The selection when the view opens: the first suite (once there is a list).
+const FIRST_SUITE: usize = usize::MAX;
+
+/// A row of the list: a side (Backend, Frontend), one of its apps (or the suites of no app), or a suite (by its
+/// place among the suites).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Row {
+    Side {
+        backend: bool,
+    },
+    App {
+        backend: bool,
+        app: Option<String>,
+    },
+    Suite(usize),
+    /// An app's projects with a test target but no test files, as one row.
+    Untested {
+        backend: bool,
+        app: Option<String>,
+    },
+}
+
+/// The list: the backend, then the frontend; in each, the profile's apps in their order (then the suites of no
+/// app), each with its suites.
+pub fn list_rows(controller: &Controller) -> Vec<Row> {
+    let suites = controller.suites.as_deref().unwrap_or_default();
+    let owner = |suite: &Suite| suite.app.clone().filter(|key| controller.app(key).is_some());
+    let mut rows = Vec::new();
+    for backend in [true, false] {
+        let side: Vec<usize> = (0..suites.len()).filter(|&at| suites[at].runner.backend() == backend).collect();
+        if side.is_empty() {
+            continue;
+        }
+        rows.push(Row::Side { backend });
+        for app in controller.apps.iter().map(|app| Some(app.key.clone())).chain([None]) {
+            let mine: Vec<usize> = side.iter().copied().filter(|&at| owner(&suites[at]) == app).collect();
+            if mine.is_empty() {
+                continue;
+            }
+            let (tested, untested): (Vec<usize>, Vec<usize>) = mine.into_iter().partition(|&at| !suites[at].untested);
+            rows.push(Row::App { backend, app: app.clone() });
+            rows.extend(tested.into_iter().map(Row::Suite));
+            if !untested.is_empty() {
+                rows.push(Row::Untested { backend, app });
+            }
+        }
+    }
+    rows
+}
+
+/// The selection, in the list: the first suite at first, never past the end.
+fn chosen(index: &mut usize, rows: &[Row]) -> usize {
+    if *index == FIRST_SUITE && !rows.is_empty() {
+        *index = rows.iter().position(|row| matches!(row, Row::Suite(_))).unwrap_or(0);
+    }
+    *index = (*index).min(rows.len().saturating_sub(1));
+    *index
+}
+
+/// The suites of a row: the suite, or every suite under a side or an app.
+fn under(controller: &Controller, rows: &[Row], at: usize) -> Vec<String> {
+    let suites = controller.suites.as_deref().unwrap_or_default();
+    let ends = |row: &Row| match rows.get(at) {
+        Some(Row::Side { .. }) => matches!(row, Row::Side { .. }),
+        Some(Row::App { .. }) => !matches!(row, Row::Suite(_)),
+        _ => true,
+    };
+    let range: Vec<&Row> = match rows.get(at) {
+        Some(Row::Suite(_)) => vec![&rows[at]],
+        Some(_) => rows[at + 1..].iter().take_while(|row| !ends(row)).collect(),
+        None => Vec::new(),
+    };
+    range
+        .into_iter()
+        .filter_map(|row| match row {
+            Row::Suite(index) => suites.get(*index).map(|suite| suite.key.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The names of an Untested row's projects.
+fn untested(controller: &Controller, row: &Row) -> Vec<String> {
+    let Row::Untested { backend, app } = row else { return Vec::new() };
+    let owner = |suite: &Suite| suite.app.clone().filter(|key| controller.app(key).is_some());
+    let suites = controller.suites.as_deref().unwrap_or_default();
+    suites
+        .iter()
+        .filter(|suite| suite.untested && suite.runner.backend() == *backend && owner(suite) == *app)
+        .map(|suite| suite.name.clone())
+        .collect()
+}
+
+/// What a side or app row says: "Backend · dotnet test", "Orders", "Other".
+fn title(controller: &Controller, row: &Row) -> String {
+    let suites = controller.suites.as_deref().unwrap_or_default();
+    match row {
+        Row::Side { backend: true } => "Backend · dotnet test".into(),
+        Row::Side { backend: false } => {
+            let mut runners: Vec<&str> = Vec::new();
+            for suite in suites.iter().filter(|suite| !suite.runner.backend()) {
+                let runner = suite.runner.group().rsplit(" · ").next().unwrap_or_default();
+                if !runners.contains(&runner) {
+                    runners.push(runner);
+                }
+            }
+            format!("Frontend · {}", runners.join(" · "))
+        }
+        Row::App { app: Some(key), .. } => controller.app(key).map_or_else(|| key.clone(), |app| app.name.clone()),
+        Row::App { app: None, .. } => "Other".into(),
+        Row::Suite(at) => suites.get(*at).map(|suite| suite.name.clone()).unwrap_or_default(),
+        Row::Untested { .. } => {
+            let count = untested(controller, row).len();
+            format!("{count} project{} without test files", if count == 1 { "" } else { "s" })
+        }
+    }
 }
 
 /// j k choose, l its tests (pick one), r / Enter run it, R run all, f / F the failed tests again, s stop, o its log,
-/// y copy its failures, Ctrl+d / Ctrl+u scroll, Esc / q / T back.
-pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
+/// y copy its failures, Ctrl+d / Ctrl+u scroll, Esc / q / T back; false for a key it doesn't use.
+pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     if matches!(ui.overlay, Some(Overlay::Tests { picking: Some(_), .. })) && pick_key(ui, controller, name) {
-        return;
+        return true;
     }
-    let Some(Overlay::Tests { index, scroll, picking }) = &mut ui.overlay else { return };
+    let rows = list_rows(controller);
+    let Some(Overlay::Tests { index, scroll, picking }) = &mut ui.overlay else { return false };
+    let at = chosen(index, &rows);
     let all: Vec<String> = controller.suites.iter().flatten().map(|suite| suite.key.clone()).collect();
-    let selected: Vec<String> = all.get(*index).cloned().into_iter().collect();
+    let selected = under(controller, &rows, at);
+    let a_suite = matches!(rows.get(at), Some(Row::Suite(_)));
+    let label = rows.get(at).map(|row| title(controller, row)).unwrap_or_default();
     match name {
         "Escape" | "q" | "T" => ui.overlay = None,
         "j" | "DownArrow" => {
-            *index = (*index + 1).min(all.len().saturating_sub(1));
+            *index = (at + 1).min(rows.len().saturating_sub(1));
             *scroll = 0;
         }
         "k" | "UpArrow" => {
-            *index = index.saturating_sub(1);
+            *index = at.saturating_sub(1);
             *scroll = 0;
         }
         "l" | "RightArrow" | "Tab" => match selected.first().and_then(|key| controller.suite(key)) {
-            Some(suite) if suite.total() > 0 => *picking = Some(0),
+            Some(suite) if a_suite && suite.total() > 0 => *picking = Some(0),
+            _ if !a_suite => controller.add_log("Choose a suite to pick one of its tests.", Hue::DarkGray),
             _ => controller.add_log("No results for this suite yet - r runs it.", Hue::DarkGray),
         },
         "g" | "Home" => *scroll = 0,
         "Ctrl+D" | "PageDown" => *scroll += PAGE,
         "Ctrl+U" | "PageUp" => *scroll = scroll.saturating_sub(PAGE),
+        "r" | "Enter" | "f" if selected.is_empty() => {
+            controller.add_log("Nothing to run here: these projects have no test files.", Hue::DarkGray);
+        }
         "r" | "Enter" => controller.run_tests(&selected, false),
         "R" => controller.run_tests(&all, false),
         "f" => controller.run_tests(&selected, true),
         "F" => controller.run_tests(&all, true),
         "s" if controller.tests_active() => controller.stop_tests(false),
         "s" => controller.add_log("No tests are running.", Hue::DarkGray),
+        "o" if !a_suite => controller.add_log("o opens a suite's log - choose one.", Hue::DarkGray),
         "o" => open_log(ui, controller, selected.first()),
-        "y" => copy_failures(ui, controller, selected.first()),
-        _ => {}
+        "y" => copy_failures(ui, controller, &selected, &label),
+        _ => return false,
     }
+    true
 }
 
 /// Picking a test (l): j k choose, r / Enter run it, y copy it, h / Esc / Tab back to the suites; false for the
 /// keys the suites handle (s, o, R, ...).
 fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
+    let rows = list_rows(controller);
     let Some(Overlay::Tests { index, picking, .. }) = &mut ui.overlay else { return false };
-    let Some(suite) = controller.suites.as_deref().and_then(|suites| suites.get(*index)) else { return false };
+    let Some(Row::Suite(at)) = rows.get(chosen(index, &rows)) else { return false };
+    let Some(suite) = controller.suites.as_deref().and_then(|suites| suites.get(*at)) else { return false };
     let names: Vec<String> = test_list(suite).iter().map(|test| test.name.clone()).collect();
     let key = suite.key.clone();
     let last = names.len().saturating_sub(1);
@@ -112,17 +242,19 @@ fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     true
 }
 
-/// A click on a suite selects it (and leaves its tests), on a test picks it; a double click runs it.
+/// A click on a side or an app runs its suites; on a suite it selects it (and leaves its tests), on a test it picks
+/// it, and a double click runs it.
 pub fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool) -> bool {
+    let rows = list_rows(controller);
     let Some(Overlay::Tests { index, scroll, picking }) = &mut ui.overlay else { return false };
+    let header = matches!(target, Some(Target::Item(at)) if !matches!(rows.get(at), Some(Row::Suite(_))));
     match target {
-        Some(Target::Item(at)) => {
-            (*index, *scroll, *picking) = (at, 0, None);
-        }
+        Some(Target::Item(at)) => (*index, *scroll, *picking) = (at, 0, None),
         Some(Target::Test(at)) => *picking = Some(at),
         _ => return false,
     }
-    if double {
+    // A header runs on the first click (the second of a double click would only say it already runs).
+    if header != double {
         key(ui, controller, "Enter");
     }
     true
@@ -177,12 +309,16 @@ fn open_log(ui: &Ui, controller: &mut Controller, key: Option<&String>) {
     }
 }
 
-/// y: every failure of the selected suite - name, message, stack - ready to paste.
-fn copy_failures(ui: &Ui, controller: &mut Controller, key: Option<&String>) {
-    let Some(suite) = key.and_then(|key| controller.suite(key)) else { return };
-    let failed: Vec<&TestResult> = suite.tests.iter().filter(|test| test.outcome == Outcome::Failed).collect();
+/// y: every failure of the selected suite (or of the suites under a side or an app) - name, message, stack -
+/// ready to paste.
+fn copy_failures(ui: &Ui, controller: &mut Controller, keys: &[String], label: &str) {
+    let failed: Vec<&TestResult> = keys
+        .iter()
+        .filter_map(|key| controller.suite(key))
+        .flat_map(|suite| suite.tests.iter().filter(|test| test.outcome == Outcome::Failed))
+        .collect();
     if failed.is_empty() {
-        let text = format!("Nothing to copy: no failed tests in {}.", suite.name);
+        let text = format!("Nothing to copy: no failed tests in {label}.");
         controller.add_log(text, Hue::DarkGray);
         return;
     }
@@ -195,7 +331,7 @@ fn copy_failures(ui: &Ui, controller: &mut Controller, key: Option<&String>) {
         })
         .collect::<Vec<_>>()
         .join(&copy::NEWLINE.repeat(2));
-    let what = format!("{} failed test{} from {}", failed.len(), if failed.len() == 1 { "" } else { "s" }, suite.name);
+    let what = format!("{} failed test{} from {label}", failed.len(), if failed.len() == 1 { "" } else { "s" });
     copy::put(ui.clipboard, controller, &text, &what);
 }
 
@@ -207,23 +343,28 @@ fn took(test: &TestResult) -> String {
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let suites = controller.suites.as_deref().unwrap_or_default();
+    let list_rows = list_rows(controller);
     let Some(Overlay::Tests { index, picking, .. }) = &mut ui.overlay else { return Vec::new() };
-    *index = (*index).min(suites.len().saturating_sub(1));
-    let selected = *index;
+    let selected = chosen(index, &list_rows);
+    let suite = match list_rows.get(selected) {
+        Some(Row::Suite(at)) => suites.get(*at),
+        _ => None,
+    };
     // Picking a test while the suite has some (a run can leave it none).
-    let total = suites.get(selected).map_or(0, Suite::total);
+    let total = suite.map_or(0, Suite::total);
     *picking = picking.filter(|_| total > 0).map(|at| at.min(total.saturating_sub(1)));
     let picking = *picking;
     let list_width = (width * 2 / 5).clamp(LIST_WIDTH.0, LIST_WIDTH.1).min(width.saturating_sub(20));
     let detail_width = width.saturating_sub(list_width + 2);
     let height = rows.saturating_sub(2);
-    let (list, at) = list(ui, suites, selected, list_width);
-    let list_top = at.saturating_sub(height / 2).min(list.len().saturating_sub(height));
-    let (detail, tail) = match (suites.get(selected), picking) {
+    let list = list(ui, controller, &list_rows, selected, list_width);
+    let list_top = selected.saturating_sub(height / 2).min(list.len().saturating_sub(height));
+    let (detail, tail) = match (suite, picking) {
         (Some(suite), Some(at)) => (pick(ui, suite, at, detail_width, height), false),
         (Some(suite), None) => details(ui, controller, suite, detail_width),
         (None, _) if controller.suites.is_none() => (vec![vec![seg("Looking for tests…", C::DarkGray)]], false),
-        (None, _) => (vec![vec![seg("No test suites in this project.", C::DarkGray)]], false),
+        (None, _) if list_rows.is_empty() => (vec![vec![seg("No test suites in this project.", C::DarkGray)]], false),
+        (None, _) => (group(ui, controller, &list_rows, selected), false),
     };
     let most = detail.len().saturating_sub(height);
     let detail_top = match &mut ui.overlay {
@@ -247,7 +388,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
 }
 
 fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
-    let count = controller.suites.as_ref().map_or(0, Vec::len);
+    let count = controller.suites.iter().flatten().filter(|suite| !suite.untested).count();
     let totals = controller.test_totals();
     let (summary, color) = if let Some(running) = status(controller) {
         let building = if controller.test_build.is_some() { " · building" } else { "" };
@@ -273,8 +414,8 @@ fn hint(width: usize, picking: bool) -> Vec<Seg> {
     let text = if picking {
         " j k choose a test · r run it · y copy it · f failed again · s stop · h back to the suites"
     } else {
-        " j k choose · l its tests (run one) · r run · R run all · f / F failed again · s stop · o log · y copy \
-         failures · ^d ^u scroll · Esc back"
+        " j k choose · r run it (a side or an app: all of it) · R run all · l its tests · f / F failed again · s \
+         stop · o log · y copy failures · Esc back"
     };
     fit(vec![seg(text, C::DarkGray)], width)
 }
@@ -335,34 +476,119 @@ fn end_of(text: &str, cells: usize) -> String {
     format!("…{rest}")
 }
 
-/// The list's rows, grouped by what runs the suites, and the selected suite's row.
-fn list(ui: &Ui, suites: &[Suite], selected: usize, width: usize) -> (Vec<Vec<Seg>>, usize) {
-    let mut rows = Vec::new();
-    let mut at = 0;
-    let mut group = "";
-    for (index, suite) in suites.iter().enumerate() {
-        if suite.runner.group() != group {
-            group = suite.runner.group();
-            rows.push(vec![seg(format!(" {group}"), C::DarkCyan)]);
-        }
-        let summary = summary(suite);
-        let room = width.saturating_sub(summary.chars().count() + 7).max(4);
-        let name = if suite.name.chars().count() > room {
-            format!("{}…", take_cells(&suite.name, room - 1))
-        } else {
-            pad(&suite.name, room)
+/// The list's rows: sides and apps (the pointer on one says a click runs it), and suites.
+fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: usize) -> Vec<Vec<Seg>> {
+    let suites = controller.suites.as_deref().unwrap_or_default();
+    let mut out = Vec::new();
+    for (index, row) in rows.iter().enumerate() {
+        let hovered = ui.hover == Some(Target::Item(index)) && index != selected;
+        let line = match row {
+            Row::Suite(at) => {
+                let Some(suite) = suites.get(*at) else { continue };
+                let summary = summary(suite);
+                let room = width.saturating_sub(summary.chars().count() + 9).max(4);
+                let name = pad(&cut(&suite.name, room), room);
+                let icon = icon(ui, suite.status);
+                if index == selected {
+                    vec![on(pad(&format!("   ▸ {icon} {name} {summary}"), width), C::FocusText, C::FocusBack)]
+                } else {
+                    let color = tone(suite);
+                    let name_color = if hovered { C::White } else { C::Gray };
+                    vec![seg(format!("     {icon} "), color), seg(format!("{name} "), name_color), seg(summary, color)]
+                }
+            }
+            Row::Untested { .. } => {
+                let text = format!("     {}", title(controller, row));
+                if index == selected {
+                    vec![on(pad(&text, width), C::FocusText, C::FocusBack)]
+                } else {
+                    vec![seg(text, C::DarkGray)]
+                }
+            }
+            header => {
+                let keys = under(controller, rows, index);
+                let (summary, color) = group_summary(controller, &keys);
+                let summary = if hovered { "▶ click to run".to_string() } else { summary };
+                let indent = if matches!(header, Row::Side { .. }) { " " } else { "   " };
+                let room = width.saturating_sub(summary.chars().count() + indent.len() + 2).max(4);
+                let name = pad(&cut(&title(controller, header), room), room);
+                if index == selected {
+                    vec![on(pad(&format!("{indent}{name} {summary}"), width), C::FocusText, C::FocusBack)]
+                } else {
+                    let tone = if matches!(header, Row::Side { .. }) { C::DarkCyan } else { C::Cyan };
+                    let mut name = seg(format!("{indent}{name} "), if hovered { C::White } else { tone });
+                    name.underline = hovered;
+                    vec![name, seg(summary, if hovered { C::White } else { color })]
+                }
+            }
         };
-        let icon = icon(ui, suite.status);
-        let row = if index == selected {
-            at = rows.len();
-            vec![on(pad(&format!(" ▸ {icon} {name} {summary}"), width), C::FocusText, C::FocusBack)]
-        } else {
-            let color = color(suite.status);
-            vec![seg(format!("   {icon} "), color), seg(format!("{name} "), C::Gray), seg(summary, color)]
-        };
-        rows.push(aim(row, Target::Item(index)));
+        out.push(aim(line, Target::Item(index)));
     }
-    (rows, at)
+    out
+}
+
+/// Cut to `cells`, with "…" when it was longer.
+fn cut(text: &str, cells: usize) -> String {
+    if text.chars().count() > cells { format!("{}…", take_cells(text, cells.saturating_sub(1))) } else { text.into() }
+}
+
+/// What a side or app row says about its suites: running, failed, passed, or not run.
+fn group_summary(controller: &Controller, keys: &[String]) -> (String, C) {
+    let suites: Vec<&Suite> = keys.iter().filter_map(|key| controller.suite(key)).collect();
+    let running = suites.iter().filter(|suite| suite.is_active()).count();
+    let unpacked = suites.iter().filter(|suite| suite.needs_packages.is_some()).count();
+    let failed: usize = suites.iter().map(|suite| suite.failed).sum();
+    let errors = suites.iter().filter(|suite| suite.status == Status::Error).count();
+    let passed: usize = suites.iter().map(|suite| suite.passed).sum();
+    if running > 0 {
+        (format!("{running} running"), C::Yellow)
+    } else if unpacked > 0 {
+        ("needs packages".into(), C::Yellow)
+    } else if failed > 0 {
+        (format!("{failed} failed"), C::Red)
+    } else if errors > 0 {
+        (format!("{errors} didn't run"), C::Red)
+    } else if suites.iter().any(|suite| suite.last_run.is_some()) {
+        (format!("{passed} passed"), C::Green)
+    } else {
+        ("not run".into(), C::DarkGray)
+    }
+}
+
+/// A side or an app selected: its suites and how they did.
+fn group(ui: &Ui, controller: &Controller, rows: &[Row], at: usize) -> Vec<Vec<Seg>> {
+    if let Some(row @ Row::Untested { .. }) = rows.get(at) {
+        let mut lines = vec![
+            vec![seg(title(controller, row), C::White)],
+            vec![seg("A test target, but no *.spec.* or *.test.* files: nothing to run.", C::DarkGray)],
+            Vec::new(),
+        ];
+        lines.extend(untested(controller, row).into_iter().map(|name| vec![seg(format!("· {name}"), C::DarkGray)]));
+        return lines;
+    }
+    let keys = under(controller, rows, at);
+    let label = rows.get(at).map(|row| title(controller, row)).unwrap_or_default();
+    let count = keys.len();
+    let mut lines = vec![
+        vec![seg(label, C::White)],
+        vec![seg(
+            format!(
+                "{count} suite{} · r runs them all · f their failed tests again",
+                if count == 1 { "" } else { "s" }
+            ),
+            C::DarkGray,
+        )],
+        Vec::new(),
+    ];
+    for suite in keys.iter().filter_map(|key| controller.suite(key)) {
+        let color = tone(suite);
+        lines.push(vec![
+            seg(format!("{} ", icon(ui, suite.status)), color),
+            seg(format!("{}  ", suite.name), C::Gray),
+            seg(summary(suite), color),
+        ]);
+    }
+    lines
 }
 
 fn icon(ui: &Ui, status: Status) -> String {
@@ -378,6 +604,11 @@ fn icon(ui: &Ui, status: Status) -> String {
     }
 }
 
+/// A suite's colour in the list: its status's, yellow while it needs packages.
+fn tone(suite: &Suite) -> C {
+    if suite.needs_packages.is_some() && !suite.is_active() { C::Yellow } else { color(suite.status) }
+}
+
 fn color(status: Status) -> C {
     match status {
         Status::Idle | Status::Queued => C::DarkGray,
@@ -389,6 +620,9 @@ fn color(status: Status) -> C {
 
 /// What the list says about a suite.
 fn summary(suite: &Suite) -> String {
+    if suite.needs_packages.is_some() && !suite.is_active() {
+        return "needs packages".into();
+    }
     match suite.status {
         Status::Idle => "not run".into(),
         Status::Queued if suite.note.is_empty() => "queued".into(),
@@ -412,6 +646,9 @@ fn details(ui: &mut Ui, controller: &Controller, suite: &Suite, width: usize) ->
         .map_or(String::new(), |at| format!("last run {} · {}", at.format("%H:%M:%S"), format_duration(suite.seconds)));
     let mut out = Details { ui, lines: Vec::new(), width };
     out.lines.push(vec![seg(suite.name.clone(), C::White), seg(format!("   {}", suite.runner.group()), C::DarkGray)]);
+    if let Some(problem) = suite.needs_packages.as_ref().filter(|_| !suite.is_active()) {
+        out.add(&format!("! {problem} - i installs the packages"), C::Yellow, 0);
+    }
     match suite.status {
         Status::Running => {
             let only = match suite.rerun.as_slice() {

@@ -205,6 +205,7 @@ impl Controller {
                 );
             }
             NpmCiEnd::Ok => {
+                self.check_packages();
                 let stamp =
                     serde_json::json!({ "root": self.root.display().to_string(), "lockHash": self.lock_hash(&key) });
                 let _ = crate::config::write(&self.npm_ci_stamp(&key), &stamp);
@@ -231,8 +232,8 @@ enum NpmCiEnd {
 /// Workspace tools can leave a daemon running from node_modules (Nx does), which keeps files locked while npm ci
 /// replaces them; stop it first when there is one.
 fn stop_nx_daemon(dir: &Path) {
-    let nx = dir.join("node_modules").join("nx").join("bin").join("nx.js");
-    let Some(node) = tools::find_on_path("node").filter(|_| nx.is_file()) else { return };
+    let Some(nx) = tools::nx_script(dir) else { return };
+    let Some(node) = tools::find_on_path("node") else { return };
     let mut command = std::process::Command::new(node);
     command.arg(nx).args(["daemon", "--stop"]).current_dir(dir);
     command.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());

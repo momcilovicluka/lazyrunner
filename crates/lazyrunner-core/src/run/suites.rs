@@ -5,6 +5,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use std::time::Instant;
 
 use serde_json::Value;
@@ -40,6 +41,8 @@ const WHOLE_FILE: &str = " (whole file)";
 const SEARCH_BUDGET: usize = 200_000;
 /// What a .NET test project references.
 const TEST_SDK: &str = "Microsoft.NET.Test.Sdk";
+/// What a test file is written in: `*.spec.ts`, `*.test.jsx`, ... (not `tsconfig.spec.json`).
+const CODE: [&str; 8] = ["ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts"];
 /// npm's default `test` script: there are no tests.
 const NO_TESTS: &str = "no test specified";
 
@@ -63,6 +66,11 @@ impl Runner {
             Runner::Npm { vitest: true, .. } => "npm · vitest",
             Runner::Nx { .. } => "Nx · nx test",
         }
+    }
+
+    /// A backend suite (.NET), not a frontend one (npm, Nx).
+    pub fn backend(&self) -> bool {
+        matches!(self, Runner::Dotnet { .. })
     }
 
     /// The npm folder it runs from (npm ci there rewrites what it needs).
@@ -120,6 +128,12 @@ pub struct Suite {
     pub key: String,
     pub name: String,
     pub runner: Runner,
+    /// The app it belongs to (its key).
+    pub app: Option<String>,
+    /// An Nx project with a test target but no test files: nothing to run.
+    pub untested: bool,
+    /// Why it can't run for want of packages (no node_modules, no Nx in them), when it can't.
+    pub needs_packages: Option<String>,
     pub status: Status,
     /// What it was before it was queued: a stop puts it back.
     pub before: Status,
@@ -154,6 +168,9 @@ impl Suite {
             key: key.into(),
             name: name.into(),
             runner,
+            app: None,
+            untested: false,
+            needs_packages: None,
             status: Status::Idle,
             before: Status::Idle,
             note: String::new(),
@@ -300,7 +317,71 @@ pub fn discover(root: &Path, apps: &[App]) -> Vec<Suite> {
             }
         }
     }
+    for suite in &mut suites {
+        suite.app = owner(root, apps, suite);
+    }
     suites
+}
+
+/// The app a suite belongs to: the one whose `"tests"` name it, else the .NET app its project references, else the
+/// npm app whose folder it runs in.
+fn owner(root: &Path, apps: &[App], suite: &Suite) -> Option<String> {
+    let listed = apps.iter().find(|app| app.tests.iter().any(|test| answers_to(root, suite, test)));
+    let found = listed.or_else(|| match &suite.runner {
+        Runner::Dotnet { project } => {
+            let referenced = references(project);
+            apps.iter().find(|app| match &app.kind {
+                AppKind::Dotnet { project: own, .. } => referenced.contains(&same(&root.join(own))),
+                AppKind::Npm { .. } => false,
+            })
+        }
+        Runner::Npm { dir: folder, .. } | Runner::Nx { workspace: folder, .. } => {
+            apps.iter().find(|app| match &app.kind {
+                AppKind::Npm { dir, .. } => same(&root.join(dir)) == same(folder),
+                AppKind::Dotnet { .. } => false,
+            })
+        }
+    });
+    found.map(|app| app.key.clone())
+}
+
+/// Whether a `"tests"` entry names the suite: by its name (a .NET test project's, an Nx project's), or by its
+/// project's or folder's path from the repo root.
+fn answers_to(root: &Path, suite: &Suite, entry: &str) -> bool {
+    let entry = entry.trim().replace('\\', "/");
+    let path = match &suite.runner {
+        Runner::Dotnet { project } => Some(project),
+        Runner::Npm { dir, .. } => Some(dir),
+        Runner::Nx { .. } => None,
+    };
+    let relative =
+        path.and_then(|path| path.strip_prefix(root).ok()).map(|path| path.to_string_lossy().replace('\\', "/"));
+    suite.name.eq_ignore_ascii_case(&entry) || relative.is_some_and(|relative| relative.eq_ignore_ascii_case(&entry))
+}
+
+/// The projects a .csproj references (`same` paths).
+fn references(project: &Path) -> Vec<String> {
+    static REFERENCE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r#"<ProjectReference\s[^>]*Include\s*=\s*"([^"]+)""#).expect("a valid pattern")
+    });
+    let Ok(text) = std::fs::read_to_string(project) else { return Vec::new() };
+    let dir = project.parent().unwrap_or(Path::new(""));
+    REFERENCE.captures_iter(&text).map(|found| same(&dir.join(found[1].replace('\\', "/")))).collect()
+}
+
+/// A path as it compares with another: `..` and `.` resolved, one kind of slash, any case.
+fn same(path: &Path) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for part in path.components() {
+        match part {
+            std::path::Component::ParentDir => {
+                parts.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => parts.push(other.as_os_str().to_string_lossy().to_lowercase()),
+        }
+    }
+    parts.join("/")
 }
 
 /// An npm app's tests, when its `test` script runs jest or vitest (other runners leave no results to read).
@@ -324,13 +405,14 @@ fn nx_suites(workspace: &Path) -> Vec<Suite> {
         let name = path.file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
         if name == "project.json" {
             projects.extend(path.parent().map(Path::to_path_buf));
-        } else if [".spec.", ".test."].iter().any(|part| name.contains(part)) {
+        } else if [".spec.", ".test."].iter().any(|part| name.contains(part))
+            && path.extension().is_some_and(|extension| CODE.iter().any(|code| extension.eq_ignore_ascii_case(code)))
+        {
             specs.push(path.to_path_buf());
         }
     });
     let mut suites: Vec<Suite> = projects
         .into_iter()
-        .filter(|dir| specs.iter().any(|spec| spec.starts_with(dir)))
         .filter_map(|dir| {
             let project = json::read(&dir.join("project.json"))?;
             let name = project["name"].as_str()?.to_string();
@@ -339,7 +421,9 @@ fn nx_suites(workspace: &Path) -> Vec<Suite> {
             (project["targets"].get("test").is_some() || jest_config).then(|| {
                 let key = format!("nx:{}:{name}", workspace.display());
                 let runner = Runner::Nx { workspace: workspace.to_path_buf(), project: name.clone() };
-                Suite::new(key, name, runner)
+                let mut suite = Suite::new(key, name, runner);
+                suite.untested = !specs.iter().any(|spec| spec.starts_with(&dir));
+                suite
             })
         })
         .collect();
@@ -642,7 +726,8 @@ mod tests {
         let temp = TempDir::new("suites-discover");
         let root = temp.path();
         let sdk = r#"<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" /></ItemGroup></Project>"#;
-        write(root.join("tests/Shop.Tests/Shop.Tests.csproj"), sdk);
+        let tests = r#"<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" /><ProjectReference Include="..\..\services\Shop\Shop.csproj" /></ItemGroup></Project>"#;
+        write(root.join("tests/Shop.Tests/Shop.Tests.csproj"), tests);
         write(root.join("services/Shop/Shop.csproj"), r#"<Project Sdk="Microsoft.NET.Sdk.Web" />"#);
         write(root.join("node_modules/x/X.Tests.csproj"), sdk);
         write(root.join("web/shop/package.json"), r#"{ "scripts": { "test": "vitest run" } }"#);
@@ -654,16 +739,43 @@ mod tests {
         write(root.join("web/nx/apps/admin/project.json"), r#"{ "name": "admin", "targets": { "test": {} } }"#);
         write(root.join("web/nx/apps/admin/src/a.spec.ts"), "");
         write(root.join("web/nx/libs/ui/project.json"), r#"{ "name": "ui", "targets": { "test": {} } }"#);
+        write(root.join("web/nx/libs/ui/tsconfig.spec.json"), "{}"); // a config, not a test
         let npm = |key: &str, dir: &str| App {
             key: key.into(),
             name: key.into(),
             icon: None,
+            tests: Vec::new(),
             kind: AppKind::Npm { dir: dir.into(), variants: Vec::new() },
         };
-        let apps = [npm("shop", "web/shop"), npm("docs", "web/docs"), npm("admin", "web/nx")];
-        let found: Vec<(String, &str)> =
-            discover(root, &apps).iter().map(|suite| (suite.name.clone(), suite.runner.group())).collect();
-        let expected = [("Shop.Tests", ".NET · dotnet test"), ("shop", "npm · vitest"), ("admin", "Nx · nx test")];
-        assert_eq!(found, expected.map(|(name, group)| (name.to_string(), group)), "no tests in ui, none in docs");
+        let api = App {
+            key: "api".into(),
+            name: "Api".into(),
+            icon: None,
+            tests: Vec::new(),
+            kind: AppKind::Dotnet {
+                project: "services/Shop/Shop.csproj".into(),
+                launch_profile: "Api".into(),
+                swagger: None,
+            },
+        };
+        let mut docs = npm("docs", "web/docs");
+        docs.tests = vec!["Admin".into()]; // the profile says so, whatever the folder
+        let apps = [api, npm("shop", "web/shop"), docs, npm("admin", "web/nx")];
+        let suites = discover(root, &apps);
+        let untested: Vec<&str> =
+            suites.iter().filter(|suite| suite.untested).map(|suite| suite.name.as_str()).collect();
+        assert_eq!(untested, ["ui"], "a test target, no test files");
+        let found: Vec<(String, &str, Option<String>)> = suites
+            .iter()
+            .filter(|suite| !suite.untested)
+            .map(|suite| (suite.name.clone(), suite.runner.group(), suite.app.clone()))
+            .collect();
+        let expected = [
+            ("Shop.Tests", ".NET · dotnet test", "api"),
+            ("shop", "npm · vitest", "shop"),
+            ("admin", "Nx · nx test", "docs"),
+        ];
+        let expected = expected.map(|(name, group, app)| (name.to_string(), group, Some(app.to_string())));
+        assert_eq!(found, expected, "no tests in ui, none in docs; Shop.Tests references the api's project");
     }
 }

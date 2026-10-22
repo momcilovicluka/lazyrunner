@@ -694,8 +694,14 @@ fn with_suites(screen: &mut Screen) {
     let mut billing = Suite::new("dotnet:billing", "Billing.Tests", dotnet("Billing.Tests"));
     billing.set_tests(vec![test("Billing.Tests.Invoices.Sums", Outcome::Passed, 230.0, "", "")]);
     (billing.status, billing.last_run, billing.seconds) = (SuiteStatus::Passed, Some(at), 2.1);
-    let shop = Suite::new("npm:shop", "Shop", Runner::Npm { dir: "/work/sample/web/shop".into(), vitest: true });
-    screen.controller.suites = Some(vec![orders, billing, shop]);
+    let mut shop = Suite::new("npm:shop", "Shop", Runner::Npm { dir: "/work/sample/web/shop".into(), vitest: true });
+    (orders.app, billing.app, shop.app) = (Some("orders".into()), Some("billing".into()), Some("shop".into()));
+    let workspace = "/work/sample/web/shop".into();
+    let mut ui = Suite::new("nx:ui", "shared-ui", Runner::Nx { workspace, project: "ui".into() });
+    (ui.app, ui.untested) = (Some("shop".into()), true);
+    // The list: 0 Backend, 1 Orders, 2 Orders.Tests, 3 Billing, 4 Billing.Tests, 5 Frontend, 6 Shop, 7 Shop's tests,
+    // 8 the one project without test files.
+    screen.controller.suites = Some(vec![orders, billing, shop, ui]);
 }
 
 #[tokio::test]
@@ -714,14 +720,24 @@ async fn in_the_tests_view_keys_choose_copy_and_say_what_they_cant_do() {
     assert!(copied()[0].starts_with("Failed: Orders.Tests.CartTests.Totals(2, 3) (41 ms)"), "{:?}", copied());
     assert_eq!(screen.last_log(), "Copied 1 failed test from Orders.Tests to the clipboard");
     screen.press("j f");
-    assert_eq!(screen.last_log(), "No failed tests to run again.", "Billing passed");
+    assert_eq!(screen.last_log(), "No failed tests to run again.", "Billing (the app) passed");
     screen.press("j o");
     assert_eq!(screen.last_log(), "No test log yet - r runs the suite.");
-    assert!(screen.frame().contains("Not run yet - r runs this suite"), "Shop is selected");
+    screen.press("j j j");
+    assert!(screen.frame().contains("Not run yet - r runs this suite"), "Shop's tests are selected");
+    screen.press("k k k k k k k y");
+    assert_eq!(screen.last_log(), "Copied 1 failed test from Backend · dotnet test to the clipboard");
+    assert!(screen.frame().contains("2 suites · r runs them all"), "the backend is selected");
+    screen.press("o");
+    assert_eq!(screen.last_log(), "o opens a suite's log - choose one.");
     screen.press("s");
     assert_eq!(screen.last_log(), "No tests are running.");
     screen.press("Esc");
     assert!(screen.ui.overlay.is_none());
+    screen.press("T ,");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { .. })), "keys it doesn't use do what they always do");
+    screen.press("Esc H ?");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Help)), "from the requests view too");
 }
 
 #[tokio::test]
@@ -733,17 +749,19 @@ async fn l_picks_a_test_of_the_suite_and_shows_its_message_and_stack() {
     screen.press("y");
     assert!(copied()[0].starts_with("Skipped: Orders.Tests.CartTests.Later"), "{:?}", copied());
     screen.press("h j l");
-    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 1, picking: Some(0), .. })));
+    assert_eq!(screen.last_log(), "Choose a suite to pick one of its tests.", "Billing, the app");
+    screen.press("j l");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 4, picking: Some(0), .. })));
     screen.press("Esc");
     assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { picking: None, .. })), "back to the suites");
-    screen.press("j j l");
+    screen.press("j j j l");
     assert_eq!(screen.last_log(), "No results for this suite yet - r runs it.", "Shop hasn't run");
-    screen.press("k k l");
+    screen.press("k k k k k l");
     screen.click(Target::Test(2));
-    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { picking: Some(2), .. })));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 2, picking: Some(2), .. })));
     screen.ui.now += Duration::from_secs(1);
-    screen.click(Target::Item(1));
-    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 1, picking: None, .. })), "a suite: leaves it");
+    screen.click(Target::Item(4));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 4, picking: None, .. })), "a suite: leaves it");
 }
 
 #[tokio::test]
@@ -751,10 +769,10 @@ async fn in_the_tests_view_a_click_picks_a_suite_and_a_link_in_a_stack_opens() {
     let mut screen = screen("tests-mouse", json!({ "editor": "myeditor {file}:{line}" }));
     with_suites(&mut screen);
     screen.press("T");
-    screen.click(Target::Item(1));
-    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 1, .. })));
+    screen.click(Target::Item(4));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 4, .. })));
     screen.ui.now += Duration::from_secs(1);
-    screen.click(Target::Item(0));
+    screen.click(Target::Item(2));
     screen.frame();
     let link = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Link { .. })).map(|hit| (hit.x, hit.y));
     let (x, y) = link.expect("the stack frame's place in the file is a link");
@@ -762,6 +780,36 @@ async fn in_the_tests_view_a_click_picks_a_suite_and_a_link_in_a_stack_opens() {
     screen.click_at(x, y);
     assert!(screen.ui.overlay.is_some(), "the view stays open");
     assert!(screen.last_log().contains("CartTests.cs isn't in"), "{}", screen.last_log());
+}
+
+#[tokio::test]
+async fn the_pointer_on_an_app_or_a_side_says_a_click_runs_it_and_a_click_does() {
+    let mut screen = screen("tests-groups", json!({}));
+    with_suites(&mut screen);
+    screen.press("T");
+    let (x, y) = screen.spot(Target::Item(6));
+    let moved = |screen: &mut Screen| {
+        let event = crossterm::event::MouseEvent {
+            kind: crossterm::event::MouseEventKind::Moved,
+            column: x,
+            row: y,
+            modifiers: KeyModifiers::NONE,
+        };
+        mouse::handle(&mut screen.ui, &mut screen.controller, event)
+    };
+    assert!(moved(&mut screen), "onto the Shop app: a redraw");
+    assert!(!moved(&mut screen), "still there: none");
+    let frame = screen.frame();
+    let row = frame.lines().find(|line| line.contains("▶ click to run")).expect("the hint");
+    assert!(row.contains("Shop"), "{row}");
+    screen.click(Target::Item(6));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 6, .. })));
+    assert!(screen.last_log().starts_with("1 suite can't run: "), "no node_modules here: {}", screen.last_log());
+    assert!(screen.frame().contains("needs packages"), "the Shop app and its suite say so");
+    screen.press("j j");
+    assert!(screen.frame().contains("1 project without test files"));
+    screen.press("r");
+    assert_eq!(screen.last_log(), "Nothing to run here: these projects have no test files.");
 }
 
 #[tokio::test]
