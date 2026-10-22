@@ -3,6 +3,17 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.2.0] - 2026-10-22
+
+### Added
+- About lazyrunner (`,` then `A`, or `:` about): the version, its release date and the OS, the core contributors, and links to the README, the changelog, the releases, the license, a bug report (the version and OS filled in), a feature request, the source and an update check - with a rainbow logo, a sparkling title and a beating heart
+
+### Fixed
+- Ctrl+R in Windows Terminal: lazyrunner drew in part of the window afterwards, over what was there - it now takes a fresh alternate screen of the window's size
+
+### Changed
+- The reload window's show is snappier: under a second instead of about a second and a half
+
 ## [1.1.0] - 2026-10-22
 
 ### Changed

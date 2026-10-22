@@ -2,6 +2,7 @@
 //! the panel below, the key reference on the whole screen. `Ui` is what the screen shows besides the controller's
 //! state; `draw` puts both on a frame.
 
+pub mod about;
 pub mod actions;
 pub mod checklist;
 pub mod columns;
@@ -108,6 +109,10 @@ pub enum Overlay {
         index: usize,
         original: String,
     },
+    /// `, A`: the About box; the selected link.
+    About {
+        index: usize,
+    },
 }
 
 impl Overlay {
@@ -127,6 +132,7 @@ impl Overlay {
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
+            Self::About { .. } => "about",
         }
     }
 }
@@ -317,7 +323,10 @@ impl Ui {
             return self.busy.is_some();
         }
         let typing = self.search.as_ref().is_some_and(|search| search.typing)
-            || matches!(self.overlay, Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. }))
+            || matches!(
+                self.overlay,
+                Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. } | Overlay::About { .. })
+            )
             || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
             || matches!(&self.overlay, Some(Overlay::Requests(view)) if view.typing);
         typing
@@ -389,6 +398,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
+        Some(Overlay::About { .. }) => return about::rows(ui, controller, width, rows),
         _ => {}
     }
     columns::rows(ui, controller, width, rows)

@@ -17,13 +17,13 @@ use super::theme::{self, C};
 use super::{Ui, overlays};
 
 /// Power off: the screen closes into a line, the line into a sparkle.
-const OFF: Duration = Duration::from_millis(300);
+const OFF: Duration = Duration::from_millis(180);
 /// The logo over the stars.
-const STAGE: Duration = Duration::from_millis(650);
+const STAGE: Duration = Duration::from_millis(420);
 /// Power on: the fresh UI opens from the middle.
-const ON: Duration = Duration::from_millis(520);
+const ON: Duration = Duration::from_millis(280);
 /// The header celebrates this long once the show is over.
-const CELEBRATE: Duration = Duration::from_secs(2);
+const CELEBRATE: Duration = Duration::from_millis(1500);
 const RAINBOW: [C; 6] = [C::Red, C::Yellow, C::Green, C::Cyan, C::Blue, C::Magenta];
 const STARS: [C; 5] = [C::White, C::Cyan, C::Magenta, C::Yellow, C::Green];
 const TWINKLES: [&str; 4] = ["·", "✧", "✦", "*"];

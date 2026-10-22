@@ -1,0 +1,42 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: "screen.render(SIZE.0, 44)"
+---
+
+
+                 ┌─ ✦ About lazyrunner ─────────────────────────────────────────────────────┐
+                 │                                                                          │
+                 │                 █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                  │
+                 │                 █   █▀█ ▄▀  ▀█▀ █▀▄ █ █ █ █ █ █ █▀  █▀▄                  │
+                 │                 ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                  │
+                 │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                  │
+                 │                                                                          │
+                 │   ⇩ v<version> · released 2026-10-22 · windows x86_64 · running Sample       │
+                 │   Runs a project's .NET and npm apps side by side.                       │
+                 │                                                                          │
+                 │   Core contributors                                                      │
+                 │    • Luka Momčilović   creator · maintainer                              │
+                 │                                                                          │
+                 │   Links                                                                  │
+                 │  ▸ r  ¶  README                setting it up, and every key              │
+                 │    c  ✦  What's new            the changelog, right here                 │
+                 │    e  ⇩  Releases              every version, on GitHub                  │
+                 │    l  §  License               source-available; free to use, at work t… │
+                 │    b  ⚑  Report a bug          a GitHub issue, this version filled in    │
+                 │    f  ☼  Suggest a feature     a GitHub issue with your idea             │
+                 │    s  ⑂  Source                the code, on GitHub                       │
+                 │    u  ⇣  Check for an update   the startup checklist, now                │
+                 │                                                                          │
+                 │   made with ♥ and ⚙ Rust · lazyrunner License 1.1                        │
+                 │ a letter, or j k + Enter · Esc closes                                    │
+                 └──────────────────────────────────────────────────────────────────────────┘
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [x] reduced motion
+              g [ ] git beside   i [ ] nerd icons

@@ -220,6 +220,13 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `g` | `L` opens the git tool beside lazyrunner, in a Windows Terminal pane |
 | `i` | Nerd Font icons (on by default): the title bars, the status line, the views' headers and marks |
 | `c` | What's new: the changelog |
+| `A` | About lazyrunner (below) |
+
+**About lazyrunner** (`,` then `A`, or `:` about): the version and when it was released, who makes lazyrunner, and
+its links - a letter (or `j` `k` and Enter, or a double click) opens the README, the changelog, the releases, the
+license, a bug report with the version and OS already filled in, a feature request or the source, or checks for an
+update. Its logo shimmers in rainbow colours over a flowing rule (still with reduced motion), with Nerd Font icons
+when they're on.
 
 ### Mouse
 

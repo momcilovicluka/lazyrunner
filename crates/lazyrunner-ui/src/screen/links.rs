@@ -10,16 +10,19 @@ use lazyrunner_core::run::Controller;
 
 use super::Ui;
 
+/// A page in the browser.
+pub fn open_url(ui: &Ui, controller: &mut Controller, url: &str) {
+    if (ui.opener)(url) {
+        controller.add_log(format!("Opening {url}"), Hue::DarkGray);
+    } else {
+        controller.add_log(format!("✗ Couldn't open {url}"), Hue::Red);
+    }
+}
+
 pub fn open(ui: &mut Ui, controller: &mut Controller, link: usize) {
     let Some(target) = ui.links.get(link).cloned() else { return };
     match target {
-        Target::Url(url) => {
-            if (ui.opener)(&url) {
-                controller.add_log(format!("Opening {url}"), Hue::DarkGray);
-            } else {
-                controller.add_log(format!("✗ Couldn't open {url}"), Hue::Red);
-            }
-        }
+        Target::Url(url) => open_url(ui, controller, &url),
         Target::File { path, line, column } => {
             let Some(file) = links::resolve(&controller.root, &path) else {
                 let root = controller.root.display().to_string();

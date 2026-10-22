@@ -27,6 +27,17 @@ pub enum Icon {
     Queued,
     Cancelled,
     Reload,
+    Readme,
+    Changelog,
+    Releases,
+    License,
+    Bug,
+    Idea,
+    Source,
+    Update,
+    Person,
+    Heart,
+    Rust,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -62,6 +73,28 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Cancelled, true) => "\u{f04d}", // stop
         (Icon::Reload, false) => "↻",
         (Icon::Reload, true) => "\u{f021}", // refresh
+        (Icon::Readme, false) => "¶",
+        (Icon::Readme, true) => "\u{f02d}", // book
+        (Icon::Changelog, false) => "✦",
+        (Icon::Changelog, true) => "\u{f1da}", // history
+        (Icon::Releases, false) => "⇩",
+        (Icon::Releases, true) => "\u{f02b}", // tag
+        (Icon::License, false) => "§",
+        (Icon::License, true) => "\u{f24e}", // balance scale
+        (Icon::Bug, false) => "⚑",
+        (Icon::Bug, true) => "\u{f188}", // bug
+        (Icon::Idea, false) => "☼",
+        (Icon::Idea, true) => "\u{f0eb}", // light bulb
+        (Icon::Source, false) => "⑂",
+        (Icon::Source, true) => "\u{f09b}", // GitHub
+        (Icon::Update, false) => "⇣",
+        (Icon::Update, true) => "\u{f019}", // download
+        (Icon::Person, false) => "•",
+        (Icon::Person, true) => "\u{f007}", // user
+        (Icon::Heart, false) => "♥",
+        (Icon::Heart, true) => "\u{f004}", // heart
+        (Icon::Rust, false) => "⚙",
+        (Icon::Rust, true) => "\u{e7a8}", // Rust
     }
 }
 
@@ -107,6 +140,17 @@ mod tests {
             Icon::Queued,
             Icon::Cancelled,
             Icon::Reload,
+            Icon::Readme,
+            Icon::Changelog,
+            Icon::Releases,
+            Icon::License,
+            Icon::Bug,
+            Icon::Idea,
+            Icon::Source,
+            Icon::Update,
+            Icon::Person,
+            Icon::Heart,
+            Icon::Rust,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");
