@@ -27,6 +27,7 @@ pub enum Run {
     OpenLog,
     Copy,
     Durations,
+    Tests,
     GitTool,
     Menu,
     Search,
@@ -128,6 +129,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Durations",
             "build, start and npm ci times over the last runs: what got slower",
             Run::Durations,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "T",
+            "Tests: run the project's test suites",
+            "dotnet test, jest, vitest - several at once in the background",
+            Run::Tests,
         )
         .safe(),
         action(

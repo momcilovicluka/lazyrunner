@@ -175,7 +175,8 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
 | `y` | Copy the focused app's last error with its stack trace (a failed build's errors with full paths), or the search match |
-| `D` | **Durations**: how long each build, app start and `npm ci` took over its last runs (below) |
+| `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |
+| `T` | **Tests**: the project's test suites - run them in the background, see what failed (below) |
 | `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
 | `x` | Menu of everything you can do with the focused app |
 | `,` | **Settings** menu (below) |
@@ -280,9 +281,27 @@ update waits until you're back. With `,` then `g` in Windows Terminal, `L` opens
 instead, so you see both. Another git tool: `"gitTool"` (for example `"gitui"`). lazygit has to be installed (`winget
 install JesseDuffield.lazygit`, `scoop install lazygit`).
 
+## Tests (`T`)
+
+`T` finds the project's test suites and shows them on the left, the selected one on the right:
+
+- **.NET**: every project referencing `Microsoft.NET.Test.Sdk` (NUnit, xUnit and MSTest alike), run with `dotnet
+  test`. The queued ones build together first, in one MSBuild run, so the projects they share build once; then they
+  run side by side without building again. An app's build pauses that test build, which runs again after it.
+- **npm**: an npm app whose `test` script runs jest or vitest; in an Nx workspace, each project with tests (`nx test`).
+  `npm ci` pauses the suites that run from its folder.
+
+`r` runs the selected suite, `R` all of them, `f` / `F` only their failed tests again (the results merge into the last
+full run's). Up to `testParallelism` suites run at once (half the cores by default), in the background: close the view
+and the apps keep running, the panel says `testing 2 +3 queued`, the log says how each suite did, and a notification
+comes when something failed. While a suite runs the right side shows its output; afterwards its failures with their
+message and their own stack frames (a place in a file opens in your editor on a click), or its slowest tests when all
+passed. `y` copies the failures, `o` opens the suite's whole log, `s` stops the tests, `Esc` / `q` / `T` close. The
+last results are kept, so they're still there after a restart, and each suite's time shows in `D`.
+
 ## Durations (`D`)
 
-Every build, app start and `npm ci` is timed and kept (the last 40 of each) in `history.json` in the project's state
+Every build, app start, `npm ci` and test suite is timed and kept (the last 40 of each) in `history.json` in the project's state
 folder. `D` shows them in a box, grouped:
 
 | Column | Meaning |
@@ -348,6 +367,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
+| `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.columnWidths` | equal | Relative width per app key, or height when stacked (`>` / `<` / `=`) |

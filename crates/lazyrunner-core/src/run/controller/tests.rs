@@ -154,7 +154,12 @@ mod scripted {
 
     fn shell(script: String, dir: &Path) -> Spec {
         let (program, flag) = if cfg!(windows) { ("cmd", "/C") } else { ("sh", "-c") };
-        Spec { program: program.into(), args: vec![flag.into(), script.into()], dir: dir.to_path_buf() }
+        Spec {
+            program: program.into(),
+            args: vec![flag.into(), script.into()],
+            dir: dir.to_path_buf(),
+            env: Vec::new(),
+        }
     }
 
     impl Commands for Scripts {

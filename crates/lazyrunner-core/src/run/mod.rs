@@ -12,6 +12,7 @@ pub mod controller;
 pub mod history;
 pub mod net;
 pub mod secrets;
+pub mod suites;
 pub mod tools;
 pub mod watcher;
 
@@ -37,6 +38,15 @@ pub enum Tag {
         key: String,
         job: u64,
     },
+    /// A test suite's run.
+    Suite {
+        key: String,
+        job: u64,
+    },
+    /// The build of the test projects.
+    TestBuild {
+        job: u64,
+    },
 }
 
 #[derive(Debug)]
@@ -59,6 +69,8 @@ pub enum Event {
     /// CPU (% of the machine) and memory (MB) per app, summed over its process tree.
     Metrics(Vec<(String, f32, f32)>),
     FileChanged(PathBuf),
+    /// The test suites found (T), with their last results.
+    Suites(Vec<suites::Suite>),
 }
 
 /// "4s", "1m05s", as the panel says durations.

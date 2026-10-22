@@ -8,6 +8,7 @@ use std::process::Command;
 use anyhow::{Result, bail};
 
 use super::child::Spec;
+use super::suites::{Runner, dotnet_filter, name_pattern};
 use crate::apptypes::{self, Mode};
 use crate::profile::{App, AppKind, join};
 
@@ -55,6 +56,16 @@ pub trait Commands: Send + Sync {
     fn server(&self, root: &Path, app: &App, active: &[App]) -> Result<ServerCommand>;
     fn build(&self, root: &Path, project: &str) -> Spec;
     fn npm_ci(&self, dir: &Path) -> Result<Spec>;
+
+    /// A test suite's run, its results written to `results` (only the tests in `names`, when there are any).
+    fn test(&self, runner: &Runner, results: &Path, names: &[String]) -> Result<Spec> {
+        test_command(runner, results, names)
+    }
+
+    /// The build of the test projects in the MSBuild project `project`.
+    fn test_build(&self, project: &Path) -> Spec {
+        test_build_command(project)
+    }
 }
 
 /// The real tools: dotnet and npm.
@@ -80,7 +91,12 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
             let dir = root.join(project).parent().map_or_else(|| root.to_path_buf(), Path::to_path_buf);
             let args = ["run", "--no-build", "--launch-profile", launch_profile].map(OsString::from).to_vec();
             Ok(ServerCommand {
-                spec: Spec { program: find_on_path("dotnet").unwrap_or_else(|| "dotnet".into()), args, dir },
+                spec: Spec {
+                    program: find_on_path("dotnet").unwrap_or_else(|| "dotnet".into()),
+                    args,
+                    dir,
+                    env: Vec::new(),
+                },
                 label: format!("dotnet run --launch-profile {launch_profile}"),
                 script: None,
             })
@@ -96,7 +112,7 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
             let (program, mut args) = npm_launcher()?;
             args.extend(["run".into(), mode.script.clone().into(), "--verbose".into()]);
             Ok(ServerCommand {
-                spec: Spec { program, args, dir: folder },
+                spec: Spec { program, args, dir: folder, env: Vec::new() },
                 label: format!("npm run {} --verbose ({})", mode.script, mode.label),
                 script: Some(mode.script),
             })
@@ -110,14 +126,78 @@ pub fn build_command(root: &Path, project: &str) -> Spec {
     let dir = path.parent().map_or_else(|| root.to_path_buf(), Path::to_path_buf);
     let mut args: Vec<OsString> = vec!["build".into(), path.into_os_string()];
     args.extend(["-nologo", "-v", "m", "-tl:off", "-clp:NoSummary"].map(OsString::from));
-    Spec { program: find_on_path("dotnet").unwrap_or_else(|| "dotnet".into()), args, dir }
+    Spec { program: find_on_path("dotnet").unwrap_or_else(|| "dotnet".into()), args, dir, env: Vec::new() }
 }
 
 /// `npm ci` in an npm app's folder.
 pub fn npm_ci_command(dir: &Path) -> Result<Spec> {
     let (program, mut args) = npm_launcher()?;
     args.push("ci".into());
-    Ok(Spec { program, args, dir: dir.to_path_buf() })
+    Ok(Spec { program, args, dir: dir.to_path_buf(), env: Vec::new() })
+}
+
+fn dotnet() -> PathBuf {
+    find_on_path("dotnet").unwrap_or_else(|| "dotnet".into())
+}
+
+/// A test suite's run: `dotnet test --no-build` writing TRX, or jest / vitest (through npm or Nx) writing their
+/// JSON; `names` narrows it to those tests.
+pub fn test_command(runner: &Runner, results: &Path, names: &[String]) -> Result<Spec> {
+    let folder = results.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    let file = results.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+    let output = format!("--outputFile={}", results.display());
+    let pattern = (!names.is_empty()).then(|| name_pattern(names));
+    match runner {
+        Runner::Dotnet { project } => {
+            let mut args: Vec<OsString> = vec!["test".into(), project.into(), "--no-build".into(), "-nologo".into()];
+            args.extend(["--logger".into(), format!("trx;LogFileName={file}").into()]);
+            args.extend(["--results-directory".into(), folder.into_os_string()]);
+            args.extend(["--logger", "console;verbosity=normal"].map(OsString::from));
+            if !names.is_empty() {
+                args.extend(["--filter".into(), dotnet_filter(names).into()]);
+            }
+            let dir = project.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+            Ok(Spec { program: dotnet(), args, dir, env: Vec::new() })
+        }
+        Runner::Npm { dir, vitest } => {
+            if !dir.join("node_modules").exists() {
+                bail!("{} has no node_modules - run npm ci (i) first", dir.display());
+            }
+            let (program, mut args) = npm_launcher()?;
+            args.extend(["test", "--"].map(OsString::from));
+            if *vitest {
+                args.extend(["--run", "--reporter=default", "--reporter=json"].map(OsString::from));
+                args.push(format!("--outputFile.json={}", results.display()).into());
+                args.extend(pattern.into_iter().flat_map(|pattern| ["-t".into(), OsString::from(pattern)]));
+            } else {
+                args.extend(["--ci".into(), "--json".into(), output.into()]);
+                args.extend(pattern.map(|pattern| format!("--testNamePattern={pattern}").into()));
+            }
+            Ok(Spec { program, args, dir: dir.clone(), env: Vec::new() })
+        }
+        Runner::Nx { workspace, project } => {
+            let nx = workspace.join("node_modules").join("nx").join("bin").join("nx.js");
+            if !nx.is_file() {
+                bail!("{} has no Nx in node_modules - run npm ci (i) first", workspace.display());
+            }
+            let Some(node) = find_on_path("node") else { bail!("node was not found on PATH - install Node.js") };
+            let mut args: Vec<OsString> = vec![nx.into_os_string(), "test".into(), project.into()];
+            args.extend(["--skip-nx-cache".into(), "--ci".into(), "--json".into(), output.into()]);
+            args.extend(pattern.map(|pattern| format!("--testNamePattern={pattern}").into()));
+            // Without its daemon: it would live in this suite's process tree and go when the suite ends, under
+            // another suite of the workspace running beside it.
+            let env = vec![("NX_DAEMON".into(), "false".into())];
+            Ok(Spec { program: node, args, dir: workspace.clone(), env })
+        }
+    }
+}
+
+/// `dotnet build` of the MSBuild project that lists the test projects.
+pub fn test_build_command(project: &Path) -> Spec {
+    let mut args: Vec<OsString> = vec!["build".into(), project.into()];
+    args.extend(["-nologo", "-m", "-v", "m", "-tl:off", "-clp:NoSummary"].map(OsString::from));
+    let dir = project.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    Spec { program: dotnet(), args, dir, env: Vec::new() }
 }
 
 /// An npm app's mode, for callers that hold only its key.

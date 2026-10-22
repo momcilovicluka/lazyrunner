@@ -1,4 +1,4 @@
-//! Durations (D): how long builds, app starts and npm ci took over their last runs, so one that got slower stands
+//! Durations (D): how long builds, app starts, npm ci and test suites took over their last runs, so one that got slower stands
 //! out. Kept in history.json in the project's state folder (timings.json only feeds the progress estimates).
 
 use std::io::ErrorKind;
@@ -28,16 +28,18 @@ pub enum Kind {
     Build,
     Start,
     NpmCi,
+    Test,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 3] = [Kind::Build, Kind::Start, Kind::NpmCi];
+    pub const ALL: [Kind; 4] = [Kind::Build, Kind::Start, Kind::NpmCi, Kind::Test];
 
     pub fn title(self) -> &'static str {
         match self {
             Kind::Build => "Builds",
             Kind::Start => "Starts",
             Kind::NpmCi => "npm ci",
+            Kind::Test => "Test suites",
         }
     }
 }
@@ -330,7 +332,7 @@ mod tests {
         let dir = TempDir::new("durations-unknown");
         write(
             dir.join("history.json"),
-            r#"[{"kind":"test","key":"unit","runs":[{"sec":3}]},
+            r#"[{"kind":"deploy","key":"unit","runs":[{"sec":3}]},
                 {"kind":"build","key":"api","label":"Api","runs":[{"sec":4}]},
                 {"kind":"start","key":"web","runs":[{"sec":"x"}]},
                 {"kind":"build","key":"old","runs":[]}]"#,
@@ -348,7 +350,7 @@ mod tests {
             .iter()
             .map(|entry| (entry["kind"].as_str().unwrap(), entry["key"].as_str().unwrap()))
             .collect();
-        assert_eq!(entries, [("build", "api"), ("build", "old"), ("start", "web"), ("test", "unit")]);
+        assert_eq!(entries, [("build", "api"), ("build", "old"), ("start", "web"), ("deploy", "unit")]);
     }
 
     #[test]

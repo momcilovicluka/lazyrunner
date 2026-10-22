@@ -7,6 +7,7 @@ mod builds;
 mod handover;
 mod npm_ci;
 mod start;
+mod suites;
 #[cfg(test)]
 mod tests;
 mod watch;
@@ -36,6 +37,7 @@ use crate::paths::Paths;
 use crate::profile::{App, Project};
 
 pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_handover};
+pub use suites::{TestBuild, Totals};
 
 /// Entries the panel's log keeps.
 const MAX_LOG_ENTRIES: usize = 200;
@@ -151,6 +153,16 @@ pub struct Controller {
     timings: Timings,
     /// How long builds, starts and npm ci took over their last runs (D).
     pub durations: Durations,
+    /// The test suites (T), found the first time the tests view opens.
+    pub suites: Option<Vec<super::suites::Suite>>,
+    /// The queued .NET suites' projects building, in one MSBuild run.
+    pub test_build: Option<TestBuild>,
+    /// The suites waiting to run, in order.
+    test_queue: Vec<String>,
+    /// When the current test run began (its suites get one summary at the end), and its suites.
+    tests_started: Option<Instant>,
+    run_keys: Vec<String>,
+    finding_suites: bool,
     probes: HashMap<String, Probe>,
     listening_due: Option<Instant>,
     listening_in_flight: bool,
@@ -204,6 +216,12 @@ impl Controller {
         let mut controller = Self {
             timings: Timings::load(&state_dir),
             durations: Durations::load(&state_dir),
+            suites: None,
+            test_build: None,
+            test_queue: Vec::new(),
+            tests_started: None,
+            run_keys: Vec::new(),
+            finding_suites: false,
             project,
             apps,
             states,
@@ -346,7 +364,12 @@ impl Controller {
     /// notably off its usual (" · 18% slower than usual (36s)").
     fn record_duration(&mut self, kind: Kind, key: &str, seconds: f64, ok: bool) -> String {
         let label = self.app(key).map_or_else(|| key.to_string(), |app| app.name.clone());
-        if let Some(why) = self.durations.add(kind, key, &label, seconds, ok) {
+        self.record_duration_as(kind, key, &label, seconds, ok)
+    }
+
+    /// Records a finished run under its own label (a test suite's name).
+    fn record_duration_as(&mut self, kind: Kind, key: &str, label: &str, seconds: f64, ok: bool) -> String {
+        if let Some(why) = self.durations.add(kind, key, label, seconds, ok) {
             self.add_log(format!("Couldn't save the durations history - {why}"), Hue::Yellow);
         }
         if ok { self.durations.note(kind, key) } else { String::new() }
@@ -396,6 +419,10 @@ impl Controller {
             Event::Exited { tag: Tag::App { key, generation }, code } => self.app_exited(&key, generation, code),
             Event::Exited { tag: Tag::Build { key, job }, code } => self.build_exited(&key, job, code),
             Event::Exited { tag: Tag::NpmCi { key, job }, code } => self.npm_ci_exited(&key, job, code),
+            Event::Output { tag: Tag::Suite { key, job }, line } => self.suite_output(&key, job, &line),
+            Event::Exited { tag: Tag::Suite { key, job }, code } => self.suite_exited(&key, job, code),
+            Event::Output { tag: Tag::TestBuild { job }, line } => self.test_build_output(job, &line),
+            Event::Exited { tag: Tag::TestBuild { job }, code } => self.test_build_exited(job, code),
             Event::Listening(listening) => {
                 if let Some(problem) = listening.problem.as_ref().filter(|_| !self.listening_warned) {
                     self.listening_warned = true;
@@ -410,6 +437,7 @@ impl Controller {
             Event::Probe { key, generation, result } => self.probe_result(&key, generation, result),
             Event::Metrics(samples) => self.metrics(samples),
             Event::FileChanged(path) => self.code.changed(path, now),
+            Event::Suites(found) => self.suites_found(found),
         }
     }
 
@@ -557,8 +585,9 @@ impl Controller {
         self.stop(Some(&[key.to_string()]), false);
     }
 
-    /// Before quitting: cancel the build and npm ci and stop every app, quietly.
+    /// Before quitting: cancel the build, npm ci and the tests, and stop every app, quietly.
     pub fn shutdown(&mut self) {
+        self.stop_tests(true);
         if self.building.is_some() {
             self.cancel_build(false);
         }

@@ -14,6 +14,7 @@ pub mod overlays;
 pub mod panel;
 pub mod seg;
 pub mod status;
+pub mod suites;
 #[cfg(test)]
 mod tests;
 pub mod theme;
@@ -74,6 +75,11 @@ pub enum Overlay {
     Durations {
         top: usize,
     },
+    /// `T`: the test suites; the selected one, and how far its details are scrolled.
+    Tests {
+        index: usize,
+        scroll: usize,
+    },
     /// `t`: the theme picker; `original` is the theme Esc puts back.
     Themes {
         query: String,
@@ -92,6 +98,7 @@ impl Overlay {
             Self::Checklist(_) => "checklist",
             Self::Changelog { .. } => "changelog",
             Self::Durations { .. } => "durations",
+            Self::Tests { .. } => "tests",
             Self::Themes { .. } => "themes",
         }
     }
@@ -271,6 +278,7 @@ impl Ui {
             || self.busy.is_some()
             || controller.building.is_some()
             || controller.npm_ci.is_some()
+            || controller.tests_active()
             || controller.celebrate.is_some()
             || controller.states.iter().any(|state| {
                 let fresh = state
@@ -320,6 +328,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Palette { .. }) => return overlays::palette(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
+        Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         _ => {}

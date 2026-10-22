@@ -559,7 +559,14 @@ fn body(
 }
 
 /// A piece of a line (its bytes `start..` in the line) in segments: its links underlined and clickable.
-fn linked(text: &str, start: usize, links: &[links::Link], ids: &[usize], color: C, column: usize) -> Vec<Seg> {
+pub(super) fn linked(
+    text: &str,
+    start: usize,
+    links: &[links::Link],
+    ids: &[usize],
+    color: C,
+    column: usize,
+) -> Vec<Seg> {
     let end = start + text.len();
     let mut segs = Vec::new();
     let mut at = start;

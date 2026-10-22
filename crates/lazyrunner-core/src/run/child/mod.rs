@@ -36,6 +36,8 @@ pub struct Spec {
     pub program: PathBuf,
     pub args: Vec<OsString>,
     pub dir: PathBuf,
+    /// Variables set for it on top of lazyrunner's own.
+    pub env: Vec<(OsString, OsString)>,
 }
 
 /// A running process tree. Dropping it kills the tree.
@@ -89,6 +91,7 @@ impl Child {
         let mut command = tokio::process::Command::new(&spec.program);
         command
             .args(&spec.args)
+            .envs(spec.env.iter().map(|(name, value)| (name, value)))
             .current_dir(&spec.dir)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

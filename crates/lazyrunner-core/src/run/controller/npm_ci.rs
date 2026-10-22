@@ -94,6 +94,7 @@ impl Controller {
         self.pane(&key, &format!("──── ⚙ {} · npm ci ────", clock()), Hue::Cyan);
         let beside = if self.building.is_some() { " (next to the build)" } else { "" };
         self.add_log(format!("Running npm ci for {}…{beside}", app.name), Hue::Cyan);
+        self.pause_npm_suites(&folder);
         stop_nx_daemon(&folder);
         // node_modules is about to be rewritten: until npm ci succeeds it isn't known to be in sync.
         let _ = std::fs::remove_file(self.npm_ci_stamp(&key));

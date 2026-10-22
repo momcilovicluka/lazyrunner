@@ -30,7 +30,7 @@ const SIZE: (u16, u16) = (110, 32);
 
 struct Screen {
     temp: TempDir,
-    _events: mpsc::UnboundedReceiver<Event>,
+    events: mpsc::UnboundedReceiver<Event>,
     controller: Controller,
     ui: Ui,
 }
@@ -103,7 +103,7 @@ fn screen(label: &str, config: Value) -> Screen {
     ui.launcher = launched;
     ui.clipboard = record;
     ui.now = started + Duration::from_secs(10);
-    Screen { temp, _events: rx, controller, ui }
+    Screen { temp, events: rx, controller, ui }
 }
 
 impl Screen {
@@ -610,6 +610,96 @@ async fn y_in_the_database_picker_copies_the_line_as_it_is_in_secrets_json() {
     screen.press("y");
     assert_eq!(copied().len(), 1, "nothing copied from a file that changed");
     assert_eq!(screen.last_log(), "secrets.json changed since the picker opened - press d again to copy that row.");
+}
+
+// ---------------------------------------------------------------- the tests view
+
+/// The sample's suites by hand: one failed, one passed, one not run yet.
+fn with_suites(screen: &mut Screen) {
+    use chrono::TimeZone;
+    use lazyrunner_core::run::suites::{Outcome, Runner, Status as SuiteStatus, Suite, TestResult};
+    let test = |name: &str, outcome, ms, message: &str, stack: &str| TestResult {
+        name: name.into(),
+        outcome,
+        ms,
+        message: message.into(),
+        stack: stack.into(),
+    };
+    let at = chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap();
+    let dotnet = |name: &str| Runner::Dotnet { project: format!("/work/sample/tests/{name}/{name}.csproj").into() };
+    let mut orders = Suite::new("dotnet:orders", "Orders.Tests", dotnet("Orders.Tests"));
+    orders.set_tests(vec![
+        test("Orders.Tests.CartTests.Adds", Outcome::Passed, 12.0, "", ""),
+        test(
+            "Orders.Tests.CartTests.Totals(2, 3)",
+            Outcome::Failed,
+            41.0,
+            "Expected 5 but was 6",
+            "at Xunit.Assert.Equal()\nat Orders.Tests.CartTests.Totals() in C:\\work\\Orders.Tests\\CartTests.cs:line 42",
+        ),
+        test("Orders.Tests.CartTests.Later", Outcome::Skipped, 0.0, "", ""),
+    ]);
+    (orders.status, orders.last_run, orders.seconds) = (SuiteStatus::Failed, Some(at), 6.4);
+    let mut billing = Suite::new("dotnet:billing", "Billing.Tests", dotnet("Billing.Tests"));
+    billing.set_tests(vec![test("Billing.Tests.Invoices.Sums", Outcome::Passed, 230.0, "", "")]);
+    (billing.status, billing.last_run, billing.seconds) = (SuiteStatus::Passed, Some(at), 2.1);
+    let shop = Suite::new("npm:shop", "Shop", Runner::Npm { dir: "/work/sample/web/shop".into(), vitest: true });
+    screen.controller.suites = Some(vec![orders, billing, shop]);
+}
+
+#[tokio::test]
+async fn the_tests_view_lists_the_suites_and_shows_the_failures() {
+    let mut screen = screen("snap-tests", json!({}));
+    with_suites(&mut screen);
+    screen.press("T");
+    insta::assert_snapshot!(screen.frame());
+}
+
+#[tokio::test]
+async fn in_the_tests_view_keys_choose_copy_and_say_what_they_cant_do() {
+    let mut screen = screen("tests-keys", json!({}));
+    with_suites(&mut screen);
+    screen.press("T y");
+    assert!(copied()[0].starts_with("Failed: Orders.Tests.CartTests.Totals(2, 3) (41 ms)"), "{:?}", copied());
+    assert_eq!(screen.last_log(), "Copied 1 failed test from Orders.Tests to the clipboard");
+    screen.press("j f");
+    assert_eq!(screen.last_log(), "No failed tests to run again.", "Billing passed");
+    screen.press("j o");
+    assert_eq!(screen.last_log(), "No test log yet - r runs the suite.");
+    assert!(screen.frame().contains("Not run yet - r runs this suite"), "Shop is selected");
+    screen.press("s");
+    assert_eq!(screen.last_log(), "No tests are running.");
+    screen.press("Esc");
+    assert!(screen.ui.overlay.is_none());
+}
+
+#[tokio::test]
+async fn in_the_tests_view_a_click_picks_a_suite_and_a_link_in_a_stack_opens() {
+    let mut screen = screen("tests-mouse", json!({ "editor": "myeditor {file}:{line}" }));
+    with_suites(&mut screen);
+    screen.press("T");
+    screen.click(Target::Item(1));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 1, .. })));
+    screen.ui.now += Duration::from_secs(1);
+    screen.click(Target::Item(0));
+    screen.frame();
+    let link = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Link { .. })).map(|hit| (hit.x, hit.y));
+    let (x, y) = link.expect("the stack frame's place in the file is a link");
+    screen.ui.now += Duration::from_secs(1);
+    screen.click_at(x, y);
+    assert!(screen.ui.overlay.is_some(), "the view stays open");
+    assert!(screen.last_log().contains("CartTests.cs isn't in"), "{}", screen.last_log());
+}
+
+#[tokio::test]
+async fn the_tests_view_looks_for_suites_in_the_background_and_says_when_there_are_none() {
+    let mut screen = screen("tests-none", json!({}));
+    screen.press("T");
+    assert!(screen.frame().contains("Looking for tests…"));
+    let event = tokio::time::timeout(Duration::from_secs(30), screen.events.recv()).await.unwrap().unwrap();
+    screen.controller.handle(event);
+    assert!(screen.frame().contains("No test suites in this project."));
+    assert!(screen.last_log().starts_with("No tests found: .NET projects referencing Microsoft.NET.Test.Sdk"));
 }
 
 // ---------------------------------------------------------------- the layout
