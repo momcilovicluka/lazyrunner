@@ -315,7 +315,8 @@ migrations (the app's own when left out), and without `contexts` its model snaps
 Checking a context against the database takes `dotnet ef` a few seconds, so `M` doesn't by itself: `r` checks the
 selected context, `R` finds the contexts again (a branch may add some) and checks them all. With
 `checkMigrationsOnOpen` (`, o`) `M` checks them all each time it opens, and switching the database or the branch
-checks them again; without it those say "not checked". `l` chooses a migration, `m` moves the context to it - forward
+checks them again. Each check is kept, per database, for the next run: a context shows its last check on the database
+you picked - when, with the day once it isn't today - or "not checked" when it has none there. `l` chooses a migration, `m` moves the context to it - forward
 applies up to it, back reverts the newer ones through their `Down()` - and `u` applies what's pending (`U`: in every
 context); each asks first, naming the database.
 

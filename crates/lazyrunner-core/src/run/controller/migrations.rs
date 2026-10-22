@@ -3,8 +3,10 @@
 //! --no-build loads the build it would be rewriting).
 
 use std::collections::{HashSet, VecDeque};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
+
+use serde_json::{Value, json};
 
 use super::Controller;
 use crate::config::Toggle;
@@ -12,7 +14,11 @@ use crate::output::{Hue, strip_ansi};
 use crate::profile::{App, AppKind};
 use crate::run::Tag;
 use crate::run::child::Child;
-use crate::run::migrations::{self, Context, Status};
+use crate::run::migrations::{self, Context, Migration, Status};
+
+/// The last check of each context, per database, kept between runs in the project's state folder:
+/// `{ "<database>": { "<app>:<context>": { "checkedAt": "<RFC 3339>", "migrations": [{ "id", "name", "applied" }] } } }`.
+const SAVED_CHECKS: &str = "migrations.json";
 
 /// What a migrations job does.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -80,12 +86,59 @@ impl Controller {
             return false;
         }
         self.contexts = Some(contexts);
+        self.restore_checks();
         if check {
             self.list_migrations(None);
         } else {
             self.pump_migrations();
         }
         true
+    }
+
+    fn saved_checks_path(&self) -> PathBuf {
+        self.state_dir.join(SAVED_CHECKS)
+    }
+
+    /// The database the checks are of, as the log and the view name it.
+    fn checked_database(&self) -> String {
+        self.db_label.clone().unwrap_or_else(|| "the database".into())
+    }
+
+    /// The contexts as last checked on this database, in this run or an earlier one; the others not checked.
+    fn restore_checks(&mut self) {
+        let db = self.checked_database();
+        let saved = crate::json::read(&self.saved_checks_path()).unwrap_or(Value::Null);
+        for context in self.contexts.iter_mut().flatten().filter(|context| !context.is_busy()) {
+            let check = &saved[db.as_str()][context.key().as_str()];
+            context.error.clear();
+            match saved_check(check) {
+                Some((at, items)) => {
+                    (context.items, context.status) = (items, Status::Ok);
+                    (context.checked_at, context.db) = (Some(at), db.clone());
+                }
+                None => {
+                    (context.items, context.status) = (Vec::new(), Status::Idle);
+                    (context.checked_at, context.db) = (None, String::new());
+                }
+            }
+        }
+    }
+
+    /// Keeps a context's check for the next run (on the database it was made on).
+    fn save_check(&mut self, key: &str) {
+        let Some(context) = self.context(key) else { return };
+        let path = self.saved_checks_path();
+        let mut saved = crate::json::read(&path).filter(Value::is_object).unwrap_or_else(|| json!({}));
+        let items: Vec<Value> = context
+            .items
+            .iter()
+            .map(|item| json!({ "id": item.id, "name": item.name, "applied": item.applied }))
+            .collect();
+        let at = context.checked_at.map(|at| at.to_rfc3339());
+        saved[context.db.as_str()][key] = json!({ "checkedAt": at, "migrations": items });
+        if let Err(error) = crate::config::write(&path, &saved) {
+            self.add_log(format!("Couldn't keep the migrations check for the next run: {error}"), Hue::Yellow);
+        }
     }
 
     /// The .NET apps' contexts: those an app's `"migrations"` names, or its project's model snapshots have (else
@@ -165,18 +218,14 @@ impl Controller {
     }
 
     /// The database was switched or the branch changed: what is applied, and which migrations exist, may differ -
-    /// checked again with `checkMigrationsOnOpen`, else no longer said to be checked.
+    /// the contexts show their last check on this database, and are checked again with `checkMigrationsOnOpen`.
     pub(super) fn migrations_changed(&mut self) {
         if self.contexts.is_none() {
             return;
         }
+        self.restore_checks();
         if self.setting(Toggle::CheckMigrationsOnOpen) {
-            return self.list_migrations(None);
-        }
-        for context in self.contexts.iter_mut().flatten() {
-            if matches!(context.status, Status::Ok | Status::Error) {
-                context.status = Status::Idle;
-            }
+            self.list_migrations(None);
         }
     }
 
@@ -266,7 +315,7 @@ impl Controller {
 
     pub(super) fn migration_exited(&mut self, id: u64, code: Option<i32>) {
         let Some(job) = self.migration_job.take_if(|job| job.id == id) else { return };
-        let db = self.db_label.clone().unwrap_or_else(|| "the database".into());
+        let db = self.checked_database();
         match job.work {
             Work::Find { app } => self.found_contexts(&app, &job.lines, code),
             Work::List { context: key } => self.listed(&key, &job.lines, code, &db),
@@ -305,6 +354,7 @@ impl Controller {
         let pending = items.iter().filter(|item| item.applied == Some(false)).count();
         (context.items, context.status, context.error) = (items, Status::Ok, String::new());
         (context.checked_at, context.db) = (Some(chrono::Local::now()), db.to_string());
+        self.save_check(key);
         if pending > 0 {
             let plural = if pending == 1 { "" } else { "s" };
             self.add_log(format!("{name}: {pending} pending migration{plural} on {db}"), Hue::Yellow);
@@ -354,6 +404,21 @@ impl Controller {
         }
         self.migration_queue.clear();
     }
+}
+
+/// A check kept by an earlier run: when, and the migrations it found.
+fn saved_check(check: &Value) -> Option<(chrono::DateTime<chrono::Local>, Vec<Migration>)> {
+    let at = chrono::DateTime::parse_from_rfc3339(check["checkedAt"].as_str()?).ok()?.with_timezone(&chrono::Local);
+    let items = check["migrations"]
+        .as_array()?
+        .iter()
+        .map(|item| Migration {
+            id: crate::json::text(&item["id"]),
+            name: crate::json::text(&item["name"]),
+            applied: item["applied"].as_bool(),
+        })
+        .collect();
+    Some((at, items))
 }
 
 #[cfg(test)]
@@ -516,7 +581,19 @@ mod tests {
             |c: &Controller| c.context("orders:ShopDbContext").is_some_and(|context| context.status == Status::Ok);
         run_until(&mut sample, &mut rx, checked).await;
         assert_eq!(sample.context("orders:ShopDbContext").unwrap().items.len(), 2);
+        sample.db_label = Some("Other @ localhost".into());
         sample.migrations_changed();
-        assert_eq!(sample.context("orders:ShopDbContext").unwrap().status, Status::Idle, "another database");
+        assert_eq!(sample.context("orders:ShopDbContext").unwrap().status, Status::Idle, "not checked on this one");
+
+        // The next run shows the last check on each database.
+        let (mut next, _rx) = sample_with(&temp, None, true, json!({}));
+        assert_eq!(next.state_dir, sample.state_dir);
+        std::fs::create_dir_all(snapshot.parent().unwrap()).unwrap();
+        std::fs::write(&snapshot, "[DbContext(typeof(ShopDbContext))]").unwrap();
+        next.db_label = None;
+        assert!(next.open_migrations());
+        let kept = next.context("orders:ShopDbContext").unwrap();
+        assert_eq!((kept.status, kept.items.len(), kept.db.as_str()), (Status::Ok, 2, "the database"));
+        assert!(kept.checked_at.is_some());
     }
 }

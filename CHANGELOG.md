@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.4.0] - 2026-10-22
+
+### Added
+- The migrations view keeps its checks between runs, per database: after lazyrunner opens again, or the database is switched back, each context shows its last check there and when it was made (the day too once it isn't today)
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

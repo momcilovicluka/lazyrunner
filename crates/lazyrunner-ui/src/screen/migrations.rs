@@ -380,9 +380,7 @@ fn details(
     }
     let applied = context.items.iter().filter(|migration| migration.applied == Some(true)).count();
     let pending = context.pending().len();
-    let checked = context
-        .checked_at
-        .map_or(String::new(), |at| format!(" · checked {} on {}", at.format("%H:%M:%S"), context.db));
+    let checked = context.checked().map_or(String::new(), |at| format!(" · checked {at} on {}", context.db));
     let color = if pending > 0 { C::Yellow } else { C::Green };
     lines.push(vec![seg(format!("{applied} applied · {pending} pending{checked}"), color)]);
     if !context.known() {
