@@ -99,10 +99,16 @@ pub fn save_stamp(state: &Path, root: &Path, key: &str, project: &str, fingerpri
     let _ = crate::config::write(&stamp_path(state, key), &stamp);
 }
 
-/// The projects a build compiles: the project and everything it references, directly or not.
+/// How many projects a build compiles.
 pub fn project_count(project: &Path) -> usize {
+    projects(project).len()
+}
+
+/// The projects a build compiles: the project and everything it references, directly or not, nearest first.
+pub fn projects(project: &Path) -> Vec<PathBuf> {
     static REFERENCE: LazyLock<Regex> = LazyLock::new(|| pattern(r#"(?i)<ProjectReference\s+Include="([^"$]+)""#));
     let mut seen: HashSet<String> = HashSet::new();
+    let mut found = Vec::new();
     let mut queue = VecDeque::from([project.to_path_buf()]);
     while let Some(path) = queue.pop_front() {
         let Ok(text) = json::read_text(&path) else { continue };
@@ -110,11 +116,12 @@ pub fn project_count(project: &Path) -> usize {
             continue;
         }
         let dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
-        for found in REFERENCE.captures_iter(&text) {
-            queue.push_back(normalize(&dir.join(crate::profile::native(&found[1]))));
+        for reference in REFERENCE.captures_iter(&text) {
+            queue.push_back(normalize(&dir.join(crate::profile::native(&reference[1]))));
         }
+        found.push(path);
     }
-    seen.len()
+    found
 }
 
 /// A path with `.` and `..` resolved (without touching the disk).

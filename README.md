@@ -219,6 +219,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `f` | Reduced motion: nothing blinks, spins, glides or fades |
 | `g` | `L` opens the git tool beside lazyrunner, in a Windows Terminal pane |
 | `i` | Nerd Font icons (on by default): the title bars, the status line, the views' headers and marks |
+| `o` | `M` checks the migrations against the database when it opens (off: `r` / `R` in it) |
 | `c` | What's new: the changelog |
 | `A` | About lazyrunner (below) |
 
@@ -295,8 +296,7 @@ install JesseDuffield.lazygit`, `scoop install lazygit`).
 
 ## Migrations (`M`)
 
-Give a .NET app `"migrations"` in the profile and `M` shows each of its DbContexts on the left and the selected one's
-migrations on the right, newest first: applied (✓), pending (◌) and the current one, as the database the app uses
+`M` shows the DbContexts on the left and the selected one's migrations on the right, newest first: applied (✓), pending (◌) and the current one, as the database the app uses
 has them. `dotnet ef` (`dotnet tool install --global dotnet-ef`) runs with the app's project as the startup project,
 its Development settings - so the database you picked with `d` - and its last build (`b` rebuilds it); in the
 background, one job at a time, waiting while an app builds.
@@ -306,10 +306,18 @@ background, one job at a time, waiting while an app builds.
   "migrations": { "project": "src/Data/Data.csproj", "contexts": ["ShopDbContext"] } }
 ```
 
-`project` is the one with the migrations (the app's own when left out); without `contexts` lazyrunner finds them with
-`dotnet ef dbcontext list`. `l` chooses a migration, `m` moves the context to it - forward applies up to it, back
-reverts the newer ones through their `Down()` - and `u` applies what's pending (`U`: in every context); each asks
-first, naming the database. `r` checks again; switching the database or the branch does too.
+lazyrunner finds them by itself: the EF Core model snapshots (`*ModelSnapshot.cs`) in each .NET app's project and the
+projects it builds, and the DbContext each is of - a project once, for the first app that builds it, which is the
+startup project. `"migrations"` in an app's profile says where instead (above): `project` is the one with the
+migrations (the app's own when left out), and without `contexts` its model snapshots name them, else
+`dotnet ef dbcontext list` finds them.
+
+Checking a context against the database takes `dotnet ef` a few seconds, so `M` doesn't by itself: `r` checks the
+selected context, `R` finds the contexts again (a branch may add some) and checks them all. With
+`checkMigrationsOnOpen` (`, o`) `M` checks them all each time it opens, and switching the database or the branch
+checks them again; without it those say "not checked". `l` chooses a migration, `m` moves the context to it - forward
+applies up to it, back reverts the newer ones through their `Down()` - and `u` applies what's pending (`U`: in every
+context); each asks first, naming the database.
 
 ## Requests (`H`)
 
@@ -441,6 +449,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
 | `nerdIcons` | `true` | Nerd Font icons in the chrome; for a terminal whose font is a Nerd Font (a "Mono" one) |
+| `checkMigrationsOnOpen` | `false` | `M` checks every DbContext against the database when it opens, and again after a database or branch switch |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |

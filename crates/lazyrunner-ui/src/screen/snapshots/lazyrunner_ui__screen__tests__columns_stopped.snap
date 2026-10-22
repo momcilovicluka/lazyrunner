@@ -1,5 +1,6 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
+assertion_line: 196
 expression: screen.frame()
 ---
  ▸ ◆ Orders  :58201  ┳ ■ Billing  :58202  ○┬ ■ Shop  :58301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :58303  ○
@@ -27,6 +28,6 @@ expression: screen.frame()
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
-              g [ ] git beside   i [ ] nerd icons
+              g [ ] git beside   i [ ] nerd icons   o [ ] check migrations on M
 
  12:00:00 Ready - press U to start everything (auto-start when lazyrunner opens is off: , then u turns it on).

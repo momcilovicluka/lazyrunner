@@ -33,10 +33,11 @@ pub enum Toggle {
     ReducedMotion,
     GitBeside,
     NerdIcons,
+    CheckMigrationsOnOpen,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 12] = [
+    pub const ALL: [Toggle; 13] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -49,6 +50,7 @@ impl Toggle {
         Toggle::ReducedMotion,
         Toggle::GitBeside,
         Toggle::NerdIcons,
+        Toggle::CheckMigrationsOnOpen,
     ];
 
     /// Its name in the settings file.
@@ -66,13 +68,18 @@ impl Toggle {
             Toggle::ReducedMotion => "reducedMotion",
             Toggle::GitBeside => "gitBeside",
             Toggle::NerdIcons => "nerdIcons",
+            Toggle::CheckMigrationsOnOpen => "checkMigrationsOnOpen",
         }
     }
 
     pub fn default_on(self) -> bool {
         !matches!(
             self,
-            Toggle::AutoRestartOnBranchChange | Toggle::RestartOnCodeChange | Toggle::ReducedMotion | Toggle::GitBeside
+            Toggle::AutoRestartOnBranchChange
+                | Toggle::RestartOnCodeChange
+                | Toggle::ReducedMotion
+                | Toggle::GitBeside
+                | Toggle::CheckMigrationsOnOpen
         )
     }
 

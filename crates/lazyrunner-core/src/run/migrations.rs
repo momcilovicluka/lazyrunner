@@ -1,12 +1,15 @@
-//! Migrations (M): the EF Core migrations of each DbContext a .NET app's `"migrations"` names (or `dotnet ef dbcontext
-//! list` finds), which are applied to the database the app uses and which are pending. `dotnet ef` runs through the
+//! Migrations (M): the EF Core migrations of each DbContext - those of the model snapshots in the projects a .NET app
+//! builds, or those its `"migrations"` names (or `dotnet ef dbcontext list` finds) - which are applied to the database
+//! the app uses and which are pending. `dotnet ef` runs through the
 //! app's project as the startup project with `--environment Development`, so it reads the same user secrets (the
 //! database picked with d) as the app, and with `--no-build`, so it uses the app's last build.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
+use regex::Regex;
 use serde_json::Value;
 
 /// Lines of a job's output a context keeps to show.
@@ -167,6 +170,59 @@ pub fn failure(lines: &[String], code: Option<i32>) -> String {
     }
 }
 
+/// Folders a search for model snapshots skips: build output, packages, tools' own.
+const SKIPPED: [&str; 5] = ["bin", "obj", "node_modules", ".git", ".vs"];
+/// How many folders deep under a project's own snapshots are looked for.
+const SNAPSHOT_DEPTH: usize = 6;
+
+/// Where an app's migrations are when its profile doesn't say: the projects its project builds (itself first) with
+/// EF Core model snapshots, and their DbContexts.
+pub fn discover(startup: &Path) -> Vec<(PathBuf, Vec<String>)> {
+    crate::run::build::projects(startup)
+        .into_iter()
+        .map(|project| {
+            let contexts = snapshot_contexts(&project);
+            (project, contexts)
+        })
+        .filter(|(_, contexts)| !contexts.is_empty())
+        .collect()
+}
+
+/// The DbContexts with migrations in a project: the `[DbContext(typeof(...))]` of each `*ModelSnapshot.cs` in its
+/// folder (not in another project's under it), sorted.
+pub fn snapshot_contexts(project: &Path) -> Vec<String> {
+    static CONTEXT: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\[DbContext\(typeof\(([\w.]+)\)\)\]").expect("a valid pattern"));
+    let mut names = BTreeSet::new();
+    let mut folders = vec![(project.parent().unwrap_or(Path::new(".")).to_path_buf(), 0)];
+    while let Some((folder, depth)) = folders.pop() {
+        let Ok(entries) = std::fs::read_dir(&folder) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if path.is_dir() {
+                let skipped = SKIPPED.iter().any(|skip| name.eq_ignore_ascii_case(skip));
+                if depth < SNAPSHOT_DEPTH && !skipped && !has_project(&path) {
+                    folders.push((path, depth + 1));
+                }
+            } else if name.ends_with("ModelSnapshot.cs")
+                && let Ok(text) = std::fs::read_to_string(&path)
+            {
+                let found =
+                    CONTEXT.captures_iter(&text).filter_map(|found| found[1].rsplit('.').next().map(String::from));
+                names.extend(found);
+            }
+        }
+    }
+    names.into_iter().collect()
+}
+
+fn has_project(folder: &Path) -> bool {
+    std::fs::read_dir(folder).is_ok_and(|entries| {
+        entries.flatten().any(|entry| entry.path().extension().is_some_and(|extension| extension == "csproj"))
+    })
+}
+
 /// Whether the startup project has a build for `--no-build` to use (bin/Debug/<framework>/<name>.dll).
 pub fn built(startup: &Path) -> bool {
     let Some(name) = startup.file_stem() else { return false };
@@ -217,6 +273,33 @@ mod tests {
         let missing = lines(&["Could not execute because the specified command or file was not found."]);
         assert!(failure(&missing, Some(1)).starts_with("dotnet ef isn't installed"));
         assert_eq!(failure(&[], Some(3)), "dotnet ef exited with code 3");
+    }
+
+    #[test]
+    fn migrations_are_found_by_their_model_snapshots_in_the_projects_an_app_builds() {
+        let temp = crate::testing::TempDir::new("snapshots");
+        let write = |path: &str, text: &str| {
+            let path = temp.join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        let reference =
+            |to: &str| format!(r#"<Project><ItemGroup><ProjectReference Include="{to}" /></ItemGroup></Project>"#);
+        write("Api/Api.csproj", &reference(r"..\Data\Data.csproj"));
+        write("Data/Data.csproj", "<Project />");
+        let snapshot = |context: &str| format!("[DbContext(typeof({context}))]\npartial class Snapshot {{}}");
+        write("Data/Migrations/ShopDbContextModelSnapshot.cs", &snapshot("ShopDbContext"));
+        write("Data/Migrations/Audit/AuditDbContextModelSnapshot.cs", &snapshot("Shop.Data.AuditDbContext"));
+        write("Data/bin/Debug/Old/StaleDbContextModelSnapshot.cs", &snapshot("StaleDbContext"));
+        write("Data/Tools/Tools.csproj", "<Project />");
+        write("Data/Tools/ToolDbContextModelSnapshot.cs", &snapshot("ToolDbContext"));
+        let found = discover(&temp.join("Api/Api.csproj"));
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].0.ends_with("Data.csproj"));
+        assert_eq!(found[0].1, ["AuditDbContext", "ShopDbContext"], "not build output's, nor another project's");
+        assert!(
+            discover(&temp.join("Data/Tools/Tools.csproj")).iter().all(|(_, contexts)| contexts == &["ToolDbContext"])
+        );
     }
 
     #[test]
