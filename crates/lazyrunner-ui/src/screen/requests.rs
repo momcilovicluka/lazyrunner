@@ -7,6 +7,7 @@ use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
 
 use super::columns::{contains_ignore_case, fit};
+use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg, take_cells};
 use super::theme::C;
@@ -268,7 +269,7 @@ fn cut(text: &str, cells: usize) -> String {
 }
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let cursor = ui.cursor();
+    let (cursor, nerd) = (ui.cursor(), ui.nerd);
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return Vec::new() };
     let list = shown(view, controller);
     if !view.follow && view.selected != 0 {
@@ -278,7 +279,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         }
     }
     let height = rows.saturating_sub(4);
-    let mut out = vec![header(view, controller, &list, width, cursor), hint(view, controller, width)];
+    let mut out = vec![header(view, controller, &list, width, cursor, nerd), hint(view, controller, width)];
     match view.tab {
         Tab::Requests => {
             view.index = view.index.min(list.len().saturating_sub(1));
@@ -306,7 +307,7 @@ fn detail(controller: &Controller, request: Option<&Request>) -> String {
     format!(" {method} {path}   {status} · {} ms{length}{content} · {name} · {at}", ms(request.ms))
 }
 
-fn header(view: &View, controller: &Controller, list: &[&Request], width: usize, cursor: &str) -> Vec<Seg> {
+fn header(view: &View, controller: &Controller, list: &[&Request], width: usize, cursor: &str, nerd: bool) -> Vec<Seg> {
     let errors = list.iter().filter(|request| request.status >= 400).count();
     let avg =
         if list.is_empty() { 0.0 } else { list.iter().map(|request| request.ms).sum::<f64>() / list.len() as f64 };
@@ -320,7 +321,8 @@ fn header(view: &View, controller: &Controller, list: &[&Request], width: usize,
     if !view.filter.is_empty() || view.typing {
         filters.push(format!("/{}{}", view.filter, if view.typing { cursor } else { "" }));
     }
-    let mut segs = vec![on(" ⇄ Requests ", C::Black, C::Cyan), seg("  ", C::Gray)];
+    let chip = format!(" {} Requests ", icons::icon(nerd, Icon::Requests));
+    let mut segs = vec![on(chip, C::Black, C::Cyan), seg("  ", C::Gray)];
     for (tab, label) in [(Tab::Requests, " requests "), (Tab::Endpoints, " endpoints ")] {
         segs.push(if view.tab == tab { on(label, C::FocusText, C::FocusBack) } else { seg(label, C::DarkGray) });
     }

@@ -6,7 +6,7 @@ expression: screen.frame()
 
 
 
-  ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
+  ┌─ Keys · lazyrunner v<version> ─────────────────────────────────────────────────────────────────────────────┐
   │ Run                                                         View                                       │
   │   Space       Start / stop the focused app                    /           Search the focused app's ou… │
   │   u U         Start · focused / all                           z           Zoom the focused column      │

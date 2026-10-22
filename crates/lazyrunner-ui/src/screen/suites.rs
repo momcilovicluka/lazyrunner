@@ -12,6 +12,7 @@ use lazyrunner_core::run::format_duration;
 use lazyrunner_core::run::suites::{Outcome, Status, Suite, TestResult};
 
 use super::columns::{chunk, fit, linked, spinner};
+use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg, take_cells};
 use super::theme::C;
@@ -413,7 +414,7 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
         ("not run yet".to_string(), C::DarkGray)
     };
     let segs = vec![
-        on(" ⚗ Tests ", C::FocusText, C::FocusBack),
+        on(format!(" {} Tests ", icons::icon(ui.nerd, Icon::Tests)), C::FocusText, C::FocusBack),
         seg(format!("  {count} suite{} · ", if count == 1 { "" } else { "s" }), C::DarkGray),
         seg(summary, color),
     ];
@@ -819,7 +820,8 @@ impl Details<'_> {
 /// failed or didn't run), or "⚗ ⠋ testing 6 +10 queued" while they run.
 pub fn badge(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
     if let Some(running) = status(controller) {
-        return Some((format!("⚗ {} {running}", icon(ui, Status::Running)), C::Yellow));
+        let flask = icons::icon(ui.nerd, Icon::Tests);
+        return Some((format!("{flask} {} {running}", icon(ui, Status::Running)), C::Yellow));
     }
     let totals = controller.test_totals();
     if totals.ran == 0 {
@@ -827,7 +829,8 @@ pub fn badge(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
     }
     let errors = if totals.errors > 0 { format!(" !{}", totals.errors) } else { String::new() };
     let color = if totals.failed > 0 || totals.errors > 0 { C::Red } else { C::Green };
-    Some((format!("⚗ ✓{} ✗{}{errors}", totals.passed, totals.failed), color))
+    let flask = icons::icon(ui.nerd, Icon::Tests);
+    Some((format!("{flask} ✓{} ✗{}{errors}", totals.passed, totals.failed), color))
 }
 
 /// What the panel's status says while tests run: "testing 2 +3…" (running, and queued).

@@ -10,6 +10,7 @@ use lazyrunner_core::run::format_duration;
 use lazyrunner_core::run::migrations::{Context, Migration, Status};
 
 use super::columns::{fit, spinner};
+use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::overlays::boxed;
 use super::seg::{Seg, aim, on, pad, seg, take_cells};
@@ -235,7 +236,7 @@ pub fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, b
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let all = contexts(controller);
     let spin = if ui.reduced_motion { '●' } else { spinner(ui.tick()) };
-    let now = ui.now;
+    let (now, nerd) = (ui.now, ui.nerd);
     let Some(Overlay::Migrations { index, picking }) = &mut ui.overlay else { return Vec::new() };
     *index = (*index).min(all.len().saturating_sub(1));
     let (selected, picking) = (*index, *picking);
@@ -259,7 +260,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     };
     let db = controller.db_label.clone().unwrap_or_else(|| "n/a".into());
     let header = vec![
-        on(" ⛁ Migrations ", C::Black, C::Cyan),
+        on(format!(" {} Migrations ", icons::icon(nerd, Icon::Migrations)), C::Black, C::Cyan),
         seg("   database ", C::DarkGray),
         seg(db, C::Yellow),
         seg(working, C::Yellow),

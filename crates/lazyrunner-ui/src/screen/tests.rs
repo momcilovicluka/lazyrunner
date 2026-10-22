@@ -666,6 +666,22 @@ async fn i_asks_npm_ci_or_npm_install_and_the_menu_and_palette_have_both() {
     assert!(palette.contains("[i n]") && palette.contains("[i c]"), "{palette}");
 }
 
+// ---------------------------------------------------------------- Nerd Font icons
+
+#[tokio::test]
+async fn nerd_icons_swap_the_chromes_symbols_and_leave_an_apps_own() {
+    let mut screen = screen("nerd", json!({}));
+    let plain = screen.frame();
+    assert!(plain.contains("⎇ main") && plain.contains("■ Billing"), "{plain}");
+    screen.press(", i Esc");
+    assert!(screen.controller.setting(Toggle::NerdIcons));
+    let nerd = screen.frame();
+    assert!(nerd.contains("\u{e725} main"), "the branch: {nerd}");
+    assert!(nerd.contains("\u{e77f} Billing"), ".NET, Billing having no icon of its own");
+    assert!(nerd.contains("◆ Orders"), "Orders keeps its own icon");
+    assert!(nerd.contains("\u{e718} Shop"), "Node.js");
+}
+
 // ---------------------------------------------------------------- reload window
 
 #[tokio::test]
