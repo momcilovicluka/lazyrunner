@@ -666,6 +666,34 @@ async fn i_asks_npm_ci_or_npm_install_and_the_menu_and_palette_have_both() {
     assert!(palette.contains("[i n]") && palette.contains("[i c]"), "{palette}");
 }
 
+// ---------------------------------------------------------------- reload window
+
+#[tokio::test]
+async fn ctrl_r_reads_the_settings_again_and_plays_its_show() {
+    let mut screen = screen("reload", json!({}));
+    let file = screen.temp.join("config.json");
+    std::fs::write(&file, r#"{ "layout": "columns", "theme": "catppuccin-mocha" }"#).unwrap(); // a hand edit
+    screen.press("Ctrl+R");
+    assert_eq!(screen.ui.theme.id, "catppuccin-mocha", "the edited theme");
+    assert!(screen.ui.reset_terminal, "the loop sets the terminal up again");
+    assert!(screen.ui.is_animating(&screen.controller));
+    screen.ui.now += Duration::from_millis(600); // the stage: the logo, the bar
+    let stage = screen.frame();
+    assert!(stage.contains("▀▀▀ ▀ ▀ ▀▀▀") && stage.contains("↻ reloading"), "{stage}");
+    screen.ui.now += Duration::from_secs(2);
+    let after = screen.frame();
+    assert!(screen.ui.reload.is_none() && after.contains("Orders"), "the show is over: {after}");
+    assert!(screen.last_log().starts_with("↻ Window reloaded"));
+}
+
+#[tokio::test]
+async fn with_reduced_motion_ctrl_r_reloads_without_a_show() {
+    let mut screen = screen("reload-still", json!({ "reducedMotion": true }));
+    screen.press("Ctrl+R");
+    assert!(screen.ui.reload.is_none());
+    assert!(screen.last_log().starts_with("↻ Window reloaded"));
+}
+
 // ---------------------------------------------------------------- the migrations view
 
 #[tokio::test]

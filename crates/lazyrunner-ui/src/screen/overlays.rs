@@ -14,7 +14,7 @@ use super::seg::{Seg, aim, limit, on, pad, seg, width};
 use super::theme::C;
 use super::{Overlay, Ui};
 
-const LOGO: [&str; 3] = [
+pub(super) const LOGO: [&str; 3] = [
     "█   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄",
     "█   █▀█ ▄▀  ▀█▀ █▀▄ █ █ █ █ █ █ █▀  █▀▄",
     "▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀",

@@ -280,6 +280,14 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 None => dirty = true,
             }
         }
+        if std::mem::take(&mut ui.reset_terminal) && git_tool.is_none() {
+            if let Err(error) = surface.reset() {
+                controller.add_log(format!("✗ Couldn't set the terminal up again: {error}"), Hue::Red);
+            }
+            mouse.again(controller.setting(Toggle::Mouse));
+            outside.again();
+            dirty = true;
+        }
         mouse.set(controller.setting(Toggle::Mouse) && git_tool.is_none());
         if let Some(Exit::Reopen { root, .. }) = &ui.exit
             && hands_over_to(&controller, &profiles, root)
@@ -578,6 +586,12 @@ impl Outside {
             let mut stdout = io::stdout();
             let _ = stdout.write_all(sequence.as_bytes()).and_then(|()| stdout.flush());
         }
+    }
+
+    /// Writes the tab and the terminal's colours again on the next update (Ctrl+R).
+    fn again(&mut self) {
+        self.tab.clear();
+        self.theme = None;
     }
 
     fn update(&mut self, ui: &Ui, controller: &Controller) {

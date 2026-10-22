@@ -28,6 +28,11 @@ pub trait Surface {
     fn take_back(&mut self) -> Result<()> {
         Ok(())
     }
+
+    /// Sets the terminal up again (Ctrl+R): raw mode, the alternate screen, no cursor, and a full repaint.
+    fn reset(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl Surface for Terminal<CrosstermBackend<Stdout>> {
@@ -55,6 +60,13 @@ impl Surface for Terminal<CrosstermBackend<Stdout>> {
         crossterm::terminal::enable_raw_mode()?;
         execute!(self.backend_mut(), EnterAlternateScreen, Hide)?;
         ignore_ctrl_c(false);
+        self.clear()?;
+        Ok(())
+    }
+
+    fn reset(&mut self) -> Result<()> {
+        crossterm::terminal::enable_raw_mode()?;
+        execute!(self.backend_mut(), EnterAlternateScreen, Hide)?;
         self.clear()?;
         Ok(())
     }
@@ -119,6 +131,14 @@ impl MouseCapture {
         if done.is_ok() {
             MOUSE.store(on, Ordering::Relaxed);
         }
+    }
+}
+
+impl MouseCapture {
+    /// Asks the terminal for the mouse again (or gives it back), whatever it was told before (Ctrl+R).
+    pub fn again(&mut self, on: bool) {
+        MOUSE.store(!on, Ordering::Relaxed);
+        self.set(on);
     }
 }
 

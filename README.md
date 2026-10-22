@@ -198,6 +198,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `<` / `>` | The first / last: the oldest output and following new output again in a column, the first and last item in a list or box (as in lazygit) |
 | `\|` | Layout: auto (stacked below 120 cells) → columns side by side → stacked top to bottom (saved) |
 | `Ctrl+L` | Clear all columns and the panel log |
+| `Ctrl+R` | **Reload window**, like VS Code's: reads the settings and themes again, sets the terminal up again (screen, mouse, tab, colours) and repaints - with a little CRT show (none with reduced motion). The apps keep running. Handy after editing a setting or a theme by hand, or when the terminal got garbled |
 | `t` | Theme picker: preview each theme live, `Enter` keeps one (saved), `Esc` undoes; see [Themes](#themes) |
 | `?` | Key reference |
 | `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting |

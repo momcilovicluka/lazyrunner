@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.20.0] - 2026-10-22
+
+### Added
+- Reload window (`Ctrl+R`), like VS Code's: reads the settings and themes again, sets the terminal up again (screen, mouse, tab, colours) and repaints, while the apps keep running. It plays a little CRT show - the screen powers off into a glowing line and a sparkle, the logo shimmers in rainbow colours over twinkling stars with a progress bar, then the fresh UI powers on from the middle - and with reduced motion just reloads
+
 ## [0.19.0] - 2026-10-22
 
 ### Added
