@@ -12,6 +12,7 @@ pub mod links;
 pub mod mouse;
 pub mod overlays;
 pub mod panel;
+pub mod requests;
 pub mod seg;
 pub mod status;
 pub mod suites;
@@ -75,6 +76,8 @@ pub enum Overlay {
     Durations {
         top: usize,
     },
+    /// `H`: the HTTP requests the .NET apps served.
+    Requests(Box<requests::View>),
     /// `T`: the test suites; the selected one, how far its details are scrolled, and the test picked in it (`l`).
     Tests {
         index: usize,
@@ -100,6 +103,7 @@ impl Overlay {
             Self::Changelog { .. } => "changelog",
             Self::Durations { .. } => "durations",
             Self::Tests { .. } => "tests",
+            Self::Requests(_) => "requests",
             Self::Themes { .. } => "themes",
         }
     }
@@ -274,7 +278,8 @@ impl Ui {
         }
         let typing = self.search.as_ref().is_some_and(|search| search.typing)
             || matches!(self.overlay, Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. }))
-            || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
+            || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
+            || matches!(&self.overlay, Some(Overlay::Requests(view)) if view.typing);
         typing
             || self.busy.is_some()
             || controller.building.is_some()
@@ -330,6 +335,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
+        Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         _ => {}

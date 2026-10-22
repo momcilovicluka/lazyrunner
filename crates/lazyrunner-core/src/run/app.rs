@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use regex::Regex;
 
 use super::child::Child;
+use super::requests;
 use crate::output::{Hue, Output};
 use crate::profile::App;
 
@@ -64,6 +65,8 @@ pub struct AppState {
     pub flash_until: Option<Instant>,
     /// The level of the last ASP.NET log entry: its indented lines take its colour.
     last_level: String,
+    /// The line before was a request log entry's header (its message comes next).
+    request_header: bool,
     log: Option<BufWriter<File>>,
     /// What the log file holds (so it starts over at `LOG_CAP`).
     log_bytes: u64,
@@ -97,6 +100,7 @@ impl AppState {
             requests: 0,
             flash_until: None,
             last_level: "info".into(),
+            request_header: false,
             log: None,
             log_bytes: 0,
             log_path: None,
@@ -174,6 +178,11 @@ impl AppState {
         if self.scroll > 0 {
             self.scroll = (self.scroll + 1).min(self.output.len().saturating_sub(1)); // a scrolled-back view stays put
         }
+        self.log_line(text);
+    }
+
+    /// A line for the log file only.
+    fn log_line(&mut self, text: &str) {
         if let Some(log) = &mut self.log {
             let _ = writeln!(log, "{text}");
             self.log_bytes += text.len() as u64 + 1;
@@ -183,9 +192,23 @@ impl AppState {
         }
     }
 
-    /// A line the app printed: coloured, counted (errors flash the title), then added.
-    pub fn receive(&mut self, app: &App, raw: &str, now: Instant) {
+    /// A line the app printed: coloured, counted (errors flash the title), then added. A request log line goes to
+    /// the log file only, and a finished request comes back (for the requests view).
+    pub fn receive(&mut self, app: &App, raw: &str, now: Instant) -> Option<requests::Finished> {
         let text = crate::output::strip_ansi(raw).replace('\t', "    ");
+        if app.traits().counts_requests {
+            match requests::classify(&text, &mut self.request_header) {
+                requests::Line::Other => {}
+                requests::Line::Hidden => {
+                    self.log_line(&text);
+                    return None;
+                }
+                requests::Line::Finished(request) => {
+                    self.log_line(&text);
+                    return Some(request);
+                }
+            }
+        }
         let hue = self.hue_of(app, &text);
         let colors_errors = app.traits().colors_errors;
         if LEVEL_ERROR.is_match(&text) || (colors_errors && hue == Hue::Red) {
@@ -196,10 +219,8 @@ impl AppState {
         {
             self.warnings += 1;
         }
-        if text.contains("Request finished ") {
-            self.requests += 1;
-        }
         self.add_line(&text, hue, now);
+        None
     }
 
     fn hue_of(&mut self, app: &App, text: &str) -> Hue {
@@ -232,6 +253,7 @@ impl AppState {
         self.errors = 0;
         self.warnings = 0;
         self.requests = 0;
+        self.request_header = false;
         self.cpu = None;
         for history in
             [&mut self.cpu_history, &mut self.memory_history, &mut self.response_history, &mut self.request_history]

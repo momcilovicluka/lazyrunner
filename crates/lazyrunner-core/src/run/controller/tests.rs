@@ -47,6 +47,28 @@ async fn stopping_nothing_says_so_and_stop_all_names_what_it_keeps() {
 }
 
 #[tokio::test]
+async fn request_lines_go_to_the_requests_view_and_the_probe_is_left_out() {
+    let temp = TempDir::new("controller-requests");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    let generation = sample.states[0].generation;
+    for line in [
+        "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
+        "      Request finished HTTP/1.1 GET http://localhost:58201/swagger/index.html - 200 - text/html 3.1ms",
+        "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
+        "      Request finished HTTP/1.1 GET http://localhost:58201/api/orders/7 - 404 0 - 12.5ms",
+        "info: Orders.Api[0]",
+    ] {
+        let tag = crate::run::Tag::App { key: "orders".into(), generation };
+        sample.handle(crate::run::Event::Output { tag, line: line.into() });
+    }
+    let paths: Vec<&str> = sample.requests.items.iter().map(|request| request.path.as_str()).collect();
+    assert_eq!(paths, ["/api/orders/7"], "not the probe");
+    assert_eq!(sample.requests.items[0].endpoint, "/api/orders/{id}");
+    assert_eq!(sample.states[0].requests, 1, "the req/s count");
+    assert_eq!(sample.states[0].output.len(), 1, "only the app's own line shows in its column");
+}
+
+#[tokio::test]
 async fn b_on_an_app_without_a_separate_build_says_so() {
     let temp = TempDir::new("controller-build-only");
     let (mut sample, _rx) = controller(&temp, json!({}));
