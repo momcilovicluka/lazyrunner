@@ -57,6 +57,11 @@ pub trait Commands: Send + Sync {
     fn build(&self, root: &Path, project: &str) -> Spec;
     fn npm_ci(&self, dir: &Path) -> Result<Spec>;
 
+    /// `dotnet ef` with these arguments, in the repo.
+    fn ef(&self, root: &Path, args: Vec<OsString>) -> Spec {
+        Spec { program: dotnet(), args, dir: root.to_path_buf(), env: Vec::new() }
+    }
+
     /// `npm install`: packages added and updated to match package.json (the lock file may change).
     fn npm_install(&self, dir: &Path) -> Result<Spec> {
         npm_install_command(dir)
@@ -298,6 +303,7 @@ mod tests {
             name: "Orders".into(),
             icon: None,
             tests: Vec::new(),
+            migrations: None,
             kind: AppKind::Dotnet {
                 project: crate::profile::native("services/Orders/Orders.csproj"),
                 launch_profile: "Orders".into(),

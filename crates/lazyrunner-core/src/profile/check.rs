@@ -20,22 +20,25 @@ pub struct Fields {
     pub variant: &'static [&'static str],
     pub when: &'static [&'static str],
     pub ready: &'static [&'static str],
+    pub migrations: &'static [&'static str],
 }
 
 pub const FIELDS: Fields = Fields {
     top: &["$schema", "schemaVersion", "extends", "id", "name", "detect", "watch", "apps"],
     detect: &["anyFile"],
-    dotnet: &["key", "name", "icon", "type", "project", "launchProfile", "swagger", "tests"],
+    dotnet: &["key", "name", "icon", "type", "project", "launchProfile", "swagger", "tests", "migrations"],
     npm: &["key", "name", "icon", "type", "dir", "variants", "tests"],
     variant: &["label", "when", "script", "port", "servedBy", "ready"],
     when: &["packageScript"],
     ready: &["file"],
+    migrations: &["project", "contexts"],
 };
 
 impl Fields {
     pub fn all(&self) -> Vec<&'static str> {
         let mut all: Vec<&str> =
-            [self.top, self.detect, self.dotnet, self.npm, self.variant, self.when, self.ready].concat();
+            [self.top, self.detect, self.dotnet, self.npm, self.variant, self.when, self.ready, self.migrations]
+                .concat();
         all.sort_unstable();
         all.dedup();
         all
@@ -172,6 +175,17 @@ fn check_app<'a>(app: &'a Value, index: usize, keys: &mut HashMap<String, &'a Va
             let swagger = field(app, "swagger");
             if !swagger.is_null() && !text(swagger).starts_with('/') {
                 problems.push(format!("{at}.swagger must start with /, e.g. '/swagger'"));
+            }
+            let setup = field(app, "migrations");
+            if !setup.is_null() {
+                known_fields(setup, FIELDS.migrations, &format!("{at}.migrations"), problems);
+                let project = field(setup, "project");
+                if !project.is_null() {
+                    relative_path(project, &format!("{at}.migrations.project"), problems);
+                    if !CSPROJ.is_match(&text(project)) {
+                        problems.push(format!("{at}.migrations.project must be a .csproj file"));
+                    }
+                }
             }
         }
         Some("npm") => {

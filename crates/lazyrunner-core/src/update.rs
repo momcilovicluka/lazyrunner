@@ -33,6 +33,8 @@ pub const TARGET: &str = env!("LAZYRUNNER_TARGET");
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 /// Checking takes one small request; a release repo that doesn't answer by then is unreachable.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(20);
+/// The release feed is a few KB; more is not GitHub's feed.
+const FEED_BYTES: u64 = 1024 * 1024;
 /// The archive itself may take a while on a slow line.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(300);
 /// GitHub sends release files from another host: a redirect or two.
@@ -356,8 +358,34 @@ pub fn resolve(current: &str, location: &str, allow_http: bool) -> Result<String
     if secure { Ok(target) } else { Err(format!("a redirect off HTTPS ({target})")) }
 }
 
-/// The latest release, from where GitHub redirects `releases/latest` (`…/releases/tag/v1.2.3`).
+/// The newest release: the highest version the release feed lists. GitHub's "Latest" is only the release published
+/// last - not the highest one when several tags go out at once and their builds finish in another order - so it is
+/// the fallback, for when there is no feed to read.
 pub fn latest(source: &Source) -> Result<Release, String> {
+    match newest_in_feed(source) {
+        Some(release) => Ok(release),
+        None => marked_latest(source),
+    }
+}
+
+/// The highest stable release in the repo's `releases.atom` (it isn't rate-limited like GitHub's API).
+fn newest_in_feed(source: &Source) -> Option<Release> {
+    let response = get(&format!("{}/releases.atom", source.url), source, CHECK_TIMEOUT).ok()?;
+    let feed = response.into_body().with_config().limit(FEED_BYTES).read_to_string().ok()?;
+    newest(&feed)
+}
+
+/// The highest version among a feed's `…/releases/tag/<tag>` links, pre-releases left out.
+pub fn newest(feed: &str) -> Option<Release> {
+    feed.split("/releases/tag/")
+        .skip(1)
+        .filter_map(|rest| tag_of(&format!("/releases/tag/{rest}")))
+        .filter(|release| !release.version.contains('-'))
+        .max_by(|a, b| compare(&a.version, &b.version).unwrap_or(Ordering::Equal))
+}
+
+/// The release GitHub marks "Latest", from where it redirects `releases/latest` (`…/releases/tag/v1.2.3`).
+fn marked_latest(source: &Source) -> Result<Release, String> {
     let mut url = format!("{}/releases/latest", source.url);
     for _ in 0..MAX_REDIRECTS {
         let response = agent(CHECK_TIMEOUT).get(&url).call().map_err(|error| request_error(&error, source))?;
@@ -377,7 +405,7 @@ pub fn latest(source: &Source) -> Result<Release, String> {
 
 /// "https://github.com/o/r/releases/tag/v1.2.3" → tag "v1.2.3", version "1.2.3".
 pub fn tag_of(location: &str) -> Option<Release> {
-    let tag = location.split("/releases/tag/").nth(1)?.split(['?', '#', '/']).next()?;
+    let tag = location.split("/releases/tag/").nth(1)?.split(['?', '#', '/', '"', '<']).next()?;
     let version = tag.strip_prefix('v').unwrap_or(tag);
     changelog::version(version).map(|_| Release { tag: tag.to_string(), version: version.to_string() })
 }
@@ -596,6 +624,19 @@ mod tests {
         assert_eq!((bare.tag.as_str(), bare.version.as_str()), ("0.3.0", "0.3.0"), "a tag without v stays without");
         assert_eq!(tag_of("https://github.com/o/r/releases"), None);
         assert_eq!(tag_of("https://github.com/o/r/releases/tag/nightly"), None);
+    }
+
+    #[test]
+    fn the_newest_release_is_the_highest_version_not_the_last_published() {
+        let feed = r#"<feed>
+  <entry><id>tag:github.com,2008:Repository/1/v0.15.0</id><link rel="alternate" type="text/html" href="https://github.com/o/r/releases/tag/v0.15.0"/></entry>
+  <entry><link rel="alternate" type="text/html" href="https://github.com/o/r/releases/tag/v0.18.0"/></entry>
+  <entry><link rel="alternate" type="text/html" href="https://github.com/o/r/releases/tag/v0.19.0-beta.1"/></entry>
+  <entry><link rel="alternate" type="text/html" href="https://github.com/o/r/releases/tag/v0.9.3"/></entry>
+</feed>"#;
+        let newest = newest(feed).unwrap();
+        assert_eq!((newest.tag.as_str(), newest.version.as_str()), ("v0.18.0", "0.18.0"), "not a pre-release");
+        assert_eq!(super::newest("<feed></feed>"), None);
     }
 
     #[test]

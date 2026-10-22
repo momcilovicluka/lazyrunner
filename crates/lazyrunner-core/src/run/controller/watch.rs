@@ -139,6 +139,7 @@ impl Controller {
         if !self.test_queue.is_empty() {
             self.pump_tests(); // what waited for a build or npm ci
         }
+        self.pump_migrations();
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {
@@ -367,6 +368,7 @@ impl Controller {
         self.test_profile_change();
         self.update_modes();
         self.test_lock_changed();
+        self.migrations_changed();
         let running: Vec<String> = self.keys().into_iter().filter(|key| self.is_running(key)).collect();
         if !self.setting(Toggle::AutoRestartOnBranchChange) {
             self.add_log(format!("Branch changed {previous} → {branch} (auto-restart is off, press R)"), Hue::Yellow);
@@ -474,6 +476,7 @@ impl Controller {
             return;
         }
         self.refresh_db_label();
+        self.migrations_changed();
         self.add_log(
             format!(
                 "Database → {}  ({}; previous file saved as secrets.json.lazyrunner-backup)",

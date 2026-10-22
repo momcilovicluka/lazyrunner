@@ -141,6 +141,7 @@ impl Controller {
             build::remove_stamp(&self.state_dir, key);
         }
         self.pause_test_build(&format!("the {} build", app.name));
+        self.pause_migrations();
         let spec = self.commands.build(&self.root, project);
         let file = Path::new(project).file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
         self.pane(key, &format!("──── ⚙ {} · dotnet build {file} ────", clock()), Hue::Cyan);

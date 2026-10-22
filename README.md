@@ -176,6 +176,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `o` | Open the focused app's full log file (or the failed build's log) |
 | `y` | Copy from the focused app's output - it asks what: `y` the last error with its stack trace (a failed build's errors with full paths), `e` every error, `w` every warning, `a` both in order (repeats once), `s` the search match, `o` all of it |
 | `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |
+| `M` | **Migrations**: the EF Core migrations, applied and pending, per DbContext; apply or roll back (below) |
 | `H` | **Requests**: the HTTP requests the .NET apps served, per endpoint too (below) |
 | `T` | **Tests**: the project's test suites - run them in the background, see what failed, run one test (below) |
 | `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
@@ -282,6 +283,24 @@ watching them (a branch you switch to in lazygit restarts them as usual, if that
 update waits until you're back. With `,` then `g` in Windows Terminal, `L` opens lazygit in a pane beside lazyrunner
 instead, so you see both. Another git tool: `"gitTool"` (for example `"gitui"`). lazygit has to be installed (`winget
 install JesseDuffield.lazygit`, `scoop install lazygit`).
+
+## Migrations (`M`)
+
+Give a .NET app `"migrations"` in the profile and `M` shows each of its DbContexts on the left and the selected one's
+migrations on the right, newest first: applied (✓), pending (◌) and the current one, as the database the app uses
+has them. `dotnet ef` (`dotnet tool install --global dotnet-ef`) runs with the app's project as the startup project,
+its Development settings - so the database you picked with `d` - and its last build (`b` rebuilds it); in the
+background, one job at a time, waiting while an app builds.
+
+```json
+{ "key": "api", "type": "dotnet", "project": "src/Api/Api.csproj", "launchProfile": "Api",
+  "migrations": { "project": "src/Data/Data.csproj", "contexts": ["ShopDbContext"] } }
+```
+
+`project` is the one with the migrations (the app's own when left out); without `contexts` lazyrunner finds them with
+`dotnet ef dbcontext list`. `l` chooses a migration, `m` moves the context to it - forward applies up to it, back
+reverts the newer ones through their `Down()` - and `u` applies what's pending (`U`: in every context); each asks
+first, naming the database. `r` checks again; switching the database or the branch does too.
 
 ## Requests (`H`)
 

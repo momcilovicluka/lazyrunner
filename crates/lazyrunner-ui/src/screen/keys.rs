@@ -359,6 +359,12 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Migrations { .. }) => {
+            if !super::migrations::key(ui, controller, name) {
+                from_view(ui, controller, name);
+            }
+        }
+        Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
             "UpArrow" | "Ctrl+P" => *index = index.saturating_sub(1),
@@ -514,6 +520,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Durations => super::durations::open(ui, controller),
         Run::Tests => super::suites::open(ui, controller),
         Run::Requests => super::requests::open(ui),
+        Run::Migrations => super::migrations::open(ui, controller),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => ui.search = Some(Search { typing: true, key, ..Search::default() }),

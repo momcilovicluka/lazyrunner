@@ -32,6 +32,7 @@ pub enum Run {
     Durations,
     Tests,
     Requests,
+    Migrations,
     GitTool,
     Menu,
     Search,
@@ -158,6 +159,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Requests: what the .NET apps served",
             "newest or slowest, per endpoint; filter, copy, open",
             Run::Requests,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "M",
+            "Migrations: what's applied to the database",
+            "EF Core, per DbContext; apply or roll back",
+            Run::Migrations,
         )
         .safe(),
         action(

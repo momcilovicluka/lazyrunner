@@ -9,6 +9,7 @@ pub mod copy;
 pub mod durations;
 pub mod keys;
 pub mod links;
+pub mod migrations;
 pub mod mouse;
 pub mod overlays;
 pub mod panel;
@@ -76,6 +77,13 @@ pub enum Overlay {
     Durations {
         top: usize,
     },
+    /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
+    Migrations {
+        index: usize,
+        picking: Option<usize>,
+    },
+    /// The y/n box before migrations are applied or reverted.
+    Confirm(Box<migrations::Confirm>),
     /// `y`: what to copy from the focused app's output.
     Copy {
         index: usize,
@@ -114,6 +122,8 @@ impl Overlay {
             Self::Requests(_) => "requests",
             Self::Install { .. } => "install",
             Self::Copy { .. } => "copy",
+            Self::Migrations { .. } => "migrations",
+            Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
         }
     }
@@ -301,6 +311,7 @@ impl Ui {
             || controller.building.is_some()
             || controller.npm_ci.is_some()
             || controller.tests_active()
+            || controller.migrations_active()
             || controller.celebrate.is_some()
             || controller.states.iter().any(|state| {
                 let fresh = state
@@ -358,6 +369,8 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
         Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),
         Some(Overlay::Copy { .. }) => return overlays::copy(ui, controller, width, rows),
+        Some(Overlay::Migrations { .. }) => return migrations::rows(ui, controller, width, rows),
+        Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         _ => {}

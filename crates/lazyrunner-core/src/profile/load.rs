@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow, bail};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-use super::{App, AppKind, ProfileDirs, Project, REPO_PROFILE_FILE, Source, Variant, check, native};
+use super::{App, AppKind, Migrations, ProfileDirs, Project, REPO_PROFILE_FILE, Source, Variant, check, native};
 use crate::json::{self, field, list, text, truthy};
 
 /// A profile lazyrunner knows besides a repo's own.
@@ -218,7 +218,19 @@ fn to_app(app: &Value) -> App {
         AppKind::Npm { dir: native(&text(field(app, "dir"))), variants }
     };
     let tests = list(field(app, "tests")).into_iter().map(text).collect();
-    App { key: text(field(app, "key")), name: text(field(app, "name")), icon: optional("icon"), kind, tests }
+    let setup = field(app, "migrations");
+    let migrations = setup.is_object().then(|| Migrations {
+        project: truthy(field(setup, "project")).then(|| native(&text(field(setup, "project")))),
+        contexts: list(field(setup, "contexts")).into_iter().map(text).collect(),
+    });
+    App {
+        key: text(field(app, "key")),
+        name: text(field(app, "name")),
+        icon: optional("icon"),
+        kind,
+        tests,
+        migrations,
+    }
 }
 
 fn to_variant(variant: &Value) -> Variant {

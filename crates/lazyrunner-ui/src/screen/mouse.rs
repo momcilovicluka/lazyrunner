@@ -38,6 +38,8 @@ pub enum Target {
     Test(usize),
     /// The tests' summary on the panel's status line: a click opens the tests view.
     Tests,
+    /// A migration of the context selected in the migrations view, by its place in that list (newest first).
+    Migration(usize),
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -122,7 +124,8 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         }
         return;
     }
-    if super::suites::click(ui, controller, target, double) {
+    if super::suites::click(ui, controller, target, double) || super::migrations::click(ui, controller, target, double)
+    {
         return;
     }
     if ui.overlay.is_some() || ui.picker.is_some() {
@@ -179,6 +182,7 @@ fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direc
         }
         Some(Overlay::Checklist(_) | Overlay::Help) => return,
         Some(Overlay::Tests { .. }) => return super::suites::wheel(ui, controller, target, direction > 0),
+        Some(Overlay::Migrations { .. }) => return super::migrations::wheel(ui, controller, target, direction > 0),
         Some(_) => return press(ui, controller, arrow),
         None if ui.picker.is_some() => return press(ui, controller, arrow),
         None => {}
