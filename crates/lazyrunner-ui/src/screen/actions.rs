@@ -42,6 +42,7 @@ pub enum Run {
     EqualWidths,
     Layout,
     Clear,
+    Reload,
     Theme,
     Settings,
     Help,
@@ -204,6 +205,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         )
         .safe(),
         action("View", "Ctrl+L", "Clear output", "", Run::Clear).safe(),
+        action(
+            "View",
+            "Ctrl+R",
+            "Reload window",
+            "the settings and themes read again, the terminal set up again; the apps keep running",
+            Run::Reload,
+        )
+        .safe(),
         action(
             "View",
             "t",

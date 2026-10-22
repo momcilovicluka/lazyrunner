@@ -13,6 +13,7 @@ pub mod migrations;
 pub mod mouse;
 pub mod overlays;
 pub mod panel;
+pub mod reload;
 pub mod requests;
 pub mod seg;
 pub mod status;
@@ -190,6 +191,10 @@ pub struct Ui {
     pub hover: Option<mouse::Target>,
     /// The view (tests, requests) a box or the database picker was opened from: it comes back when that closes.
     pub behind: Option<Overlay>,
+    /// Ctrl+R's show while it plays.
+    pub reload: Option<reload::Show>,
+    /// Ctrl+R: the loop sets the terminal up again (screen, mouse, tab, colours) before the next frame.
+    pub reset_terminal: bool,
     pub started: Instant,
     /// The time of the frame being drawn (fixed in tests).
     pub now: Instant,
@@ -236,6 +241,8 @@ impl Ui {
             last_click: None,
             hover: None,
             behind: None,
+            reload: None,
+            reset_terminal: false,
             started: now,
             now,
             body_rows: 20,
@@ -298,6 +305,9 @@ impl Ui {
 
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
+        if self.reload.is_some() {
+            return true;
+        }
         if self.reduced_motion {
             // Nothing moves: keys, output and the tick redraw what changed (the busy frame still has to show).
             return self.busy.is_some();
@@ -356,6 +366,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     for (y, row) in rows.iter().enumerate().take(height) {
         seg::draw(buf, area.x, area.y + y as u16, area.width, row, &ui.theme, &mut ui.hits);
     }
+    reload::paint(buf, area, ui);
 }
 
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {

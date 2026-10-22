@@ -532,6 +532,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             controller.add_log("Column widths reset to equal (saved)", Hue::Cyan);
         }
         Run::Layout => switch_layout(controller),
+        Run::Reload => super::reload::start(ui, controller),
         Run::Clear => {
             for state in &mut controller.states {
                 state.output.clear();

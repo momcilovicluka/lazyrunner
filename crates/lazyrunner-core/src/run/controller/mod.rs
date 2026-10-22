@@ -631,6 +631,11 @@ impl Controller {
         }
     }
 
+    /// Reads the settings file again (Ctrl+R): a hand edit counts from now on.
+    pub fn reload_settings(&mut self) {
+        self.config = self.config_file.load(Some(&self.project.id));
+    }
+
     /// An on/off setting.
     pub fn setting(&self, toggle: Toggle) -> bool {
         toggle.read(&self.config)
