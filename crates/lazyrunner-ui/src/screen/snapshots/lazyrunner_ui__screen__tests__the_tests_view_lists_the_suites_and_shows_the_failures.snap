@@ -3,7 +3,7 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
  ⚗ Tests   3 suites · ✓ 2   ✗ 1   – 1
- j k choose · r run · R run all · f / F failed again · s stop · o log · y copy failures · ^d ^u scroll · Esc b
+ j k choose · l its tests (run one) · r run · R run all · f / F failed again · s stop · o log · y copy failure
  .NET · dotnet test                         │ Orders.Tests   .NET · dotnet test
  ▸ ✗ Orders.Tests             1 of 3 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   · last run 09:41:07 · 6s
    ✓ Billing.Tests                 1 passed │

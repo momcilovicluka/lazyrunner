@@ -138,10 +138,10 @@ pub struct Suite {
     pub started: Option<Instant>,
     /// A .NET suite's project is built (it runs with --no-build).
     pub built: bool,
-    /// The run is the failed tests only.
+    /// The run is some tests only: the failed ones (f, F), or one (picked with l).
     pub failed_only: bool,
-    /// The tests a run of the failed tests asked for.
-    pub(crate) rerun: Vec<String>,
+    /// The tests such a run asked for.
+    pub rerun: Vec<String>,
     pub(crate) job: u64,
     pub(crate) child: Option<Child>,
     /// All of the run's output, for its log file.

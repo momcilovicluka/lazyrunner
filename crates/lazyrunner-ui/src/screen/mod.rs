@@ -75,10 +75,11 @@ pub enum Overlay {
     Durations {
         top: usize,
     },
-    /// `T`: the test suites; the selected one, and how far its details are scrolled.
+    /// `T`: the test suites; the selected one, how far its details are scrolled, and the test picked in it (`l`).
     Tests {
         index: usize,
         scroll: usize,
+        picking: Option<usize>,
     },
     /// `t`: the theme picker; `original` is the theme Esc puts back.
     Themes {

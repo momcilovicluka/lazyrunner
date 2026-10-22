@@ -150,20 +150,17 @@ impl Controller {
     pub fn run_tests(&mut self, keys: &[String], failed_only: bool) {
         let mut queued = Vec::new();
         for key in keys {
-            let Some(suite) = self.suite_mut(key) else { continue };
-            if suite.is_active() || (failed_only && suite.failed == 0) {
+            let Some(suite) = self.suite(key) else { continue };
+            let failed: Vec<String> = suite
+                .tests
+                .iter()
+                .filter(|test| test.outcome == Outcome::Failed)
+                .map(|test| test.name.clone())
+                .collect();
+            if suite.is_active() || (failed_only && failed.is_empty()) {
                 continue;
             }
-            suite.before = suite.status;
-            suite.status = Status::Queued;
-            suite.note.clear();
-            suite.built = false;
-            suite.failed_only = failed_only;
-            queued.push(suite.name.clone());
-            self.test_queue.push(key.clone());
-            if !self.run_keys.contains(key) {
-                self.run_keys.push(key.clone());
-            }
+            queued.extend(self.queue_suite(key, failed_only.then_some(failed)));
         }
         if queued.is_empty() {
             let why = if failed_only { "No failed tests to run again." } else { "Those tests are already running." };
@@ -177,6 +174,41 @@ impl Controller {
         let at_once = self.test_parallelism();
         self.add_log(format!("Running tests: {what}{only}, up to {at_once} at once"), Hue::Cyan);
         self.pump_tests();
+    }
+
+    /// One test of a suite (picked in the tests view); its result joins the suite's.
+    pub fn run_test(&mut self, key: &str, test: &str) {
+        match self.suite(key) {
+            None => return,
+            Some(suite) if suite.is_active() => {
+                let text = format!("{} is already running.", suite.name);
+                self.add_log(text, Hue::DarkGray);
+                return;
+            }
+            Some(_) => {}
+        }
+        self.queue_suite(key, Some(vec![test.to_string()]));
+        let now = (self.now)();
+        self.tests_started.get_or_insert(now);
+        self.add_log(format!("Running 1 test: {test}"), Hue::Cyan);
+        self.pump_tests();
+    }
+
+    /// Puts a suite in the queue (only the `rerun` tests, when there are some); its name.
+    fn queue_suite(&mut self, key: &str, rerun: Option<Vec<String>>) -> Option<String> {
+        let suite = self.suite_mut(key)?;
+        suite.before = suite.status;
+        suite.status = Status::Queued;
+        suite.note.clear();
+        suite.built = false;
+        suite.failed_only = rerun.is_some();
+        suite.rerun = rerun.unwrap_or_default();
+        let name = suite.name.clone();
+        self.test_queue.push(key.to_string());
+        if !self.run_keys.iter().any(|known| known == key) {
+            self.run_keys.push(key.to_string());
+        }
+        Some(name)
     }
 
     /// s in the tests view, and quitting: stops the running suites and the test build, and drops the queue (the
@@ -197,12 +229,14 @@ impl Controller {
                     let _ = std::fs::write(suite.log_file(&dir), suite.lines.join("\n") + "\n");
                     suite.status = Status::Cancelled;
                     suite.failed_only = false;
+                    suite.rerun.clear();
                     stopped.push(suite.name.clone());
                 }
                 Status::Queued => {
                     suite.status = suite.before;
                     suite.note.clear();
                     suite.failed_only = false;
+                    suite.rerun.clear();
                     queued = true;
                 }
                 _ => {}
@@ -309,15 +343,12 @@ impl Controller {
         // Never this run's results from the run before.
         let file = if suite.failed_only { suite.rerun_file(&dir) } else { suite.results_file(&dir) };
         let _ = std::fs::remove_file(&file);
-        let mut names: Vec<String> = if suite.failed_only {
-            suite.tests.iter().filter(|test| test.outcome == Outcome::Failed).map(|test| test.name.clone()).collect()
-        } else {
-            Vec::new()
-        };
+        let mut names: Vec<String> = if suite.failed_only { suite.rerun.clone() } else { Vec::new() };
         let too_many = names.iter().map(|name| name.len() * 2 + 24).sum::<usize>() > MAX_NAMES;
         if too_many {
             names.clear();
             suite.failed_only = false;
+            suite.rerun.clear();
             let file = suite.results_file(&dir);
             let _ = std::fs::remove_file(file);
         }
@@ -570,6 +601,7 @@ impl Controller {
                 suite.output = output.iter().cloned().collect();
                 suite.last_run = Some(chrono::Local::now());
                 suite.failed_only = false;
+                suite.rerun.clear();
             }
         }
     }
@@ -719,6 +751,23 @@ mod tests {
         let mut reloaded = Suite::new("npm:cart", "cart", cart.runner.clone());
         reloaded.load_last(&sample.tests_dir());
         assert_eq!(reloaded.failed, 1, "a restart shows the last full run");
+    }
+
+    #[tokio::test]
+    async fn one_test_runs_on_its_own_and_its_result_joins_the_suites() {
+        let temp = TempDir::new("suites-one");
+        let (mut sample, mut events) = controller(&temp);
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        sample.run_test("npm:cart", "rounds");
+        assert_eq!(sample.suite("npm:cart").unwrap().rerun, ["rounds"]);
+        assert_eq!(log(&sample).lines().last(), Some("Running 1 test: rounds"));
+        sample.run_test("npm:cart", "adds");
+        assert_eq!(log(&sample).lines().last(), Some("cart is already running."));
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        let cart = sample.suite("npm:cart").unwrap();
+        assert_eq!((cart.passed, cart.failed, cart.rerun.len()), (2, 0, 0));
+        assert!(log(&sample).contains("✓ cart (1 test again) - 2 passed"), "{}", log(&sample));
     }
 
     #[tokio::test]
