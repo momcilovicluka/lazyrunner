@@ -31,10 +31,11 @@ pub enum Toggle {
     AutoUpdate,
     Mouse,
     ReducedMotion,
+    GitBeside,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 10] = [
+    pub const ALL: [Toggle; 11] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -45,6 +46,7 @@ impl Toggle {
         Toggle::AutoUpdate,
         Toggle::Mouse,
         Toggle::ReducedMotion,
+        Toggle::GitBeside,
     ];
 
     /// Its name in the settings file.
@@ -60,11 +62,15 @@ impl Toggle {
             Toggle::AutoUpdate => "autoUpdate",
             Toggle::Mouse => "mouse",
             Toggle::ReducedMotion => "reducedMotion",
+            Toggle::GitBeside => "gitBeside",
         }
     }
 
     pub fn default_on(self) -> bool {
-        !matches!(self, Toggle::AutoRestartOnBranchChange | Toggle::RestartOnCodeChange | Toggle::ReducedMotion)
+        !matches!(
+            self,
+            Toggle::AutoRestartOnBranchChange | Toggle::RestartOnCodeChange | Toggle::ReducedMotion | Toggle::GitBeside
+        )
     }
 
     /// Whether it is on in these settings (defaults included, as `ConfigFile::load` gives them).
@@ -81,6 +87,7 @@ pub fn defaults() -> Map<String, Value> {
         "columnWidths": {},
         "panelLogLines": 5,
         "theme": "default",
+        "gitTool": "lazygit",
         "updateRepoUrl": "",
         "updateBranch": "",
     }) else {

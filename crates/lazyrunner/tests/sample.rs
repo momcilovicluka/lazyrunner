@@ -235,6 +235,27 @@ fn a_click_on_a_column_title_focuses_it() {
 }
 
 #[test]
+fn l_hands_the_terminal_to_the_git_tool_and_comes_back() {
+    if !cfg!(windows) {
+        return;
+    }
+    let temp = TempDir::new("git-tool");
+    let (repo, profile) = two_servers(&temp, [31387, 31388]);
+    // A stand-in for lazygit that takes a couple of seconds.
+    let config = json!({ "startupChecklist": false, "gitTool": "cmd /c ping -n 3 127.0.0.1" });
+    let lazyrunner = Lazyrunner::start(&temp, &repo, &profile, config, &[]);
+    let away = || lazyrunner.ask(json!({ "state": true }))["state"]["away"].clone();
+    lazyrunner.wait_for("the first frame", Duration::from_secs(30), || lazyrunner.frame().contains("two"));
+    lazyrunner.press("L");
+    assert_eq!(away(), "cmd", "{}", lazyrunner.log());
+    assert_eq!(lazyrunner.ask(json!({ "action": "quit" }))["ok"], true);
+    thread::sleep(Duration::from_millis(500));
+    assert_eq!(away(), "cmd", "a quit waits until the git tool is done");
+    lazyrunner.wait_for("the git tool to quit", Duration::from_secs(30), || lazyrunner.log().contains("Back from cmd"));
+    lazyrunner.quit();
+}
+
+#[test]
 fn nothing_survives_when_lazyrunner_is_killed() {
     if skip_without(&["node", "npm"]) {
         return;

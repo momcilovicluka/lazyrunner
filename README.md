@@ -170,6 +170,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `o` | Open the focused app's full log file (or the failed build's log) |
 | `y` | Copy the focused app's last error with its stack trace (a failed build's errors with full paths), or the search match |
 | `D` | **Durations**: how long each build, app start and `npm ci` took over its last runs (below) |
+| `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
 | `x` | Menu of everything you can do with the focused app |
 | `,` | **Settings** menu (below) |
 
@@ -204,6 +205,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `v` | Auto-update lazyrunner when it opens |
 | `m` | The mouse (below); off, the terminal selects text again |
 | `f` | Reduced motion: nothing blinks, spins, glides or fades |
+| `g` | `L` opens the git tool beside lazyrunner, in a Windows Terminal pane |
 | `c` | What's new: the changelog |
 
 ### Mouse
@@ -255,6 +257,15 @@ and comments out (`//`) the others with the same key, checks the file is still v
 as `secrets.json.lazyrunner-backup`, and restarts the running .NET apps (no build needed). `n` adds an entry: a copy
 of the selected one with another database name; `y` copies the highlighted line as it is in the file,
 password included.
+
+## lazygit (`L`)
+
+`L` opens [lazygit](https://github.com/jesseduffield/lazygit) in the project's folder without leaving lazyrunner. It
+takes over this terminal; `q` in lazygit brings lazyrunner back. Meanwhile the apps keep running and lazyrunner keeps
+watching them (a branch you switch to in lazygit restarts them as usual, if that setting is on), and quitting or an
+update waits until you're back. With `,` then `g` in Windows Terminal, `L` opens lazygit in a pane beside lazyrunner
+instead, so you see both. Another git tool: `"gitTool"` (for example `"gitui"`). lazygit has to be installed (`winget
+install JesseDuffield.lazygit`, `scoop install lazygit`).
 
 ## Durations (`D`)
 
@@ -321,6 +332,8 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `autoUpdate` | `true` | Install a newer lazyrunner when it opens |
 | `mouse` | `true` | Clicks and the wheel (off: the terminal selects text) |
 | `reducedMotion` | `false` | No blinking, spinners, glides or fades |
+| `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
+| `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.columnWidths` | equal | Relative width per app key (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |

@@ -26,6 +26,7 @@ use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::sleep_until;
 
+use crate::git_tool::{self, GitTool};
 use crate::keys;
 use crate::screen::checklist::{Checklist, StillChecking};
 use crate::screen::{self, Exit, Overlay, Ui, status};
@@ -92,8 +93,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         }
     }
     drop(control_tx);
-    let mut terminal_events: Pin<Box<dyn Stream<Item = io::Result<Event>> + Send>> =
-        if options.headless { Box::pin(futures_util::stream::pending()) } else { Box::pin(EventStream::new()) };
+    let mut terminal_events = terminal_input(options.headless);
 
     let started = Instant::now();
     let (mut ui, warnings) = Ui::new(&controller, user_themes, started);
@@ -131,6 +131,8 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
     let mut last_dump: Option<Instant> = None;
     let mut tick = tokio::time::interval(TICK);
     let far = started + Duration::from_secs(365 * 24 * 3600);
+    // The git tool running in this terminal (L): lazyrunner neither draws nor reads keys until it quits.
+    let mut git_tool: Option<(String, tokio::task::JoinHandle<io::Result<std::process::ExitStatus>>)> = None;
 
     loop {
         let mut dirty = false;
@@ -172,7 +174,30 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 }
                 dirty = true;
             }
-            _ = sleep_until(next_frame.unwrap_or(far).into()), if next_frame.is_some() => {
+            done = async {
+                match git_tool.as_mut() {
+                    Some((_, handle)) => handle.await,
+                    None => std::future::pending().await,
+                }
+            }, if git_tool.is_some() => {
+                let name = git_tool.take().map(|(name, _)| name).unwrap_or_default();
+                ui.away = None;
+                if let Err(error) = surface.take_back() {
+                    controller.shutdown();
+                    return Err(error);
+                }
+                terminal_events = terminal_input(options.headless);
+                outside = Outside::new(!options.headless); // its title and progress are written again
+                match done {
+                    Ok(Ok(status)) if status.success() => controller.add_log(format!("Back from {name}"), Hue::DarkGray),
+                    Ok(Ok(status)) => controller.add_log(format!("{name} ended ({status})"), Hue::Yellow),
+                    Ok(Err(error)) => controller.add_log(format!("✗ {name} didn't start - {error}"), Hue::Red),
+                    Err(error) => controller.add_log(format!("✗ {name}: {error}"), Hue::Red),
+                }
+                dirty = true;
+                urgent = true;
+            }
+            _ = sleep_until(next_frame.unwrap_or(far).into()), if next_frame.is_some() && git_tool.is_none() => {
                 let now = Instant::now();
                 ui.now = now;
                 last_frame = now;
@@ -239,7 +264,23 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             }
         }
         notify(&mut controller, options.headless);
-        mouse.set(controller.setting(Toggle::Mouse));
+        if std::mem::take(&mut ui.git_tool_wanted) && git_tool.is_none() {
+            match open_git_tool(&mut controller) {
+                Some(tool) => {
+                    terminal_events = Box::pin(futures_util::stream::pending()); // its keys are its own
+                    mouse.set(false);
+                    if let Err(error) = surface.hand_over() {
+                        controller.shutdown();
+                        return Err(error);
+                    }
+                    let root = controller.root.clone();
+                    ui.away = Some(tool.name.clone());
+                    git_tool = Some((tool.name.clone(), tokio::task::spawn_blocking(move || tool.run(&root))));
+                }
+                None => dirty = true,
+            }
+        }
+        mouse.set(controller.setting(Toggle::Mouse) && git_tool.is_none());
         if let Some(Exit::Reopen { root, .. }) = &ui.exit
             && hands_over_to(&controller, &profiles, root)
             && let Some(why) = controller.handover_blocked()
@@ -247,7 +288,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             controller.add_log(format!("{why} - , then p again once it's done (the apps keep running)"), Hue::Yellow);
             ui.exit = None;
         }
-        if let Some(mut exit) = ui.exit.clone() {
+        if let Some(mut exit) = ui.exit.clone().filter(|_| git_tool.is_none()) {
             let mut handover = None;
             let mut notes = Vec::new();
             if let Exit::Reopen { root, .. } = &exit
@@ -284,6 +325,37 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             next_frame = Some(next_frame.map_or(slot, |planned| planned.min(slot)));
         }
     }
+}
+
+/// The terminal's keys, mouse and resizes (none headless). A new one after the git tool: dropping the old one stops
+/// its reading, so the tool gets every key.
+fn terminal_input(headless: bool) -> Pin<Box<dyn Stream<Item = io::Result<Event>> + Send>> {
+    if headless { Box::pin(futures_util::stream::pending()) } else { Box::pin(EventStream::new()) }
+}
+
+/// L: the git tool found, or why not (in the log). Beside lazyrunner (Windows Terminal, "gitBeside") it opens there
+/// and `None` comes back too; here, the caller hands it the terminal.
+fn open_git_tool(controller: &mut Controller) -> Option<GitTool> {
+    let tool = match GitTool::from_config(&controller.config) {
+        Ok(tool) => tool,
+        Err(why) => {
+            controller.add_log(format!("✗ {why}"), Hue::Red);
+            return None;
+        }
+    };
+    let beside = git_tool::place(&controller.config, git_tool::in_windows_terminal()) == git_tool::Place::Beside;
+    if !beside {
+        if controller.setting(Toggle::GitBeside) {
+            controller.add_log(format!("{} opens here: beside needs Windows Terminal", tool.name), Hue::DarkGray);
+        }
+        controller.add_log(format!("{} - q comes back to lazyrunner; the apps keep running", tool.name), Hue::Cyan);
+        return Some(tool);
+    }
+    match tool.open_beside(&controller.root) {
+        Ok(()) => controller.add_log(format!("Opened {} beside lazyrunner", tool.name), Hue::Cyan),
+        Err(why) => controller.add_log(format!("✗ {why}"), Hue::Red),
+    }
+    None
 }
 
 /// After the checklist (or without it): start everything, or say how.
@@ -345,7 +417,14 @@ fn switch_when_idle(ui: &mut Ui, controller: &mut Controller) {
     let Some(version) = ui.switch_to.clone() else { return };
     let typing = ui.search.as_ref().is_some_and(|search| search.typing);
     let waiting = ui.busy.is_some() || ui.deferred.is_some() || ui.pending_g.is_some();
-    if controller.handover_blocked().is_some() || ui.overlay.is_some() || ui.picker.is_some() || typing || waiting {
+    let away = ui.away.is_some();
+    if controller.handover_blocked().is_some()
+        || ui.overlay.is_some()
+        || ui.picker.is_some()
+        || typing
+        || waiting
+        || away
+    {
         return;
     }
     ui.switch_to = None;
@@ -562,6 +641,13 @@ fn control(
     dumps: &mut Vec<oneshot::Sender<Value>>,
 ) -> bool {
     let body = &request.body;
+    if let Some(tool) = &ui.away
+        && ["keys", "click", "wheel", "dump"].iter().any(|key| body.get(*key).is_some())
+    {
+        let error = format!("{tool} has the terminal - try again once it quits");
+        let _ = request.reply.send(json!({ "ok": false, "error": error }));
+        return false;
+    }
     if let Some(spec) = body.get("keys").and_then(Value::as_str) {
         let answer = match keys::parse(spec) {
             Ok(keys) => {
@@ -616,6 +702,7 @@ fn control(
         state["zoom"] = json!(ui.zoom);
         state["overlay"] = json!(ui.overlay.as_ref().map(Overlay::kind));
         state["picker"] = json!(ui.picker.is_some());
+        state["away"] = json!(ui.away);
         state["theme"] = json!(ui.theme.id);
         let _ = request.reply.send(json!({ "ok": true, "state": state }));
         return false;

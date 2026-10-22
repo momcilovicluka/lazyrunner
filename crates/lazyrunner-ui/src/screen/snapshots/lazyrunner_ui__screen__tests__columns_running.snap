@@ -12,7 +12,6 @@ expression: screen.frame()
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
-                     ┃                     │                     │                     │
 info: Microsoft.Hosti┃                     │                     │                     │
 ng.Lifetime[14]      ┃                     │                     │                     │
       Now listening o┃                     │                     │                     │
@@ -28,6 +27,7 @@ rted.                ┃): something is off  │                     │        
  , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
               s [x] stop/restart all include frontend   e [ ] restart APIs on code change
               w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside
 
  12:00:00 Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

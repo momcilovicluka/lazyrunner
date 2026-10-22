@@ -27,6 +27,7 @@ pub enum Run {
     OpenLog,
     Copy,
     Durations,
+    GitTool,
     Menu,
     Search,
     Zoom,
@@ -128,6 +129,18 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             Run::Durations,
         )
         .safe(),
+        action(
+            "Tools",
+            "L",
+            &format!("{}: git without leaving lazyrunner", crate::git_tool::name(&controller.config)),
+            if controller.setting(Toggle::GitBeside) {
+                "beside it, in Windows Terminal"
+            } else {
+                "q comes back; the apps keep running"
+            },
+            Run::GitTool,
+        )
+        .safe(),
         action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
         action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
         action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),
@@ -165,7 +178,7 @@ pub(crate) struct MenuToggle {
     pub short: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 8] = [
+const MENU_TOGGLES: [MenuToggle; 9] = [
     MenuToggle {
         letter: "a",
         toggle: Toggle::AutoRestartOnBranchChange,
@@ -213,6 +226,12 @@ const MENU_TOGGLES: [MenuToggle; 8] = [
         toggle: Toggle::ReducedMotion,
         label: "Reduced motion: no blinking, spinners or fades",
         short: "reduced motion",
+    },
+    MenuToggle {
+        letter: "g",
+        toggle: Toggle::GitBeside,
+        label: "L opens the git tool beside lazyrunner (Windows Terminal)",
+        short: "git beside",
     },
 ];
 

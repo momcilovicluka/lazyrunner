@@ -5,8 +5,9 @@ use std::io::{self, Stdout};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Result, anyhow};
+use crossterm::cursor::{Hide, Show};
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
-use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate};
+use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{execute, queue};
 use ratatui::backend::{CrosstermBackend, TestBackend};
 use ratatui::{Frame, Terminal};
@@ -17,6 +18,16 @@ use crate::dump;
 pub trait Surface {
     /// Draws a frame; returns it as text when `want_text`.
     fn render(&mut self, draw: &mut dyn FnMut(&mut Frame), want_text: bool) -> Result<Option<String>>;
+
+    /// Hands the terminal to another program (the git tool): its normal screen and input back.
+    fn hand_over(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    /// Takes it back once that program has quit, and draws everything again.
+    fn take_back(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl Surface for Terminal<CrosstermBackend<Stdout>> {
@@ -29,6 +40,51 @@ impl Surface for Terminal<CrosstermBackend<Stdout>> {
         };
         execute!(self.backend_mut(), EndSynchronizedUpdate)?;
         Ok(text)
+    }
+
+    fn hand_over(&mut self) -> Result<()> {
+        ignore_ctrl_c(true); // its Ctrl+C mustn't end lazyrunner and its apps
+        flush_input();
+        crossterm::terminal::disable_raw_mode()?;
+        execute!(self.backend_mut(), LeaveAlternateScreen, Show)?;
+        Ok(())
+    }
+
+    fn take_back(&mut self) -> Result<()> {
+        flush_input(); // keys typed for it, not read (a second q), mustn't reach lazyrunner
+        crossterm::terminal::enable_raw_mode()?;
+        execute!(self.backend_mut(), EnterAlternateScreen, Hide)?;
+        ignore_ctrl_c(false);
+        self.clear()?;
+        Ok(())
+    }
+}
+
+/// While another program has the terminal, Ctrl+C and Ctrl+Break reach every process on the console: lazyrunner
+/// swallows them. A handler routine, unlike the ignore flag, isn't inherited by what lazyrunner starts meanwhile.
+fn ignore_ctrl_c(ignore: bool) {
+    #[cfg(windows)]
+    // SAFETY: registers or removes a handler that only reads its argument.
+    unsafe {
+        windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(swallow), i32::from(ignore));
+    }
+    #[cfg(not(windows))]
+    let _ = ignore;
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn swallow(kind: u32) -> windows_sys::core::BOOL {
+    use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
+    i32::from(kind == CTRL_C_EVENT || kind == CTRL_BREAK_EVENT)
+}
+
+/// Drops the keys waiting in the console's input.
+fn flush_input() {
+    #[cfg(windows)]
+    // SAFETY: the process's own standard input handle.
+    unsafe {
+        use windows_sys::Win32::System::Console::{FlushConsoleInputBuffer, GetStdHandle, STD_INPUT_HANDLE};
+        FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
     }
 }
 
