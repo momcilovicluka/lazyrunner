@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.15.0] - 2026-10-22
+
+### Added
+- Requests (`H`): the HTTP requests the .NET apps served - time, app, method, status, milliseconds and path, newest or slowest first - and, on `Tab`, summed up per endpoint (count, errors, average, 95th percentile, slowest). `e` errors only, `a` one app, `/` a path filter; `y` copies a row, `w` opens a GET request. lazyrunner turns on ASP.NET's request log for the apps it starts (Serilog's request lines count too) and keeps those lines out of the columns
+
 ## [0.14.0] - 2026-10-22
 
 ### Added

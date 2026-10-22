@@ -190,6 +190,7 @@ fn select(ui: &mut Ui, controller: &mut Controller, index: usize) {
             | Overlay::Themes { index, .. }
             | Overlay::Tests { index, .. },
         ) => *index,
+        Some(Overlay::Requests(view)) => view.index,
         _ => ui.picker.as_ref().map_or(index, |picker| picker.index),
     };
     let arrow = if index > current { KeyCode::Down } else { KeyCode::Up };

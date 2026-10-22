@@ -153,6 +153,8 @@ pub struct Controller {
     timings: Timings,
     /// How long builds, starts and npm ci took over their last runs (D).
     pub durations: Durations,
+    /// The HTTP requests the .NET apps served (H).
+    pub requests: super::requests::Requests,
     /// The test suites (T), found the first time the tests view opens.
     pub suites: Option<Vec<super::suites::Suite>>,
     /// The queued .NET suites' projects building, in one MSBuild run.
@@ -216,6 +218,7 @@ impl Controller {
         let mut controller = Self {
             timings: Timings::load(&state_dir),
             durations: Durations::load(&state_dir),
+            requests: Default::default(),
             suites: None,
             test_build: None,
             test_queue: Vec::new(),
@@ -411,7 +414,12 @@ impl Controller {
                 let Some(index) = self.index(&key) else { return };
                 if self.states[index].generation == generation {
                     let app = self.apps[index].clone();
-                    self.states[index].receive(&app, &line, now);
+                    let request = self.states[index].receive(&app, &line, now);
+                    // lazyrunner's own probe of the app isn't one of its requests.
+                    if let Some(request) = request.filter(|request| request.path != watch::probe_path(&app)) {
+                        self.states[index].requests += 1;
+                        self.requests.add(&key, request, chrono::Local::now());
+                    }
                 }
             }
             Event::Output { tag: Tag::Build { key, job }, line } => self.build_output(&key, job, &line),

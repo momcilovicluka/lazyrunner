@@ -292,10 +292,7 @@ impl Controller {
                 continue;
             }
             probe.in_flight = true;
-            let path = match &self.apps[index].kind {
-                AppKind::Dotnet { swagger: Some(swagger), .. } => format!("{swagger}/index.html"),
-                _ => "/".into(),
-            };
+            let path = probe_path(&self.apps[index]);
             let (events, generation, port) =
                 (self.events.clone(), self.states[index].generation, port.unwrap_or_default());
             tokio::spawn(async move {
@@ -493,5 +490,13 @@ impl Controller {
         if !running.is_empty() {
             self.restart_api_processes(&running, "database switched");
         }
+    }
+}
+
+/// What the response-time probe asks an app for: its Swagger page, else its root.
+pub(super) fn probe_path(app: &crate::profile::App) -> String {
+    match &app.kind {
+        AppKind::Dotnet { swagger: Some(swagger), .. } => format!("{swagger}/index.html"),
+        _ => "/".into(),
     }
 }

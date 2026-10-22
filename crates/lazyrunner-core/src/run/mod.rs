@@ -11,6 +11,7 @@ pub mod command;
 pub mod controller;
 pub mod history;
 pub mod net;
+pub mod requests;
 pub mod secrets;
 pub mod suites;
 pub mod tools;

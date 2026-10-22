@@ -28,6 +28,7 @@ pub enum Run {
     Copy,
     Durations,
     Tests,
+    Requests,
     GitTool,
     Menu,
     Search,
@@ -129,6 +130,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Durations",
             "build, start and npm ci times over the last runs: what got slower",
             Run::Durations,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "H",
+            "Requests: what the .NET apps served",
+            "newest or slowest, per endpoint; filter, copy, open",
+            Run::Requests,
         )
         .safe(),
         action(

@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ⇄ Requests    requests  endpoints    4 shown · 1 errors · avg 400 ms
+ Tab requests/endpoints · j k choose · e errors only · a app · s sort (time) · / filter · y copy · w open · c
+ TIME      APP       METHOD STATUS      MS  PATH
+ 09:41:07  Orders    GET       200      10  /api/orders/43
+ 09:41:07  Billing   GET       500    1530  /api/invoices/7
+ 09:41:07  Orders    POST      201      48  /api/orders
+ 09:41:07  Orders    GET       200      12  /api/orders/42
+
+
+
+
+
+
+
+
+
+
+
+ GET /api/orders/43   200 · 10 ms · 512 bytes · application/json · Orders · 09:41:07
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside

@@ -176,6 +176,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `o` | Open the focused app's full log file (or the failed build's log) |
 | `y` | Copy the focused app's last error with its stack trace (a failed build's errors with full paths), or the search match |
 | `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |
+| `H` | **Requests**: the HTTP requests the .NET apps served, per endpoint too (below) |
 | `T` | **Tests**: the project's test suites - run them in the background, see what failed, run one test (below) |
 | `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
 | `x` | Menu of everything you can do with the focused app |
@@ -280,6 +281,19 @@ watching them (a branch you switch to in lazygit restarts them as usual, if that
 update waits until you're back. With `,` then `g` in Windows Terminal, `L` opens lazygit in a pane beside lazyrunner
 instead, so you see both. Another git tool: `"gitTool"` (for example `"gitui"`). lazygit has to be installed (`winget
 install JesseDuffield.lazygit`, `scoop install lazygit`).
+
+## Requests (`H`)
+
+lazyrunner starts the .NET apps with ASP.NET's request log turned on (`--Logging:LogLevel:Microsoft.AspNetCore.
+Hosting.Diagnostics=Information`) and keeps those lines out of the columns: `H` lists the requests instead - time,
+app, method, status, milliseconds and path, newest first (`s`: slowest first). Serilog's request logging (`HTTP GET /x
+responded 200 in 12 ms`) shows too. `Tab` sums them up per endpoint (ids in paths become `{id}`): count, errors,
+average, 95th percentile and slowest, sorted by total time (`s` for the others).
+
+`e` shows errors only, `a` one app, `/` filters by path; `y` copies the selected row, `w` (or a double click) opens a
+GET request in the browser, `c` clears the list, `Esc` / `q` / `H` close. The top row follows new requests; any other
+row stays put as new ones arrive. The last 5,000 are kept while lazyrunner runs (lazyrunner's own response-time probe
+isn't among them); the full lines are still in each app's log file.
 
 ## Tests (`T`)
 

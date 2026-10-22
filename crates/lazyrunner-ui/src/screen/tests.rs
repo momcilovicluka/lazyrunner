@@ -612,6 +612,57 @@ async fn y_in_the_database_picker_copies_the_line_as_it_is_in_secrets_json() {
     assert_eq!(screen.last_log(), "secrets.json changed since the picker opened - press d again to copy that row.");
 }
 
+// ---------------------------------------------------------------- the requests view
+
+/// Requests the sample's .NET apps served, by hand.
+fn with_requests(screen: &mut Screen) {
+    use chrono::TimeZone;
+    use lazyrunner_core::run::requests::Finished;
+    let at = chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap();
+    for (app, method, path, status, ms) in [
+        ("orders", "GET", "/api/orders/42", 200, 12.4),
+        ("orders", "POST", "/api/orders", 201, 48.0),
+        ("billing", "GET", "/api/invoices/7", 500, 1530.0),
+        ("orders", "GET", "/api/orders/43", 200, 9.6),
+    ] {
+        let (method, path) = (method.to_string(), path.to_string());
+        let request = Finished { method, path, status, ms, length: "512".into(), content: "application/json".into() };
+        screen.controller.requests.add(app, request, at);
+    }
+}
+
+#[tokio::test]
+async fn the_requests_view_lists_the_newest_first_and_sums_up_endpoints() {
+    let mut screen = screen("snap-requests", json!({}));
+    with_requests(&mut screen);
+    screen.press("H");
+    insta::assert_snapshot!(screen.frame());
+    screen.press("Tab");
+    let frame = screen.frame();
+    let line = frame.lines().find(|line| line.contains("/api/orders/{id}")).expect("the endpoint");
+    assert!(line.contains("      2      0"), "two requests, no errors: {line}");
+}
+
+#[tokio::test]
+async fn in_the_requests_view_filters_copy_and_open_narrow_and_act_on_the_selection() {
+    let mut screen = screen("requests-keys", json!({}));
+    with_requests(&mut screen);
+    screen.press("H e");
+    assert!(screen.frame().contains("1 shown"), "errors only");
+    screen.press("e / 4 2 Enter");
+    assert!(screen.frame().contains("[/42]"), "{}", screen.frame());
+    screen.press("y");
+    assert_eq!(copied(), ["GET http://localhost:58201/api/orders/42 -> 200 in 12 ms (Orders, 2026-10-22 09:41:07)"]);
+    screen.press("w");
+    assert_eq!(OPENED.with(|opened| opened.borrow().clone()), ["http://localhost:58201/api/orders/42"]);
+    screen.press("/ Esc s");
+    assert!(screen.frame().contains("sort (slowest)"));
+    screen.click(Target::Item(1));
+    assert!(matches!(&screen.ui.overlay, Some(Overlay::Requests(view)) if view.index == 1 && !view.follow));
+    screen.press("c");
+    assert!(screen.frame().contains("No requests yet"));
+}
+
 // ---------------------------------------------------------------- the tests view
 
 /// The sample's suites by hand: one failed, one passed, one not run yet.

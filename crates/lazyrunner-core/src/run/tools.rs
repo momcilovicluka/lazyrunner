@@ -89,7 +89,10 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
     match &app.kind {
         AppKind::Dotnet { project, launch_profile, .. } => {
             let dir = root.join(project).parent().map_or_else(|| root.to_path_buf(), Path::to_path_buf);
-            let args = ["run", "--no-build", "--launch-profile", launch_profile].map(OsString::from).to_vec();
+            // After --: ASP.NET logs each request it finished, for the requests view (H).
+            let args = ["run", "--no-build", "--launch-profile", launch_profile, "--", super::requests::LOG_REQUESTS]
+                .map(OsString::from)
+                .to_vec();
             Ok(ServerCommand {
                 spec: Spec {
                     program: find_on_path("dotnet").unwrap_or_else(|| "dotnet".into()),
@@ -256,6 +259,10 @@ mod tests {
         let command = server_command(root, &app, &[]).unwrap();
         assert_eq!(command.label, "dotnet run --launch-profile Orders");
         assert_eq!(command.spec.dir, root.join("services").join("Orders"));
-        assert_eq!(command.spec.args, ["run", "--no-build", "--launch-profile", "Orders"].map(OsString::from));
+        let logs = crate::run::requests::LOG_REQUESTS;
+        assert_eq!(
+            command.spec.args,
+            ["run", "--no-build", "--launch-profile", "Orders", "--", logs].map(OsString::from)
+        );
     }
 }
