@@ -135,8 +135,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "k" | "UpArrow" => step(view, controller, -1, count),
         "Ctrl+D" | "PageDown" => step(view, controller, PAGE as isize, count),
         "Ctrl+U" | "PageUp" => step(view, controller, -(PAGE as isize), count),
-        "g" | "Home" => (view.index, view.follow) = (0, true),
-        "G" | "End" => step(view, controller, count as isize, count),
+        "g" | "Home" | "<" => (view.index, view.follow) = (0, true),
+        "G" | "End" | ">" => step(view, controller, count as isize, count),
         "e" => {
             view.errors_only = !view.errors_only;
             (view.index, view.follow) = (0, true);

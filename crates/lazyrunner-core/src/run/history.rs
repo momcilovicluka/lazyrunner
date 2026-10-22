@@ -29,16 +29,18 @@ pub enum Kind {
     Start,
     NpmCi,
     Test,
+    NpmInstall,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 4] = [Kind::Build, Kind::Start, Kind::NpmCi, Kind::Test];
+    pub const ALL: [Kind; 5] = [Kind::Build, Kind::Start, Kind::NpmCi, Kind::NpmInstall, Kind::Test];
 
     pub fn title(self) -> &'static str {
         match self {
             Kind::Build => "Builds",
             Kind::Start => "Starts",
             Kind::NpmCi => "npm ci",
+            Kind::NpmInstall => "npm install",
             Kind::Test => "Test suites",
         }
     }

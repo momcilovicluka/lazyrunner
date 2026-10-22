@@ -169,6 +169,7 @@ impl Controller {
                     total,
                     warnings: 0,
                     start_after: false,
+                    what: "dotnet build",
                 });
                 BuildStep::Started
             }

@@ -101,6 +101,19 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     action_key(ui, controller, &name);
 }
 
+/// A key a view (tests, requests) doesn't use, run as on the columns; what it opens (settings, the key reference,
+/// the database picker…) goes back to the view when it closes.
+fn from_view(ui: &mut Ui, controller: &mut Controller, name: &str) {
+    let view = ui.overlay.take();
+    action_key(ui, controller, name);
+    let opened = ui.overlay.is_some() || ui.picker.is_some() || ui.search.as_ref().is_some_and(|search| search.typing);
+    if opened {
+        ui.behind = view;
+    } else {
+        ui.overlay = view;
+    }
+}
+
 /// The action a key runs, as the panel runs it: during a build only the safe ones (S cancels it, q quits).
 fn action_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     let busy = controller.building.is_some();
@@ -137,8 +150,8 @@ fn navigation(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "Ctrl+D" => scroll(ui, controller, -(page / 2)),
         "Ctrl+B" | "PageUp" => scroll(ui, controller, page),
         "Ctrl+F" | "PageDown" => scroll(ui, controller, -page),
-        "Home" => scroll(ui, controller, isize::MAX / 2),
-        "G" | "End" => {
+        "Home" | "<" => scroll(ui, controller, isize::MAX / 2),
+        "G" | "End" | ">" => {
             if let Some(state) = controller.states.get_mut(ui.focus) {
                 state.scroll = 0;
             }
@@ -270,8 +283,8 @@ fn scroll_box(top: &mut usize, name: &str) {
         "k" | "UpArrow" => *top = top.saturating_sub(1),
         "Ctrl+D" | "PageDown" => *top += 10,
         "Ctrl+U" | "PageUp" => *top = top.saturating_sub(10),
-        "g" | "Home" => *top = 0,
-        "G" | "End" => *top = usize::MAX / 2,
+        "g" | "Home" | "<" => *top = 0,
+        "G" | "End" | ">" => *top = usize::MAX / 2,
         _ => {}
     }
 }
@@ -296,12 +309,23 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         // The views' own keys first; the rest do what they do on the columns (, settings, d database, ...).
         Some(Overlay::Tests { .. }) => {
             if !super::suites::key(ui, controller, name) {
-                action_key(ui, controller, name);
+                from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Install { index }) => match name {
+            "Escape" | "q" | "i" => ui.overlay = None,
+            "j" | "DownArrow" | ">" => *index = 1,
+            "k" | "UpArrow" | "<" => *index = 0,
+            "c" | "n" | "Enter" | "Space" => {
+                let clean = name == "c" || (name != "n" && *index == 0);
+                ui.overlay = None;
+                run(ui, controller, if clean { &Run::NpmCi } else { &Run::NpmInstall });
+            }
+            _ => {}
+        },
         Some(Overlay::Requests(_)) => {
             if !super::requests::key(ui, controller, name, key) {
-                action_key(ui, controller, name);
+                from_view(ui, controller, name);
             }
         }
         Some(Overlay::Palette { query, index }) => match name {
@@ -338,6 +362,8 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 "Escape" | "q" => ui.overlay = None,
                 _ if name == close => ui.overlay = None,
                 "j" | "DownArrow" | "Ctrl+N" => *index = (*index + 1).min(items.len().saturating_sub(1)),
+                "<" | "Home" => *index = 0,
+                ">" | "End" => *index = items.len().saturating_sub(1),
                 "k" | "UpArrow" | "Ctrl+P" => *index = index.saturating_sub(1),
                 "Enter" | "Space" => {
                     if let Some(item) = items.get(*index).cloned() {
@@ -419,6 +445,7 @@ fn needs_app(action: &Run) -> bool {
             | Run::RestartFocused
             | Run::BuildFocused
             | Run::NpmCi
+            | Run::NpmInstall
             | Run::OpenFocused
             | Run::OpenLog
             | Run::Copy
@@ -447,6 +474,8 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Quit => ui.exit = Some(Exit::Quit),
         Run::Database => open_picker(ui, controller),
         Run::NpmCi => execute(controller, Command::NpmCi(key)),
+        Run::NpmInstall => execute(controller, Command::NpmInstall(key)),
+        Run::Install => ui.overlay = Some(Overlay::Install { index: 0 }),
         Run::OpenFocused => open_focused(ui, controller, &key),
         Run::OpenAll => open_all(ui, controller),
         Run::OpenLog => open_log(ui, controller),
@@ -716,8 +745,8 @@ fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEve
         "j" | "DownArrow" => picker.index = (picker.index + 1).min(count.saturating_sub(1)),
         "Ctrl+U" | "PageUp" => picker.index = picker.index.saturating_sub(PICKER_PAGE),
         "Ctrl+D" | "PageDown" => picker.index = (picker.index + PICKER_PAGE).min(count.saturating_sub(1)),
-        "Home" => picker.index = 0,
-        "G" | "End" => picker.index = count.saturating_sub(1),
+        "Home" | "<" => picker.index = 0,
+        "G" | "End" | ">" => picker.index = count.saturating_sub(1),
         "h" | "l" | "LeftArrow" | "RightArrow" => {
             let groups = picker.groups.len().max(1);
             let step = if matches!(name, "l" | "RightArrow") { 1 } else { groups - 1 };

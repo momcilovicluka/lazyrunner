@@ -42,8 +42,8 @@ pub fn summary(controller: &Controller) -> Summary {
             tools.push(format!("building {app}…"));
         }
     }
-    if controller.npm_ci.is_some() {
-        tools.push("npm ci…".to_string());
+    if let Some(job) = &controller.npm_ci {
+        tools.push(format!("{}…", job.what));
     }
     tools.extend(super::suites::status(controller));
     let (progress, text, color) = if !tools.is_empty() {

@@ -11,12 +11,12 @@ expression: screen.frame()
              │ [, a]     [ ] Auto-restart on branch change                                      │
              │ [, s]     [x] Stop/Restart all include the frontend                              │
              │ [, e]     [ ] Restart the APIs when code changes                                 │
-             │ [i]       npm ci (reinstall packages)  the focused npm app's, in the background  │
              │ [H]       Requests: what the .NET apps served  newest or slowest, per endpoint;… │
              │ [, r]     Run the startup checklist now (and check for an update)                │
              │ [,]       Settings (on/off toggles, r checklist)  auto-restart, auto-start, che… │
              │ [T]       Tests: run the project's test suites  dotnet test, jest, vitest - sev… │
              │ [, w]     [x] Startup checklist when lazyrunner opens                            │
+             │ [, g]     [ ] L opens the git tool beside lazyrunner (Windows Terminal)          │
              │ type to search · ↑↓ or Ctrl+N Ctrl+P choose · Enter run · Esc close              │
              └──────────────────────────────────────────────────────────────────────────────────┘
 

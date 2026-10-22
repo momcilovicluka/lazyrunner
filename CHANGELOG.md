@@ -3,6 +3,17 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.17.0] - 2026-10-22
+
+### Added
+- npm install next to npm ci: `i` asks which - `c` npm ci (a clean install of exactly what package-lock.json says) or `n` npm install (adds and updates packages to match package.json) - and the `x` menu and the command palette offer both. npm install runs like npm ci: in the background, the dev server stopped meanwhile and started again after, its folder's test suites paused, its time in `D` on its own
+- `<` and `>` go to the first and last, as in lazygit: the oldest output and following new output in a column, the first and last item in the tests and requests views, menus, the database picker, durations and the changelog. Widening and narrowing a column moves to `+` and `-`
+- In the tests view `1`-`9` jump to the apps' sections, numbered in the list
+
+### Changed
+- A box opened from the tests or requests view - `,` settings, `?` the key reference, `d` the database picker… - goes back to the view when it closes, not to the columns
+- A test suite that leaves no results says why when its output does ("Test environment jest-environment-jsdom cannot be found") instead of only its exit code
+
 ## [0.16.0] - 2026-10-22
 
 ### Added

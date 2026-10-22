@@ -82,7 +82,8 @@ fn tool<'a>(
     if let Some(job) = controller.building.as_ref().filter(|job| job.key == key) {
         return Some(("build", job));
     }
-    controller.npm_ci.as_ref().filter(|job| job.key == key).map(|job| ("npmci", job))
+    let job = controller.npm_ci.as_ref().filter(|job| job.key == key)?;
+    Some((if job.what == "npm ci" { "npmci" } else { "npminstall" }, job))
 }
 
 /// The app's colour for its title chip; it flashes red for a moment when an error line arrives.
@@ -300,17 +301,17 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
         let estimate = controller.timing_estimate(kind, &key);
         let frame = if !animated {
             '●'
-        } else if kind == "npmci" {
+        } else if kind != "build" {
             ORBIT[tick as usize % ORBIT.len()]
         } else {
             spinner(tick)
         };
-        let verb = if kind != "npmci" {
-            "building"
+        let verb = if kind == "build" {
+            "building".to_string()
         } else if job.start_after {
-            "npm ci → start"
+            format!("{} → start", job.what)
         } else {
-            "npm ci"
+            job.what.to_string()
         };
         let bar =
             estimate.map_or(String::new(), |estimate| bar(ui, elapsed / estimate, &format!("{kind}:{key}"), animated));

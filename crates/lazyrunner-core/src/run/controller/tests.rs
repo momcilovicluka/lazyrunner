@@ -209,6 +209,10 @@ mod scripted {
         fn npm_ci(&self, dir: &Path) -> anyhow::Result<Spec> {
             Ok(shell("echo added 1 package".into(), dir))
         }
+
+        fn npm_install(&self, dir: &Path) -> anyhow::Result<Spec> {
+            Ok(shell("echo changed 2 packages".into(), dir))
+        }
     }
 
     fn scripted(label: &str, failing: Vec<&'static str>) -> (TempDir, Controller, UnboundedReceiver<Event>) {
@@ -239,6 +243,21 @@ mod scripted {
                 _ => panic!("timed out; the log:\n{}", log(controller)),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn npm_install_runs_without_a_lock_file_and_is_timed_on_its_own() {
+        let (_temp, mut sample, mut events) = scripted("scripted-npm-install", Vec::new());
+        sample.npm_ci(Some("shop"));
+        assert!(log(&sample).ends_with("npm ci needs one (npm install makes it)."), "{}", log(&sample));
+        sample.npm_install(Some("shop"));
+        assert_eq!(sample.npm_ci.as_ref().map(|job| job.what), Some("npm install"));
+        assert_eq!(sample.handover_blocked().as_deref(), Some("npm install is running"));
+        run_until(&mut sample, &mut events, |c| c.npm_ci.is_none()).await;
+        let log = log(&sample);
+        assert!(log.contains("Running npm install for Shop") && log.contains("✓ npm install done in"), "{log}");
+        assert_eq!(sample.durations.item(Kind::NpmInstall, "shop").map(|item| item.runs.len()), Some(1));
+        assert!(sample.durations.item(Kind::NpmCi, "shop").is_none());
     }
 
     #[tokio::test]

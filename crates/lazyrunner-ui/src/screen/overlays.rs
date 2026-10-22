@@ -219,6 +219,44 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     }
 }
 
+/// What `i` offers: npm ci or npm install (key, command, what it does).
+const INSTALLS: [(&str, &str, &str); 2] = [
+    ("c", "npm ci", "a clean install of exactly what package-lock.json says"),
+    ("n", "npm install", "adds and updates packages to match package.json (the lock file may change)"),
+];
+
+/// i: npm ci or npm install, for the npm app i installs.
+pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    const INNER: usize = 80;
+    let index = match &mut ui.overlay {
+        Some(Overlay::Install { index }) => {
+            *index = (*index).min(INSTALLS.len() - 1);
+            *index
+        }
+        _ => 0,
+    };
+    let lines: Vec<Vec<Seg>> = INSTALLS
+        .iter()
+        .enumerate()
+        .map(|(i, (key, command, hint))| {
+            let key = pad(&format!(" {key}"), 5);
+            if i == index {
+                return aim(selected(&format!("{key}{command}  {hint}"), INNER), Target::Item(i));
+            }
+            aim(
+                vec![seg(key, C::Cyan), seg(*command, C::White), seg(format!("  {hint}"), C::DarkGray)],
+                Target::Item(i),
+            )
+        })
+        .collect();
+    let focused = controller.apps.get(ui.focus).map(|app| app.key.as_str());
+    let app = controller
+        .npm_ci_key(focused)
+        .and_then(|key| controller.app(&key))
+        .map_or(String::new(), |app| app.name.clone());
+    boxed(&format!("Install {app}'s packages"), lines, "c or n, or j k + Enter · Esc / i close", cells, rows, INNER)
+}
+
 /// The digits that focus a column, for the key reference: "1 2 3", or "1-9" for many columns.
 fn column_digits(count: usize) -> String {
     let count = count.clamp(1, 9);
@@ -247,7 +285,7 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             if is_upper && all.iter().any(|other| other.focused && other.key == key.to_lowercase()) {
                 continue;
             }
-            if key == "<" {
+            if key == "-" {
                 continue;
             }
             let twin = all
@@ -258,8 +296,8 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
                     &format!("{key} {}", twin.key),
                     &format!("{} · focused / all", action.label.replace(" the focused app", "")),
                 ));
-            } else if key == ">" {
-                entries.push(entry("> <", "Widen / narrow the focused column"));
+            } else if key == "+" {
+                entries.push(entry("+ -", "Widen / narrow the focused column"));
             } else {
                 entries.push(entry(key, &action.label));
             }
@@ -272,7 +310,7 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         (digits.as_str(), "jump to a column"),
         ("j k ↑ ↓", "scroll a line"),
         ("^u ^d ^b ^f", "half page / page (PgUp PgDn)"),
-        ("gg G", "oldest / follow new output"),
+        ("gg G < >", "oldest / follow new output"),
         ("n N Esc", "search: older / newer / clear"),
     ] {
         entries.push(entry(keys, label));
