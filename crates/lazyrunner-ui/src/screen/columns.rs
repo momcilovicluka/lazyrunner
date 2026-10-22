@@ -243,8 +243,7 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let focused = index == ui.focus;
     let tone = tone(ui, controller, index);
     let marker = if focused { "▸ " } else { "" };
-    let kind = if app.traits().builds { Icon::Dotnet } else { Icon::Npm };
-    let icon = app.icon.as_deref().unwrap_or(icons::icon(ui.nerd, kind));
+    let icon = icons::app(ui.nerd, app, controller.framework(&app.key));
     let chip_fg = if tone == C::DarkGray { C::White } else { C::Black };
     let mut segs = vec![on(format!(" {marker}{icon} {} ", app.name), chip_fg, tone)];
     segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
@@ -418,7 +417,7 @@ fn info(controller: &Controller, index: usize, cells: usize, nerd: bool) -> Vec<
         segs.push(seg(sparkline(state.request_history.iter(), 5.0), C::DarkMagenta));
     }
     if state.errors > 0 {
-        segs.push(seg(format!("  ✗ {}", state.errors), C::Red));
+        segs.push(seg(format!("  {} {}", icons::icon(nerd, Icon::Fail), state.errors), C::Red));
     }
     if state.warnings > 0 {
         segs.push(seg(format!("  △ {}", state.warnings), C::Yellow));

@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.1.0] - 2026-10-22
+
+### Changed
+- Nerd Font icons are on by default (`, i` turns them off), and with them every app's title bar has one: the .NET logo, or for an npm app its framework's (Angular, React, Vue, by its package.json) else Node.js's - an app's own `"icon"` is now its plain one
+
+### Added
+- `"nerdIcon"` in a profile's app: its title-bar icon with Nerd Font icons on (`"\uf0ac"` a globe, `"\uf085"` cogs)
+- Nerd Font marks in the tests view (passed, failed, errors, skipped, queued, cancelled), the migrations view, the startup checklist, a column's error count and the reload window
+
 ## [1.0.0] - 2026-10-22
 
 lazyrunner 1.0: everything the PowerShell lazybms did, in Rust, for any project a profile describes - builds, runs and watches its .NET and npm apps, with tests, requests, migrations, durations, lazygit and the database picker beside them.

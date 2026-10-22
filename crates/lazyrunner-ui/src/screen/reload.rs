@@ -12,6 +12,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 
+use super::icons::{self, Icon};
 use super::theme::{self, C};
 use super::{Ui, overlays};
 
@@ -53,7 +54,8 @@ pub fn start(ui: &mut Ui, controller: &mut Controller) {
         ui.reload = Some(Show { started: ui.now, seed });
         celebrate += OFF + STAGE + ON;
     }
-    controller.celebrate = Some(("↻ window reloaded".into(), ui.now + celebrate));
+    let reload = icons::icon(controller.setting(Toggle::NerdIcons), Icon::Reload);
+    controller.celebrate = Some((format!("{reload} window reloaded"), ui.now + celebrate));
     controller.add_log("↻ Window reloaded: the settings and themes read again, the terminal set up again", Hue::Cyan);
 }
 
@@ -158,7 +160,7 @@ fn stage(buf: &mut Buffer, area: Rect, ui: &Ui, show: Show, seconds: f64, progre
         };
         put(buf, bar_left + at, top + 4, symbol, ui.theme.style(color, None));
     }
-    let text = "↻ reloading";
+    let text = format!("{} reloading", icons::icon(ui.nerd, Icon::Reload));
     let text_left = area.x + area.width.saturating_sub(text.chars().count() as u16) / 2;
     for (at, symbol) in text.chars().enumerate() {
         put(buf, text_left + at as u16, top + 6, &symbol.to_string(), ui.theme.style(C::DarkGray, None));

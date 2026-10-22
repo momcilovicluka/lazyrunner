@@ -83,10 +83,14 @@ fn screen(label: &str, config: Value) -> Screen {
             only: Some(sample_profile()),
         },
     };
-    // Side by side unless a test says otherwise: SIZE is narrow enough that auto would stack the apps.
+    // Side by side unless a test says otherwise: SIZE is narrow enough that auto would stack the apps. Plain icons
+    // too: the snapshots shouldn't need a Nerd Font.
     let mut config = config;
     if config.get("layout").is_none() {
         config["layout"] = json!("columns");
+    }
+    if config.get("nerdIcons").is_none() {
+        config["nerdIcons"] = json!(false);
     }
     lazyrunner_core::config::write(&paths.config_file, &config).unwrap();
     let project = import(&sample_profile(), &paths.profiles).unwrap();
@@ -669,17 +673,28 @@ async fn i_asks_npm_ci_or_npm_install_and_the_menu_and_palette_have_both() {
 // ---------------------------------------------------------------- Nerd Font icons
 
 #[tokio::test]
-async fn nerd_icons_swap_the_chromes_symbols_and_leave_an_apps_own() {
+async fn nerd_icons_are_on_by_default_and_swap_the_symbols_and_the_apps_icons() {
+    assert!(Toggle::NerdIcons.default_on());
     let mut screen = screen("nerd", json!({}));
     let plain = screen.frame();
-    assert!(plain.contains("⎇ main") && plain.contains("■ Billing"), "{plain}");
+    assert!(plain.contains("⎇ main") && plain.contains("■ Billing") && plain.contains("◆ Orders"), "{plain}");
     screen.press(", i Esc");
     assert!(screen.controller.setting(Toggle::NerdIcons));
     let nerd = screen.frame();
     assert!(nerd.contains("\u{e725} main"), "the branch: {nerd}");
-    assert!(nerd.contains("\u{e77f} Billing"), ".NET, Billing having no icon of its own");
-    assert!(nerd.contains("◆ Orders"), "Orders keeps its own icon");
-    assert!(nerd.contains("\u{e718} Shop"), "Node.js");
+    assert!(nerd.contains("\u{e77f} Billing"), ".NET");
+    assert!(nerd.contains("\u{e77f} Orders"), "its own icon ◆ is the plain one");
+    assert!(nerd.contains("\u{e718} Shop"), "Node.js: no framework in its package.json");
+}
+
+#[tokio::test]
+async fn an_apps_nerd_icon_from_its_profile_wins_over_its_kinds() {
+    let mut screen = screen("nerd-own", json!({ "nerdIcons": true }));
+    let mut apps = screen.controller.apps.clone();
+    apps[0].nerd_icon = Some("\u{f0ac}".into());
+    screen.controller.apps = apps;
+    let name = screen.controller.apps[0].name.clone();
+    assert!(screen.frame().contains(&format!("\u{f0ac} {name}")));
 }
 
 // ---------------------------------------------------------------- reload window
@@ -695,7 +710,10 @@ async fn ctrl_r_reads_the_settings_again_and_plays_its_show() {
     assert!(screen.ui.is_animating(&screen.controller));
     screen.ui.now += Duration::from_millis(600); // the stage: the logo, the bar
     let stage = screen.frame();
-    assert!(stage.contains("▀▀▀ ▀ ▀ ▀▀▀") && stage.contains("↻ reloading"), "{stage}");
+    assert!(
+        stage.contains("▀▀▀ ▀ ▀ ▀▀▀") && stage.contains("\u{f021} reloading"),
+        "Nerd Font icons by default: {stage}"
+    );
     screen.ui.now += Duration::from_secs(2);
     let after = screen.frame();
     assert!(screen.ui.reload.is_none() && after.contains("Orders"), "the show is over: {after}");

@@ -185,7 +185,8 @@ fn the_sample_repo_starts_gets_ready_and_stops() {
 
     // 5 focuses the fifth column.
     lazyrunner.press("5");
-    assert!(lazyrunner.frame().contains("▸ ■ Console"), "the Console column has the focus marker");
+    let focused = lazyrunner.frame().split("▸ ").nth(1).map(|rest| rest.chars().skip(2).collect::<String>());
+    assert!(focused.is_some_and(|rest| rest.starts_with("Console")), "the Console column has the focus marker");
 
     // S stops all but the app with includeInAll false.
     lazyrunner.press("S");

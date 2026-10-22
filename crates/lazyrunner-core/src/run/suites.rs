@@ -744,6 +744,7 @@ mod tests {
             key: key.into(),
             name: key.into(),
             icon: None,
+            nerd_icon: None,
             tests: Vec::new(),
             migrations: None,
             kind: AppKind::Npm { dir: dir.into(), variants: Vec::new() },
@@ -752,6 +753,7 @@ mod tests {
             key: "api".into(),
             name: "Api".into(),
             icon: None,
+            nerd_icon: None,
             tests: Vec::new(),
             migrations: None,
             kind: AppKind::Dotnet {

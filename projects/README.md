@@ -103,6 +103,7 @@ An ASP.NET (or any dotnet run) project. lazyrunner builds it with dotnet build, 
 | `key` | app key | yes | Short name, unique in the profile. Used in settings (columnWidths, apps.<key>) and by servedBy. Example: `"orders"`. |
 | `name` | string | yes | The column's title. Example: `"Orders"`. |
 | `icon` | character |  | One character before the app's name in its title bar. Default: `■`. Example: `"◆"`. |
+| `nerdIcon` | character |  | Optional. Its icon in the title bar when Nerd Font icons are on (nerdIcons): one Nerd Font character. Without it .NET's, or the framework's in package.json (Angular, React, Vue) else Node.js's, as a JSON escape (\uf0ac, a globe) or the character itself. |
 | `type` | `"dotnet"` | yes | The app type: what lazyrunner does with the app follows from it. |
 | `project` | path | yes | The .csproj to build and run. Example: `"services/Orders/Orders.csproj"`. |
 | `launchProfile` | string | yes | A profile in the project's Properties/launchSettings.json. Its applicationUrl gives the port. Example: `"Orders"`. |
@@ -121,6 +122,7 @@ A folder with package.json, run with npm run <script>. It needs no build from la
 | `key` | app key | yes | Short name, unique in the profile. Example: `"shop"`. |
 | `name` | string | yes | The column's title. Example: `"Shop"`. |
 | `icon` | character |  | One character before the app's name in its title bar. Default: `■`. Example: `"◆"`. |
+| `nerdIcon` | character |  | Optional. Its icon in the title bar when Nerd Font icons are on (nerdIcons): one Nerd Font character. Without it .NET's, or the framework's in package.json (Angular, React, Vue) else Node.js's, as a JSON escape (\uf0ac, a globe) or the character itself. |
 | `type` | `"npm"` | yes | The app type: what lazyrunner does with the app follows from it. |
 | `dir` | path | yes | The folder with package.json. Example: `"web/shop"`. |
 | `variants` | array of objects | yes | How it runs, chosen again on every start: the first variant whose when.packageScript package.json has. One without when always applies, so only the last can leave it out. Example: `[{"script":"dev","port":5173}]`. |

@@ -9,6 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use super::actions::{self, Action};
 use super::checklist::Checklist;
 use super::columns::{hue_color, spinner};
+use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, aim, limit, on, pad, seg, width};
 use super::theme::C;
@@ -385,7 +386,7 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
     boxed(&format!("Keys · lazyrunner v{VERSION}"), lines, footer, cells, rows, inner)
 }
 
-fn icon(status: Status, tick: u64, animated: bool) -> String {
+fn icon(status: Status, tick: u64, animated: bool, nerd: bool) -> String {
     match status {
         Status::Pending => "·".into(),
         Status::Running => {
@@ -395,10 +396,10 @@ fn icon(status: Status, tick: u64, animated: bool) -> String {
                 "●".into()
             }
         }
-        Status::Ok => "✓".into(),
-        Status::Warn => "!".into(),
-        Status::Fail => "✗".into(),
-        Status::Skip => "–".into(),
+        Status::Ok => icons::icon(nerd, Icon::Ok).into(),
+        Status::Warn => icons::icon(nerd, Icon::Warn).into(),
+        Status::Fail => icons::icon(nerd, Icon::Fail).into(),
+        Status::Skip => icons::icon(nerd, Icon::Skip).into(),
     }
 }
 
@@ -432,14 +433,20 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         .map(|item| {
             let detail_color = if item.status == Status::Ok { C::Gray } else { status_color(item.status) };
             vec![
-                seg(format!(" {} ", icon(item.status, tick, animated)), status_color(item.status)),
+                seg(format!(" {} ", icon(item.status, tick, animated, ui.nerd)), status_color(item.status)),
                 seg(format!("{:<19}", item.name), C::White),
                 seg(item.detail.clone(), detail_color),
             ]
         })
         .collect();
     if fold {
-        checks.insert(0, vec![seg(" ✓ ", C::Green), seg(format!("{passed} checks passed"), C::Gray)]);
+        checks.insert(
+            0,
+            vec![
+                seg(format!(" {} ", icons::icon(ui.nerd, Icon::Ok)), C::Green),
+                seg(format!("{passed} checks passed"), C::Gray),
+            ],
+        );
     }
     let news_room = WHATS_NEW_MAX_LINES.min(room.saturating_sub(checks.len() + 3));
     let mut lines: Vec<Vec<Seg>> = Vec::new();

@@ -78,6 +78,8 @@ pub struct App {
     pub key: String,
     pub name: String,
     pub icon: Option<String>,
+    /// Its icon when Nerd Font icons are on (`"nerdIcon"`); without it one for its kind or framework.
+    pub nerd_icon: Option<String>,
     pub kind: AppKind,
     /// Test suites that belong to it whatever lazyrunner works out (`"tests"`): .NET test projects by path or
     /// name, Nx projects by name.

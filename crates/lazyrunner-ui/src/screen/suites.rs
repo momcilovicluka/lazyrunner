@@ -406,10 +406,19 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
         let at_once = controller.test_parallelism();
         (format!("{} {running}{building} · up to {at_once} at once", icon(ui, Status::Running)), C::Yellow)
     } else if totals.ran > 0 {
-        let skipped = if totals.skipped > 0 { format!("   – {}", totals.skipped) } else { String::new() };
-        let errors = if totals.errors > 0 { format!("   ! {} didn't run", totals.errors) } else { String::new() };
+        let mark = |icon| icons::icon(ui.nerd, icon);
+        let skipped =
+            if totals.skipped > 0 { format!("   {} {}", mark(Icon::Skip), totals.skipped) } else { String::new() };
+        let errors = if totals.errors > 0 {
+            format!("   {} {} didn't run", mark(Icon::Warn), totals.errors)
+        } else {
+            String::new()
+        };
         let color = if totals.failed > 0 || totals.errors > 0 { C::Red } else { C::Green };
-        (format!("✓ {}   ✗ {}{skipped}{errors}", totals.passed, totals.failed), color)
+        (
+            format!("{} {}   {} {}{skipped}{errors}", mark(Icon::Ok), totals.passed, mark(Icon::Fail), totals.failed),
+            color,
+        )
     } else {
         ("not run yet".to_string(), C::DarkGray)
     };
@@ -443,7 +452,7 @@ fn pick(ui: &mut Ui, suite: &Suite, at: usize, width: usize, height: usize) -> V
     let room = (height.saturating_sub(2) * 11 / 20).max(3);
     let top = at.saturating_sub(room / 2).min(list.len().saturating_sub(room));
     for (index, test) in list.iter().enumerate().skip(top).take(room) {
-        let (icon, color) = outcome_mark(test.outcome);
+        let (icon, color) = outcome_mark(ui.nerd, test.outcome);
         let ms = if test.ms > 0.0 { format!("{:>7} ms", test.ms.round()) } else { String::new() };
         let room = width.saturating_sub(ms.chars().count() + 4).max(8);
         let name = pad(&end_of(&test.name, room), room);
@@ -456,7 +465,7 @@ fn pick(ui: &mut Ui, suite: &Suite, at: usize, width: usize, height: usize) -> V
     }
     lines.push(vec![seg("─".repeat(width), C::DarkGray)]);
     let Some(test) = list.get(at) else { return lines };
-    let (_, color) = outcome_mark(test.outcome);
+    let (_, color) = outcome_mark(ui.nerd, test.outcome);
     let mut out = Details { ui, lines, width };
     out.add(&test.name, C::White, 0);
     out.add(&format!("{:?}{}", test.outcome, took(test)), color, 0);
@@ -469,11 +478,11 @@ fn pick(ui: &mut Ui, suite: &Suite, at: usize, width: usize, height: usize) -> V
     out.lines
 }
 
-fn outcome_mark(outcome: Outcome) -> (&'static str, C) {
+fn outcome_mark(nerd: bool, outcome: Outcome) -> (&'static str, C) {
     match outcome {
-        Outcome::Failed => ("✗", C::Red),
-        Outcome::Skipped => ("–", C::DarkGray),
-        Outcome::Passed => ("✓", C::Green),
+        Outcome::Failed => (icons::icon(nerd, Icon::Fail), C::Red),
+        Outcome::Skipped => (icons::icon(nerd, Icon::Skip), C::DarkGray),
+        Outcome::Passed => (icons::icon(nerd, Icon::Ok), C::Green),
     }
 }
 
@@ -613,11 +622,11 @@ fn icon(ui: &Ui, status: Status) -> String {
         Status::Running if ui.reduced_motion => "●".into(),
         Status::Running => spinner(ui.tick()).to_string(),
         Status::Idle => "·".into(),
-        Status::Queued => "◌".into(),
-        Status::Passed => "✓".into(),
-        Status::Failed => "✗".into(),
-        Status::Error => "!".into(),
-        Status::Cancelled => "■".into(),
+        Status::Queued => icons::icon(ui.nerd, Icon::Queued).into(),
+        Status::Passed => icons::icon(ui.nerd, Icon::Ok).into(),
+        Status::Failed => icons::icon(ui.nerd, Icon::Fail).into(),
+        Status::Error => icons::icon(ui.nerd, Icon::Warn).into(),
+        Status::Cancelled => icons::icon(ui.nerd, Icon::Cancelled).into(),
     }
 }
 

@@ -31,7 +31,7 @@ use super::history::{Durations, Kind};
 use super::net::{Listening, ProbeResult};
 use super::watcher::CodeWatcher;
 use super::{Event, Tag};
-use crate::apptypes::{self, Mode};
+use crate::apptypes::{self, Framework, Mode};
 use crate::config::{ConfigFile, Toggle};
 use crate::output::Hue;
 use crate::paths::Paths;
@@ -142,6 +142,7 @@ pub struct Controller {
     guard: Option<Arc<Guard>>,
     ports: HashMap<String, Option<u16>>,
     modes: HashMap<String, Option<Mode>>,
+    frameworks: HashMap<String, Framework>,
     ready_pending: Vec<String>,
     action_started: Option<Instant>,
     timeline: HashMap<String, Timeline>,
@@ -266,6 +267,7 @@ impl Controller {
             guard,
             ports: HashMap::new(),
             modes: HashMap::new(),
+            frameworks: HashMap::new(),
             ready_pending: Vec::new(),
             action_started: None,
             timeline: HashMap::new(),
@@ -319,7 +321,11 @@ impl Controller {
         self.branch = self.git_dir.as_deref().and_then(super::tools::branch).unwrap_or_default();
         self.pending_branch = None;
         self.update_modes();
+        self.frameworks.clear();
         for app in &self.apps {
+            if let Some(framework) = apptypes::framework(root, app) {
+                self.frameworks.insert(app.key.clone(), framework);
+            }
             if !app.traits().variants {
                 self.ports.insert(app.key.clone(), apptypes::port(root, app, &self.apps));
             }
@@ -364,6 +370,11 @@ impl Controller {
 
     pub fn mode(&self, key: &str) -> Option<&Mode> {
         self.modes.get(key).and_then(Option::as_ref)
+    }
+
+    /// An npm app's front-end framework, as this checkout's package.json says.
+    pub fn framework(&self, key: &str) -> Option<Framework> {
+        self.frameworks.get(key).copied()
     }
 
     /// The names of these apps, as the log says them: "Orders + Billing".

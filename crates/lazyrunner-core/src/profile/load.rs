@@ -227,6 +227,7 @@ fn to_app(app: &Value) -> App {
         key: text(field(app, "key")),
         name: text(field(app, "name")),
         icon: optional("icon"),
+        nerd_icon: optional("nerdIcon"),
         kind,
         tests,
         migrations,
