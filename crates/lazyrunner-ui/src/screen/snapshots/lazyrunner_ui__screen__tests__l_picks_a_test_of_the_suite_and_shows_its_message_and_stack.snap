@@ -5,12 +5,12 @@ expression: screen.frame()
  ⚗ Tests   3 suites · ✓ 2   ✗ 1   – 1
  j k choose a test · r run it · y copy it · f failed again · s stop · h back to the suites
  Backend · dotnet test             1 failed │ Orders.Tests   3 tests · r runs the picked one
-   Orders                          1 failed │  ✗ Orders.Tests.CartTests.Totals(2, 3)                     41 ms
+ 1 Orders                          1 failed │  ✗ Orders.Tests.CartTests.Totals(2, 3)                     41 ms
    ▸ ✗ Orders.Tests           1 of 3 failed │  – Orders.Tests.CartTests.Later
-   Billing                         1 passed │  ✓ Orders.Tests.CartTests.Adds                             12 ms
+ 2 Billing                         1 passed │  ✓ Orders.Tests.CartTests.Adds                             12 ms
      ✓ Billing.Tests               1 passed │ ────────────────────────────────────────────────────────────────
  Frontend · vitest · nx test        not run │ Orders.Tests.CartTests.Later
-   Shop                             not run │ Skipped
+ 3 Shop                             not run │ Skipped
      · Shop                         not run │
      1 project without test files           │
                                             │

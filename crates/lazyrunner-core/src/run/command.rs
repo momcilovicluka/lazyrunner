@@ -26,6 +26,7 @@ pub enum Command {
     Build(String),
     BuildAll,
     NpmCi(String),
+    NpmInstall(String),
     /// Kill what holds a port an app needs, then start.
     KillPortUser,
     SetToggle {
@@ -62,7 +63,8 @@ impl Command {
             | Command::Stop(key)
             | Command::Restart(key)
             | Command::Build(key)
-            | Command::NpmCi(key) => Some(key),
+            | Command::NpmCi(key)
+            | Command::NpmInstall(key) => Some(key),
             _ => None,
         }
     }
@@ -88,6 +90,7 @@ impl Controller {
             Command::Build(key) => self.build_only(Some(&[key])),
             Command::BuildAll => self.build_only(None),
             Command::NpmCi(key) => self.npm_ci(Some(&key)),
+            Command::NpmInstall(key) => self.npm_install(Some(&key)),
             Command::KillPortUser => self.resolve_port_conflicts(),
             Command::SetToggle { toggle, on } => self.set_toggle(toggle, on),
         }

@@ -22,6 +22,9 @@ pub enum Run {
     Quit,
     Database,
     NpmCi,
+    NpmInstall,
+    /// i: npm ci or npm install.
+    Install,
     OpenFocused,
     OpenAll,
     OpenLog,
@@ -42,7 +45,10 @@ pub enum Run {
     Settings,
     Help,
     Palette,
-    Setting { toggle: Toggle, label: &'static str },
+    Setting {
+        toggle: Toggle,
+        label: &'static str,
+    },
     Checklist,
     Changelog,
     ReloadProfile,
@@ -111,7 +117,15 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
     list.push(action("Tools", "d", "Switch database", "connection strings in secrets.json", Run::Database).safe());
     if installs {
         list.push(
-            action("Tools", "i", "npm ci (reinstall packages)", "the focused npm app's, in the background", Run::NpmCi)
+            action("Tools", "i", "Install packages: npm ci or npm install", "the focused npm app's", Run::Install)
+                .safe(),
+        );
+        list.push(
+            action("Tools", "i c", "npm ci", "a clean install of exactly what package-lock.json says", Run::NpmCi)
+                .safe(),
+        );
+        list.push(
+            action("Tools", "i n", "npm install", "adds and updates packages to match package.json", Run::NpmInstall)
                 .safe(),
         );
     }
@@ -163,8 +177,8 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
         action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
         action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),
-        action("View", ">", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),
-        action("View", "<", "Narrow the focused column", "shorter when the apps are stacked", Run::Narrow).safe(),
+        action("View", "+", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),
+        action("View", "-", "Narrow the focused column", "shorter when the apps are stacked", Run::Narrow).safe(),
         action("View", "=", "Equal column widths", "", Run::EqualWidths).safe(),
         action(
             "View",
@@ -291,13 +305,13 @@ pub fn find(ui: &Ui, controller: &Controller, name: &str) -> Option<Action> {
     actions(ui, controller).into_iter().find(|action| action.key == name || action.alt.contains(&name))
 }
 
-/// The x menu: the actions for the focused app (and npm ci for an npm app).
+/// The x menu: the actions for the focused app (and npm ci and npm install for an npm app).
 pub fn menu(ui: &Ui, controller: &Controller) -> Vec<Action> {
     let all = actions(ui, controller);
     let mut items: Vec<Action> = all.iter().filter(|action| action.focused).cloned().collect();
     let focused_installs = controller.apps.get(ui.focus).is_some_and(|app| app.traits().installs);
-    if focused_installs && let Some(npm) = all.iter().find(|action| action.key == "i") {
-        items.push(npm.clone());
+    if focused_installs {
+        items.extend(all.iter().filter(|action| action.key == "i c" || action.key == "i n").cloned());
     }
     items
 }

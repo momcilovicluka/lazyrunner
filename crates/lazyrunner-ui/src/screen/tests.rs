@@ -211,7 +211,7 @@ async fn focus_moves_and_zoom_fills_the_body() {
 #[tokio::test]
 async fn wider_columns_are_saved() {
     let mut screen = screen("snap-widths", json!({}));
-    screen.press("> > >");
+    screen.press("+ + +");
     assert_eq!(screen.controller.config["columnWidths"]["orders"], json!(48.0));
     insta::assert_snapshot!(screen.frame());
     screen.press("=");
@@ -612,6 +612,26 @@ async fn y_in_the_database_picker_copies_the_line_as_it_is_in_secrets_json() {
     assert_eq!(screen.last_log(), "secrets.json changed since the picker opened - press d again to copy that row.");
 }
 
+// ---------------------------------------------------------------- installing packages
+
+#[tokio::test]
+async fn i_asks_npm_ci_or_npm_install_and_the_menu_and_palette_have_both() {
+    let mut screen = screen("snap-install", json!({}));
+    screen.press("l l i");
+    insta::assert_snapshot!(screen.frame());
+    screen.press("j");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Install { index: 1 })));
+    screen.press("Esc x");
+    let menu = screen.frame();
+    assert!(menu.contains("npm ci") && menu.contains("npm install"), "{menu}");
+    screen.press("Esc :");
+    for key in "install".chars() {
+        screen.press(&key.to_string());
+    }
+    let palette = screen.frame();
+    assert!(palette.contains("[i n]") && palette.contains("[i c]"), "{palette}");
+}
+
 // ---------------------------------------------------------------- the requests view
 
 /// Requests the sample's .NET apps served, by hand.
@@ -725,7 +745,7 @@ async fn in_the_tests_view_keys_choose_copy_and_say_what_they_cant_do() {
     assert_eq!(screen.last_log(), "No test log yet - r runs the suite.");
     screen.press("j j j");
     assert!(screen.frame().contains("Not run yet - r runs this suite"), "Shop's tests are selected");
-    screen.press("k k k k k k k y");
+    screen.press("< y");
     assert_eq!(screen.last_log(), "Copied 1 failed test from Backend · dotnet test to the clipboard");
     assert!(screen.frame().contains("2 suites · r runs them all"), "the backend is selected");
     screen.press("o");
@@ -736,8 +756,17 @@ async fn in_the_tests_view_keys_choose_copy_and_say_what_they_cant_do() {
     assert!(screen.ui.overlay.is_none());
     screen.press("T ,");
     assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { .. })), "keys it doesn't use do what they always do");
+    screen.press(",");
+    screen.frame();
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { .. })), "closing the settings goes back to the tests");
+    screen.press("> 2");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 3, .. })), "2: the second app, Billing");
+    assert!(screen.frame().contains(" 2 Billing"), "numbered");
     screen.press("Esc H ?");
     assert!(matches!(screen.ui.overlay, Some(Overlay::Help)), "from the requests view too");
+    screen.press("x");
+    screen.frame();
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Requests(_))), "and back to it");
 }
 
 #[tokio::test]

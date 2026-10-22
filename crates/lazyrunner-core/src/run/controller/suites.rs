@@ -35,6 +35,19 @@ pub struct TestBuild {
     child: Child,
 }
 
+/// What a run that left no results said went wrong: its first line naming something missing or an error, to its
+/// first full stop ("Test environment jest-environment-jsdom cannot be found").
+fn reason(lines: &[String]) -> Option<String> {
+    const SIGNS: [&str; 6] =
+        ["cannot be found", "Cannot find", "not found", "is not recognized", "error TS", "Error: "];
+    let line = lines
+        .iter()
+        .map(|line| line.trim())
+        .find(|line| !line.contains("Validation Error") && SIGNS.iter().any(|sign| line.contains(sign)))?;
+    let sentence = line.split(". ").next().unwrap_or(line).trim_end_matches('.');
+    Some(sentence.chars().take(160).collect())
+}
+
 /// The suites' results added up.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Totals {
@@ -456,8 +469,11 @@ impl Controller {
                 suite.status = Status::Error;
                 let exit = code.map_or_else(|| "?".to_string(), |code| code.to_string());
                 let readable = file.is_file();
-                suite.note =
-                    if readable { "unreadable results".into() } else { format!("no results (exit code {exit})") };
+                suite.note = match (readable, reason(&suite.lines)) {
+                    (true, _) => "unreadable results".into(),
+                    (false, Some(reason)) => reason,
+                    (false, None) => format!("no results (exit code {exit})"),
+                };
                 let why = if readable { error } else { suite.note.clone() };
                 self.add_log(format!("✗ {name}: {why} - o in the tests view opens its log"), Hue::Red);
                 return;
@@ -747,6 +763,19 @@ mod tests {
 
     fn keys(names: &[&str]) -> Vec<String> {
         names.iter().map(|name| format!("npm:{name}")).collect()
+    }
+
+    #[test]
+    fn a_run_without_results_says_what_went_wrong() {
+        let lines = [
+            "> nx run @focus/core:test --ci --json --outputFile=x.json",
+            "  NX   ● Validation Error:",
+            "  Test environment jest-environment-jsdom cannot be found. Make sure the testEnvironment option points to an existing node module.",
+            "  NX   Running target test for project @focus/core failed",
+        ]
+        .map(String::from);
+        assert_eq!(super::reason(&lines).as_deref(), Some("Test environment jest-environment-jsdom cannot be found"));
+        assert_eq!(super::reason(&["all good".to_string()]), None);
     }
 
     #[tokio::test]

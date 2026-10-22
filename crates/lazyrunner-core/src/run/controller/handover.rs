@@ -99,8 +99,8 @@ impl Controller {
         if self.building.is_some() || !self.build_queue.is_empty() {
             return Some("a build is running".into());
         }
-        if self.npm_ci.is_some() {
-            return Some("npm ci is running".into());
+        if let Some(job) = &self.npm_ci {
+            return Some(format!("{} is running", job.what));
         }
         self.tests_active().then(|| "tests are running".into())
     }

@@ -72,8 +72,10 @@ pub struct ToolJob {
     pub done: usize,
     pub total: usize,
     pub warnings: usize,
-    /// npm ci: start the app once it's done.
+    /// npm ci or npm install: start the app once it's done.
     pub start_after: bool,
+    /// What runs: "dotnet build", "npm ci", "npm install".
+    pub what: &'static str,
 }
 
 /// When each app of the current start built, started and got up (seconds since the start), for the timeline.

@@ -76,6 +76,10 @@ pub enum Overlay {
     Durations {
         top: usize,
     },
+    /// `i`: npm ci or npm install, for the npm app it installs.
+    Install {
+        index: usize,
+    },
     /// `H`: the HTTP requests the .NET apps served.
     Requests(Box<requests::View>),
     /// `T`: the test suites; the selected one, how far its details are scrolled, and the test picked in it (`l`).
@@ -104,6 +108,7 @@ impl Overlay {
             Self::Durations { .. } => "durations",
             Self::Tests { .. } => "tests",
             Self::Requests(_) => "requests",
+            Self::Install { .. } => "install",
             Self::Themes { .. } => "themes",
         }
     }
@@ -168,6 +173,8 @@ pub struct Ui {
     pub last_click: Option<(Instant, u16, u16)>,
     /// What the mouse pointer is over (the tests view marks it).
     pub hover: Option<mouse::Target>,
+    /// The view (tests, requests) a box or the database picker was opened from: it comes back when that closes.
+    pub behind: Option<Overlay>,
     pub started: Instant,
     /// The time of the frame being drawn (fixed in tests).
     pub now: Instant,
@@ -213,6 +220,7 @@ impl Ui {
             launcher: links::launch,
             last_click: None,
             hover: None,
+            behind: None,
             started: now,
             now,
             body_rows: 20,
@@ -304,6 +312,10 @@ impl Ui {
 /// Draws the whole screen.
 pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.reduced_motion = controller.setting(Toggle::ReducedMotion);
+    let typing = ui.search.as_ref().is_some_and(|search| search.typing);
+    if ui.overlay.is_none() && ui.picker.is_none() && !typing {
+        ui.overlay = ui.behind.take(); // what was opened from a view closed: the view again
+    }
     let area = frame.area();
     let buf = frame.buffer_mut();
     buf.set_style(area, Style::reset());
@@ -339,6 +351,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
+        Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         _ => {}

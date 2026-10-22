@@ -1,4 +1,4 @@
-//! npm ci: whether an npm app's packages match its lock file, and reinstalling them in the background.
+//! npm ci and npm install: whether an npm app's packages match its lock file, and installing them in the background.
 
 use std::path::Path;
 use std::time::Instant;
@@ -66,8 +66,19 @@ impl Controller {
         self.lock_changed = changed;
     }
 
-    /// i: npm ci for an npm app (the focused one, or the one whose lock file changed), in the background.
+    /// i, c: npm ci for an npm app (the focused one, or the one whose lock file changed), in the background.
     pub fn npm_ci(&mut self, focused: Option<&str>) {
+        self.install_packages(focused, true);
+    }
+
+    /// i, n: npm install for the same app: packages added and updated to match package.json.
+    pub fn npm_install(&mut self, focused: Option<&str>) {
+        self.install_packages(focused, false);
+    }
+
+    /// npm ci (`clean`) or npm install, in the background.
+    fn install_packages(&mut self, focused: Option<&str>, clean: bool) {
+        let what = if clean { "npm ci" } else { "npm install" };
         let Some(key) = self.npm_ci_key(focused) else {
             self.add_log(
                 "There is no npm app (the project has none, or lazyrunner.config.json turns them off).",
@@ -77,28 +88,31 @@ impl Controller {
         };
         if let Some(job) = &self.npm_ci {
             let name = self.app(&job.key).map(|app| app.name.clone()).unwrap_or_default();
-            self.add_log(format!("npm ci is already running ({name})."), Hue::Gray);
+            self.add_log(format!("{} is already running ({name}).", job.what), Hue::Gray);
             return;
         }
         let app = self.app(&key).expect("a known app").clone();
         let AppKind::Npm { dir, .. } = &app.kind else { return };
         let folder = self.root.join(dir);
-        if !folder.join("package-lock.json").is_file() {
-            self.add_log(format!("No package-lock.json in {} - npm ci needs one.", folder.display()), Hue::Yellow);
+        if clean && !folder.join("package-lock.json").is_file() {
+            let text =
+                format!("No package-lock.json in {} - npm ci needs one (npm install makes it).", folder.display());
+            self.add_log(text, Hue::Yellow);
             return;
         }
         let was_running = self.is_running(&key);
         if was_running {
             self.stop(Some(std::slice::from_ref(&key)), true); // a running dev server locks files in node_modules
         }
-        self.pane(&key, &format!("──── ⚙ {} · npm ci ────", clock()), Hue::Cyan);
+        self.pane(&key, &format!("──── ⚙ {} · {what} ────", clock()), Hue::Cyan);
         let beside = if self.building.is_some() { " (next to the build)" } else { "" };
-        self.add_log(format!("Running npm ci for {}…{beside}", app.name), Hue::Cyan);
+        self.add_log(format!("Running {what} for {}…{beside}", app.name), Hue::Cyan);
         self.pause_npm_suites(&folder);
         stop_nx_daemon(&folder);
-        // node_modules is about to be rewritten: until npm ci succeeds it isn't known to be in sync.
+        // node_modules is about to be rewritten: until it succeeds it isn't known to be in sync.
         let _ = std::fs::remove_file(self.npm_ci_stamp(&key));
-        let spawned = self.commands.npm_ci(&folder).and_then(|spec| {
+        let spec = if clean { self.commands.npm_ci(&folder) } else { self.commands.npm_install(&folder) };
+        let spawned = spec.and_then(|spec| {
             Ok(Child::spawn(
                 &spec,
                 Tag::NpmCi { key: key.clone(), job: self.next_job + 1 },
@@ -120,9 +134,10 @@ impl Controller {
                     total: 0,
                     warnings: 0,
                     start_after: was_running,
+                    what,
                 });
             }
-            Err(error) => self.add_log(format!("✗ npm ci couldn't start: {error}"), Hue::Red),
+            Err(error) => self.add_log(format!("✗ {what} couldn't start: {error}"), Hue::Red),
         }
     }
 
@@ -179,30 +194,27 @@ impl Controller {
 
     fn complete_npm_ci(&mut self, end: NpmCiEnd) {
         let Some(job) = self.npm_ci.take() else { return };
-        let key = job.key.clone();
+        let (key, what) = (job.key.clone(), job.what);
+        let (kind, timing) = if what == "npm ci" { (Kind::NpmCi, "npmci") } else { (Kind::NpmInstall, "npminstall") };
         let name = self.app(&key).map(|app| app.name.clone()).unwrap_or_default();
-        let log = self.state_dir.join(format!("npm-ci-{key}.log"));
+        let log = self.state_dir.join(format!("{}-{key}.log", what.replace(' ', "-")));
         let _ = std::fs::write(&log, job.lines.join("\n") + "\n");
         let seconds = ((self.now)() - job.started).as_secs_f64();
         let waiting =
             if job.start_after { format!(" - {name} was waiting for it and stays stopped") } else { String::new() };
         match end {
             NpmCiEnd::Cancelled => {
-                self.pane(&key, "■ npm ci cancelled - node_modules may be incomplete, press i again", Hue::Yellow);
-                self.add_log(
-                    format!("■ npm ci cancelled - node_modules may be incomplete, press i again{waiting}"),
-                    Hue::Yellow,
-                );
+                let text = format!("■ {what} cancelled - node_modules may be incomplete, press i again");
+                self.pane(&key, &text, Hue::Yellow);
+                self.add_log(format!("{text}{waiting}"), Hue::Yellow);
             }
             NpmCiEnd::Failed => {
-                self.record_duration(Kind::NpmCi, &key, seconds, false);
+                self.record_duration(kind, &key, seconds, false);
                 self.last_failed_log = Some(log);
-                self.notifications.push(("npm ci failed".into(), format!("See the {name} column in lazyrunner")));
-                self.pane(&key, &format!("✗ npm ci failed after {}s", seconds as u64), Hue::Red);
-                self.add_log(
-                    format!("✗ npm ci failed after {}s - o opens the full log{waiting}", seconds as u64),
-                    Hue::Red,
-                );
+                self.notifications.push((format!("{what} failed"), format!("See the {name} column in lazyrunner")));
+                self.pane(&key, &format!("✗ {what} failed after {}s", seconds as u64), Hue::Red);
+                let text = format!("✗ {what} failed after {}s - o opens the full log{waiting}", seconds as u64);
+                self.add_log(text, Hue::Red);
             }
             NpmCiEnd::Ok => {
                 self.check_packages();
@@ -210,9 +222,9 @@ impl Controller {
                     serde_json::json!({ "root": self.root.display().to_string(), "lockHash": self.lock_hash(&key) });
                 let _ = crate::config::write(&self.npm_ci_stamp(&key), &stamp);
                 self.lock_changed.retain(|changed| *changed != key);
-                self.timings.add("npmci", &key, seconds);
-                let note = self.record_duration(Kind::NpmCi, &key, seconds, true);
-                let done = format!("✓ npm ci done in {}{note}", format_duration(seconds));
+                self.timings.add(timing, &key, seconds);
+                let note = self.record_duration(kind, &key, seconds, true);
+                let done = format!("✓ {what} done in {}{note}", format_duration(seconds));
                 self.pane(&key, &done, Hue::Green);
                 self.add_log(done, Hue::Green);
                 if job.start_after {

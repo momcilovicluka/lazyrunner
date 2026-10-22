@@ -188,6 +188,16 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             _ if !a_suite => controller.add_log("Choose a suite to pick one of its tests.", Hue::DarkGray),
             _ => controller.add_log("No results for this suite yet - r runs it.", Hue::DarkGray),
         },
+        "<" => (*index, *scroll) = (0, 0),
+        ">" => (*index, *scroll) = (rows.len().saturating_sub(1), 0),
+        digit if digit.len() == 1 && ('1'..='9').contains(&digit.chars().next().unwrap_or('0')) => {
+            // The apps' sections, numbered in the list.
+            let nth = digit.parse::<usize>().unwrap_or(1) - 1;
+            let apps = rows.iter().enumerate().filter(|(_, row)| matches!(row, Row::App { .. }));
+            if let Some((at, _)) = apps.clone().nth(nth) {
+                (*index, *scroll, *picking) = (at, 0, None);
+            }
+        }
         "g" | "Home" => *scroll = 0,
         "Ctrl+D" | "PageDown" => *scroll += PAGE,
         "Ctrl+U" | "PageUp" => *scroll = scroll.saturating_sub(PAGE),
@@ -226,8 +236,8 @@ fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "k" | "UpArrow" => *at = at.saturating_sub(1),
         "Ctrl+D" | "PageDown" => *at = (*at + PAGE).min(last),
         "Ctrl+U" | "PageUp" => *at = at.saturating_sub(PAGE),
-        "g" | "Home" => *at = 0,
-        "G" | "End" => *at = last,
+        "g" | "Home" | "<" => *at = 0,
+        "G" | "End" | ">" => *at = last,
         "r" | "Enter" => {
             if let Some(test) = names.get(*at) {
                 controller.run_test(&key, test);
@@ -414,8 +424,8 @@ fn hint(width: usize, picking: bool) -> Vec<Seg> {
     let text = if picking {
         " j k choose a test · r run it · y copy it · f failed again · s stop · h back to the suites"
     } else {
-        " j k choose · r run it (a side or an app: all of it) · R run all · l its tests · f / F failed again · s \
-         stop · o log · y copy failures · Esc back"
+        " j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its \
+         tests · f / F failed again · s stop · o log · y copy failures · Esc back"
     };
     fit(vec![seg(text, C::DarkGray)], width)
 }
@@ -509,7 +519,13 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let keys = under(controller, rows, index);
                 let (summary, color) = group_summary(controller, &keys);
                 let summary = if hovered { "▶ click to run".to_string() } else { summary };
-                let indent = if matches!(header, Row::Side { .. }) { " " } else { "   " };
+                // An app's number jumps to it (1-9).
+                let number = rows[..index].iter().filter(|row| matches!(row, Row::App { .. })).count() + 1;
+                let indent = match header {
+                    Row::Side { .. } => " ".to_string(),
+                    _ if number <= 9 => format!(" {number} "),
+                    _ => "   ".to_string(),
+                };
                 let room = width.saturating_sub(summary.chars().count() + indent.len() + 2).max(4);
                 let name = pad(&cut(&title(controller, header), room), room);
                 if index == selected {

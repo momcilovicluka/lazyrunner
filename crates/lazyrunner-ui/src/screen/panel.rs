@@ -70,7 +70,7 @@ fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
         items.push(("!", "kill port user", C::Red));
     }
     if lock_changed {
-        items.push(("i", "npm ci", C::Yellow));
+        items.push(("i", "install", C::Yellow));
     }
     let menu = [
         ("?", "keys"),
@@ -89,7 +89,7 @@ fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
     ];
     items.extend(menu.iter().map(|(key, label)| (*key, *label, C::Gray)));
     if controller.apps.iter().any(|app| app.traits().installs) && !lock_changed {
-        items.push(("i", "npm ci", C::Gray));
+        items.push(("i", "install", C::Gray));
     }
     let mut segs = Vec::new();
     let mut used = 0;

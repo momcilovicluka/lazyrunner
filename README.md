@@ -171,7 +171,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | Key | Action |
 |-----|--------|
 | `d` | **Database picker**: switch the active connection string in the .NET apps' user secrets (below) |
-| `i` | `npm ci` for an npm app, in the background (it stops the app first and starts it again after) |
+| `i` | Install an npm app's packages in the background: `c` `npm ci`, `n` `npm install` (it stops the app first and starts it again after) |
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
 | `y` | Copy the focused app's last error with its stack trace (a failed build's errors with full paths), or the search match |
@@ -193,7 +193,8 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `gg` / `G` (`Home` / `End`) | Oldest output / follow new output again |
 | `/`, `n` / `N`, `Esc` | Search the focused column (matches highlighted), older / newer match, clear |
 | `z` | Zoom: only the focused column |
-| `>` / `<` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
+| `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
+| `<` / `>` | The first / last: the oldest output and following new output again in a column, the first and last item in a list or box (as in lazygit) |
 | `\|` | Layout: auto (stacked below 120 cells) → columns side by side → stacked top to bottom (saved) |
 | `Ctrl+L` | Clear all columns and the panel log |
 | `t` | Theme picker: preview each theme live, `Enter` keeps one (saved), `Esc` undoes; see [Themes](#themes) |
@@ -308,7 +309,9 @@ profile's apps with their suites - the selected one on the right:
 
 A .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder
 it runs in; an app's `"tests"` in the profile (test project paths or names, Nx project names) says otherwise. Choose
-Backend, Frontend or an app and `r` (or a click on it - the pointer on one says so) runs all of its suites.
+Backend, Frontend or an app and `r` (or a click on it - the pointer on one says so) runs all of its suites; `1`-`9`
+jump to the apps' sections, numbered in the list. A box opened from the tests or requests view (`,` settings, `?`,
+`d`…) goes back to the view when it closes.
 
 `r` runs the selected suite, `R` all of them, `f` / `F` only their failed tests again (the results merge into the last
 full run's). Up to `testParallelism` suites run at once (half the cores by default), in the background: close the view
@@ -344,7 +347,10 @@ unreadable `history.json` is kept as `history.json.bad` and a new one starts.
 Which script an npm app runs is decided on every start from its `package.json` (the profile's variants), so a branch
 can use a dev server and another a watch build. npm apps start right away and compile while the .NET apps build.
 Automatic restarts leave them alone, since `npm run` watches its own files - unless a branch needs another variant.
-`i` runs `npm ci` in the background; once you've run it from lazyrunner, it warns when `package-lock.json` changes.
+`i` installs packages in the background and asks how: `c` runs `npm ci` (a clean install of exactly what
+`package-lock.json` says), `n` runs `npm install` (adds and updates packages to match `package.json`; the lock file may
+change). Both stop the app first and start it again after, and pause the test suites that run from its folder. Once
+you've installed from lazyrunner, it warns when `package-lock.json` changes.
 
 ## Themes
 

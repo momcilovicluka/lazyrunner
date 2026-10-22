@@ -57,6 +57,11 @@ pub trait Commands: Send + Sync {
     fn build(&self, root: &Path, project: &str) -> Spec;
     fn npm_ci(&self, dir: &Path) -> Result<Spec>;
 
+    /// `npm install`: packages added and updated to match package.json (the lock file may change).
+    fn npm_install(&self, dir: &Path) -> Result<Spec> {
+        npm_install_command(dir)
+    }
+
     /// A test suite's run, its results written to `results` (only the tests in `names`, when there are any).
     fn test(&self, runner: &Runner, results: &Path, names: &[String]) -> Result<Spec> {
         test_command(runner, results, names)
@@ -223,6 +228,13 @@ pub fn test_build_command(project: &Path) -> Spec {
     args.extend(["-nologo", "-m", "-v", "m", "-tl:off", "-clp:NoSummary"].map(OsString::from));
     let dir = project.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     Spec { program: dotnet(), args, dir, env: Vec::new() }
+}
+
+/// `npm install` in an npm app's folder.
+pub fn npm_install_command(dir: &Path) -> Result<Spec> {
+    let (program, mut args) = npm_launcher()?;
+    args.push("install".into());
+    Ok(Spec { program, args, dir: dir.to_path_buf(), env: Vec::new() })
 }
 
 /// An npm app's mode, for callers that hold only its key.
