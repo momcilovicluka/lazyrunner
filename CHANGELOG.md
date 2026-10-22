@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.14.0] - 2026-10-22
+
+### Added
+- One test at a time: in the tests view `l` opens the selected suite's tests (failed first) to pick one - its message and stack on the right - and `r` runs just that test; its result joins the suite's. `y` copies it, `h` goes back; a click picks a test, a double click runs it
+
 ## [0.13.0] - 2026-10-22
 
 ### Added

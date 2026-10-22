@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ⚗ Tests   3 suites · ✓ 2   ✗ 1   – 1
+ j k choose a test · r run it · y copy it · f failed again · s stop · h back to the suites
+ .NET · dotnet test                         │ Orders.Tests   3 tests · r runs the picked one
+ ▸ ✗ Orders.Tests             1 of 3 failed │  ✗ Orders.Tests.CartTests.Totals(2, 3)                     41 ms
+   ✓ Billing.Tests                 1 passed │  – Orders.Tests.CartTests.Later
+ npm · vitest                               │  ✓ Orders.Tests.CartTests.Adds                             12 ms
+   · Shop                           not run │ ────────────────────────────────────────────────────────────────
+                                            │ Orders.Tests.CartTests.Later
+                                            │ Skipped
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside

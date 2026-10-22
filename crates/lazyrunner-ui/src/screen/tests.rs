@@ -674,6 +674,28 @@ async fn in_the_tests_view_keys_choose_copy_and_say_what_they_cant_do() {
 }
 
 #[tokio::test]
+async fn l_picks_a_test_of_the_suite_and_shows_its_message_and_stack() {
+    let mut screen = screen("snap-tests-pick", json!({}));
+    with_suites(&mut screen);
+    screen.press("T l j");
+    insta::assert_snapshot!(screen.frame());
+    screen.press("y");
+    assert!(copied()[0].starts_with("Skipped: Orders.Tests.CartTests.Later"), "{:?}", copied());
+    screen.press("h j l");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 1, picking: Some(0), .. })));
+    screen.press("Esc");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { picking: None, .. })), "back to the suites");
+    screen.press("j j l");
+    assert_eq!(screen.last_log(), "No results for this suite yet - r runs it.", "Shop hasn't run");
+    screen.press("k k l");
+    screen.click(Target::Test(2));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { picking: Some(2), .. })));
+    screen.ui.now += Duration::from_secs(1);
+    screen.click(Target::Item(1));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 1, picking: None, .. })), "a suite: leaves it");
+}
+
+#[tokio::test]
 async fn in_the_tests_view_a_click_picks_a_suite_and_a_link_in_a_stack_opens() {
     let mut screen = screen("tests-mouse", json!({ "editor": "myeditor {file}:{line}" }));
     with_suites(&mut screen);

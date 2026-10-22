@@ -34,6 +34,8 @@ pub enum Target {
     Setting(Toggle),
     /// A link in a column's output: the column, and the link (in `Ui::links`).
     Link { column: usize, link: usize },
+    /// A test of the suite picked in the tests view, by its place in that list.
+    Test(usize),
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -112,6 +114,9 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         }
         return;
     }
+    if super::suites::click(ui, controller, target, double) {
+        return;
+    }
     if ui.overlay.is_some() || ui.picker.is_some() {
         match target {
             Some(Target::Item(index)) => {
@@ -164,9 +169,7 @@ fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direc
             return;
         }
         Some(Overlay::Checklist(_) | Overlay::Help) => return,
-        Some(Overlay::Tests { .. }) if !matches!(target, Some(Target::Item(_))) => {
-            return super::suites::wheel(ui, direction > 0);
-        }
+        Some(Overlay::Tests { .. }) => return super::suites::wheel(ui, controller, target, direction > 0),
         Some(_) => return press(ui, controller, arrow),
         None if ui.picker.is_some() => return press(ui, controller, arrow),
         None => {}
