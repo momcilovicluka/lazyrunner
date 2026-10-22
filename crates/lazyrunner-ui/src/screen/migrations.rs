@@ -279,7 +279,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         .iter()
         .enumerate()
         .map(|(at, context)| {
-            let (icon, summary, color) = summary(context, spin);
+            let (icon, summary, color) = summary(context, spin, nerd);
             let label = if several_apps {
                 let app = controller.app(&context.app).map_or(context.app.as_str(), |app| app.name.as_str());
                 format!("{} · {app}", context.name)
@@ -299,7 +299,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         .collect();
     let detail = all
         .get(selected)
-        .map_or_else(Vec::new, |context| details(controller, context, picking, detail_width, height, spin));
+        .map_or_else(Vec::new, |context| details(controller, context, picking, detail_width, height, spin, nerd));
     for row in 0..height {
         let mut line = fit(list.get(row).cloned().unwrap_or_default(), list_width);
         line.push(seg("│ ", C::FocusBorder));
@@ -314,17 +314,18 @@ fn cut(text: &str, cells: usize) -> String {
 }
 
 /// What the list says about a context: its icon, its state, its colour.
-fn summary(context: &Context, spin: char) -> (String, String, C) {
+fn summary(context: &Context, spin: char, nerd: bool) -> (String, String, C) {
+    let mark = |icon| icons::icon(nerd, icon).to_string();
     match context.status {
         Status::Idle => ("·".into(), "not checked".into(), C::DarkGray),
-        Status::Queued => ("◌".into(), "queued".into(), C::DarkGray),
+        Status::Queued => (mark(Icon::Queued), "queued".into(), C::DarkGray),
         Status::Loading => (spin.to_string(), "checking…".into(), C::Yellow),
         Status::Migrating => (spin.to_string(), "migrating…".into(), C::Yellow),
-        Status::Error => ("!".into(), "failed".into(), C::Red),
+        Status::Error => (mark(Icon::Warn), "failed".into(), C::Red),
         Status::Ok if !context.known() => ("?".into(), "history unreadable".into(), C::Yellow),
         Status::Ok => match context.pending().len() {
-            0 => ("✓".into(), "up to date".into(), C::Green),
-            pending => ("◌".into(), format!("{pending} pending"), C::Yellow),
+            0 => (mark(Icon::Ok), "up to date".into(), C::Green),
+            pending => (mark(Icon::Queued), format!("{pending} pending"), C::Yellow),
         },
     }
 }
@@ -337,6 +338,7 @@ fn details(
     width: usize,
     height: usize,
     spin: char,
+    nerd: bool,
 ) -> Vec<Vec<Seg>> {
     let app = controller.app(&context.app).map_or(context.app.as_str(), |app| app.name.as_str());
     let project = context.project.file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
@@ -385,8 +387,8 @@ fn details(
     let top = picking.map_or(0, |at| at.saturating_sub(room / 2).min(newest_first.len().saturating_sub(room)));
     for (at, migration) in newest_first.iter().enumerate().skip(top).take(room) {
         let (icon, color) = match migration.applied {
-            Some(true) => ("✓", C::Green),
-            Some(false) => ("◌", C::Yellow),
+            Some(true) => (icons::icon(nerd, Icon::Ok), C::Green),
+            Some(false) => (icons::icon(nerd, Icon::Queued), C::Yellow),
             None => ("?", C::DarkGray),
         };
         let stamp = migration.id.split('_').next().filter(|stamp| stamp.len() == 14).unwrap_or_default();

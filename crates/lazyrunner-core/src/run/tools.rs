@@ -302,6 +302,7 @@ mod tests {
             key: "orders".into(),
             name: "Orders".into(),
             icon: None,
+            nerd_icon: None,
             tests: Vec::new(),
             migrations: None,
             kind: AppKind::Dotnet {

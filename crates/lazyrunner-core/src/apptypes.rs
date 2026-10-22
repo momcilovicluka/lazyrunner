@@ -207,6 +207,24 @@ pub fn port(root: &Path, app: &App, active: &[App]) -> Option<u16> {
     }
 }
 
+/// The front-end framework an npm app is written with, by the packages its package.json depends on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Framework {
+    Angular,
+    React,
+    Vue,
+}
+
+pub fn framework(root: &Path, app: &App) -> Option<Framework> {
+    let AppKind::Npm { dir, .. } = &app.kind else { return None };
+    let package = json::read(&root.join(package_path(dir)))?;
+    let depends =
+        |name: &str| ["dependencies", "devDependencies"].iter().any(|at| has_key_ci(field(&package, at), name));
+    [("@angular/core", Framework::Angular), ("react", Framework::React), ("vue", Framework::Vue)]
+        .into_iter()
+        .find_map(|(name, framework)| depends(name).then_some(framework))
+}
+
 /// The port of a URL, or its scheme's default (http 80, https 443).
 pub fn url_port(url: &str) -> Option<u16> {
     let (scheme, rest) = url.split_once("://")?;
@@ -321,5 +339,30 @@ mod tests {
         assert_eq!(url_port("https://example.test/a"), Some(443));
         assert_eq!(url_port("http://[::1]:5000"), Some(5000));
         assert_eq!(url_port("localhost:5000"), None);
+    }
+
+    #[test]
+    fn an_npm_apps_framework_is_what_its_package_json_depends_on() {
+        let temp = crate::testing::TempDir::new("framework");
+        let app = |dir: &str| App {
+            key: dir.into(),
+            name: dir.into(),
+            icon: None,
+            nerd_icon: None,
+            kind: AppKind::Npm { dir: dir.into(), variants: Vec::new() },
+            tests: Vec::new(),
+            migrations: None,
+        };
+        let write = |dir: &str, package: &str| {
+            std::fs::create_dir_all(temp.join(dir)).unwrap();
+            std::fs::write(temp.join(dir).join("package.json"), package).unwrap();
+        };
+        write("spa", r#"{ "dependencies": { "@angular/core": "^20.0.0", "rxjs": "^7.8.0" } }"#);
+        write("shop", r#"{ "devDependencies": { "react": "^19.0.0" } }"#);
+        write("api", r#"{ "dependencies": { "express": "^5.0.0" } }"#);
+        assert_eq!(framework(temp.path(), &app("spa")), Some(Framework::Angular));
+        assert_eq!(framework(temp.path(), &app("shop")), Some(Framework::React));
+        assert_eq!(framework(temp.path(), &app("api")), None);
+        assert_eq!(framework(temp.path(), &app("missing")), None);
     }
 }

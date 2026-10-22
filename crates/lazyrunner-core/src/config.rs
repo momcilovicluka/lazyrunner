@@ -72,11 +72,7 @@ impl Toggle {
     pub fn default_on(self) -> bool {
         !matches!(
             self,
-            Toggle::AutoRestartOnBranchChange
-                | Toggle::RestartOnCodeChange
-                | Toggle::ReducedMotion
-                | Toggle::GitBeside
-                | Toggle::NerdIcons
+            Toggle::AutoRestartOnBranchChange | Toggle::RestartOnCodeChange | Toggle::ReducedMotion | Toggle::GitBeside
         )
     }
 

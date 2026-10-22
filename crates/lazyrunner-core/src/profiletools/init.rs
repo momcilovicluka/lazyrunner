@@ -422,6 +422,7 @@ PORT=4100",
             key: "tests".into(),
             name: "Tests".into(),
             icon: None,
+            nerd_icon: None,
             tests: Vec::new(),
             migrations: None,
             kind: AppKind::Dotnet {

@@ -83,7 +83,7 @@ fn type_name(node: &Value) -> String {
         return match name {
             "relativePath" => "path",
             "appKey" => "app key",
-            "icon" => "character",
+            "icon" | "nerdIcon" => "character",
             _ => "object",
         }
         .into();

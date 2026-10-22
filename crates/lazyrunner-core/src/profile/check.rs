@@ -26,8 +26,8 @@ pub struct Fields {
 pub const FIELDS: Fields = Fields {
     top: &["$schema", "schemaVersion", "extends", "id", "name", "detect", "watch", "apps"],
     detect: &["anyFile"],
-    dotnet: &["key", "name", "icon", "type", "project", "launchProfile", "swagger", "tests", "migrations"],
-    npm: &["key", "name", "icon", "type", "dir", "variants", "tests"],
+    dotnet: &["key", "name", "icon", "nerdIcon", "type", "project", "launchProfile", "swagger", "tests", "migrations"],
+    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "tests"],
     variant: &["label", "when", "script", "port", "servedBy", "ready"],
     when: &["packageScript"],
     ready: &["file"],
@@ -151,9 +151,11 @@ fn check_app<'a>(app: &'a Value, index: usize, keys: &mut HashMap<String, &'a Va
     if text(field(app, "name")).trim().is_empty() {
         problems.push(format!("{at}.name is required"));
     }
-    let icon = field(app, "icon");
-    if !icon.is_null() && icon.as_str().is_none_or(|icon| icon.encode_utf16().count() != 1) {
-        problems.push(format!("{at}.icon must be one character (it fills one cell of the title bar)"));
+    for name in ["icon", "nerdIcon"] {
+        let icon = field(app, name);
+        if !icon.is_null() && icon.as_str().is_none_or(|icon| icon.encode_utf16().count() != 1) {
+            problems.push(format!("{at}.{name} must be one character (it fills one cell of the title bar)"));
+        }
     }
     let kind = field(app, "type").as_str().map(str::to_lowercase);
     match kind.as_deref() {

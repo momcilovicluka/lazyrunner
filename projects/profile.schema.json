@@ -48,6 +48,7 @@
     "relativePath": { "type": "string", "minLength": 1, "pattern": "^[^:]+$", "description": "Relative to the repo root; / or \\ both work." },
     "appKey": { "type": "string", "pattern": "^[a-z][a-z0-9]*$", "description": "Lowercase letters and digits, starting with a letter." },
     "icon": { "type": "string", "minLength": 1, "maxLength": 1, "description": "One character before the app's name in its title bar.", "default": "■", "examples": ["◆"] },
+    "nerdIcon": { "type": "string", "minLength": 1, "maxLength": 1, "description": "Optional. Its icon in the title bar when Nerd Font icons are on (nerdIcons): one Nerd Font character. Without it .NET's, or the framework's in package.json (Angular, React, Vue) else Node.js's, as a JSON escape (\\uf0ac, a globe) or the character itself." },
     "dotnetApp": {
       "title": "A .NET app (\"type\": \"dotnet\")",
       "description": "An ASP.NET (or any dotnet run) project. lazyrunner builds it with dotnet build, one build at a time and skipped when nothing in watch changed, then runs it with dotnet run --no-build --launch-profile.",
@@ -58,6 +59,7 @@
         "key": { "$ref": "#/$defs/appKey", "description": "Short name, unique in the profile. Used in settings (columnWidths, apps.<key>) and by servedBy.", "examples": ["orders"] },
         "name": { "type": "string", "minLength": 1, "description": "The column's title.", "examples": ["Orders"] },
         "icon": { "$ref": "#/$defs/icon" },
+        "nerdIcon": { "$ref": "#/$defs/nerdIcon" },
         "type": { "const": "dotnet", "description": "The app type: what lazyrunner does with the app follows from it." },
         "project": { "allOf": [{ "$ref": "#/$defs/relativePath" }], "pattern": "\\.csproj$", "description": "The .csproj to build and run.", "examples": ["services/Orders/Orders.csproj"] },
         "launchProfile": { "type": "string", "minLength": 1, "description": "A profile in the project's Properties/launchSettings.json. Its applicationUrl gives the port.", "examples": ["Orders"] },
@@ -76,6 +78,7 @@
         "key": { "$ref": "#/$defs/appKey", "description": "Short name, unique in the profile.", "examples": ["shop"] },
         "name": { "type": "string", "minLength": 1, "description": "The column's title.", "examples": ["Shop"] },
         "icon": { "$ref": "#/$defs/icon" },
+        "nerdIcon": { "$ref": "#/$defs/nerdIcon" },
         "type": { "const": "npm", "description": "The app type: what lazyrunner does with the app follows from it." },
         "dir": { "$ref": "#/$defs/relativePath", "description": "The folder with package.json.", "examples": ["web/shop"] },
         "variants": {

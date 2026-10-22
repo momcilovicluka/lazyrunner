@@ -218,7 +218,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `m` | The mouse (below); off, the terminal selects text again |
 | `f` | Reduced motion: nothing blinks, spins, glides or fades |
 | `g` | `L` opens the git tool beside lazyrunner, in a Windows Terminal pane |
-| `i` | Nerd Font icons in lazyrunner's chrome (title bars, the status line, the views' headers) |
+| `i` | Nerd Font icons (on by default): the title bars, the status line, the views' headers and marks |
 | `c` | What's new: the changelog |
 
 ### Mouse
@@ -377,11 +377,18 @@ you've installed from lazyrunner, it warns when `package-lock.json` changes.
 
 ## Nerd Font icons
 
-With `, i` (`nerdIcons`) lazyrunner draws Nerd Font icons in its chrome: .NET and Node.js for apps without an icon of
-their own, a git branch, a database, a flask for the tests, and so on. They need a terminal font that is a Nerd Font,
-a "Mono" one so each icon is one cell wide - [CaskaydiaCove Nerd Font Mono](https://www.nerdfonts.com/font-downloads)
-goes well with Windows Terminal. Boxes instead of icons mean the font isn't one; `, i` again turns them off. An icon an
-app's profile gives it and the text in the columns stay as they are.
+lazyrunner draws Nerd Font icons in its chrome (`nerdIcons`, on by default; `, i` turns them off). An app's title bar
+shows the .NET logo, or for an npm app its framework's - Angular, React or Vue, by its package.json - else Node.js's;
+the status line a git branch and a database; the tests, requests and migrations views a flask, an exchange and a
+database, and check, cross, warning, minus and clock marks for passed, failed, errors, skipped and queued (the startup
+checklist's marks too). An app's `"icon"` is the one it has without them; `"nerdIcon"` in its profile gives it one with
+them, as PowerShell's lazybms had - `"\uf0ac"` a globe, `"\uf085"` cogs, any icon on
+[the Nerd Fonts cheat sheet](https://www.nerdfonts.com/cheat-sheet). Text written into the columns and the log stays as
+it is.
+
+They need a terminal font that is a Nerd Font, a "Mono" one so each icon is one cell wide -
+[CaskaydiaCove Nerd Font Mono](https://www.nerdfonts.com/font-downloads) goes well with Windows Terminal. Boxes or
+question marks instead of icons mean the font isn't one: set one, or `, i` for plain symbols every font has.
 
 ## Themes
 
@@ -426,7 +433,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `reducedMotion` | `false` | No blinking, spinners, glides or fades |
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
-| `nerdIcons` | `false` | Nerd Font icons in the chrome; for a terminal whose font is a Nerd Font (a "Mono" one) |
+| `nerdIcons` | `true` | Nerd Font icons in the chrome; for a terminal whose font is a Nerd Font (a "Mono" one) |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
