@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [0.19.0] - 2026-10-22
+
+### Added
+- Migrations (`M`): each DbContext of the .NET apps with `"migrations"` in the profile, and its EF Core migrations - applied, pending, the current one - on the database the app uses. `u` applies what's pending (`U` everywhere), `m` moves a context to the chosen migration, forward or back; each asks first, naming the database. dotnet ef runs with the app's project as the startup project, its Development settings and its last build, one job at a time, waiting while an app builds; without `contexts`, `dotnet ef dbcontext list` finds them
+
+### Fixed
+- Self-update takes the highest released version, not the one GitHub marks "Latest": that is only the release published last, and when several tags were pushed at once their builds could finish out of order (0.15.0 became "Latest" after 0.18.0 was out). The version comes from the release feed, with GitHub's "Latest" as the fallback
+
 ## [0.18.0] - 2026-10-22
 
 ### Added

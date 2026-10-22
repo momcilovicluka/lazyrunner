@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ⛁ Migrations    database ShopLocal @ localhost
+ j k choose · l its migrations · u apply pending · U apply pending everywhere · r check again · Esc back
+ dotnet ef uses each app's last build (b rebuilds it) and its Development settings - the database d picks
+ ▸ ◌ ShopDbContext        1 pending │ ShopDbContext   Orders · Data.csproj
+                                    │ 2 applied · 1 pending · checked 09:41:07 on ShopLocal
+                                    │
+                                    │  ◌ 20260301000000  Invoices  pending
+                                    │  ✓ 20260201000000  Orders  ● current
+                                    │  ✓ 20260101000000  Init
+                                    │
+                                    │
+                                    │
+                                    │
+                                    │
+                                    │
+                                    │
+                                    │
+                                    │
+                                    │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
+ , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
+              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
+              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [ ] reduced motion
+              g [ ] git beside

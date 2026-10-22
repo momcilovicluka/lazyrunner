@@ -5,6 +5,7 @@
 
 mod builds;
 mod handover;
+mod migrations;
 mod npm_ci;
 mod start;
 mod suites;
@@ -37,6 +38,7 @@ use crate::paths::Paths;
 use crate::profile::{App, Project};
 
 pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_handover};
+pub use migrations::{EfJob, Work};
 pub use suites::{TestBuild, Totals};
 
 /// Entries the panel's log keeps.
@@ -155,6 +157,11 @@ pub struct Controller {
     timings: Timings,
     /// How long builds, starts and npm ci took over their last runs (D).
     pub durations: Durations,
+    /// The DbContexts of the apps with migrations (M), once the view opened.
+    pub contexts: Option<Vec<super::migrations::Context>>,
+    /// dotnet ef's job, and the ones waiting.
+    pub migration_job: Option<EfJob>,
+    migration_queue: VecDeque<Work>,
     /// The HTTP requests the .NET apps served (H).
     pub requests: super::requests::Requests,
     /// The test suites (T), found the first time the tests view opens.
@@ -220,6 +227,9 @@ impl Controller {
         let mut controller = Self {
             timings: Timings::load(&state_dir),
             durations: Durations::load(&state_dir),
+            contexts: None,
+            migration_job: None,
+            migration_queue: VecDeque::new(),
             requests: Default::default(),
             suites: None,
             test_build: None,
@@ -433,6 +443,8 @@ impl Controller {
             Event::Exited { tag: Tag::Suite { key, job }, code } => self.suite_exited(&key, job, code),
             Event::Output { tag: Tag::TestBuild { job }, line } => self.test_build_output(job, &line),
             Event::Exited { tag: Tag::TestBuild { job }, code } => self.test_build_exited(job, code),
+            Event::Output { tag: Tag::Migration { job }, line } => self.migration_output(job, &line),
+            Event::Exited { tag: Tag::Migration { job }, code } => self.migration_exited(job, code),
             Event::Listening(listening) => {
                 if let Some(problem) = listening.problem.as_ref().filter(|_| !self.listening_warned) {
                     self.listening_warned = true;
@@ -598,6 +610,7 @@ impl Controller {
     /// Before quitting: cancel the build, npm ci and the tests, and stop every app, quietly.
     pub fn shutdown(&mut self) {
         self.stop_tests(true);
+        self.stop_migrations();
         if self.building.is_some() {
             self.cancel_build(false);
         }

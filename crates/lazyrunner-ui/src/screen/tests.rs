@@ -666,6 +666,42 @@ async fn i_asks_npm_ci_or_npm_install_and_the_menu_and_palette_have_both() {
     assert!(palette.contains("[i n]") && palette.contains("[i c]"), "{palette}");
 }
 
+// ---------------------------------------------------------------- the migrations view
+
+#[tokio::test]
+async fn the_migrations_view_shows_what_is_applied_and_asks_before_it_moves() {
+    use chrono::TimeZone;
+    use lazyrunner_core::run::migrations::{Context, Migration, Status as Ef};
+    let mut screen = screen("snap-migrations", json!({}));
+    let migration = |id: &str, applied| Migration { id: id.into(), name: id[15..].into(), applied: Some(applied) };
+    let mut shop =
+        Context::new("orders", "ShopDbContext", "/work/sample/Data.csproj".into(), "/nowhere/Orders.csproj".into());
+    shop.items = vec![
+        migration("20260101000000_Init", true),
+        migration("20260201000000_Orders", true),
+        migration("20260301000000_Invoices", false),
+    ];
+    shop.status = Ef::Ok;
+    (shop.checked_at, shop.db) =
+        (Some(chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap()), "ShopLocal".into());
+    screen.controller.contexts = Some(vec![shop]);
+    let setup = lazyrunner_core::profile::Migrations { project: None, contexts: vec!["ShopDbContext".into()] };
+    screen.controller.apps[0].migrations = Some(setup);
+    screen.ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
+    insta::assert_snapshot!(screen.frame());
+    screen.press("l j j m");
+    let frame = screen.frame();
+    assert!(frame.contains("Revert 1 migration of ShopDbContext on ShopLocal @ localhost, back to Init?"), "{frame}");
+    assert!(frame.contains("Their Down() runs"));
+    screen.press("n");
+    screen.frame();
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Migrations { picking: Some(2), .. })), "back to the view");
+    screen.press("u y");
+    screen.frame();
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Migrations { .. })));
+    assert_eq!(screen.last_log(), "✗ Migrations: Orders has no build yet - b builds it, then r here");
+}
+
 // ---------------------------------------------------------------- the requests view
 
 /// Requests the sample's .NET apps served, by hand.

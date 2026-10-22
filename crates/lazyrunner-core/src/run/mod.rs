@@ -10,6 +10,7 @@ pub mod child;
 pub mod command;
 pub mod controller;
 pub mod history;
+pub mod migrations;
 pub mod net;
 pub mod requests;
 pub mod secrets;
@@ -46,6 +47,10 @@ pub enum Tag {
     },
     /// The build of the test projects.
     TestBuild {
+        job: u64,
+    },
+    /// dotnet ef, for the migrations view.
+    Migration {
         job: u64,
     },
 }

@@ -308,7 +308,7 @@ mod tests {
         } else {
             AppKind::Npm { dir: "web".into(), variants: Vec::<Variant>::new() }
         };
-        App { key: "a".into(), name: "A".into(), icon: None, kind, tests: Vec::new() }
+        App { key: "a".into(), name: "A".into(), icon: None, kind, tests: Vec::new(), migrations: None }
     }
 
     fn hues(app: &App, lines: &[&str]) -> (Vec<Hue>, AppState) {

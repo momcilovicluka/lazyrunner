@@ -82,6 +82,16 @@ pub struct App {
     /// Test suites that belong to it whatever lazyrunner works out (`"tests"`): .NET test projects by path or
     /// name, Nx projects by name.
     pub tests: Vec<String>,
+    /// A .NET app's EF Core migrations (`"migrations"`), for the migrations view (M).
+    pub migrations: Option<Migrations>,
+}
+
+/// Where a .NET app's EF Core migrations are: the project with them (the app's own when `None`) and its DbContexts
+/// (found with `dotnet ef dbcontext list` when there are none).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Migrations {
+    pub project: Option<String>,
+    pub contexts: Vec<String>,
 }
 
 /// A loaded profile: checked and turned into what lazyrunner runs. Paths use this OS's separators.
