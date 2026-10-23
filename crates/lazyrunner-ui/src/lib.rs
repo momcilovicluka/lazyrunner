@@ -1,5 +1,6 @@
 //! lazyrunner's terminal UI: the screen of a running project, the event loop that draws it, and where frames go.
 
+pub mod agent;
 pub mod dump;
 pub mod git_tool;
 pub mod keys;

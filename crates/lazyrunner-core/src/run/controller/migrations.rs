@@ -60,7 +60,12 @@ impl Controller {
             }
             return true;
         }
-        self.load_migrations(check)
+        self.load_migrations(check, false)
+    }
+
+    /// The contexts, found the first time, without checking them; false (quietly) when there are none.
+    pub fn find_migrations(&mut self) -> bool {
+        self.contexts.is_some() || self.load_migrations(false, true)
     }
 
     /// R: the contexts found again (a branch may add or drop some) and all checked; while dotnet ef is busy, the
@@ -71,13 +76,18 @@ impl Controller {
             return true;
         }
         self.contexts = None;
-        self.load_migrations(true)
+        self.load_migrations(true, false)
     }
 
-    fn load_migrations(&mut self, check: bool) -> bool {
+    /// Finds the contexts and shows their saved checks, checking them too when `check`; `quiet` doesn't say in the
+    /// log that there are none (an agent asking).
+    fn load_migrations(&mut self, check: bool, quiet: bool) -> bool {
         self.migrations_check = check;
         let contexts = self.find_contexts();
         if contexts.is_empty() && self.migration_queue.is_empty() {
+            if quiet {
+                return false;
+            }
             self.add_log(
                 "No migrations: no EF Core model snapshots in the .NET apps' projects or the ones they build - give \
                  an app \"migrations\" in the profile when they're elsewhere.",

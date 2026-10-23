@@ -4,6 +4,7 @@
 //! column; S stops all but the app with includeInAll false; and nothing lazyrunner started survives it, whether
 //! it quits or is killed. Needs dotnet, node, npm and git (skipped without them).
 
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
@@ -232,6 +233,74 @@ fn a_click_on_a_column_title_focuses_it() {
     let answer = lazyrunner.ask(json!({ "click": [border + 3, 0] }));
     assert_eq!(answer["target"], "Some(Title(1))", "{answer}");
     assert_eq!(focus(), Some(1));
+    lazyrunner.quit();
+}
+
+/// `lazyrunner mcp` against a real lazyrunner: an agent's session starts an app, waits until it's ready and reads its
+/// output, and lazyrunner's log says who did it. Every line the server writes must be protocol.
+#[test]
+fn an_agent_drives_lazyrunner_over_mcp() {
+    if skip_without(&["node"]) {
+        return;
+    }
+    let temp = TempDir::new("mcp");
+    let (repo, profile) = two_servers(&temp, [31399, 31400]);
+    let config = json!({ "startupChecklist": false, "autoStartOnOpen": false });
+    let lazyrunner = Lazyrunner::start(&temp, &repo, &profile, config, &[]);
+    let mut mcp = Command::new(BIN)
+        .args(["mcp", "--ipc", &lazyrunner.name])
+        .current_dir(&repo)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("lazyrunner mcp starts");
+    let mut stdin = mcp.stdin.take().unwrap();
+    let stdout = mcp.stdout.take().unwrap();
+    let (lines, received) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            let _ = lines.send(line);
+        }
+    });
+    let mut call = move |id: u64, method: &str, params: Value| -> Value {
+        writeln!(stdin, "{}", json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params })).unwrap();
+        loop {
+            let line = received.recv_timeout(Duration::from_secs(90)).expect("an answer");
+            let message: Value = serde_json::from_str(&line).unwrap_or_else(|_| panic!("not protocol: {line}"));
+            if message["id"] == id {
+                return message;
+            }
+        }
+    };
+    let text = |answer: &Value| answer["result"]["content"][0]["text"].as_str().unwrap_or_default().to_string();
+
+    let hello =
+        call(1, "initialize", json!({ "protocolVersion": "2025-06-18", "clientInfo": { "name": "e2e-agent" } }));
+    assert_eq!(hello["result"]["serverInfo"]["name"], "lazyrunner");
+    let tools = call(2, "tools/list", json!({}));
+    let start = tools["result"]["tools"].as_array().unwrap().iter().find(|tool| tool["name"] == "start_apps").cloned();
+    let app = start.unwrap()["inputSchema"]["properties"]["app"]["description"].clone();
+    assert!(app.as_str().unwrap().contains(": one, two)"), "{app}");
+
+    let started = call(3, "tools/call", json!({ "name": "start_apps", "arguments": { "app": "one" } }));
+    assert_eq!(started["result"]["isError"], false, "{}", text(&started));
+    let ready = call(4, "tools/call", json!({ "name": "wait", "arguments": { "for": "ready", "timeout_sec": 60 } }));
+    let ready: Value = serde_json::from_str(&text(&ready)).unwrap();
+    assert_eq!((ready["done"].clone(), ready["summary"].clone()), (json!(true), json!("up: one")), "{ready}");
+    let logs = call(5, "tools/call", json!({ "name": "get_logs", "arguments": { "app": "one", "limit": 5 } }));
+    assert!(text(&logs).contains("\"seq\""), "{}", text(&logs));
+    assert!(lazyrunner.log().contains("▸ e2e-agent: start one"), "{}", lazyrunner.log());
+
+    drop(call); // closes the server's stdin: it ends
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while mcp.try_wait().unwrap().is_none() {
+        if Instant::now() > deadline {
+            let _ = mcp.kill();
+            panic!("lazyrunner mcp kept running after its input closed");
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
     lazyrunner.quit();
 }
 

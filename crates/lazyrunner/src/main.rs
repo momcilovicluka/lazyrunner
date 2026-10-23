@@ -1,6 +1,7 @@
 //! lazyrunner, the Rust version: `lazyrunner [start]` runs the project here, `stop` / `restart` tell an open one,
 //! `update` / `version` keep it current, and `profile check|init` look after project profiles.
 
+mod mcp;
 mod profile_cli;
 mod start;
 mod update_cli;
@@ -78,6 +79,13 @@ enum Command {
     /// Sends a control request to a running lazyrunner and prints the answer (the tests use it).
     #[command(hide = true)]
     Ctl { name: String, request: String },
+    /// An MCP server on stdin and stdout for an agent such as Claude Code: it reads and drives the open lazyrunner
+    /// (claude mcp add --scope user lazyrunner -- lazyrunner mcp).
+    Mcp {
+        /// Another lazyrunner's control channel (the tests use it).
+        #[arg(long, hide = true)]
+        ipc: Option<String>,
+    },
 }
 
 fn main() {
@@ -101,6 +109,7 @@ fn run_cli() -> Result<()> {
             println!("{answer}");
             Ok(())
         }
+        Some(Command::Mcp { ipc }) => mcp::run(ipc),
         Some(Command::Start) => start::start(true),
         None => start::start(false),
         Some(Command::Update) => update_cli::update(),

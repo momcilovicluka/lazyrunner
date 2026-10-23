@@ -36,6 +36,7 @@ Inspired by lazygit: one command instead of a row of terminal tabs.
 - **Process management** — start/stop/restart apps while cleaning up child processes.
 - **Project profiles** — keep stack setup in a shareable `.lazyrunner.json`.
 - **Keyboard-first workflow** — fast controls inspired by lazygit.
+- **Agent-ready** — `lazyrunner mcp` lets Claude Code read and drive the lazyrunner you watch.
 
 ## Quick start
 
@@ -156,6 +157,7 @@ lazyrunner restart    stop, rebuild if anything changed, run again
 lazyrunner profile …  init / check a project profile (above)
 lazyrunner update     update lazyrunner now (also when auto-update is off)
 lazyrunner version    the installed version, where updates come from, and what's new in it
+lazyrunner mcp        an MCP server for an agent such as Claude Code (below)
 lazyrunner help
 ```
 
@@ -393,6 +395,37 @@ When a run finishes notably off its usual, its log line says so, e.g.
 `✓ Orders built in 52s (41 projects) · 37% slower than usual (38s)`. A cancelled build or `npm ci` isn't recorded; an
 unreadable `history.json` is kept as `history.json.bad` and a new one starts.
 `j` `k` scroll, `Esc` / `q` / `D` close.
+
+## Agents (MCP)
+
+`lazyrunner mcp` is an MCP server for an agent such as Claude Code. The agent reads and drives the lazyrunner you have
+open, and you watch it happen there: each of its actions shows in the log, as `▸ claude-code: build Orders`.
+Register it once:
+
+```bash
+claude mcp add --scope user lazyrunner -- lazyrunner mcp
+```
+
+| Tool | What it does |
+|------|--------------|
+| `get_status` | Each app's state, port, url and error count; what's busy; the test totals; the settings; what's on screen |
+| `get_logs` | An app's output, numbered: `since` (only what's new), `limit`, `grep`, `errors_only` |
+| `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
+| `get_screen` | The screen as you see it, as text |
+| `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
+| `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
+| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results; run all, a suite, its failed tests or one test |
+| `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
+
+It asks from anywhere, but acts only in the checkout lazyrunner runs (or a folder in it): an agent working in another
+worktree is told to have you open lazyrunner there. Its actions follow the keys' rules while an app builds. Applying
+or rolling back migrations, switching the database and killing what holds a port stay yours. When lazyrunner isn't
+open, the tools say so; open it and the agent carries on. Run lazyrunner and the agent at the same level: Windows
+doesn't let an agent that isn't elevated drive a lazyrunner opened with "Run as administrator". After an update, restart lazyrunner (`q`, then
+`lazyrunner`) so it speaks the same version as `lazyrunner mcp`. To let Claude Code read without asking each time,
+allow `mcp__lazyrunner__get_status`, `mcp__lazyrunner__get_logs`, `mcp__lazyrunner__get_errors`,
+`mcp__lazyrunner__get_screen`, `mcp__lazyrunner__list_tests`, `mcp__lazyrunner__get_test_results`,
+`mcp__lazyrunner__get_migrations` and `mcp__lazyrunner__wait` in its permissions.
 
 ## npm apps
 
