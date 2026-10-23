@@ -37,6 +37,9 @@ const MIN_BAND: usize = 3;
 /// The `"layout"` setting's values, in the order `|` goes through them.
 pub const LAYOUTS: [&str; 3] = ["auto", "columns", "stacked"];
 
+/// How fast the glint runs along a progress bar.
+const GLINT_CELLS_PER_SECOND: f64 = 16.0;
+
 pub fn spinner(tick: u64) -> char {
     SPINNER[tick as usize % SPINNER.len()]
 }
@@ -272,7 +275,7 @@ pub fn bar(ui: &mut Ui, fraction: f64, id: &str, animated: bool) -> String {
         if full < WIDTH { BLOCKS[((cells - full as f64) * 8.0) as usize % 8].to_string() } else { String::new() };
     let mut filled: Vec<char> = vec!['█'; full];
     if animated && full > 1 && shown < 1.0 {
-        filled[ui.tick() as usize % full] = '▓'; // a light glint runs along the bar
+        filled[(ui.seconds() * GLINT_CELLS_PER_SECOND) as usize % full] = '▓'; // a light glint runs along the bar
     }
     let rest = WIDTH.saturating_sub(full + partial.chars().count());
     format!("▕{}{partial}{}▏ ", filled.into_iter().collect::<String>(), " ".repeat(rest))

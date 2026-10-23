@@ -276,9 +276,14 @@ impl Ui {
         (ui, warnings)
     }
 
-    /// The PowerShell version's frame count: one every 100 ms.
+    /// The PowerShell version's frame count: one every 100 ms, for what steps (spinners, sparkles, blinking).
     pub fn tick(&self) -> u64 {
         (self.now.saturating_duration_since(self.started).as_millis() / ANIMATION_TICK.as_millis()) as u64
+    }
+
+    /// The time since lazyrunner opened, in seconds, for what flows instead of stepping.
+    pub fn seconds(&self) -> f64 {
+        self.now.saturating_duration_since(self.started).as_secs_f64()
     }
 
     /// Uses theme `id` (the first theme when there is none by that id; none at all with NO_COLOR).
@@ -293,14 +298,14 @@ impl Ui {
         };
     }
 
-    /// Glides a progress bar towards `target` (35% of the way per 100 ms, never backwards); `id` keeps its place.
+    /// Glides a progress bar towards `target` (half the way per 100 ms, never backwards); `id` keeps its place.
     pub fn glide(&mut self, id: &str, target: f64) -> f64 {
         let now = self.now;
         let target = if target.is_finite() { target } else { 0.0 };
         let (shown, at) = self.bars.get(id).copied().unwrap_or((target, now));
         let mut shown = if target < shown { target } else { shown };
         let steps = now.saturating_duration_since(at).as_secs_f64() / ANIMATION_TICK.as_secs_f64();
-        shown += (target - shown) * (1.0 - 0.65f64.powf(steps.max(0.0)));
+        shown += (target - shown) * (1.0 - 0.5f64.powf(steps.max(0.0)));
         if (target - shown).abs() < 0.004 {
             shown = target;
         }

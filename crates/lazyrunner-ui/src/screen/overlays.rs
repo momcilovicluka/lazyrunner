@@ -21,6 +21,8 @@ pub(super) const LOGO: [&str; 3] = [
     "▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀",
 ];
 const SPARKLE: [char; 2] = ['✦', '✧'];
+/// How fast the light sweeps across the checklist's logo.
+const SWEEP_COLUMNS_PER_SECOND: f64 = 12.0;
 pub const WHATS_NEW_MAX_LINES: usize = 12;
 const VERSION: &str = lazyrunner_core::changelog::VERSION;
 
@@ -453,20 +455,18 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let news_rows = if news.is_empty() { 1 } else { news.len().min(WHATS_NEW_MAX_LINES) + 3 };
     if checks.len() + news_rows + LOGO.len() + 2 <= room {
         lines.push(Vec::new());
-        let sweep = if animated {
-            (tick % (LOGO[0].chars().count() as u64 + 15)) as i64 - 6 // the light's column: left to right, then a pause
-        } else {
-            -99
-        };
+        // The light's column: left to right, then a pause.
+        let cycle = LOGO[0].chars().count() as f64 + 15.0;
+        let sweep = if animated { (ui.seconds() * SWEEP_COLUMNS_PER_SECOND) % cycle - 6.0 } else { -99.0 };
         for row in LOGO {
             let mut segs = vec![seg("   ", C::Gray)];
             for (i, c) in row.chars().enumerate() {
-                let distance = (i as i64 - sweep).abs();
+                let distance = (i as f64 - sweep).abs();
                 segs.push(seg(
                     c.to_string(),
-                    if distance <= 1 {
+                    if distance <= 1.0 {
                         C::White
-                    } else if distance <= 3 {
+                    } else if distance <= 3.0 {
                         C::Cyan
                     } else {
                         C::DarkCyan
