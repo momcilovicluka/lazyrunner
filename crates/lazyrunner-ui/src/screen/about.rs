@@ -22,6 +22,8 @@ const INNER: usize = 72;
 const CONTRIBUTORS: [(&str, &str); 1] = [("Luka Momčilović", "creator · maintainer")];
 const RAINBOW: [C; 6] = [C::Red, C::Yellow, C::Green, C::Cyan, C::Blue, C::Magenta];
 const SPARKLES: [&str; 4] = ["✦", "✧", "⋆", "✧"];
+/// How fast the rainbow flows across the logo and its rule.
+const RAINBOW_BANDS_PER_SECOND: f64 = 5.0;
 const LABEL_CELLS: usize = 22;
 
 /// What a link does: opens a page in the browser, or runs one of lazyrunner's own actions.
@@ -130,7 +132,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         }
         _ => 0,
     };
-    let (nerd, animated, tick) = (ui.nerd, !ui.reduced_motion, ui.tick());
+    let (nerd, animated, tick, seconds) = (ui.nerd, !ui.reduced_motion, ui.tick(), ui.seconds());
     let inner = cells.saturating_sub(8).clamp(20, INNER);
     let mut lines = vec![
         version_line(controller, nerd),
@@ -165,7 +167,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     lines.push(Vec::new());
     lines.push(made_with(nerd, animated, tick));
     // A short terminal loses the logo first, then the blank line above the rest.
-    let logo = logo(inner, animated, tick);
+    let logo = logo(inner, animated, seconds);
     let borders = 3;
     if lines.len() + logo.len() + 2 + borders <= rows {
         lines.splice(0..0, [vec![Vec::new()], logo, vec![Vec::new()]].concat());
@@ -179,10 +181,12 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
 
 /// The logo, centred, in rainbow colours flowing across it, a rainbow rule flowing the other way under it. Still:
 /// the theme's cyans.
-fn logo(inner: usize, animated: bool, tick: u64) -> Vec<Vec<Seg>> {
+fn logo(inner: usize, animated: bool, seconds: f64) -> Vec<Vec<Seg>> {
     let wide = LOGO[0].width();
     let indent = " ".repeat(inner.saturating_sub(wide) / 2);
-    let shift = (tick / 2) as usize % RAINBOW.len();
+    // How far the colours have flowed, in bands: fractions too, so a band's edge moves a cell at a time.
+    let shift = seconds * RAINBOW_BANDS_PER_SECOND;
+    let rainbow = |band: f64| RAINBOW[band.floor().rem_euclid(RAINBOW.len() as f64) as usize];
     let mut lines: Vec<Vec<Seg>> = LOGO
         .iter()
         .enumerate()
@@ -190,7 +194,7 @@ fn logo(inner: usize, animated: bool, tick: u64) -> Vec<Vec<Seg>> {
             let mut segs = vec![seg(indent.clone(), C::Gray)];
             segs.extend(line.chars().enumerate().map(|(at, symbol)| {
                 let color = match (animated, row) {
-                    (true, _) => RAINBOW[(at / 3 + row + RAINBOW.len() - shift) % RAINBOW.len()],
+                    (true, _) => rainbow(at as f64 / 3.0 + row as f64 - shift),
                     (false, 0) => C::Cyan,
                     (false, _) => C::DarkCyan,
                 };
@@ -201,7 +205,7 @@ fn logo(inner: usize, animated: bool, tick: u64) -> Vec<Vec<Seg>> {
         .collect();
     let mut rule = vec![seg(indent, C::Gray)];
     rule.extend((0..wide).map(|at| {
-        let color = if animated { RAINBOW[(at / 2 + shift) % RAINBOW.len()] } else { C::DarkGray };
+        let color = if animated { rainbow(at as f64 / 2.0 + shift) } else { C::DarkGray };
         seg("━", color)
     }));
     lines.push(rule);

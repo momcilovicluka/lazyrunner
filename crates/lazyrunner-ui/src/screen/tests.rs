@@ -1320,3 +1320,19 @@ async fn an_agents_actions_say_so_in_the_log_and_another_folders_are_refused() {
     let reading_elsewhere = agent(&mut screen, "status", json!({}), Some(&outside));
     assert_eq!(reading_elsewhere["ok"], true, "questions are answered from anywhere");
 }
+
+// ---------------------------------------------------------------- motion
+
+#[tokio::test]
+async fn a_bar_glides_half_the_way_every_100_ms_and_the_clock_flows_between_ticks() {
+    let mut screen = screen("glide", json!({}));
+    assert_eq!(screen.ui.glide("bar", 0.0), 0.0);
+    screen.ui.now += Duration::from_millis(100);
+    assert!((screen.ui.glide("bar", 1.0) - 0.5).abs() < 1e-9);
+    screen.ui.now += Duration::from_millis(100);
+    assert!((screen.ui.glide("bar", 1.0) - 0.75).abs() < 1e-9);
+    let (tick, seconds) = (screen.ui.tick(), screen.ui.seconds());
+    screen.ui.now += Duration::from_millis(30);
+    assert_eq!(screen.ui.tick(), tick, "the same 100 ms step");
+    assert!(screen.ui.seconds() > seconds, "but what flows has moved on");
+}

@@ -33,8 +33,9 @@ use crate::screen::{self, Exit, Overlay, Ui, status};
 use crate::terminal::{MouseCapture, Surface, TimerResolution};
 use crate::theme::{ColorMode, downsample};
 
-/// While something animates: the animations step every 100 ms, so 30 frames a second is plenty.
-const FRAME: Duration = Duration::from_micros(33_333);
+/// While something animates: 60 frames a second, so what flows (the logo's light, rainbows, a bar's glint and
+/// glide, the reload show) moves every frame.
+const FRAME: Duration = Duration::from_micros(16_667);
 const MIN_GAP: Duration = Duration::from_millis(2);
 const TICK: Duration = Duration::from_millis(250);
 const FRAME_DUMP_EVERY: Duration = Duration::from_millis(100);

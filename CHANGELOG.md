@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.5.1] - 2026-10-23
+
+### Changed
+- Smoother and snappier: 60 frames a second while something moves (30 before); the light across the startup checklist's logo, the About box's rainbow and a progress bar's glint now flow every frame instead of jumping every 100 ms, and progress bars glide to their value faster
+
 ## [1.5.0] - 2026-10-23
 
 ### Added
