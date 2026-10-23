@@ -29,11 +29,12 @@ const STARS: [C; 5] = [C::White, C::Cyan, C::Magenta, C::Yellow, C::Green];
 const TWINKLES: [&str; 4] = ["·", "✧", "✦", "*"];
 const BAR_CELLS: u16 = 30;
 
-/// The show going on: when it began, and the seed of its stars.
+/// The show going on: when it began, the seed of its stars, and what it says under the logo.
 #[derive(Clone, Copy, Debug)]
 pub struct Show {
     started: Instant,
     seed: u64,
+    label: &'static str,
 }
 
 /// Ctrl+R.
@@ -51,12 +52,31 @@ pub fn start(ui: &mut Ui, controller: &mut Controller) {
     let mut celebrate = CELEBRATE;
     if !ui.reduced_motion {
         let seed = ui.now.saturating_duration_since(ui.started).as_nanos() as u64 | 1;
-        ui.reload = Some(Show { started: ui.now, seed });
+        ui.reload = Some(Show { started: ui.now, seed, label: "reloading" });
         celebrate += OFF + STAGE + ON;
     }
     let reload = icons::icon(controller.setting(Toggle::NerdIcons), Icon::Reload);
     controller.celebrate = Some((format!("{reload} window reloaded"), ui.now + celebrate));
     controller.add_log("↻ Window reloaded: the settings and themes read again, the terminal set up again", Hue::Cyan);
+}
+
+/// Reopening (the profile reloaded, an update): the logo over the stars as the last frame, left on screen while the
+/// next lazyrunner starts.
+pub fn farewell(ui: &mut Ui) {
+    if !ui.reduced_motion
+        && let Some(started) = ui.now.checked_sub(OFF)
+    {
+        ui.reload = Some(Show { started, seed: 7, label: "reopening" });
+    }
+}
+
+/// The lazyrunner a reopen started: its first frames open from the middle, as the show ends.
+pub fn open_from_middle(ui: &mut Ui) {
+    if !ui.reduced_motion
+        && let Some(started) = ui.now.checked_sub(OFF + STAGE)
+    {
+        ui.reload = Some(Show { started, seed: 7, label: "" });
+    }
 }
 
 /// Paints the show over the frame just drawn; it ends by itself.
@@ -160,7 +180,7 @@ fn stage(buf: &mut Buffer, area: Rect, ui: &Ui, show: Show, seconds: f64, progre
         };
         put(buf, bar_left + at, top + 4, symbol, ui.theme.style(color, None));
     }
-    let text = format!("{} reloading", icons::icon(ui.nerd, Icon::Reload));
+    let text = format!("{} {}", icons::icon(ui.nerd, Icon::Reload), show.label);
     let text_left = area.x + area.width.saturating_sub(text.chars().count() as u16) / 2;
     for (at, symbol) in text.chars().enumerate() {
         put(buf, text_left + at as u16, top + 6, &symbol.to_string(), ui.theme.style(C::DarkGray, None));

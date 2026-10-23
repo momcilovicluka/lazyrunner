@@ -13,7 +13,7 @@ use lazyrunner_core::run::checks::{self, Outcome, Status};
 use lazyrunner_core::update;
 
 /// Each check shows its spinner at least this long, so every tick can be seen.
-const MIN_CHECK: Duration = Duration::from_millis(150);
+const MIN_CHECK: Duration = Duration::from_millis(80);
 /// Once the other checks are done, how long the startup waits for a background check (the update check, which
 /// offline can take 20 s) before it goes on behind the scenes.
 const BACKGROUND_GRACE: Duration = Duration::from_secs(2);

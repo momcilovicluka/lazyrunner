@@ -96,7 +96,29 @@ pub fn limit(segs: &[Seg], cells: usize) -> Vec<Seg> {
 }
 
 /// Draws a row at (x, y), cut to `cells`; where segments with a target landed goes to `hits`.
-pub fn draw(buf: &mut Buffer, x: u16, y: u16, cells: u16, segs: &[Seg], theme: &Theme, hits: &mut Vec<Hit>) {
+/// What the pointer touches: what it's over (lit up), and what was just clicked (shown pressed).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Touch {
+    pub hover: Option<Target>,
+    pub pressed: Option<Target>,
+}
+
+/// Whether a target is something to click (a title, an item, a link…), not the background of a box or a column.
+fn clickable(target: Target) -> bool {
+    !matches!(target, Target::Box | Target::Output(_))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn draw(
+    buf: &mut Buffer,
+    x: u16,
+    y: u16,
+    cells: u16,
+    segs: &[Seg],
+    theme: &Theme,
+    hits: &mut Vec<Hit>,
+    touch: Touch,
+) {
     let right = x.saturating_add(cells).min(buf.area.right());
     if y >= buf.area.bottom() {
         return;
@@ -109,14 +131,21 @@ pub fn draw(buf: &mut Buffer, x: u16, y: u16, cells: u16, segs: &[Seg], theme: &
             }
             continue;
         }
-        let style = seg.style.unwrap_or_else(|| theme.style(seg.fg, seg.bg));
-        let (next, _) = buf.set_stringn(
-            cx,
-            y,
-            &seg.text,
-            usize::from(right - cx),
-            if seg.underline { style.add_modifier(Modifier::UNDERLINED) } else { style },
-        );
+        let mut style = seg.style.unwrap_or_else(|| theme.style(seg.fg, seg.bg));
+        if seg.underline {
+            style = style.add_modifier(Modifier::UNDERLINED);
+        }
+        if let Some(target) = seg.target.filter(|target| clickable(*target)) {
+            if touch.pressed == Some(target) {
+                style = style.add_modifier(Modifier::REVERSED);
+            } else if touch.hover == Some(target) {
+                style = style.add_modifier(Modifier::BOLD);
+                if matches!(target, Target::Link { .. } | Target::Setting(_) | Target::Tests) {
+                    style = style.add_modifier(Modifier::UNDERLINED);
+                }
+            }
+        }
+        let (next, _) = buf.set_stringn(cx, y, &seg.text, usize::from(right - cx), style);
         if let Some(target) = seg.target {
             hits.push(Hit { x: cx, y, width: next.saturating_sub(cx), target });
         }
@@ -145,5 +174,23 @@ mod tests {
         assert_eq!(cut.iter().map(|s| s.text.as_str()).collect::<Vec<_>>(), ["hello ", "w…"]);
         assert_eq!(pad("ab", 4), "ab  ");
         assert_eq!(pad("abcdef", 3), "abc");
+    }
+
+    #[test]
+    fn what_the_pointer_is_over_lights_up_and_what_was_clicked_shows_pressed() {
+        let row = [seg("Orders", C::Gray).at(Target::Title(0)), seg(" box", C::Gray).at(Target::Box)];
+        let theme = crate::screen::theme::Theme::no_color();
+        let style_at = |touch: Touch, x: u16| {
+            let mut buf = Buffer::empty(ratatui::layout::Rect::new(0, 0, 20, 1));
+            draw(&mut buf, 0, 0, 20, &row, &theme, &mut Vec::new(), touch);
+            buf[(x, 0)].modifier
+        };
+        let over = Touch { hover: Some(Target::Title(0)), pressed: None };
+        assert!(style_at(over, 0).contains(Modifier::BOLD));
+        let pressed = Touch { hover: Some(Target::Title(0)), pressed: Some(Target::Title(0)) };
+        assert!(style_at(pressed, 0).contains(Modifier::REVERSED));
+        let over_the_box = Touch { hover: Some(Target::Box), pressed: Some(Target::Box) };
+        assert!(style_at(over_the_box, 8).is_empty(), "a box's background isn't something to click");
+        assert!(style_at(Touch::default(), 0).is_empty());
     }
 }

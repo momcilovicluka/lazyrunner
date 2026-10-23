@@ -14,6 +14,7 @@ use serde_json::{Map, Value, json};
 use super::actions::{self, Action, Run};
 use super::checklist::Checklist;
 use super::columns::{self, chunk, contains_ignore_case};
+use super::motion::Spot;
 use super::overlays::menu_items;
 use super::{Exit, Overlay, Picker, Search, Ui};
 
@@ -73,6 +74,18 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         ui.exit = Some(Exit::Quit);
         return;
     }
+    // A key ends the reload show at once, and does what it does (Esc only ends it).
+    if ui.reload.take().is_some() && name == "Escape" {
+        return;
+    }
+    if let Some(Overlay::Checklist(list)) = &mut ui.overlay {
+        // Skips what's still running; the loop closes the checklist and runs the key right away.
+        list.skip = true;
+        if !matches!(name.as_str(), "Escape" | "Enter" | "Space") {
+            ui.replay = Some(key);
+        }
+        return;
+    }
     if ui.overlay.is_some() {
         overlay_key(ui, controller, &name, &key);
         return;
@@ -130,7 +143,21 @@ fn action_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
         controller.add_log(format!("Building - press S to cancel it first, then: {}", action.label), Hue::Yellow);
         return;
     }
+    ui.motion.flash(Spot::Hint(name.to_string()), ui.now);
     run(ui, controller, &action.run);
+}
+
+/// Where an action shows it was done: the title of the app it's about, or every title, or the setting it flips.
+fn flash_for(ui: &mut Ui, action: &Run) {
+    let spot = match action {
+        Run::Toggle | Run::StartFocused | Run::StopFocused | Run::RestartFocused | Run::BuildFocused => {
+            Spot::Title(ui.focus)
+        }
+        Run::StartAll | Run::StopAll | Run::RestartAll | Run::BuildAll => Spot::Titles,
+        Run::Setting { toggle, .. } => Spot::Setting(*toggle),
+        _ => return,
+    };
+    ui.motion.flash(spot, ui.now);
 }
 
 fn page(ui: &Ui) -> isize {
@@ -272,6 +299,7 @@ fn find_match(ui: &mut Ui, controller: &mut Controller, older: bool) {
         scroll -= 1;
     }
     state.scroll = scroll;
+    ui.motion.flash(Spot::Match { app: ui.focus, line: found }, ui.now);
 }
 
 // ---------------------------------------------------------------- overlays
@@ -295,7 +323,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         _ => 0,
     };
     match &mut ui.overlay {
-        Some(Overlay::Checklist(list)) => list.skip = true,
+        Some(Overlay::Checklist(_)) => {}         // press() has it
         Some(Overlay::Help) => ui.overlay = None, // any key closes the reference
         Some(Overlay::Themes { .. }) => super::theme_picker::key(ui, controller, name, key),
         Some(Overlay::About { .. }) => super::about::key(ui, controller, name),
@@ -440,6 +468,7 @@ const SOURCE_CHECK: &str = "Checking for source changes…";
 /// Does what an action does. One that fingerprints the source first (a start that builds) waits for a frame that
 /// says so; the loop then calls `run_deferred`.
 pub fn run(ui: &mut Ui, controller: &mut Controller, action: &Run) {
+    flash_for(ui, action);
     if ui.deferred.is_none() && checks_sources(ui, controller, action) {
         ui.busy = Some(SOURCE_CHECK);
         ui.deferred = Some(action.clone());

@@ -105,6 +105,10 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, event: MouseEvent) -> bo
 }
 
 fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool) {
+    ui.reload = None; // a click ends the reload show too
+    if let Some(target) = target {
+        ui.motion.flash(super::motion::Spot::Clicked(target), ui.now);
+    }
     match &mut ui.overlay {
         Some(Overlay::Checklist(list)) => {
             list.skip = true; // as any key

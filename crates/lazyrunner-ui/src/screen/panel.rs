@@ -21,8 +21,8 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
     let tag = if ui.theme.id != "default" || no_color() { format!(" {} ", ui.theme.name) } else { String::new() };
     rows.push(vec![seg("─".repeat(cells.saturating_sub(tag.chars().count())), C::DarkGray), seg(tag, C::DarkGray)]);
     rows.push(header(ui, controller));
-    rows.push(compact_menu(controller, cells));
-    rows.extend(settings_rows(controller, cells));
+    rows.push(compact_menu(ui, controller, cells));
+    rows.extend(settings_rows(ui, controller, cells));
     rows.push(notice(ui, controller));
     let count = controller.config["panelLogLines"]
         .as_u64()
@@ -68,7 +68,7 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
 }
 
 /// Only what fits on one line; ? and : reach everything else. Lowercase = focused app, uppercase = all.
-fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
+fn compact_menu(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
     let lock_changed = !controller.lock_changed_keys().is_empty();
     let mut items: Vec<(&str, &str, C)> = Vec::new();
     if !controller.conflicts.is_empty() {
@@ -103,8 +103,20 @@ fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
         if used + length > cells {
             break;
         }
-        segs.push(seg(format!(" {key}"), C::Cyan));
-        segs.push(seg(format!(" {label}  "), color));
+        // A key just pressed lights its hint ("u/U" for u and for U).
+        let pressed = key.split('/').any(|part| {
+            let spot = |name: &str| super::motion::Spot::Hint(name.to_string());
+            let name = if part == "space" { "Space" } else { part };
+            ui.motion.lit(&spot(name), ui.now).is_some()
+        });
+        if pressed {
+            segs.push(on(format!(" {key}"), C::Black, C::Cyan));
+            segs.push(on(format!(" {label}"), C::Black, C::Cyan));
+            segs.push(seg("  ", color));
+        } else {
+            segs.push(seg(format!(" {key}"), C::Cyan));
+            segs.push(seg(format!(" {label}  "), color));
+        }
         used += length;
     }
     segs
@@ -112,15 +124,15 @@ fn compact_menu(controller: &Controller, cells: usize) -> Vec<Seg> {
 
 /// Every on/off setting, always visible (, opens the menu where the letter shown toggles it); wraps onto more
 /// rows when the window is narrow.
-fn settings_rows(controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
+fn settings_rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
     let settings: Vec<(&str, &str, bool, Toggle)> = super::actions::menu_toggles(controller)
         .map(|item| (item.letter, item.short, controller.setting(item.toggle), item.toggle))
         .collect();
     let mut rows = Vec::new();
     let mut current = vec![seg(" ,", C::Cyan), seg(" settings", C::DarkGray)];
     let mut used = 11;
-    for (key, label, on, toggle) in settings {
-        let check = if on { "[x]" } else { "[ ]" };
+    for (key, label, is_on, toggle) in settings {
+        let check = if is_on { "[x]" } else { "[ ]" };
         let length = key.len() + check.len() + label.len() + 6;
         if used + length > cells && current.len() > 1 {
             rows.push(std::mem::take(&mut current));
@@ -130,8 +142,15 @@ fn settings_rows(controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
         current.push(seg("   ", C::DarkCyan));
         let target = Target::Setting(toggle);
         current.push(seg(format!("{key} "), C::DarkCyan).at(target));
-        current.push(seg(check, if on { C::Green } else { C::DarkGray }).at(target));
-        current.push(seg(format!(" {label}"), if on { C::Gray } else { C::DarkGray }).at(target));
+        // A setting just flipped flashes, its box passing through a dot.
+        let flipping = ui.motion.lit(&super::motion::Spot::Setting(toggle), ui.now);
+        let check = if flipping.is_some_and(|lit| lit > 0.6) { "[•]" } else { check };
+        let check = match flipping {
+            Some(_) => on(check, C::Black, if is_on { C::Green } else { C::Gray }),
+            None => seg(check, if is_on { C::Green } else { C::DarkGray }),
+        };
+        current.push(check.at(target));
+        current.push(seg(format!(" {label}"), if is_on { C::Gray } else { C::DarkGray }).at(target));
         used += length;
     }
     rows.push(current);
