@@ -1,6 +1,6 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
-assertion_line: 1252
+assertion_line: 1260
 expression: "screen.render(SIZE.0, 44)"
 ---
 
@@ -17,21 +17,21 @@ expression: "screen.render(SIZE.0, 44)"
                  │                                                                          │
                  │   Core contributors                                                      │
                  │    • Luka Momčilović   creator · maintainer                              │
+                 │    ☼ Ognjen Maričić    bug reports & ideas · @ognjen004028               │
                  │                                                                          │
                  │   Links                                                                  │
                  │  ▸ r  ¶  README                setting it up, and every key              │
                  │    c  ✦  What's new            the changelog, right here                 │
                  │    e  ⇩  Releases              every version, on GitHub                  │
                  │    l  §  License               source-available; free to use, at work t… │
-                 │    b  ⚑  Report a bug          a GitHub issue, this version filled in    │
-                 │    f  ☼  Suggest a feature     a GitHub issue with your idea             │
+                 │    b  ⚑  Report a bug          the bug form, this version filled in      │
+                 │    f  ☼  Suggest a feature     the feature form, for your idea           │
                  │    s  ⑂  Source                the code, on GitHub                       │
                  │    u  ⇣  Check for an update   the startup checklist, now                │
                  │                                                                          │
                  │   made with ♥ and ⚙ Rust · lazyrunner License 1.1                        │
                  │ a letter, or j k + Enter · Esc closes                                    │
                  └──────────────────────────────────────────────────────────────────────────┘
-
 
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────

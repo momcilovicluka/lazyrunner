@@ -437,8 +437,10 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                     }
                 }
                 _ => {
-                    if let Some(item) = items.iter().find(|item| item.key == name).cloned() {
-                        run_from_overlay(ui, controller, &item, settings);
+                    // The item a key runs gets the highlight too, as if chosen with j k (a setting stays in view).
+                    if let Some(at) = items.iter().position(|item| item.key == name) {
+                        *index = at;
+                        run_from_overlay(ui, controller, &items[at], settings);
                     }
                 }
             }
