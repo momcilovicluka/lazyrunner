@@ -1,6 +1,6 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
-assertion_line: 1247
+assertion_line: 1252
 expression: "screen.render(SIZE.0, 44)"
 ---
 
@@ -12,7 +12,7 @@ expression: "screen.render(SIZE.0, 44)"
                  │                 ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                  │
                  │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                  │
                  │                                                                          │
-                 │   ⇩ v<version> · released 2026-10-22 · windows x86_64 · running Sample       │
+                 │   ⇩ v<version> · released <date>    · windows x86_64 · running Sample       │
                  │   Runs a project's .NET and npm apps side by side.                       │
                  │                                                                          │
                  │   Core contributors                                                      │

@@ -424,6 +424,14 @@ impl Controller {
 
     // ---------------------------------------------------------------- code changes
 
+    /// A rebuild restartOnCodeChange starts once saving has been quiet for a moment: code changed, and an app that
+    /// builds runs.
+    pub fn rebuild_pending(&self) -> bool {
+        self.code.count != self.code.handled
+            && self.setting(Toggle::RestartOnCodeChange)
+            && self.apps.iter().any(|app| app.traits().builds && self.is_running(&app.key))
+    }
+
     /// restartOnCodeChange: once saving has been quiet for a moment, rebuild and restart the running apps that build.
     fn test_code_change(&mut self, now: Instant) {
         if self.code.count == self.code.handled {

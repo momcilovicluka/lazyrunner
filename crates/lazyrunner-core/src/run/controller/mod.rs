@@ -371,6 +371,11 @@ impl Controller {
         self.ports.get(key).copied().flatten()
     }
 
+    /// The apps a start is waiting for to answer ("Ready in ..." once they all do).
+    pub fn getting_ready(&self) -> &[String] {
+        &self.ready_pending
+    }
+
     pub fn mode(&self, key: &str) -> Option<&Mode> {
         self.modes.get(key).and_then(Option::as_ref)
     }

@@ -643,7 +643,7 @@ fn same_project(controller: &Controller, dirs: &ProfileDirs, root: &Path) -> boo
 }
 
 /// `{"keys": "U"}`, `{"click": [x, y]}`, `{"wheel": [x, y, 1 | -1]}`, `{"dump": true}` (answered after the next
-/// frame), `{"state": true}`, `{"command": <Command>}`
+/// frame), `{"state": true}`, `{"agent": {...}}` (crate::agent: what `lazyrunner mcp` asks), `{"command": <Command>}`
 /// (lazyrunner_core::run::Command, e.g. `{"command": {"restart": "orders"}}`), `{"action": "start" | "stop"
 /// | "restart" | "quit", "root"?: "<dir>"}`, `{"quit": true}`. True when the answer needs a moment to get out before
 /// lazyrunner exits.
@@ -660,6 +660,11 @@ fn control(
     {
         let error = format!("{tool} has the terminal - try again once it quits");
         let _ = request.reply.send(json!({ "ok": false, "error": error }));
+        return false;
+    }
+    if let Some(agent) = body.get("agent") {
+        let answer = crate::agent::handle(ui, controller, agent);
+        let _ = request.reply.send(answer);
         return false;
     }
     if let Some(spec) = body.get("keys").and_then(Value::as_str) {

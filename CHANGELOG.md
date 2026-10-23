@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.5.0] - 2026-10-23
+
+### Added
+- `lazyrunner mcp`: an MCP server for an agent such as Claude Code (`claude mcp add --scope user lazyrunner -- lazyrunner mcp`). It reads and drives the open lazyrunner - status, numbered logs, the last error with its stack, the screen, start / stop / restart / build, wait for ready / a build / the tests / the migrations check, the tests and the migrations - and each of its actions shows in the log with the agent's name. It acts only in the checkout lazyrunner runs
+
+### Fixed
+- The migrations view's snapshot test depended on the day it ran
+
 ## [1.4.0] - 2026-10-22
 
 ### Added

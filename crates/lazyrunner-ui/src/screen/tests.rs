@@ -117,9 +117,14 @@ impl Screen {
         }
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
         terminal.draw(|frame| draw(frame, &mut self.ui, &self.controller)).unwrap();
-        // The version in titles changes with every release; the snapshots shouldn't.
-        let version = format!("v{}", lazyrunner_core::changelog::VERSION);
-        text(terminal.backend().buffer()).replace(&version, "v<version>")
+        // The version in titles, and the day it was released, change with every release; the snapshots shouldn't.
+        use lazyrunner_core::changelog::{self, VERSION};
+        let released = changelog::entries(changelog::CHANGELOG, None, None)
+            .into_iter()
+            .find(|entry| entry.version == VERSION)
+            .map_or(String::new(), |entry| format!("released {}", entry.date));
+        let frame = text(terminal.backend().buffer()).replace(&format!("v{VERSION}"), "v<version>");
+        if released.is_empty() { frame } else { frame.replace(&released, "released <date>   ") }
     }
 
     fn frame(&mut self) -> String {
@@ -732,7 +737,6 @@ async fn with_reduced_motion_ctrl_r_reloads_without_a_show() {
 
 #[tokio::test]
 async fn the_migrations_view_shows_what_is_applied_and_asks_before_it_moves() {
-    use chrono::TimeZone;
     use lazyrunner_core::run::migrations::{Context, Migration, Status as Ef};
     let mut screen = screen("snap-migrations", json!({}));
     let migration = |id: &str, applied| Migration { id: id.into(), name: id[15..].into(), applied: Some(applied) };
@@ -744,8 +748,9 @@ async fn the_migrations_view_shows_what_is_applied_and_asks_before_it_moves() {
         migration("20260301000000_Invoices", false),
     ];
     shop.status = Ef::Ok;
-    (shop.checked_at, shop.db) =
-        (Some(chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap()), "ShopLocal".into());
+    // Checked today: an earlier day's check would show the day too.
+    let today = chrono::Local::now().date_naive().and_hms_opt(9, 41, 7).unwrap();
+    (shop.checked_at, shop.db) = (today.and_local_timezone(chrono::Local).single(), "ShopLocal".into());
     screen.controller.contexts = Some(vec![shop]);
     let setup = lazyrunner_core::profile::Migrations { project: None, contexts: vec!["ShopDbContext".into()] };
     screen.controller.apps[0].migrations = Some(setup);
@@ -1245,4 +1250,73 @@ async fn the_about_box_on_a_tall_screen_has_its_logo() {
     let mut screen = screen("about-tall", json!({ "reducedMotion": true }));
     screen.press(", A");
     insta::assert_snapshot!(screen.render(SIZE.0, 44));
+}
+
+// ---------------------------------------------------------------- the agent channel
+
+fn agent(screen: &mut Screen, op: &str, args: Value, repo: Option<&std::path::Path>) -> Value {
+    let repo = repo.map(|repo| repo.display().to_string());
+    let request = json!({ "v": crate::agent::PROTOCOL, "op": op, "args": args, "client": "claude-code", "repo": repo });
+    crate::agent::handle(&mut screen.ui, &mut screen.controller, &request)
+}
+
+#[tokio::test]
+async fn an_agent_reads_the_status_and_numbered_logs_and_the_last_error() {
+    let mut screen = screen("agent", json!({}));
+    let (at, base) = (screen.ui.now, screen.controller.states[0].output.total());
+    let lines = [
+        "info: Now listening on: http://localhost:58201",
+        "fail: Orders.Api.Checkout[0]",
+        "      System.InvalidOperationException: the basket is empty",
+        r"         at Orders.Api.Checkout.Pay() in C:\src\Checkout.cs:line 42",
+        "info: Request finished",
+    ];
+    for line in lines {
+        screen.controller.states[0].output.push(line, at);
+    }
+    let status = agent(&mut screen, "status", json!({}), None);
+    assert_eq!(status["ok"], true, "{status}");
+    assert_eq!(status["result"]["apps"][0]["key"], "orders");
+    assert_eq!(status["result"]["ui"]["view"], "columns");
+    assert_eq!(status["result"]["busy"]["build"], Value::Null);
+
+    let found = agent(&mut screen, "logs", json!({ "app": "Orders", "since": base + 1, "grep": "EXCEPTION" }), None);
+    assert_eq!(found["result"]["lines"], json!([{ "seq": base + 3, "text": lines[2] }]));
+    assert_eq!(found["result"]["next"], base + 5);
+    let newest = agent(&mut screen, "logs", json!({ "app": "orders", "limit": 2 }), None);
+    let seqs: Vec<u64> =
+        newest["result"]["lines"].as_array().unwrap().iter().map(|line| line["seq"].as_u64().unwrap()).collect();
+    assert_eq!(seqs, [base + 4, base + 5], "the newest, oldest first");
+    assert_eq!(newest["result"]["truncated"], true, "older lines after since didn't fit");
+    let after_a_restart = agent(&mut screen, "logs", json!({ "app": "orders", "since": base + 500 }), None);
+    assert_eq!(after_a_restart["result"]["reset"], true);
+    assert_eq!(after_a_restart["result"]["lines"].as_array().map(Vec::len), Some(base as usize + 5));
+    let error = agent(&mut screen, "errors", json!({ "app": "orders" }), None);
+    let text = error["result"]["text"].as_str().unwrap();
+    assert!(text.starts_with("fail: Orders.Api.Checkout[0]") && text.contains("Checkout.cs:line 42"), "{text}");
+
+    let refused = |answer: &Value| answer["code"].as_str().unwrap_or_default().to_string();
+    assert_eq!(refused(&agent(&mut screen, "logs", json!({ "app": "nope" }), None)), "bad_args");
+    assert_eq!(refused(&agent(&mut screen, "dance", json!({}), None)), "unknown_op");
+    let old = crate::agent::handle(&mut screen.ui, &mut screen.controller, &json!({ "op": "status" }));
+    assert_eq!(refused(&old), "protocol_mismatch");
+}
+
+#[tokio::test]
+async fn an_agents_actions_say_so_in_the_log_and_another_folders_are_refused() {
+    let mut screen = screen("agent-act", json!({}));
+    let repo = screen.temp.join("repo");
+    screen.controller.root = repo.clone();
+    let stopped = agent(&mut screen, "stop", json!({ "app": "all" }), Some(&repo.join("services")));
+    assert_eq!(stopped["result"]["accepted"], true, "{stopped}");
+    assert_eq!(stopped["result"]["ui"]["view"], "columns");
+    assert!(screen.controller.log.iter().any(|entry| entry.text == "▸ claude-code: stop every app"));
+
+    let outside = screen.temp.path().to_path_buf();
+    let typo = agent(&mut screen, "stop", json!({ "app": ["orders"] }), Some(&repo));
+    assert_eq!(typo["code"], "bad_args", "not every app: {typo}");
+    let elsewhere = agent(&mut screen, "stop", json!({}), Some(&outside));
+    assert_eq!(elsewhere["code"], "wrong_repo", "{elsewhere}");
+    let reading_elsewhere = agent(&mut screen, "status", json!({}), Some(&outside));
+    assert_eq!(reading_elsewhere["ok"], true, "questions are answered from anywhere");
 }

@@ -25,7 +25,7 @@ use sha2::{Digest, Sha256};
 use crate::profile_cli::install_dir;
 
 /// The control channel of the lazyrunner open on this machine (one per state folder).
-fn control_name(paths: &Paths) -> String {
+pub(crate) fn control_name(paths: &Paths) -> String {
     let digest = Sha256::digest(paths.state_dir.display().to_string().to_lowercase().as_bytes());
     let short: String = digest.iter().take(6).map(|byte| format!("{byte:02x}")).collect();
     format!("ctl-{short}")

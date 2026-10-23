@@ -8,6 +8,7 @@ use std::path::Path;
 
 use lazyrunner_core::output::{Hue, Level, OutputLine};
 use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::app::AppState;
 use lazyrunner_core::run::secrets::{self, Entry};
 
 use super::Ui;
@@ -52,31 +53,48 @@ pub const PICKS: [(Pick, &str, &str); 6] = [
 /// What a pick takes from the focused app's output now: its lines, and how many entries they are (errors and
 /// warnings are separated by an empty line; the others are one entry).
 pub fn gather(ui: &Ui, controller: &Controller, pick: Pick) -> (Vec<String>, usize) {
+    if pick != Pick::Search {
+        return gather_app(controller, ui.focus, pick);
+    }
     let (Some(app), Some(state)) = (controller.apps.get(ui.focus), controller.states.get(ui.focus)) else {
         return (Vec::new(), 0);
     };
-    let mut lines: Vec<&OutputLine> = state.output.newest_first(0).collect();
-    lines.reverse();
-    let one = |lines: Vec<String>| {
-        let count = usize::from(!lines.is_empty());
-        (lines, count)
+    let lines = oldest_first(state);
+    let index = ui
+        .search
+        .as_ref()
+        .filter(|search| !search.typing && search.key == app.key)
+        .and_then(|search| search.index)
+        .filter(|&index| index < lines.len());
+    one(index.map_or_else(Vec::new, |index| block(&lines, index)))
+}
+
+/// What a pick other than the search match takes from the output of the app at `index` (the agent asks for any).
+pub fn gather_app(controller: &Controller, index: usize, pick: Pick) -> (Vec<String>, usize) {
+    let (Some(app), Some(state)) = (controller.apps.get(index), controller.states.get(index)) else {
+        return (Vec::new(), 0);
     };
+    let lines = oldest_first(state);
     match pick {
         Pick::LastError => one(last_error(&lines, controller.failed_build_errors.get(&app.key))),
-        Pick::Search => {
-            let index = ui
-                .search
-                .as_ref()
-                .filter(|search| !search.typing && search.key == app.key)
-                .and_then(|search| search.index)
-                .filter(|&index| index < lines.len());
-            one(index.map_or_else(Vec::new, |index| block(&lines, index)))
-        }
+        Pick::Search => (Vec::new(), 0),
         Pick::Output => one(lines.iter().map(|line| line.text.clone()).collect()),
         Pick::Errors => collect(&lines, |error, _| error),
         Pick::Warnings => collect(&lines, |error, warning| warning && !error),
         Pick::Both => collect(&lines, |error, warning| error || warning),
     }
+}
+
+fn oldest_first(state: &AppState) -> Vec<&OutputLine> {
+    let mut lines: Vec<&OutputLine> = state.output.newest_first(0).collect();
+    lines.reverse();
+    lines
+}
+
+/// One entry, or none when it has no lines.
+fn one(lines: Vec<String>) -> (Vec<String>, usize) {
+    let count = usize::from(!lines.is_empty());
+    (lines, count)
 }
 
 /// y, then what: copies it, or says there's nothing of it.
@@ -134,7 +152,7 @@ fn continues(text: &str) -> bool {
 }
 
 /// A line that reports an error: red, a .NET fail / crit entry, an exception, or a compiler error.
-fn is_error(line: &OutputLine) -> bool {
+pub fn is_error(line: &OutputLine) -> bool {
     let text = line.text.as_str();
     line.hue == Some(Hue::Red)
         || line.level == Level::Error
