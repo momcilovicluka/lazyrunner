@@ -55,11 +55,11 @@ and macOS currently build from source.
 ## Preview
 
 ![lazyrunner running a shop project: two .NET APIs and three npm apps in columns, each with its port, response time,
-CPU and memory; below them the panel with the branch, the database, the keys, the settings and the log](docs/screenshots/overview.svg)
+CPU and memory; below them the panel with the branch, the database, the keys that matter now and the log](docs/screenshots/overview.svg)
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/palette.svg" alt="The command palette, filtered by typing 'start'"></td>
+    <td><img src="docs/screenshots/palette.svg" alt="The command palette, filtered by typing 'start': keycaps, the matched letters lit, the selection bar"></td>
     <td><img src="docs/screenshots/durations.svg" alt="The durations box: builds, starts and npm ci over their last runs, with the usual time and the trend"></td>
   </tr>
   <tr>
@@ -73,6 +73,22 @@ CPU and memory; below them the panel with the branch, the database, the keys, th
   <tr>
     <td align="center"><code>t</code> themes, previewed live</td>
     <td align="center"><code>|</code> a narrow terminal stacks the apps</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/tests.svg" alt="The tests view: the backend's and the frontend's suites, a failed test with its message and stack"></td>
+    <td><img src="docs/screenshots/migrations.svg" alt="The migrations view: two DbContexts, their migrations applied and pending on the database the apps use"></td>
+  </tr>
+  <tr>
+    <td align="center"><code>T</code> the tests, run and read</td>
+    <td align="center"><code>M</code> the migrations, applied and pending</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/requests.svg" alt="The requests view: what the APIs served, newest first, a slow and a failed one among them"></td>
+    <td><img src="docs/screenshots/about.svg" alt="The About box: the version, the contributors and links to the README, the license and the issue forms"></td>
+  </tr>
+  <tr>
+    <td align="center"><code>H</code> the requests the APIs served</td>
+    <td align="center"><code>, A</code> about lazyrunner</td>
   </tr>
 </table>
 
@@ -169,6 +185,17 @@ project's checkout it reopens there, with that project's apps and settings.
 The keys follow vim and lazygit. Letters are case-sensitive: **lowercase acts on the focused column, uppercase on
 every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name.
 
+The line under the header shows the keys that matter now, as keycaps: on the left what the focused app can do as it
+is - start or build it stopped, restart, stop or open it running, cancel what it's busy with, look at what went wrong
+when it crashed - with search and start or stop all, and the alerts (a port in use, a changed package-lock.json); on
+the right `:` commands, `x` the focused app's menu, `?` keys, `,` settings and `q` quit, which give way first in a
+narrow terminal.
+
+The command palette lists every command and setting with its keys as keycaps, grouped (Run, Tools, View, Help,
+Settings) until you type; then the best matches come first with the typed letters lit. What acts on the focused app
+names it and shows its icon ("Start Orders"). The selection bar slides to the chosen row, and Enter runs the command
+at once while the palette wipes away.
+
 **Run**
 
 | Key | Action |
@@ -218,7 +245,7 @@ every app**. `?` shows them all, and `:` (or `Ctrl+P`) finds any command by name
 | `?` | Key reference |
 | `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting |
 
-**Settings (`,` then a letter)**, saved in `lazyrunner.config.json` and always shown in the panel:
+**Settings (`,` then a letter)**, saved in `lazyrunner.config.json` (the letter highlights the setting it flips):
 
 | Key | Setting |
 |-----|---------|
@@ -248,7 +275,7 @@ when they're on.
 
 A click focuses a column; a double click on its title zooms it (again: back). The wheel scrolls the column under the
 pointer, whichever has the focus. In the menus, the command palette and the database and theme pickers a click picks
-an item and a double click runs it; a click outside a box closes it. A setting in the panel toggles on a click. What the
+an item and a double click runs it; a click outside a box closes it. What the
 pointer is over lights up, and what you click shows pressed for a moment. While the mouse is on, the terminal leaves text selection to
 lazyrunner, which has none: `,` then `m` turns it off (in Windows Terminal, Shift + drag selects either way).
 

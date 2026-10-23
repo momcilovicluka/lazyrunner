@@ -674,7 +674,7 @@ async fn i_asks_npm_ci_or_npm_install_and_the_menu_and_palette_have_both() {
         screen.press(&key.to_string());
     }
     let palette = screen.frame();
-    assert!(palette.contains("[i n]") && palette.contains("[i c]"), "{palette}");
+    assert!(palette.contains(" i   n ") && palette.contains(" i   c "), "the keys as keycaps: {palette}");
 }
 
 // ---------------------------------------------------------------- Nerd Font icons
@@ -1109,15 +1109,6 @@ async fn in_a_menu_a_click_picks_an_item_a_double_click_runs_it_and_a_click_outs
 }
 
 #[tokio::test]
-async fn a_setting_in_the_panel_toggles_on_a_click() {
-    let mut screen = screen("mouse-setting", json!({}));
-    assert!(!screen.controller.setting(Toggle::AutoRestartOnBranchChange));
-    screen.click(Target::Setting(Toggle::AutoRestartOnBranchChange));
-    assert!(screen.controller.setting(Toggle::AutoRestartOnBranchChange));
-    assert!(screen.last_log().starts_with("Auto-restart on branch change: on"), "{}", screen.last_log());
-}
-
-#[tokio::test]
 async fn a_long_column_has_a_scrollbar_bright_while_scrolled_back() {
     let mut screen = screen("snap-scrollbar", json!({}));
     screen.running();
@@ -1448,4 +1439,52 @@ async fn a_settings_letter_also_highlights_the_setting_it_toggles() {
     let Some(Overlay::Settings { index }) = &screen.ui.overlay else { panic!("the settings stay open") };
     assert_eq!(Some(*index), wanted);
     assert!(screen.controller.setting(Toggle::ReducedMotion));
+}
+
+// ---------------------------------------------------------------- the command palette and the hints
+
+#[tokio::test]
+async fn the_palette_groups_its_keycaps_until_something_is_typed() {
+    let mut screen = screen("palette-groups", json!({}));
+    screen.press(":");
+    let grouped = screen.frame();
+    assert!(grouped.contains(" ▸ Run ─") && grouped.contains("Start Orders"), "{grouped}");
+    assert!(grouped.contains("  u  "), "the key as a keycap: {grouped}");
+    screen.press("z o o");
+    let found = screen.frame();
+    assert!(!found.contains(" ▸ Run ─") && found.contains("Zoom Orders"), "ranked, no headers: {found}");
+}
+
+#[tokio::test]
+async fn enter_runs_at_once_while_the_palette_wipes_away() {
+    let mut screen = screen("palette-enter", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.frame();
+    screen.press(": z o o m Enter");
+    assert!(screen.ui.zoom && screen.ui.overlay.is_none(), "zoomed already");
+    assert!(screen.ui.motion.palette_closing(screen.ui.now).is_some());
+    let closing = screen.frame();
+    assert!(closing.contains("─ Commands ─"), "the palette shows its pressed keycap for a frame: {closing}");
+    screen.ui.now += Duration::from_millis(100);
+    assert!(!screen.frame().contains("─ Commands ─"), "and is gone");
+}
+
+#[tokio::test]
+async fn the_hints_follow_the_focused_apps_state() {
+    let mut screen = screen("hints", json!({}));
+    let hints = |screen: &mut Screen| {
+        screen.frame().lines().find(|line| line.contains(":  commands")).unwrap_or_default().to_string()
+    };
+    let stopped = hints(&mut screen);
+    assert!(
+        stopped.contains(" u  start ") && stopped.contains(" b  build ") && stopped.contains(" U  start all "),
+        "{stopped}"
+    );
+    screen.running();
+    let running = hints(&mut screen);
+    assert!(
+        running.contains(" r  restart ") && running.contains(" S  stop all ") && !running.contains(" u  start "),
+        "{running}"
+    );
+    assert!(!screen.frame().contains("[x] auto-update"), "the settings live in the , menu");
 }

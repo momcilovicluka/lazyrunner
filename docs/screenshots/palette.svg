@@ -3,155 +3,255 @@
 <rect width="100%" height="34" rx="10" fill="#000000" fill-opacity="0.28"/>
 <circle cx="22" cy="17" r="6" fill="#ff5f57"/><circle cx="42" cy="17" r="6" fill="#febc2e"/><circle cx="62" cy="17" r="6" fill="#28c840"/>
 <text x="728" y="22" fill="#cdd6f4" fill-opacity="0.6" font-size="13" text-anchor="middle">lazyrunner — shop</text>
-<text x="375.2" y="79.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┌─</text>
-<text x="392.0" y="79.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Commands </text>
-<text x="476.0" y="79.7" fill="#94e2d5" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">───────────────────────────────────────────────────────────────────────┐</text>
-<text x="375.2" y="97.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ › </text>
-<text x="408.8" y="97.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">start</text>
-<text x="450.8" y="97.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▏</text>
-<text x="1064.0" y="97.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="115.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="392.0" y="115.7" fill="#6c7086" textLength="672.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">────────────────────────────────────────────────────────────────────────────────</text>
-<text x="1064.0" y="115.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="392.0" y="120.0" width="672.0" height="18" fill="#94e2d5"/>
-<text x="375.2" y="133.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="392.0" y="133.7" fill="#11111b" textLength="672.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[Space]   Start / stop the focused app  whichever it is not                     </text>
-<text x="1064.0" y="133.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="151.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [u]      </text>
-<text x="467.6" y="151.7" fill="#ffffff" textLength="184.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Start the focused app</text>
-<text x="652.4" y="151.7" fill="#6c7086" textLength="260.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  builds it first if it changed</text>
-<text x="1064.0" y="151.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="169.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [U]      </text>
-<text x="467.6" y="169.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Start all</text>
-<text x="551.6" y="169.7" fill="#6c7086" textLength="369.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build if needed, start whatever is stopped</text>
-<text x="1064.0" y="169.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="187.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [, u]    </text>
-<text x="467.6" y="187.7" fill="#ffffff" textLength="310.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> [x] Auto-start when lazyrunner opens</text>
-<text x="1064.0" y="187.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="205.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [, w]    </text>
-<text x="467.6" y="205.7" fill="#ffffff" textLength="369.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> [ ] Startup checklist when lazyrunner opens</text>
-<text x="1064.0" y="205.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="223.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [, r]    </text>
-<text x="467.6" y="223.7" fill="#ffffff" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Run the startup checklist now (and check for an update)</text>
-<text x="1064.0" y="223.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="241.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [r]      </text>
-<text x="467.6" y="241.7" fill="#ffffff" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Restart the focused app</text>
-<text x="669.2" y="241.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if it changed</text>
-<text x="1064.0" y="241.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="259.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [R]      </text>
-<text x="467.6" y="259.7" fill="#ffffff" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Restart all</text>
-<text x="568.4" y="259.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if anything changed</text>
-<text x="1064.0" y="259.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="277.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [, a]    </text>
-<text x="467.6" y="277.7" fill="#ffffff" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> [ ] Auto-restart on branch change</text>
-<text x="1064.0" y="277.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="295.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [, e]    </text>
-<text x="467.6" y="295.7" fill="#ffffff" textLength="327.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> [ ] Restart the APIs when code changes</text>
-<text x="1064.0" y="295.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="313.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [, s]    </text>
-<text x="467.6" y="313.7" fill="#ffffff" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> [x] Stop/Restart all include the frontend</text>
-<text x="1064.0" y="313.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="331.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [, g]    </text>
-<text x="467.6" y="331.7" fill="#ffffff" textLength="520.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> [ ] L opens the git tool beside lazyrunner (Windows Terminal)</text>
-<text x="1064.0" y="331.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="349.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [s]      </text>
-<text x="467.6" y="349.7" fill="#ffffff" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Stop the focused app</text>
-<text x="644.0" y="349.7" fill="#6c7086" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  or cancel its build / npm ci</text>
-<text x="1064.0" y="349.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="367.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [D]      </text>
-<text x="467.6" y="367.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Durations</text>
-<text x="551.6" y="367.7" fill="#6c7086" textLength="512.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build, start and npm ci times over the last runs: what got…</text>
-<text x="1064.0" y="367.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="385.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [|]      </text>
-<text x="467.6" y="385.7" fill="#ffffff" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Layout: auto → next</text>
-<text x="635.6" y="385.7" fill="#6c7086" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto (stacked when narrow) / columns side by sid…</text>
-<text x="1064.0" y="385.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="403.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [&gt;]      </text>
-<text x="467.6" y="403.7" fill="#ffffff" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Widen the focused column</text>
-<text x="677.6" y="403.7" fill="#6c7086" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  taller when the apps are stacked</text>
-<text x="1064.0" y="403.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="421.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [/]      </text>
-<text x="467.6" y="421.7" fill="#ffffff" textLength="268.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Search the focused app's output</text>
-<text x="736.4" y="421.7" fill="#6c7086" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  n older match, N newer</text>
-<text x="1064.0" y="421.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="439.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [,]      </text>
-<text x="467.6" y="439.7" fill="#ffffff" textLength="327.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Settings (on/off toggles, r checklist)</text>
-<text x="795.2" y="439.7" fill="#6c7086" textLength="268.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto-restart, auto-start, che…</text>
-<text x="1064.0" y="439.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="457.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [d]      </text>
-<text x="467.6" y="457.7" fill="#ffffff" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Switch database</text>
-<text x="602.0" y="457.7" fill="#6c7086" textLength="302.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  connection strings in secrets.json</text>
-<text x="1064.0" y="457.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="475.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [y]      </text>
-<text x="467.6" y="475.7" fill="#ffffff" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Copy (yank)</text>
-<text x="568.4" y="475.7" fill="#6c7086" textLength="487.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the last error with its stack trace, or the search match</text>
-<text x="1064.0" y="475.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="493.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [&lt;]      </text>
-<text x="467.6" y="493.7" fill="#ffffff" textLength="218.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Narrow the focused column</text>
-<text x="686.0" y="493.7" fill="#6c7086" textLength="294.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  shorter when the apps are stacked</text>
-<text x="1064.0" y="493.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="511.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="392.0" y="511.7" fill="#6c7086" textLength="672.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">type to search · ↑↓ or Ctrl+N Ctrl+P choose · Enter run · Esc close             </text>
-<text x="1064.0" y="511.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<text x="375.2" y="529.7" fill="#94e2d5" textLength="705.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">└──────────────────────────────────────────────────────────────────────────────────┘</text>
-<text x="14.0" y="583.7" fill="#6c7086" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Catppuccin Mocha </text>
-<rect x="14.0" y="588.0" width="100.8" height="18" fill="#94e2d5"/>
-<text x="14.0" y="601.7" fill="#11111b" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> lazyrunner </text>
-<text x="114.8" y="601.7" fill="#a6e3a1" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● all up (5)</text>
-<text x="232.4" y="601.7" fill="#f5c2e7" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ⎇ feature/checkout-v2</text>
-<text x="434.0" y="601.7" fill="#6c7086" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   DB </text>
-<text x="484.4" y="601.7" fill="#f9e2af" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopLocal @ localhost</text>
-<text x="660.8" y="601.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   /work/shop</text>
-<text x="14.0" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ?</text>
-<text x="30.8" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> keys  </text>
-<text x="89.6" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> :</text>
-<text x="106.4" y="619.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> commands  </text>
-<text x="198.8" y="619.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> space</text>
-<text x="249.2" y="619.7" fill="#cdd6f4" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> start/stop  </text>
-<text x="358.4" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> u/U</text>
-<text x="392.0" y="619.7" fill="#cdd6f4" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> start  </text>
-<text x="459.2" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> s/S</text>
-<text x="492.8" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop  </text>
-<text x="551.6" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r/R</text>
-<text x="585.2" y="619.7" fill="#cdd6f4" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> restart  </text>
-<text x="669.2" y="619.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> b/B</text>
-<text x="702.8" y="619.7" fill="#cdd6f4" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> build  </text>
-<text x="770.0" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> d</text>
-<text x="786.8" y="619.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> database  </text>
-<text x="879.2" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> w</text>
-<text x="896.0" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> open  </text>
-<text x="954.8" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> x</text>
-<text x="971.6" y="619.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> menu  </text>
-<text x="1030.4" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> /</text>
-<text x="1047.2" y="619.7" fill="#cdd6f4" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> search  </text>
-<text x="1122.8" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ,</text>
-<text x="1139.6" y="619.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> settings  </text>
-<text x="1232.0" y="619.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> q</text>
-<text x="1248.8" y="619.7" fill="#cdd6f4" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> quit                  </text>
-<text x="14.0" y="637.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ,</text>
-<text x="30.8" y="637.7" fill="#6c7086" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> settings</text>
-<text x="106.4" y="637.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   a </text>
-<text x="148.4" y="637.7" fill="#6c7086" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] auto-restart on branch change</text>
-<text x="425.6" y="637.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   u </text>
-<text x="467.6" y="637.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
-<text x="492.8" y="637.7" fill="#cdd6f4" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> auto-start when lazyrunner opens</text>
-<text x="770.0" y="637.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   s </text>
-<text x="812.0" y="637.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
-<text x="837.2" y="637.7" fill="#cdd6f4" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop/restart all include frontend                                      </text>
-<text x="106.4" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   e </text>
-<text x="148.4" y="655.7" fill="#6c7086" textLength="260.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] restart APIs on code change</text>
-<text x="408.8" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   w </text>
-<text x="450.8" y="655.7" fill="#6c7086" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] startup checklist</text>
-<text x="627.2" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   v </text>
-<text x="669.2" y="655.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
-<text x="694.4" y="655.7" fill="#cdd6f4" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> auto-update</text>
-<text x="795.2" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   m </text>
-<text x="837.2" y="655.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x]</text>
-<text x="862.4" y="655.7" fill="#cdd6f4" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> mouse</text>
-<text x="912.8" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   f </text>
-<text x="954.8" y="655.7" fill="#6c7086" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] reduced motion</text>
-<text x="1106.0" y="655.7" fill="#89dceb" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   g </text>
-<text x="1148.0" y="655.7" fill="#6c7086" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] git beside</text>
+<text x="358.4" y="79.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┌─</text>
+<text x="375.2" y="79.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Commands </text>
+<text x="459.2" y="79.7" fill="#94e2d5" textLength="638.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">───────────────────────────────────────────────────────────────────────────┐</text>
+<text x="358.4" y="97.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ › </text>
+<text x="392.0" y="97.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">start</text>
+<text x="434.0" y="97.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▏</text>
+<text x="988.4" y="97.7" fill="#6c7086" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">26 commands</text>
+<text x="1080.8" y="97.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="358.4" y="115.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="375.2" y="115.7" fill="#6c7086" textLength="705.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">────────────────────────────────────────────────────────────────────────────────────</text>
+<text x="1080.8" y="115.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="375.2" y="120.0" width="33.6" height="18" fill="#cba6f7"/>
+<rect x="408.8" y="120.0" width="42.0" height="18" fill="#cba6f7"/>
+<rect x="450.8" y="120.0" width="562.8" height="18" fill="#cba6f7"/>
+<rect x="1013.6" y="120.0" width="58.8" height="18" fill="#cdd6f4"/>
+<rect x="1072.4" y="120.0" width="8.4" height="18" fill="#cba6f7"/>
+<text x="358.4" y="133.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="375.2" y="133.7" fill="#1e1e2e" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ◆  </text>
+<text x="408.8" y="133.7" fill="#1e1e2e" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">Start</text>
+<text x="450.8" y="133.7" fill="#1e1e2e" textLength="562.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> / stop Orders  whichever it is not                                </text>
+<text x="1013.6" y="133.7" fill="#0c0c0c" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Space </text>
+<text x="1080.8" y="133.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="138.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="151.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="408.8" y="151.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">Start</text>
+<text x="450.8" y="151.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Orders</text>
+<text x="509.6" y="151.7" fill="#6c7086" textLength="260.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  builds it first if it changed</text>
+<text x="1047.2" y="151.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> u </text>
+<text x="1080.8" y="151.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="156.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="169.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ▸  </text>
+<text x="408.8" y="169.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">Start</text>
+<text x="450.8" y="169.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all</text>
+<text x="484.4" y="169.7" fill="#6c7086" textLength="369.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build if needed, start whatever is stopped</text>
+<text x="1047.2" y="169.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> U </text>
+<text x="1080.8" y="169.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="174.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="174.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="187.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="187.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x] Auto-</text>
+<text x="484.4" y="187.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="526.4" y="187.7" fill="#ffffff" textLength="487.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> when lazyrunner opens                                    </text>
+<text x="1013.6" y="187.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="187.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> u </text>
+<text x="1080.8" y="187.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="192.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="192.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="205.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="205.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] </text>
+<text x="442.4" y="205.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">Start</text>
+<text x="484.4" y="205.7" fill="#ffffff" textLength="529.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">up checklist when lazyrunner opens                             </text>
+<text x="1013.6" y="205.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="205.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> w </text>
+<text x="1080.8" y="205.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="210.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="210.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="223.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="223.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Run the </text>
+<text x="476.0" y="223.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="518.0" y="223.7" fill="#ffffff" textLength="495.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">up checklist now (and check for an update)                 </text>
+<text x="1013.6" y="223.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="223.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r </text>
+<text x="1080.8" y="223.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="228.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="241.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="408.8" y="241.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Re</text>
+<text x="425.6" y="241.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="467.6" y="241.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Orders</text>
+<text x="526.4" y="241.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if it changed</text>
+<text x="1047.2" y="241.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r </text>
+<text x="1080.8" y="241.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="246.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="259.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ▸  </text>
+<text x="408.8" y="259.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Re</text>
+<text x="425.6" y="259.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="467.6" y="259.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all</text>
+<text x="501.2" y="259.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if anything changed</text>
+<text x="1047.2" y="259.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> R </text>
+<text x="1080.8" y="259.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="264.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="264.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="277.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="277.7" fill="#ffffff" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Auto-re</text>
+<text x="501.2" y="277.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="543.2" y="277.7" fill="#ffffff" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> on branch change                                       </text>
+<text x="1013.6" y="277.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="277.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> a </text>
+<text x="1080.8" y="277.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="282.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="282.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="295.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="295.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Re</text>
+<text x="459.2" y="295.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="501.2" y="295.7" fill="#ffffff" textLength="512.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> the APIs when code changes                                  </text>
+<text x="1013.6" y="295.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="295.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> e </text>
+<text x="1080.8" y="295.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="300.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="300.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="313.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="313.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x] </text>
+<text x="442.4" y="313.7" fill="#f9e2af" textLength="16.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">St</text>
+<text x="459.2" y="313.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">op/Rest</text>
+<text x="518.0" y="313.7" fill="#f9e2af" textLength="25.2" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">art</text>
+<text x="543.2" y="313.7" fill="#ffffff" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all include the frontend                               </text>
+<text x="1013.6" y="313.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="313.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> s </text>
+<text x="1080.8" y="313.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="318.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="331.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="408.8" y="331.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">In</text>
+<text x="425.6" y="331.7" fill="#f9e2af" textLength="25.2" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">sta</text>
+<text x="450.8" y="331.7" fill="#ffffff" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ll packages: npm ci o</text>
+<text x="627.2" y="331.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="635.6" y="331.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> npm ins</text>
+<text x="702.8" y="331.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="711.2" y="331.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">all</text>
+<text x="736.4" y="331.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the focused npm app's</text>
+<text x="1047.2" y="331.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
+<text x="1080.8" y="331.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="336.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="336.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="349.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="349.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] L open</text>
+<text x="492.8" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="509.6" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="518.0" y="349.7" fill="#ffffff" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he git tool beside l</text>
+<text x="686.0" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="694.4" y="349.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">zy</text>
+<text x="711.2" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="719.6" y="349.7" fill="#ffffff" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">unner (Windows </text>
+<text x="845.6" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">T</text>
+<text x="854.0" y="349.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">erminal)           </text>
+<text x="1013.6" y="349.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="349.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> g </text>
+<text x="1080.8" y="349.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1013.6" y="354.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1047.2" y="354.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="367.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="408.8" y="367.7" fill="#ffffff" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Nerd Font icon</text>
+<text x="560.0" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="568.4" y="367.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> (</text>
+<text x="585.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="593.6" y="367.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he termin</text>
+<text x="669.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="677.6" y="367.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">l's font a Ne</text>
+<text x="786.8" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="795.2" y="367.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">d Fon</text>
+<text x="837.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="845.6" y="367.7" fill="#ffffff" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Mono)              </text>
+<text x="1013.6" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1047.2" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
+<text x="1080.8" y="367.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="372.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="385.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="408.8" y="385.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Durations</text>
+<text x="484.4" y="385.7" fill="#6c7086" textLength="554.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build, start and npm ci times over the last runs: what got slow…</text>
+<text x="1047.2" y="385.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> D </text>
+<text x="1080.8" y="385.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="390.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="403.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
+<text x="408.8" y="403.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Layout: auto → next</text>
+<text x="568.4" y="403.7" fill="#6c7086" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto (stacked when narrow) / columns side by side / s…</text>
+<text x="1047.2" y="403.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> | </text>
+<text x="1080.8" y="403.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1005.2" y="408.0" width="67.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="421.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
+<text x="408.8" y="421.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Reload window</text>
+<text x="518.0" y="421.7" fill="#6c7086" textLength="478.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the settings and themes read again, the terminal set u…</text>
+<text x="1005.2" y="421.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Ctrl+R </text>
+<text x="1080.8" y="421.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="426.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="439.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
+<text x="408.8" y="439.7" fill="#ffffff" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Widen the focused column</text>
+<text x="610.4" y="439.7" fill="#6c7086" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  taller when the apps are stacked</text>
+<text x="1047.2" y="439.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> + </text>
+<text x="1080.8" y="439.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="444.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="457.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ?  </text>
+<text x="408.8" y="457.7" fill="#ffffff" textLength="319.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Settings (on/off toggles, r checklist)</text>
+<text x="728.0" y="457.7" fill="#6c7086" textLength="310.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto-restart, auto-start, checklis…</text>
+<text x="1047.2" y="457.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1080.8" y="457.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="462.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="475.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="408.8" y="475.7" fill="#ffffff" textLength="294.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Requests: what the .NET apps served</text>
+<text x="702.8" y="475.7" fill="#6c7086" textLength="336.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  newest or slowest, per endpoint; filt…</text>
+<text x="1047.2" y="475.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> H </text>
+<text x="1080.8" y="475.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="480.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="493.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="408.8" y="493.7" fill="#ffffff" textLength="302.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Tests: run the project's test suites</text>
+<text x="711.2" y="493.7" fill="#6c7086" textLength="327.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  dotnet test, jest, vitest - several …</text>
+<text x="1047.2" y="493.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> T </text>
+<text x="1080.8" y="493.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="498.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="511.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="408.8" y="511.7" fill="#ffffff" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Copy (yank)</text>
+<text x="501.2" y="511.7" fill="#6c7086" textLength="537.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the last error, every error or warning, the search match, the…</text>
+<text x="1047.2" y="511.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> y </text>
+<text x="1080.8" y="511.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1047.2" y="516.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="358.4" y="529.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="408.8" y="529.7" fill="#ffffff" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Switch database</text>
+<text x="534.8" y="529.7" fill="#6c7086" textLength="302.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  connection strings in secrets.json</text>
+<text x="1047.2" y="529.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> d </text>
+<text x="1080.8" y="529.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="358.4" y="547.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="375.2" y="547.7" fill="#6c7086" textLength="705.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">type to search · ↑↓ choose · Enter run · Esc close                                  </text>
+<text x="1080.8" y="547.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="358.4" y="565.7" fill="#94e2d5" textLength="739.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">└──────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="14.0" y="619.7" fill="#6c7086" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Catppuccin Mocha </text>
+<rect x="14.0" y="624.0" width="100.8" height="18" fill="#94e2d5"/>
+<text x="14.0" y="637.7" fill="#11111b" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> lazyrunner </text>
+<text x="114.8" y="637.7" fill="#a6e3a1" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● all up (5)</text>
+<text x="232.4" y="637.7" fill="#f5c2e7" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ⎇ feature/checkout-v2</text>
+<text x="434.0" y="637.7" fill="#6c7086" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   DB </text>
+<text x="484.4" y="637.7" fill="#f9e2af" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopLocal @ localhost</text>
+<text x="660.8" y="637.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   /work/shop</text>
+<rect x="22.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="131.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="215.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="299.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="400.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="954.8" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1072.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1156.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1240.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1358.0" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<text x="22.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r </text>
+<text x="47.6" y="655.7" fill="#cdd6f4" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> restart  </text>
+<text x="131.6" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> s </text>
+<text x="156.8" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop  </text>
+<text x="215.6" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> w </text>
+<text x="240.8" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> open  </text>
+<text x="299.6" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> / </text>
+<text x="324.8" y="655.7" fill="#cdd6f4" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> search  </text>
+<text x="400.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> S </text>
+<text x="425.6" y="655.7" fill="#cdd6f4" textLength="529.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop all                                                      </text>
+<text x="954.8" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> : </text>
+<text x="980.0" y="655.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> commands  </text>
+<text x="1072.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> x </text>
+<text x="1097.6" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> menu  </text>
+<text x="1156.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ? </text>
+<text x="1181.6" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> keys  </text>
+<text x="1240.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1265.6" y="655.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> settings  </text>
+<text x="1358.0" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> q </text>
+<text x="1383.2" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> quit  </text>
 <text x="14.0" y="691.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
 <text x="98.0" y="691.7" fill="#a6e3a1" textLength="294.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ Orders built in 21s (14 projects)</text>
 <text x="14.0" y="709.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>

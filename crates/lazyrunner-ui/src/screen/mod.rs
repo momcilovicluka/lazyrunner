@@ -15,6 +15,7 @@ pub mod migrations;
 pub mod motion;
 pub mod mouse;
 pub mod overlays;
+pub mod palette;
 pub mod panel;
 pub mod reload;
 pub mod requests;
@@ -397,6 +398,17 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
         let panel = panel::rows(ui, controller, width);
         let body_height = height.saturating_sub(panel.len());
         let mut rows = reveal(body(ui, controller, width, body_height), opened);
+        // The palette Enter just closed wipes away over what's behind it.
+        if ui.overlay.is_none()
+            && ui.picker.is_none()
+            && let Some(ghost) = palette::closing(ui, controller, width, body_height)
+        {
+            for (row, line) in rows.iter_mut().zip(ghost) {
+                if !line.is_empty() {
+                    *row = line;
+                }
+            }
+        }
         rows.extend(panel);
         rows
     };
@@ -408,7 +420,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
 }
 
 /// A box opening (`opened` of the way): only its middle rows so far, more the further it has opened.
-fn reveal(rows: Vec<Vec<Seg>>, opened: f64) -> Vec<Vec<Seg>> {
+pub(super) fn reveal(rows: Vec<Vec<Seg>>, opened: f64) -> Vec<Vec<Seg>> {
     if opened >= 1.0 {
         return rows;
     }
@@ -431,7 +443,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
     match &ui.overlay {
         Some(Overlay::Checklist(_)) => return overlays::checklist(ui, width, rows),
         _ if ui.picker.is_some() => return overlays::picker(ui, width, rows),
-        Some(Overlay::Palette { .. }) => return overlays::palette(ui, controller, width, rows),
+        Some(Overlay::Palette { .. }) => return palette::rows(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),

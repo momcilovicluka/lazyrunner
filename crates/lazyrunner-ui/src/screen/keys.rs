@@ -406,6 +406,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 let (query, index) = (query.clone(), *index);
                 let found = actions::palette(ui, controller, &query);
                 if let Some(action) = found.get(index).cloned() {
+                    ui.motion.close_palette(&query, index, ui.now);
                     run_from_overlay(ui, controller, &action, false);
                 } else {
                     ui.overlay = None;

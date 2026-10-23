@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1456" height="782" viewBox="0 0 1456 782" font-family="'Cascadia Mono', 'Cascadia Code', Consolas, 'DejaVu Sans Mono', Menlo, monospace" font-size="14">
+<rect width="100%" height="100%" rx="10" fill="#1e1e2e"/>
+<rect width="100%" height="34" rx="10" fill="#000000" fill-opacity="0.28"/>
+<circle cx="22" cy="17" r="6" fill="#ff5f57"/><circle cx="42" cy="17" r="6" fill="#febc2e"/><circle cx="62" cy="17" r="6" fill="#28c840"/>
+<text x="728" y="22" fill="#cdd6f4" fill-opacity="0.6" font-size="13" text-anchor="middle">lazyrunner — shop</text>
+<rect x="14.0" y="48.0" width="117.6" height="18" fill="#94e2d5"/>
+<text x="14.0" y="61.7" fill="#11111b" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ⛁ Migrations </text>
+<text x="131.6" y="61.7" fill="#6c7086" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   database </text>
+<text x="232.4" y="61.7" fill="#f9e2af" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopLocal @ localhost</text>
+<text x="14.0" y="79.7" fill="#6c7086" textLength="924.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> j k choose · l its migrations · r check it · R find and check all · u apply pending · U everywhere · Esc back</text>
+<text x="14.0" y="97.7" fill="#6c7086" textLength="882.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> dotnet ef uses each app's last build (b rebuilds it) and its Development settings - the database d picks</text>
+<rect x="14.0" y="102.0" width="403.2" height="18" fill="#cba6f7"/>
+<text x="14.0" y="115.7" fill="#1e1e2e" textLength="403.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ▸ ◌ ShopDbContext                    1 pending </text>
+<text x="417.2" y="115.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="434.0" y="115.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopDbContext</text>
+<text x="543.2" y="115.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   Orders · Data.csproj</text>
+<text x="14.0" y="133.7" fill="#a6e3a1" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ✓ </text>
+<text x="56.0" y="133.7" fill="#cdd6f4" textLength="268.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">AuditDbContext                  </text>
+<text x="324.8" y="133.7" fill="#a6e3a1" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">up to date</text>
+<text x="417.2" y="133.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="434.0" y="133.7" fill="#f9e2af" textLength="546.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">4 applied · 1 pending · checked 09:41:07 on ShopLocal @ localhost</text>
+<text x="417.2" y="151.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="169.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="434.0" y="169.7" fill="#f9e2af" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ◌ </text>
+<text x="459.2" y="169.7" fill="#6c7086" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">20261019114025  </text>
+<text x="593.6" y="169.7" fill="#f9e2af" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">AddLoyaltyPoints  pending</text>
+<text x="417.2" y="187.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="434.0" y="187.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
+<text x="459.2" y="187.7" fill="#6c7086" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">20260520160307  </text>
+<text x="593.6" y="187.7" fill="#cdd6f4" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">InvoiceNumbers</text>
+<text x="711.2" y="187.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● current</text>
+<text x="417.2" y="205.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="434.0" y="205.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
+<text x="459.2" y="205.7" fill="#6c7086" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">20260311101944  </text>
+<text x="593.6" y="205.7" fill="#cdd6f4" textLength="848.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">AddVouchers                                                                                          </text>
+<text x="417.2" y="223.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="434.0" y="223.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
+<text x="459.2" y="223.7" fill="#6c7086" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">20260203141522  </text>
+<text x="593.6" y="223.7" fill="#cdd6f4" textLength="848.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">AddOrders                                                                                            </text>
+<text x="417.2" y="241.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="434.0" y="241.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
+<text x="459.2" y="241.7" fill="#6c7086" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">20260112093011  </text>
+<text x="593.6" y="241.7" fill="#cdd6f4" textLength="848.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Init                                                                                                 </text>
+<text x="417.2" y="259.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="277.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="295.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="313.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="331.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="349.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="367.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="385.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="403.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="421.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="439.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="457.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="475.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="493.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="511.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="529.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="547.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="565.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="583.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="417.2" y="601.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="14.0" y="619.7" fill="#6c7086" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Catppuccin Mocha </text>
+<rect x="14.0" y="624.0" width="100.8" height="18" fill="#94e2d5"/>
+<text x="14.0" y="637.7" fill="#11111b" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> lazyrunner </text>
+<text x="114.8" y="637.7" fill="#a6e3a1" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● all up (5)</text>
+<text x="232.4" y="637.7" fill="#f5c2e7" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ⎇ feature/checkout-v2</text>
+<text x="434.0" y="637.7" fill="#6c7086" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   DB </text>
+<text x="484.4" y="637.7" fill="#f9e2af" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopLocal @ localhost</text>
+<text x="660.8" y="637.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   /work/shop</text>
+<rect x="22.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="131.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="215.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="299.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="400.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="954.8" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1072.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1156.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1240.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<rect x="1358.0" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
+<text x="22.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r </text>
+<text x="47.6" y="655.7" fill="#cdd6f4" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> restart  </text>
+<text x="131.6" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> s </text>
+<text x="156.8" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop  </text>
+<text x="215.6" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> w </text>
+<text x="240.8" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> open  </text>
+<text x="299.6" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> / </text>
+<text x="324.8" y="655.7" fill="#cdd6f4" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> search  </text>
+<text x="400.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> S </text>
+<text x="425.6" y="655.7" fill="#cdd6f4" textLength="529.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> stop all                                                      </text>
+<text x="954.8" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> : </text>
+<text x="980.0" y="655.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> commands  </text>
+<text x="1072.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> x </text>
+<text x="1097.6" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> menu  </text>
+<text x="1156.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ? </text>
+<text x="1181.6" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> keys  </text>
+<text x="1240.4" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1265.6" y="655.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> settings  </text>
+<text x="1358.0" y="655.7" fill="#11111b" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> q </text>
+<text x="1383.2" y="655.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> quit  </text>
+<text x="14.0" y="691.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="691.7" fill="#a6e3a1" textLength="294.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ Orders built in 21s (14 projects)</text>
+<text x="14.0" y="709.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="709.7" fill="#a6e3a1" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ Billing built in 9s (6 projects)</text>
+<text x="14.0" y="727.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="727.7" fill="#94e2d5" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Starting Orders + Billing</text>
+<text x="14.0" y="745.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="745.7" fill="#a6e3a1" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● Orders is listening on :58201 - up in 4s</text>
+<text x="14.0" y="763.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
+<text x="98.0" y="763.7" fill="#a6e3a1" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Ready in 38s</text>
+</svg>

@@ -149,38 +149,6 @@ pub fn picker(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     boxed(&format!("Database · {key}{group_info}"), lines, &footer, cells, rows, 96)
 }
 
-pub fn palette(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let cursor = ui.cursor();
-    let Some(Overlay::Palette { query, index }) = &ui.overlay else { return Vec::new() };
-    let (query, mut index) = (query.clone(), *index);
-    let found = actions::palette(ui, controller, &query);
-    index = index.min(found.len().saturating_sub(1));
-    if let Some(Overlay::Palette { index: stored, .. }) = &mut ui.overlay {
-        *stored = index;
-    }
-    let inner = cells.saturating_sub(8).clamp(20, 80);
-    let mut lines = vec![
-        vec![seg("› ", C::Cyan), seg(query, C::White), seg(cursor, C::Cyan)],
-        vec![seg("─".repeat(inner), C::DarkGray)],
-    ];
-    let visible = found.len().min(rows.saturating_sub(8)).max(1);
-    let first = (index + 1).saturating_sub(visible).min(found.len().saturating_sub(visible));
-    for (i, action) in found.iter().enumerate().skip(first).take(visible) {
-        let key = pad(&format!("[{}]", action.key), 9);
-        let hint = if action.hint.is_empty() { String::new() } else { format!("  {}", action.hint) };
-        let line = if i == index {
-            selected(&format!("{key} {}{hint}", action.label), inner)
-        } else {
-            vec![seg(key, C::Cyan), seg(format!(" {}", action.label), C::White), seg(hint, C::DarkGray)]
-        };
-        lines.push(aim(line, Target::Item(i)));
-    }
-    if found.is_empty() {
-        lines.push(vec![seg("no matching command", C::DarkGray)]);
-    }
-    boxed("Commands", lines, "type to search · ↑↓ or Ctrl+N Ctrl+P choose · Enter run · Esc close", cells, rows, 80)
-}
-
 /// The items of the x menu or the , settings.
 pub fn menu_items(ui: &Ui, controller: &Controller) -> Vec<Action> {
     match ui.overlay {

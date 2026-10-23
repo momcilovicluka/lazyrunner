@@ -34,6 +34,18 @@ pub fn seg(text: impl Into<String>, fg: C) -> Seg {
     Seg { text: text.into(), fg, bg: None, style: None, target: None, underline: false }
 }
 
+/// A key as keycaps: each part of it (", f", "i c") a pill, a space between them.
+pub fn keycaps(key: &str, fg: C, bg: C) -> Vec<Seg> {
+    let mut caps = Vec::new();
+    for part in key.split(' ').filter(|part| !part.is_empty()) {
+        if !caps.is_empty() {
+            caps.push(seg(" ", fg));
+        }
+        caps.push(on(format!(" {part} "), fg, bg));
+    }
+    caps
+}
+
 pub fn on(text: impl Into<String>, fg: C, bg: C) -> Seg {
     Seg { text: text.into(), fg, bg: Some(bg), style: None, target: None, underline: false }
 }
@@ -140,7 +152,7 @@ pub fn draw(
                 style = style.add_modifier(Modifier::REVERSED);
             } else if touch.hover == Some(target) {
                 style = style.add_modifier(Modifier::BOLD);
-                if matches!(target, Target::Link { .. } | Target::Setting(_) | Target::Tests) {
+                if matches!(target, Target::Link { .. } | Target::Tests) {
                     style = style.add_modifier(Modifier::UNDERLINED);
                 }
             }
