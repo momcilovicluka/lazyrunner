@@ -30,8 +30,6 @@ pub enum Target {
     Item(usize),
     /// The rest of an open box: a click there keeps it open.
     Box,
-    /// An on/off setting in the panel.
-    Setting(Toggle),
     /// A link in a column's output: the column, and the link (in `Ui::links`).
     Link { column: usize, link: usize },
     /// A test of the suite picked in the tests view, by its place in that list.
@@ -161,13 +159,6 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::Link { column, link }) => {
             ui.focus = column;
             super::links::open(ui, controller, link);
-        }
-        Some(Target::Setting(_)) if double => {} // the first click toggled it
-        Some(Target::Setting(toggle)) => {
-            let label = super::actions::menu_toggles(controller)
-                .find(|item| item.toggle == toggle)
-                .map_or(toggle.key(), |item| item.label);
-            keys::run(ui, controller, &Run::Setting { toggle, label });
         }
         _ => {}
     }

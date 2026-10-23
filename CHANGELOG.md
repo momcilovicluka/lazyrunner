@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.7.0] - 2026-10-23
+
+### Changed
+- The command palette as keycaps: every command and setting with its keys as keycap pills, grouped under headers (Run, Tools, View, Help, Settings) until something is typed, then ranked with the typed letters lit; what acts on the focused app names it and shows its icon ("Start Orders"); a coloured selection bar slides to the chosen row a row at a time (40 ms a row, a jump of more than 3 rows cut), and Enter runs the command at once, shows its keycap pressed for a frame and wipes the palette away in 60 ms
+- The panel's key line shows the keys that matter now, as keycaps: what the focused app can do in its state (start / build, restart / stop / open, cancel, copy / log after a crash), search, start or stop all and the alerts, with commands, the x menu, keys, settings and quit on the right - those give way first in a narrow terminal
+- The settings are no longer listed in the panel (they're in the , menu): the columns get the rows back
+
 ## [1.6.1] - 2026-10-23
 
 ### Fixed

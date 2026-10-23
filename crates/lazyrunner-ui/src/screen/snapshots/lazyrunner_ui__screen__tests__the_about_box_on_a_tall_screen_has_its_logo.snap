@@ -1,8 +1,9 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
-assertion_line: 1260
 expression: "screen.render(SIZE.0, 44)"
 ---
+
+
 
 
                  ┌─ ✦ About lazyrunner ─────────────────────────────────────────────────────┐
@@ -34,10 +35,8 @@ expression: "screen.render(SIZE.0, 44)"
                  └──────────────────────────────────────────────────────────────────────────┘
 
 
+
+
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
- ? keys   : commands   space start/stop   u/U start   s/S stop   r/R restart   b/B build
- , settings   a [ ] auto-restart on branch change   u [x] auto-start when lazyrunner opens
-              s [x] stop/restart all include frontend   e [ ] restart APIs on code change
-              w [x] startup checklist   v [x] auto-update   m [x] mouse   f [x] reduced motion
-              g [ ] git beside   i [ ] nerd icons   o [ ] check migrations on M
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

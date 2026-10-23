@@ -1,13 +1,15 @@
 //! The control panel below the columns: a rule with the theme's name, the header (the lazyrunner chip, the
-//! summary, branch, database and folder), the one-line menu, the settings, a notice line, and the log.
+//! summary, branch, database and folder), the keys that matter now as keycaps, a notice line, and the log. The
+//! settings live in the , menu.
 
-use lazyrunner_core::config::Toggle;
 use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::app::Status as AppStatus;
 
 use super::columns::hue_color;
 use super::icons::{self, Icon};
+use super::motion::Spot;
 use super::mouse::Target;
-use super::seg::{Seg, on, seg};
+use super::seg::{Seg, on, seg, width};
 use super::theme::{C, no_color};
 use super::{Ui, status};
 
@@ -21,8 +23,7 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
     let tag = if ui.theme.id != "default" || no_color() { format!(" {} ", ui.theme.name) } else { String::new() };
     rows.push(vec![seg("─".repeat(cells.saturating_sub(tag.chars().count())), C::DarkGray), seg(tag, C::DarkGray)]);
     rows.push(header(ui, controller));
-    rows.push(compact_menu(ui, controller, cells));
-    rows.extend(settings_rows(ui, controller, cells));
+    rows.push(hints(ui, controller, cells));
     rows.push(notice(ui, controller));
     let count = controller.config["panelLogLines"]
         .as_u64()
@@ -67,94 +68,94 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     segs
 }
 
-/// Only what fits on one line; ? and : reach everything else. Lowercase = focused app, uppercase = all.
-fn compact_menu(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
-    let lock_changed = !controller.lock_changed_keys().is_empty();
-    let mut items: Vec<(&str, &str, C)> = Vec::new();
+/// The keys that matter now, as keycaps: on the left the alerts and what the focused app can do as it is, on the
+/// right what's always there (: and ? reach everything else). A key just pressed lights its keycap.
+fn hints(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
+    let mut now: Vec<(&str, &str, C)> = Vec::new();
     if !controller.conflicts.is_empty() {
-        items.push(("!", "kill port user", C::Red));
+        now.push(("!", "kill port user", C::Red));
     }
-    if lock_changed {
-        items.push(("i", "install", C::Yellow));
+    if !controller.lock_changed_keys().is_empty() {
+        now.push(("i", "install", C::Yellow));
     }
-    let menu = [
-        ("?", "keys"),
-        (":", "commands"),
-        ("space", "start/stop"),
-        ("u/U", "start"),
-        ("s/S", "stop"),
-        ("r/R", "restart"),
-        ("b/B", "build"),
-        ("d", "database"),
-        ("w", "open"),
-        ("x", "menu"),
-        ("/", "search"),
-        (",", "settings"),
-        ("q", "quit"),
+    now.extend(focused_hints(ui, controller));
+    let always = [
+        (":", "commands", C::Gray),
+        ("x", "menu", C::Gray),
+        ("?", "keys", C::Gray),
+        (",", "settings", C::Gray),
+        ("q", "quit", C::Gray),
     ];
-    items.extend(menu.iter().map(|(key, label)| (*key, *label, C::Gray)));
-    if controller.apps.iter().any(|app| app.traits().installs) && !lock_changed {
-        items.push(("i", "install", C::Gray));
-    }
-    let mut segs = Vec::new();
-    let mut used = 0;
-    for (key, label, color) in items {
-        let length = key.chars().count() + label.chars().count() + 5;
-        if used + length > cells {
+    let pills = |items: &[(&str, &str, C)], room: usize| {
+        let mut segs = Vec::new();
+        for &(key, label, color) in items {
+            let lit = ui.motion.lit(&Spot::Hint(key.to_string()), ui.now).is_some();
+            let (cap, text) = match (lit, color) {
+                (true, _) => (C::Cyan, C::Cyan),
+                (false, C::Gray) => (C::Gray, C::Gray),
+                (false, alert) => (alert, alert),
+            };
+            let item = [on(format!(" {key} "), C::Black, cap), seg(format!(" {label}  "), text)];
+            if width(&segs) + width(&item) > room {
+                break;
+            }
+            segs.extend(item);
+        }
+        segs
+    };
+    // What's always there gives way first (quit, settings, keys, then the menu; : stays), then the right now from its
+    // end.
+    let wanted = width(&pills(&now, usize::MAX));
+    let mut right = Vec::new();
+    for kept in (1..=always.len()).rev() {
+        right = pills(&always[..kept], cells.saturating_sub(1));
+        if wanted + width(&right) + 2 <= cells {
             break;
         }
-        // A key just pressed lights its hint ("u/U" for u and for U).
-        let pressed = key.split('/').any(|part| {
-            let spot = |name: &str| super::motion::Spot::Hint(name.to_string());
-            let name = if part == "space" { "Space" } else { part };
-            ui.motion.lit(&spot(name), ui.now).is_some()
-        });
-        if pressed {
-            segs.push(on(format!(" {key}"), C::Black, C::Cyan));
-            segs.push(on(format!(" {label}"), C::Black, C::Cyan));
-            segs.push(seg("  ", color));
-        } else {
-            segs.push(seg(format!(" {key}"), C::Cyan));
-            segs.push(seg(format!(" {label}  "), color));
-        }
-        used += length;
     }
+    let mut segs = vec![seg(" ", C::Gray)];
+    segs.extend(pills(&now, cells.saturating_sub(width(&right) + 2)));
+    let gap = cells.saturating_sub(width(&segs) + width(&right));
+    segs.push(seg(" ".repeat(gap), C::Gray));
+    segs.extend(right);
     segs
 }
 
-/// Every on/off setting, always visible (, opens the menu where the letter shown toggles it); wraps onto more
-/// rows when the window is narrow.
-fn settings_rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
-    let settings: Vec<(&str, &str, bool, Toggle)> = super::actions::menu_toggles(controller)
-        .map(|item| (item.letter, item.short, controller.setting(item.toggle), item.toggle))
-        .collect();
-    let mut rows = Vec::new();
-    let mut current = vec![seg(" ,", C::Cyan), seg(" settings", C::DarkGray)];
-    let mut used = 11;
-    for (key, label, is_on, toggle) in settings {
-        let check = if is_on { "[x]" } else { "[ ]" };
-        let length = key.len() + check.len() + label.len() + 6;
-        if used + length > cells && current.len() > 1 {
-            rows.push(std::mem::take(&mut current));
-            current.push(seg(" ".repeat(11), C::Gray));
-            used = 11;
+/// What the focused app can do as it is: cancel what it's busy with, start or build it stopped, restart or stop or
+/// open it running, look at what went wrong when it stopped with an error; then search, and start or stop all.
+fn focused_hints(ui: &Ui, controller: &Controller) -> Vec<(&'static str, &'static str, C)> {
+    let (Some(app), Some(state)) = (controller.apps.get(ui.focus), controller.states.get(ui.focus)) else {
+        return Vec::new();
+    };
+    let busy = controller.building.as_ref().is_some_and(|job| job.key == app.key)
+        || controller.build_queue.contains(&app.key)
+        || controller.npm_ci.as_ref().is_some_and(|job| job.key == app.key);
+    let mut hints = Vec::new();
+    match &state.status {
+        _ if busy => hints.push(("s", "cancel", C::Gray)),
+        AppStatus::Stopped => {
+            hints.push(("u", "start", C::Gray));
+            if app.traits().builds {
+                hints.push(("b", "build", C::Gray));
+            }
         }
-        current.push(seg("   ", C::DarkCyan));
-        let target = Target::Setting(toggle);
-        current.push(seg(format!("{key} "), C::DarkCyan).at(target));
-        // A setting just flipped flashes, its box passing through a dot.
-        let flipping = ui.motion.lit(&super::motion::Spot::Setting(toggle), ui.now);
-        let check = if flipping.is_some_and(|lit| lit > 0.6) { "[•]" } else { check };
-        let check = match flipping {
-            Some(_) => on(check, C::Black, if is_on { C::Green } else { C::Gray }),
-            None => seg(check, if is_on { C::Green } else { C::DarkGray }),
-        };
-        current.push(check.at(target));
-        current.push(seg(format!(" {label}"), if is_on { C::Gray } else { C::DarkGray }).at(target));
-        used += length;
+        AppStatus::Running if state.is_up() => {
+            hints.extend([("r", "restart", C::Gray), ("s", "stop", C::Gray)]);
+            if controller.port(&app.key).is_some() {
+                hints.push(("w", "open", C::Gray));
+            }
+        }
+        AppStatus::Running => hints.push(("s", "stop", C::Gray)),
+        AppStatus::Exited(_) | AppStatus::Error(_) => {
+            hints.extend([("r", "restart", C::Gray), ("y", "copy", C::Gray), ("o", "log", C::Gray)]);
+        }
     }
-    rows.push(current);
-    rows
+    if !state.output.is_empty() {
+        hints.push(("/", "search", C::Gray));
+    }
+    let running = controller.states.iter().any(|state| state.is_running());
+    hints.push(if running { ("S", "stop all", C::Gray) } else { ("U", "start all", C::Gray) });
+    hints
 }
 
 /// The search prompt or where the search is, else a port conflict, else a changed package-lock.json.

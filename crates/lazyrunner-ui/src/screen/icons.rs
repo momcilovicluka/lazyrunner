@@ -38,6 +38,12 @@ pub enum Icon {
     Person,
     Heart,
     Rust,
+    /// The command palette's groups.
+    Run,
+    Tools,
+    View,
+    Help,
+    Settings,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -95,6 +101,16 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Heart, true) => "\u{f004}", // heart
         (Icon::Rust, false) => "⚙",
         (Icon::Rust, true) => "\u{e7a8}", // Rust
+        (Icon::Run, false) => "▸",
+        (Icon::Run, true) => "\u{f04b}", // play
+        (Icon::Tools, false) => "✱",
+        (Icon::Tools, true) => "\u{f0ad}", // wrench
+        (Icon::View, false) => "◧",
+        (Icon::View, true) => "\u{f06e}", // eye
+        (Icon::Help, false) => "?",
+        (Icon::Help, true) => "\u{f059}", // question
+        (Icon::Settings, false) => "≡",
+        (Icon::Settings, true) => "\u{f013}", // cog
     }
 }
 
@@ -151,6 +167,11 @@ mod tests {
             Icon::Person,
             Icon::Heart,
             Icon::Rust,
+            Icon::Run,
+            Icon::Tools,
+            Icon::View,
+            Icon::Help,
+            Icon::Settings,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");

@@ -16,6 +16,9 @@ use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::Status;
 use lazyrunner_core::run::controller::{LogEntry, Setup};
 use lazyrunner_core::run::history::Kind;
+use lazyrunner_core::run::migrations::{Context, Migration, Status as MigrationStatus};
+use lazyrunner_core::run::requests::Finished;
+use lazyrunner_core::run::suites::{Outcome, Runner, Status as SuiteStatus, Suite, TestResult};
 use lazyrunner_core::testing::{TempDir, sample_profile, sample_repo};
 use lazyrunner_ui::screen::{self, Overlay, Ui};
 use ratatui::Terminal;
@@ -45,12 +48,16 @@ async fn main() {
         .nth(1)
         .map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/screenshots"), PathBuf::from);
     std::fs::create_dir_all(&out).expect("the screenshots folder");
-    let scenes: [(&str, Scene, (u16, u16)); 5] = [
+    let scenes: [(&str, Scene, (u16, u16)); 9] = [
         ("overview", overview, SIZE),
         ("palette", palette, SIZE),
         ("durations", durations, SIZE),
         ("themes", themes, SIZE),
         ("stacked", overview, NARROW),
+        ("tests", tests, SIZE),
+        ("migrations", migrations, SIZE),
+        ("requests", requests, SIZE),
+        ("about", about, SIZE),
     ];
     for (name, scene, size) in scenes {
         let mut demo = Demo::new(name);
@@ -94,6 +101,113 @@ fn themes(demo: &mut Demo) {
     demo.press(KeyCode::Char('t'));
 }
 
+/// The tests view: the backend's suites (one with a failure), the frontend's, and one Nx project without tests.
+fn tests(demo: &mut Demo) {
+    let test = |name: &str, outcome, ms, message: &str, stack: &str| TestResult {
+        name: name.into(),
+        outcome,
+        ms,
+        message: message.into(),
+        stack: stack.into(),
+    };
+    let at = today(9, 38, 52);
+    let dotnet = |name: &str| Runner::Dotnet { project: format!("/work/shop/tests/{name}/{name}.csproj").into() };
+    let mut orders = Suite::new("dotnet:orders", "Orders.Tests", dotnet("Orders.Tests"));
+    orders.set_tests(vec![
+        test("Orders.Tests.CartTests.AddsAnItem", Outcome::Passed, 12.0, "", ""),
+        test("Orders.Tests.CartTests.AppliesTheVoucher", Outcome::Passed, 18.0, "", ""),
+        test(
+            "Orders.Tests.CartTests.Totals(quantity: 2, price: 3)",
+            Outcome::Failed,
+            41.0,
+            "Assert.Equal() Failure: Values differ\nExpected: 6\nActual:   5",
+            "at Shop.Orders.Tests.CartTests.Totals(Int32 quantity, Decimal price) in /work/shop/tests/Orders.Tests/CartTests.cs:line 42",
+        ),
+        test("Orders.Tests.CheckoutTests.PaysTheInvoice", Outcome::Passed, 230.0, "", ""),
+        test("Orders.Tests.CheckoutTests.RetriesThePayment", Outcome::Skipped, 0.0, "", ""),
+    ]);
+    (orders.status, orders.last_run, orders.seconds) = (SuiteStatus::Failed, Some(at), 6.4);
+    let mut billing = Suite::new("dotnet:billing", "Billing.Tests", dotnet("Billing.Tests"));
+    billing.set_tests(vec![
+        test("Billing.Tests.InvoiceTests.Sums", Outcome::Passed, 9.0, "", ""),
+        test("Billing.Tests.InvoiceTests.RoundsTheTax", Outcome::Passed, 6.0, "", ""),
+    ]);
+    (billing.status, billing.last_run, billing.seconds) = (SuiteStatus::Passed, Some(at), 2.1);
+    let mut shop = Suite::new("npm:shop", "Shop", Runner::Npm { dir: "/work/shop/web/shop".into(), vitest: true });
+    shop.set_tests(vec![
+        test("CartPage > shows the total", Outcome::Passed, 31.0, "", ""),
+        test("CartPage > removes an item", Outcome::Passed, 22.0, "", ""),
+    ]);
+    (shop.status, shop.last_run, shop.seconds) = (SuiteStatus::Passed, Some(at), 3.8);
+    let mut ui =
+        Suite::new("nx:ui", "shared-ui", Runner::Nx { workspace: "/work/shop/web".into(), project: "ui".into() });
+    (orders.app, billing.app, shop.app) = (Some("orders".into()), Some("billing".into()), Some("shop".into()));
+    (ui.app, ui.untested) = (Some("shop".into()), true);
+    demo.controller.suites = Some(vec![orders, billing, shop, ui]);
+    demo.press(KeyCode::Char('T'));
+}
+
+/// The migrations view: the shop's database up to date but for one migration, the audit log's up to date.
+fn migrations(demo: &mut Demo) {
+    let migration = |id: &str, applied| Migration { id: id.into(), name: id[15..].into(), applied: Some(applied) };
+    let project = PathBuf::from("/work/shop/services/Data/Data.csproj");
+    let startup = PathBuf::from("/work/shop/services/Orders/Orders.csproj");
+    let mut shop = Context::new("orders", "ShopDbContext", project.clone(), startup.clone());
+    shop.items = vec![
+        migration("20260112093011_Init", true),
+        migration("20260203141522_AddOrders", true),
+        migration("20260311101944_AddVouchers", true),
+        migration("20260520160307_InvoiceNumbers", true),
+        migration("20261019114025_AddLoyaltyPoints", false),
+    ];
+    let mut audit = Context::new("orders", "AuditDbContext", project, startup);
+    audit.items = vec![migration("20260112093514_Init", true), migration("20260808084210_TrackRefunds", true)];
+    for context in [&mut shop, &mut audit] {
+        context.status = MigrationStatus::Ok;
+        (context.checked_at, context.db) = (Some(today(9, 41, 7)), "ShopLocal @ localhost".into());
+    }
+    demo.controller.contexts = Some(vec![shop, audit]);
+    demo.ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
+}
+
+/// The requests view: what the APIs served over the last minute, a slow one and a failed one among them.
+fn requests(demo: &mut Demo) {
+    let served = [
+        ("orders", "GET", "/api/orders?page=1", 200, 14.2, 0),
+        ("orders", "GET", "/api/orders/1042", 200, 7.1, 4),
+        ("billing", "GET", "/api/invoices", 200, 9.4, 9),
+        ("orders", "POST", "/api/orders", 201, 42.8, 15),
+        ("billing", "GET", "/api/invoices/1042", 500, 1532.0, 21),
+        ("orders", "GET", "/api/orders/1043", 200, 6.3, 28),
+        ("orders", "PUT", "/api/orders/1043/items", 204, 31.5, 33),
+        ("billing", "GET", "/api/invoices/1041", 200, 5.2, 41),
+        ("orders", "GET", "/api/orders?page=2", 200, 12.0, 47),
+        ("orders", "GET", "/api/vouchers/SPRING", 404, 3.9, 52),
+    ];
+    for (app, method, path, status, ms, second) in served {
+        let request = Finished {
+            method: method.into(),
+            path: path.into(),
+            status,
+            ms,
+            length: "512".into(),
+            content: "application/json".into(),
+        };
+        demo.controller.requests.add(app, request, today(9, 40, second));
+    }
+    demo.press(KeyCode::Char('H'));
+}
+
+fn about(demo: &mut Demo) {
+    demo.ui.overlay = Some(Overlay::About { index: 0 });
+}
+
+/// A time today (the views show the day too for an earlier one).
+fn today(hour: u32, minute: u32, second: u32) -> chrono::DateTime<chrono::Local> {
+    let at = chrono::Local::now().date_naive().and_hms_opt(hour, minute, second).expect("a time");
+    at.and_local_timezone(chrono::Local).single().expect("a local time")
+}
+
 // ---------------------------------------------------------------- the made-up project
 
 /// One app of the made-up project: how long it took to come up, what it costs, how fast it answers (0: no
@@ -126,7 +240,8 @@ impl Demo {
                 only: Some(sample_profile()),
             },
         };
-        let config = json!({ "theme": THEME, "startupChecklist": false });
+        // Plain icons: a browser showing the README has no Nerd Font.
+        let config = json!({ "theme": THEME, "startupChecklist": false, "nerdIcons": false });
         lazyrunner_core::config::write(&paths.config_file, &config).expect("settings");
         let project = import(&sample_profile(), &paths.profiles).expect("the sample profile");
         let (events, _) = tokio::sync::mpsc::unbounded_channel();
@@ -139,6 +254,7 @@ impl Demo {
         let started = Instant::now();
         let (mut ui, _) = Ui::new(&controller, None, started);
         ui.now = started + Duration::from_secs(600);
+        ui.motion.enabled = false; // one frame at one instant: a box would still be opening
         Self { _temp: temp, controller, ui }
     }
 

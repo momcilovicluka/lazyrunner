@@ -1,19 +1,16 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
-assertion_line: 385
 expression: "screen.render(60, 15)"
 ---
+ ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop  :58┬ ■ Docs   ○ ┬ ■ Conso
+            ┃            │   dev serve│   watch bui│   live
+once        ┃error: Billi│            │            │
+info: Applic┃ng.cs(3,1): │            │            │
+ation starte┃something is│            │            │
+d.          ┃ off        │            │            │
 ────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ l
- ? keys   : commands   space start/stop   u/U start
- , settings   a [ ] auto-restart on branch change
-              u [x] auto-start when lazyrunner opens
-              s [x] stop/restart all include frontend
-              e [ ] restart APIs on code change
-              w [x] startup checklist   v [x] auto-update
-              m [x] mouse   f [ ] reduced motion
-              g [ ] git beside   i [ ] nerd icons
-              o [ ] check migrations on M
+  r  restart   s  stop   w  open               :  commands
 
  12:00:00 Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

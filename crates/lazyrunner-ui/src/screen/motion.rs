@@ -18,6 +18,19 @@ pub const COPY_FLASH: Duration = Duration::from_millis(450);
 pub const REVEAL: Duration = Duration::from_millis(120);
 /// Column widths and scrolling moving to where they're going.
 pub const GLIDE: Duration = Duration::from_millis(120);
+/// The palette's selection bar slides a row at a time, this long a row; a longer jump than `BAR_ROWS` is cut.
+pub const BAR_STEP: Duration = Duration::from_millis(40);
+pub const BAR_ROWS: usize = 3;
+/// After Enter the chosen keycap shows pressed for a frame, then the palette wipes closed.
+pub const PRESS: Duration = Duration::from_millis(16);
+pub const WIPE: Duration = Duration::from_millis(60);
+
+/// The palette closing after Enter: shown pressed, then wiping (how much of it is left, 1 to 0).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Closing {
+    Pressed,
+    Wiping(f64),
+}
 
 /// Where a flash shows.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,6 +78,9 @@ pub struct Motion {
     focus: Option<usize>,
     widths: Option<(Vec<usize>, Glide<Vec<f64>>)>,
     scrolls: HashMap<usize, Glide<f64>>,
+    bar: Option<Glide<usize>>,
+    /// The palette Enter closed: its search, the chosen item, and when.
+    closing: Option<(String, usize, Instant)>,
 }
 
 impl Default for Motion {
@@ -78,6 +94,8 @@ impl Default for Motion {
             focus: None,
             widths: None,
             scrolls: HashMap::new(),
+            bar: None,
+            closing: None,
         }
     }
 }
@@ -140,6 +158,7 @@ impl Motion {
         if shown != self.shown {
             self.opened = shown.map(|_| now);
             self.shown = shown;
+            self.bar = None; // a list that opens starts with its bar where it is
         }
         if self.focus.is_some_and(|before| before != focus) {
             self.flash(Spot::Title(focus), now);
@@ -201,6 +220,55 @@ impl Motion {
         shown(glide).round().max(0.0) as usize
     }
 
+    /// The row to draw the palette's selection bar on, on its way to `target`: a row every `BAR_STEP`, a jump of more
+    /// than `BAR_ROWS` cut.
+    pub fn bar(&mut self, target: usize, now: Instant) -> usize {
+        if !self.on() {
+            return target;
+        }
+        match &self.bar {
+            Some(glide) if glide.to == target => {}
+            Some(_) => {
+                let current = self.bar_at(now);
+                let from = if current.abs_diff(target) > BAR_ROWS { target } else { current };
+                self.bar = Some(Glide { from, to: target, at: now });
+            }
+            None => self.bar = Some(Glide { from: target, to: target, at: now }),
+        }
+        self.bar_at(now)
+    }
+
+    fn bar_at(&self, now: Instant) -> usize {
+        let Some(glide) = &self.bar else { return 0 };
+        let rows = (now.saturating_duration_since(glide.at).as_secs_f64() / BAR_STEP.as_secs_f64()) as usize;
+        if glide.from < glide.to {
+            (glide.from + rows).min(glide.to)
+        } else {
+            glide.from.saturating_sub(rows).max(glide.to)
+        }
+    }
+
+    /// Enter closed the palette on item `index` of what `query` found: it shows that, pressed, then wipes away.
+    pub fn close_palette(&mut self, query: &str, index: usize, now: Instant) {
+        if self.on() {
+            self.closing = Some((query.to_string(), index, now));
+        }
+    }
+
+    /// The palette closing, while it does: its search, the chosen item, and how far along.
+    pub fn palette_closing(&self, now: Instant) -> Option<(String, usize, Closing)> {
+        let (query, index, at) = self.closing.as_ref().filter(|_| self.on())?;
+        let elapsed = now.saturating_duration_since(*at);
+        let phase = if elapsed < PRESS {
+            Closing::Pressed
+        } else if elapsed < PRESS + WIPE {
+            Closing::Wiping(1.0 - (elapsed - PRESS).as_secs_f64() / WIPE.as_secs_f64())
+        } else {
+            return None;
+        };
+        Some((query.clone(), *index, phase))
+    }
+
     /// Whether something is still moving (the next frame differs).
     pub fn active(&self, now: Instant) -> bool {
         if !self.on() {
@@ -211,6 +279,8 @@ impl Motion {
             || self.revealed(now) < 1.0
             || self.widths.as_ref().is_some_and(|(_, glide)| gliding(glide.at))
             || self.scrolls.values().any(|glide| gliding(glide.at))
+            || self.bar.as_ref().is_some_and(|glide| self.bar_at(now) != glide.to)
+            || self.palette_closing(now).is_some()
     }
 }
 
@@ -262,6 +332,30 @@ mod tests {
         assert_eq!(motion.widths(&[1], vec![100], later(start, 210)), [100], "zoomed: no glide");
         motion.enabled = false;
         assert_eq!(motion.widths(&[0, 1], vec![10, 90], later(start, 220)), [10, 90]);
+    }
+
+    #[test]
+    fn the_selection_bar_slides_a_row_at_a_time_and_a_long_jump_is_cut() {
+        let (mut motion, start) = (Motion::default(), Instant::now());
+        assert_eq!(motion.bar(0, start), 0);
+        assert_eq!(motion.bar(2, later(start, 1)), 0);
+        assert_eq!(motion.bar(2, later(start, 41)), 1, "40 ms a row");
+        assert_eq!(motion.bar(2, later(start, 81)), 2);
+        assert!(!motion.active(later(start, 81)));
+        assert_eq!(motion.bar(9, later(start, 100)), 9, "more than 3 rows: cut");
+        assert_eq!(motion.bar(7, later(start, 110)), 9);
+        assert_eq!(motion.bar(7, later(start, 151)), 8, "back up a row at a time");
+    }
+
+    #[test]
+    fn the_palette_closes_pressed_for_a_frame_then_wipes() {
+        let (mut motion, start) = (Motion::default(), Instant::now());
+        motion.close_palette("sta", 2, start);
+        assert_eq!(motion.palette_closing(start), Some(("sta".into(), 2, Closing::Pressed)));
+        let Some((_, _, Closing::Wiping(left))) = motion.palette_closing(later(start, 46)) else { panic!() };
+        assert!((left - 0.5).abs() < 0.01, "{left}");
+        assert_eq!(motion.palette_closing(later(start, 80)), None);
+        assert!(!motion.active(later(start, 80)));
     }
 
     #[test]

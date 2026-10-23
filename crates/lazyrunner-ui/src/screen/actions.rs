@@ -236,80 +236,36 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
     list
 }
 
-/// An on/off setting in the , menu: its letter there, its label, and the panel's shorter one.
+/// An on/off setting in the , menu: its letter there, and its label.
 pub(crate) struct MenuToggle {
     pub letter: &'static str,
     pub toggle: Toggle,
     pub label: &'static str,
-    pub short: &'static str,
 }
 
 const MENU_TOGGLES: [MenuToggle; 11] = [
-    MenuToggle {
-        letter: "a",
-        toggle: Toggle::AutoRestartOnBranchChange,
-        label: "Auto-restart on branch change",
-        short: "auto-restart on branch change",
-    },
-    MenuToggle {
-        letter: "u",
-        toggle: Toggle::AutoStartOnOpen,
-        label: "Auto-start when lazyrunner opens",
-        short: "auto-start when lazyrunner opens",
-    },
-    MenuToggle {
-        letter: "s",
-        toggle: Toggle::StopFrontendOnStop,
-        label: "Stop/Restart all include the frontend",
-        short: "stop/restart all include frontend",
-    },
-    MenuToggle {
-        letter: "e",
-        toggle: Toggle::RestartOnCodeChange,
-        label: "Restart the APIs when code changes",
-        short: "restart APIs on code change",
-    },
-    MenuToggle {
-        letter: "w",
-        toggle: Toggle::StartupChecklist,
-        label: "Startup checklist when lazyrunner opens",
-        short: "startup checklist",
-    },
-    MenuToggle {
-        letter: "v",
-        toggle: Toggle::AutoUpdate,
-        label: "Auto-update lazyrunner when it opens",
-        short: "auto-update",
-    },
-    MenuToggle {
-        letter: "m",
-        toggle: Toggle::Mouse,
-        label: "Mouse: click and scroll (off: select text)",
-        short: "mouse",
-    },
-    MenuToggle {
-        letter: "f",
-        toggle: Toggle::ReducedMotion,
-        label: "Reduced motion: no blinking, spinners or fades",
-        short: "reduced motion",
-    },
+    MenuToggle { letter: "a", toggle: Toggle::AutoRestartOnBranchChange, label: "Auto-restart on branch change" },
+    MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
+    MenuToggle { letter: "s", toggle: Toggle::StopFrontendOnStop, label: "Stop/Restart all include the frontend" },
+    MenuToggle { letter: "e", toggle: Toggle::RestartOnCodeChange, label: "Restart the APIs when code changes" },
+    MenuToggle { letter: "w", toggle: Toggle::StartupChecklist, label: "Startup checklist when lazyrunner opens" },
+    MenuToggle { letter: "v", toggle: Toggle::AutoUpdate, label: "Auto-update lazyrunner when it opens" },
+    MenuToggle { letter: "m", toggle: Toggle::Mouse, label: "Mouse: click and scroll (off: select text)" },
+    MenuToggle { letter: "f", toggle: Toggle::ReducedMotion, label: "Reduced motion: no blinking, spinners or fades" },
     MenuToggle {
         letter: "g",
         toggle: Toggle::GitBeside,
         label: "L opens the git tool beside lazyrunner (Windows Terminal)",
-        short: "git beside",
     },
     MenuToggle {
         letter: "i",
         toggle: Toggle::NerdIcons,
         label: "Nerd Font icons (the terminal's font a Nerd Font Mono)",
-        short: "nerd icons",
     },
     MenuToggle {
         letter: "o",
         toggle: Toggle::CheckMigrationsOnOpen,
         label: "Check the migrations against the database when M opens",
-        short: "check migrations on M",
     },
 ];
 
@@ -356,30 +312,53 @@ pub fn menu(ui: &Ui, controller: &Controller) -> Vec<Action> {
 
 /// Fuzzy subsequence match: every typed character in order; consecutive and word-start hits score higher.
 pub fn fuzzy_score(query: &str, text: &str) -> u32 {
+    fuzzy_match(query, text).map_or(0, |(score, _)| score)
+}
+
+/// Where the typed characters matched in `text` (character positions), to light them; none when they don't.
+pub fn fuzzy_positions(query: &str, text: &str) -> Vec<usize> {
+    fuzzy_match(query, text).map_or_else(Vec::new, |(_, positions)| positions)
+}
+
+fn fuzzy_match(query: &str, text: &str) -> Option<(u32, Vec<usize>)> {
     let text: Vec<char> = text.to_lowercase().chars().collect();
     let mut score = 0;
     let mut from = 0;
-    let mut previous: Option<usize> = None;
+    let mut positions = Vec::new();
     for c in query.to_lowercase().chars().filter(|c| *c != ' ') {
-        let Some(found) = text[from.min(text.len())..].iter().position(|t| *t == c).map(|at| at + from) else {
-            return 0;
-        };
+        let found = text[from.min(text.len())..].iter().position(|t| *t == c).map(|at| at + from)?;
         score += 1;
-        if previous.is_some_and(|previous| found == previous + 1) {
+        if positions.last().is_some_and(|previous| found == previous + 1) {
             score += 3;
         }
         if found == 0 || matches!(text[found - 1], ' ' | '-' | '/' | '(' | '[' | '\\') {
             score += 2;
         }
-        previous = Some(found);
+        positions.push(found);
         from = found + 1;
     }
-    score
+    Some((score, positions))
 }
 
-/// Every action plus the settings (as ", a" and so on), best matches first.
+/// Every action plus the settings (as ", a" and so on), best matches first. What acts on the focused app names it
+/// ("Start Orders").
 pub fn palette(ui: &Ui, controller: &Controller, query: &str) -> Vec<Action> {
-    let mut all: Vec<Action> = actions(ui, controller).into_iter().filter(|action| action.key != ":").collect();
+    let focused = controller.apps.get(ui.focus).map(|app| app.name.clone());
+    let mut all: Vec<Action> = actions(ui, controller)
+        .into_iter()
+        .filter(|action| action.key != ":")
+        .map(|mut action| {
+            if let Some(name) = focused.as_deref().filter(|_| action.focused) {
+                let owner = if name.ends_with('s') { format!("{name}'") } else { format!("{name}'s") };
+                action.label = action
+                    .label
+                    .replace("the focused app's", &owner)
+                    .replace("the focused app", name)
+                    .replace("the focused column", name);
+            }
+            action
+        })
+        .collect();
     all.extend(settings(controller).into_iter().map(|mut setting| {
         setting.key = format!(", {}", setting.key);
         setting
@@ -413,5 +392,12 @@ mod tests {
         assert!(fuzzy_score("sa", "Stop all") > 0);
         assert!(fuzzy_score("sto", "Stop all") > fuzzy_score("sto", "restore"));
         assert!(fuzzy_score("db", "Switch database") > 0);
+    }
+
+    #[test]
+    fn the_matched_letters_are_where_the_score_found_them() {
+        assert_eq!(fuzzy_positions("rso", "Restart Orders"), [0, 2, 8]);
+        assert_eq!(fuzzy_positions("ORD", "Restart Orders"), [8, 9, 10], "ignoring case");
+        assert!(fuzzy_positions("xyz", "Restart Orders").is_empty());
     }
 }
