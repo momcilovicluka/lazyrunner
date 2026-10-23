@@ -107,6 +107,8 @@ fn screen(label: &str, config: Value) -> Screen {
     ui.launcher = launched;
     ui.clipboard = record;
     ui.now = started + Duration::from_secs(10);
+    // The frames are taken at one frozen instant: a box would never have opened. The motion tests turn it on.
+    ui.motion.enabled = false;
     Screen { temp, events: rx, controller, ui }
 }
 
@@ -1335,4 +1337,87 @@ async fn a_bar_glides_half_the_way_every_100_ms_and_the_clock_flows_between_tick
     screen.ui.now += Duration::from_millis(30);
     assert_eq!(screen.ui.tick(), tick, "the same 100 ms step");
     assert!(screen.ui.seconds() > seconds, "but what flows has moved on");
+}
+
+// ---------------------------------------------------------------- answering input
+
+#[tokio::test]
+async fn a_box_opens_from_its_middle_without_holding_up_its_keys() {
+    let mut screen = screen("reveal", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.frame();
+    screen.press(",");
+    let box_rows = |frame: &str| frame.lines().filter(|line| line.contains('│')).count();
+    let opening = screen.frame();
+    screen.press("Down");
+    assert_eq!(screen.ui.overlay.as_ref().map(Overlay::kind), Some("settings"), "keys act while it opens");
+    screen.ui.now += Duration::from_millis(40);
+    let partly = screen.frame();
+    screen.ui.now += Duration::from_millis(200);
+    let open = screen.frame();
+    assert!(box_rows(&opening) < box_rows(&partly) && box_rows(&partly) < box_rows(&open), "{partly}");
+}
+
+#[tokio::test]
+async fn an_action_key_lights_its_hint_and_the_apps_title_and_a_setting_flashes_where_it_shows() {
+    let mut screen = screen("flash", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.frame();
+    screen.press("s");
+    use super::motion::Spot;
+    let now = screen.ui.now;
+    assert!(screen.ui.motion.lit(&Spot::Hint("s".into()), now).is_some());
+    assert!(screen.ui.motion.title_lit(screen.ui.focus, now));
+    screen.press("S");
+    assert!(screen.ui.motion.title_lit(3, now), "every title");
+    screen.press(", f");
+    assert!(screen.ui.motion.lit(&Spot::Setting(Toggle::ReducedMotion), now).is_some());
+    screen.press("Esc l");
+    screen.frame();
+    assert!(screen.ui.motion.title_lit(1, screen.ui.now), "the column that got the focus pulses");
+}
+
+#[tokio::test]
+async fn a_key_ends_the_checklist_and_is_run_and_a_key_ends_the_reload_show() {
+    let mut screen = screen("no-waiting", json!({}));
+    screen.press(", r");
+    assert_eq!(screen.ui.overlay.as_ref().map(Overlay::kind), Some("checklist"));
+    screen.press("T");
+    assert!(screen.ui.replay.is_some(), "the loop runs T once the checklist is gone");
+    screen.press("Esc");
+    assert!(screen.ui.replay.take().is_some(), "T still waits; Esc only skips");
+    screen.ui.overlay = None; // what the loop does once the skipped checklist is done
+    screen.press("Ctrl+R");
+    assert!(screen.ui.reload.is_some() || screen.controller.setting(Toggle::ReducedMotion));
+    screen.press("j");
+    assert!(screen.ui.reload.is_none(), "the show ends at the first key, which still scrolls");
+}
+
+#[tokio::test]
+async fn copied_lines_light_up_in_their_column() {
+    let mut screen = screen("copy-flash", json!({}));
+    screen.ui.motion.enabled = true;
+    let at = screen.ui.now;
+    screen.controller.states[0].output.push("fail: Orders.Api[0]", at);
+    screen.controller.states[0].output.push("      boom", at);
+    screen.press("y y");
+    let copied = screen.ui.motion.copied(0, screen.ui.now).cloned().unwrap_or_default();
+    assert!(copied.contains("fail: Orders.Api[0]") && copied.contains("      boom"), "{copied:?}");
+    screen.ui.now += Duration::from_millis(500);
+    assert!(screen.ui.motion.copied(0, screen.ui.now).is_none(), "only for a moment");
+}
+
+#[tokio::test]
+async fn a_saved_change_counts_down_to_the_rebuild_on_the_running_apis() {
+    let mut screen = screen("countdown", json!({ "restartOnCodeChange": true }));
+    screen.controller.states[0].status = AppStatus::Running;
+    screen.controller.handle(Event::FileChanged(PathBuf::from("services/Orders/Checkout.cs")));
+    let left = screen.controller.rebuild_in(Instant::now()).map(|(left, settle)| (left <= settle, settle.as_secs()));
+    assert_eq!(left, Some((true, 2)));
+    screen.ui.now = Instant::now();
+    screen.press("z"); // Orders alone, wide enough for its whole title
+    let frame = screen.frame();
+    let orders = frame.lines().next().unwrap_or_default();
+    assert!(orders.contains("change noticed") && orders.contains("rebuilding in"), "{frame}");
+    assert!(screen.ui.is_animating(&screen.controller), "it counts down");
 }

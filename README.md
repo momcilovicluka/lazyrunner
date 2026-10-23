@@ -248,9 +248,18 @@ when they're on.
 
 A click focuses a column; a double click on its title zooms it (again: back). The wheel scrolls the column under the
 pointer, whichever has the focus. In the menus, the command palette and the database and theme pickers a click picks
-an item and a double click runs it; a click outside a box closes it. A setting in the panel toggles on a click. Moving
-the pointer does nothing (and costs nothing). While the mouse is on, the terminal leaves text selection to
+an item and a double click runs it; a click outside a box closes it. A setting in the panel toggles on a click. What the
+pointer is over lights up, and what you click shows pressed for a moment. While the mouse is on, the terminal leaves text selection to
 lazyrunner, which has none: `,` then `m` turns it off (in Windows Terminal, Shift + drag selects either way).
+
+### Motion
+
+lazyrunner answers what you do at once, and shows it: the hint of the key you pressed and the column it acts on
+flash, the column that gets the focus pulses, a box opens from its middle, a setting flashes as it flips, copied lines
+light up in their column, the line the search jumps to flashes, and column widths and scrolling glide. Long work moves
+for as long as it lasts: builds, starts, npm, tests and migrations have a spinner and a bar against the usual time,
+and with `restartOnCodeChange` a saved change counts down to the rebuild. None of it holds you up - a key acts at once,
+also during the startup checklist or the reload show, which it ends. `, f` (reduced motion) turns it all off.
 
 ### During a build
 

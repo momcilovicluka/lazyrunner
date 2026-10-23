@@ -98,7 +98,7 @@ fn one(lines: Vec<String>) -> (Vec<String>, usize) {
 }
 
 /// y, then what: copies it, or says there's nothing of it.
-pub fn copy(ui: &Ui, controller: &mut Controller, pick: Pick) {
+pub fn copy(ui: &mut Ui, controller: &mut Controller, pick: Pick) {
     let Some(name) = controller.apps.get(ui.focus).map(|app| app.name.clone()) else { return };
     let (lines, entries) = gather(ui, controller, pick);
     if lines.is_empty() {
@@ -113,6 +113,9 @@ pub fn copy(ui: &Ui, controller: &mut Controller, pick: Pick) {
         controller.add_log(format!("Nothing to copy: {why}."), Hue::DarkGray);
         return;
     }
+    // What was taken lights up in the column.
+    let taken = lines.iter().filter(|line| !line.is_empty()).cloned().collect();
+    ui.motion.flash(super::motion::Spot::Copied { app: ui.focus, lines: taken }, ui.now);
     let label = PICKS.iter().find(|(choice, ..)| *choice == pick).map_or("", |(_, _, label)| *label);
     let count = lines.iter().filter(|line| !line.is_empty()).count();
     let lines_said = format!("{count} line{}", if count == 1 { "" } else { "s" });

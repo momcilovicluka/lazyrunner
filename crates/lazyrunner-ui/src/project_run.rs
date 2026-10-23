@@ -98,6 +98,9 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
 
     let started = Instant::now();
     let (mut ui, warnings) = Ui::new(&controller, user_themes, started);
+    if !options.headless && (options.handover.is_some() || !options.notes.is_empty()) {
+        screen::reload::open_from_middle(&mut ui); // reopened: the screen the last lazyrunner left opens up
+    }
     for warning in warnings {
         controller.add_log(warning, Hue::Yellow);
     }
@@ -145,6 +148,14 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 Some(Ok(Event::Key(key))) if key.kind != KeyEventKind::Release => {
                     ui.now = Instant::now();
                     screen::keys::press(&mut ui, &mut controller, key);
+                    if ui.replay.is_some() {
+                        // A key ended the checklist: it closes now, and the key does what it does.
+                        update_checklist(&mut ui, &mut controller, &mut still_checking);
+                        let replay = ui.replay.take();
+                        if let Some(key) = replay.filter(|_| !matches!(ui.overlay, Some(Overlay::Checklist(_)))) {
+                            screen::keys::press(&mut ui, &mut controller, key);
+                        }
+                    }
                     dirty = true;
                     urgent = true;
                 }
@@ -326,6 +337,12 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 controller.add_log("Quitting - stopping everything", Hue::DarkGray);
             }
             controller.shutdown();
+            if matches!(exit, Exit::Reopen { .. }) && !options.headless {
+                // The logo stays on screen while the next lazyrunner starts (it keeps the alternate screen).
+                ui.now = Instant::now();
+                screen::reload::farewell(&mut ui);
+                let _ = surface.render(&mut |frame| screen::draw(frame, &mut ui, &controller), false);
+            }
             return Ok(Finished { exit, handover, notes });
         }
         if dirty {

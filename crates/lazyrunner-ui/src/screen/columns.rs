@@ -150,7 +150,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
     if keys.len() > 1 && stacks(&controller.config, total) {
         return stacked(ui, controller, &keys, total, rows);
     }
-    let widths = shares(controller, &keys, total.saturating_sub(keys.len() - 1), MIN_WIDTH, keys.len() - 1);
+    let target = shares(controller, &keys, total.saturating_sub(keys.len() - 1), MIN_WIDTH, keys.len() - 1);
+    let widths = ui.motion.widths(&keys, target, ui.now);
     if let Some(cells) = keys.iter().position(|&index| index == ui.focus).map(|at| widths[at]) {
         ui.focus_cells = text_cells(controller, ui.focus, cells, rows);
     }
@@ -226,8 +227,9 @@ fn pane(
         aim(title(ui, controller, index, cells), Target::Title(index)),
         aim(info(controller, index, cells, ui.nerd), Target::Title(index)),
     ];
+    let scroll = ui.motion.scroll(index, controller.states[index].scroll, ui.now);
     pane.extend(
-        body(ui, controller, index, cells, rows.saturating_sub(2), found, base)
+        body(ui, controller, index, cells, rows.saturating_sub(2), scroll, found, base)
             .into_iter()
             .map(|row| aim(row, Target::Output(index))),
     );
@@ -247,8 +249,14 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let tone = tone(ui, controller, index);
     let marker = if focused { "▸ " } else { "" };
     let icon = icons::app(ui.nerd, app, controller.framework(&app.key));
-    let chip_fg = if tone == C::DarkGray { C::White } else { C::Black };
-    let mut segs = vec![on(format!(" {marker}{icon} {} ", app.name), chip_fg, tone)];
+    let (chip_fg, chip_bg) = if ui.motion.title_lit(index, ui.now) {
+        (C::Black, C::White) // an action on it, or the focus just moved to it
+    } else if tone == C::DarkGray {
+        (C::White, tone)
+    } else {
+        (C::Black, tone)
+    };
+    let mut segs = vec![on(format!(" {marker}{icon} {} ", app.name), chip_fg, chip_bg)];
     segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
     segs.extend(status(ui, controller, index));
     let used = width(&segs);
@@ -320,6 +328,15 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
             estimate.map_or(String::new(), |estimate| bar(ui, elapsed / estimate, &format!("{kind}:{key}"), animated));
         let eta = estimate.map_or(String::new(), |estimate| format!(" / ~{}", format_duration(estimate)));
         return vec![seg(format!("{frame} {verb} {bar}{}{eta}", format_duration(elapsed)), C::Yellow)];
+    }
+    if let Some((left, settle)) =
+        controller.rebuild_in(ui.now).filter(|_| controller.apps[index].traits().builds && state.is_running())
+    {
+        // Saving was noticed: the rebuild starts once it has been quiet for a moment.
+        let waited = 1.0 - left.as_secs_f64() / settle.as_secs_f64();
+        let bar = bar(ui, waited, &format!("rebuild:{key}"), animated);
+        let reload = icons::icon(ui.nerd, Icon::Reload);
+        return vec![seg(format!("{reload} change noticed {bar}rebuilding in {:.1}s", left.as_secs_f64()), C::Yellow)];
     }
     match &state.status {
         Status::Running if state.is_up() => {
@@ -483,12 +500,14 @@ fn bright(color: C) -> C {
 
 /// Output rows, newest at the bottom, wrapped to the width. New lines fade in; search matches are highlighted
 /// (the current one in the focus colours, the others yellow).
+#[allow(clippy::too_many_arguments)]
 fn body(
     ui: &Ui,
     controller: &Controller,
     index: usize,
     column: usize,
     rows: usize,
+    scroll: usize,
     found: &mut Vec<links::Target>,
     base: usize,
 ) -> Vec<Vec<Seg>> {
@@ -498,12 +517,14 @@ fn body(
     // More lines than rows: the last cell is a scrollbar.
     let scrollable = total > rows && rows > 0 && column > 1;
     let cells = if scrollable { column - 1 } else { column };
+    let scroll = scroll.min(total.saturating_sub(1));
+    let copied = ui.motion.copied(index, ui.now);
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
-    for (offset, line) in state.output.newest_first(state.scroll).enumerate() {
+    for (offset, line) in state.output.newest_first(scroll).enumerate() {
         if result.len() >= rows {
             break;
         }
-        let position = total - 1 - state.scroll - offset; // 0 = the oldest line kept
+        let position = total - 1 - scroll - offset; // 0 = the oldest line kept
         let mut color = line_color(line);
         let mut back = None;
         let age = ui.now.saturating_duration_since(line.born);
@@ -518,10 +539,15 @@ fn body(
             && contains_ignore_case(&line.text, &search.query)
         {
             if search.index == Some(position) {
-                (color, back) = (C::FocusText, Some(C::FocusBack));
+                let jumped =
+                    ui.motion.lit(&super::motion::Spot::Match { app: index, line: position }, ui.now).is_some();
+                (color, back) = if jumped { (C::Black, Some(C::White)) } else { (C::FocusText, Some(C::FocusBack)) };
             } else {
                 (color, back) = (C::Black, Some(C::Yellow));
             }
+        }
+        if copied.is_some_and(|lines| lines.contains(&line.text)) {
+            (color, back) = (C::Black, Some(C::Cyan)); // just copied
         }
         let line_links = if back.is_none() { links::find(&line.text) } else { Vec::new() };
         let ids: Vec<usize> = line_links
@@ -558,7 +584,7 @@ fn body(
     }
     result.reverse();
     if scrollable {
-        add_scrollbar(&mut result, total, state.scroll);
+        add_scrollbar(&mut result, total, scroll);
     }
     result
 }

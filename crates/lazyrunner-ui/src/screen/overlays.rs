@@ -207,6 +207,12 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         .map(|(i, item)| {
             let key = pad(&format!(" {}", item.key), 8);
             let hint = if item.hint.is_empty() { String::new() } else { format!("  {}", item.hint) };
+            let flipped = matches!(&item.run, actions::Run::Setting { toggle, .. }
+                if ui.motion.lit(&super::motion::Spot::Setting(*toggle), ui.now).is_some());
+            if flipped {
+                let line = pad(&format!("{key}{}{hint}", item.label), INNER);
+                return aim(vec![on(line, C::Black, C::Green)], Target::Item(i));
+            }
             if i == index {
                 return aim(selected(&format!("{key}{}{hint}", item.label), INNER), Target::Item(i));
             }

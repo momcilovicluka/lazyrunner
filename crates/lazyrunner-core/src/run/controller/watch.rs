@@ -424,6 +424,13 @@ impl Controller {
 
     // ---------------------------------------------------------------- code changes
 
+    /// How long until restartOnCodeChange rebuilds (saving has to be quiet that long), and that whole wait, when a
+    /// rebuild is coming.
+    pub fn rebuild_in(&self, now: Instant) -> Option<(Duration, Duration)> {
+        let last = self.code.last_at.filter(|_| self.rebuild_pending())?;
+        Some((CODE_SETTLE.saturating_sub(now.saturating_duration_since(last)), CODE_SETTLE))
+    }
+
     /// A rebuild restartOnCodeChange starts once saving has been quiet for a moment: code changed, and an app that
     /// builds runs.
     pub fn rebuild_pending(&self) -> bool {

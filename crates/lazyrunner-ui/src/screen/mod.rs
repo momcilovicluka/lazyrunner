@@ -12,6 +12,7 @@ pub mod icons;
 pub mod keys;
 pub mod links;
 pub mod migrations;
+pub mod motion;
 pub mod mouse;
 pub mod overlays;
 pub mod panel;
@@ -229,6 +230,10 @@ pub struct Ui {
     pub reduced_motion: bool,
     /// The nerdIcons setting (`, i`), read at every frame: Nerd Font icons in the chrome.
     pub nerd: bool,
+    /// The short effects that answer input: flashes, boxes opening, widths and scrolling gliding.
+    pub motion: motion::Motion,
+    /// A key that ended the startup checklist: the loop runs it as soon as the checklist is gone.
+    pub replay: Option<crossterm::event::KeyEvent>,
     bars: HashMap<String, (f64, Instant)>,
 }
 
@@ -269,6 +274,8 @@ impl Ui {
             clipboard: copy::to_clipboard,
             reduced_motion: controller.setting(Toggle::ReducedMotion),
             nerd: controller.setting(Toggle::NerdIcons),
+            motion: motion::Motion::default(),
+            replay: None,
             bars: HashMap::new(),
         };
         let wanted = controller.config["theme"].as_str().unwrap_or("default").to_string();
@@ -320,7 +327,7 @@ impl Ui {
 
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
-        if self.reload.is_some() {
+        if self.reload.is_some() || self.motion.active(self.now) {
             return true;
         }
         if self.reduced_motion {
@@ -341,6 +348,7 @@ impl Ui {
             || controller.tests_active()
             || controller.migrations_active()
             || controller.celebrate.is_some()
+            || controller.rebuild_pending()
             || controller.states.iter().any(|state| {
                 let fresh = state
                     .output
@@ -357,10 +365,18 @@ impl Ui {
 pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.reduced_motion = controller.setting(Toggle::ReducedMotion);
     ui.nerd = controller.setting(Toggle::NerdIcons);
+    ui.motion.reduced = ui.reduced_motion;
     let typing = ui.search.as_ref().is_some_and(|search| search.typing);
     if ui.overlay.is_none() && ui.picker.is_none() && !typing {
         ui.overlay = ui.behind.take(); // what was opened from a view closed: the view again
     }
+    // A box that just appeared opens from its middle; the checklist and the theme picker have their own motion.
+    let revealing = match &ui.overlay {
+        Some(Overlay::Checklist(_) | Overlay::Themes { .. }) => None,
+        Some(overlay) => Some(overlay.kind()),
+        None => ui.picker.as_ref().map(|_| "picker"),
+    };
+    ui.motion.frame(revealing, ui.focus, ui.now);
     let area = frame.area();
     let buf = frame.buffer_mut();
     buf.set_style(area, Style::reset());
@@ -370,22 +386,45 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.links.clear();
     if area.width < MIN_SIZE.0 || area.height < MIN_SIZE.1 {
         let hint = format!(" lazyrunner: make the terminal a bit bigger ({}x{} at least)", MIN_SIZE.0, MIN_SIZE.1);
-        seg::draw(buf, area.x, area.y, area.width, &[s(hint, C::Yellow)], &ui.theme, &mut ui.hits);
+        let touch = seg::Touch::default();
+        seg::draw(buf, area.x, area.y, area.width, &[s(hint, C::Yellow)], &ui.theme, &mut ui.hits, touch);
         return;
     }
+    let opened = if revealing.is_some() { ui.motion.revealed(ui.now) } else { 1.0 };
     let rows: Vec<Vec<Seg>> = if matches!(ui.overlay, Some(Overlay::Help)) {
-        overlays::help(ui, controller, width, height) // the whole screen
+        reveal(overlays::help(ui, controller, width, height), opened) // the whole screen
     } else {
         let panel = panel::rows(ui, controller, width);
         let body_height = height.saturating_sub(panel.len());
-        let mut rows = body(ui, controller, width, body_height);
+        let mut rows = reveal(body(ui, controller, width, body_height), opened);
         rows.extend(panel);
         rows
     };
+    let touch = seg::Touch { hover: ui.hover, pressed: ui.motion.pressed(ui.now) };
     for (y, row) in rows.iter().enumerate().take(height) {
-        seg::draw(buf, area.x, area.y + y as u16, area.width, row, &ui.theme, &mut ui.hits);
+        seg::draw(buf, area.x, area.y + y as u16, area.width, row, &ui.theme, &mut ui.hits, touch);
     }
     reload::paint(buf, area, ui);
+}
+
+/// A box opening (`opened` of the way): only its middle rows so far, more the further it has opened.
+fn reveal(rows: Vec<Vec<Seg>>, opened: f64) -> Vec<Vec<Seg>> {
+    if opened >= 1.0 {
+        return rows;
+    }
+    let filled: Vec<usize> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| row.iter().any(|seg| !seg.text.trim().is_empty()))
+        .map(|(at, _)| at)
+        .collect();
+    let (Some(&top), Some(&bottom)) = (filled.first(), filled.last()) else { return rows };
+    let middle = (top + bottom) as f64 / 2.0;
+    let reach = ((bottom - top + 1) as f64 / 2.0 * opened).max(0.5);
+    rows.into_iter()
+        .enumerate()
+        .map(|(at, row)| if (at as f64 - middle).abs() <= reach { row } else { Vec::new() })
+        .collect()
 }
 
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {

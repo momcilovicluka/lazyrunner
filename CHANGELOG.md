@@ -3,6 +3,16 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.6.0] - 2026-10-23
+
+### Added
+- Motion that answers input, never waited for: the hint of the key pressed and the column it acts on flash (every column for an action on all), the column that gets the focus pulses, boxes and views open from their middle, a setting flashes as it flips (in the , menu and the panel), copied lines light up in their column, the search's match flashes as it jumps there, column widths and scrolling glide, and what the pointer is over lights up everywhere (a click shows pressed)
+- With restartOnCodeChange, a saved change counts down to the rebuild on the running APIs' columns
+- Reloading the profile or switching to an update keeps lazyrunner's screen: the logo shows while the next lazyrunner starts, which opens from the middle - the shell's screen no longer flashes in between
+
+### Changed
+- A key during the startup checklist ends it and does what it does at once (Esc, Enter and Space only end it); a key or a click during the Ctrl+R show ends it and acts. The checklist's spinners show for 80 ms at least (150 before)
+
 ## [1.5.1] - 2026-10-23
 
 ### Changed

@@ -172,8 +172,12 @@ fn run_with(
     let (mut project, mut start_now, mut notes, mut handover) = (project, start_now, notes, handover);
     let binary = Binary::now();
     loop {
-        let Finished { exit, handover: passed, notes: carried } =
-            run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes, handover.take())?;
+        let finished =
+            run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes, handover.take());
+        let Finished { exit, handover: passed, notes: carried } = finished.inspect_err(|_| {
+            // A reopen may have left the last frame on screen: the error shows on the shell's screen.
+            let _ = ratatui::crossterm::execute!(io::stdout(), ratatui::crossterm::terminal::LeaveAlternateScreen);
+        })?;
         match exit {
             Exit::Quit => return Ok(()),
             Exit::Reopen { root, start } => {
@@ -320,10 +324,18 @@ fn run_once(
             runtime.block_on(run_project(&mut terminal as &mut dyn Surface, run, options))
         }
         None => {
+            // A lazyrunner that reopened left its last frame on the alternate screen: out of it first, so this one
+            // gets a fresh one of the window's size (entering it while in it gives Windows' console a stale one).
+            let _ = ratatui::crossterm::execute!(io::stdout(), ratatui::crossterm::terminal::LeaveAlternateScreen);
             let mut terminal = ratatui::try_init().context("this needs a terminal")?;
             lazyrunner_ui::panics::keep_off_screen(); // after ratatui's hook, which it keeps for this thread
             let result = runtime.block_on(run_project(&mut terminal as &mut dyn Surface, run, options));
-            ratatui::restore();
+            if result.as_ref().is_ok_and(|finished| matches!(finished.exit, Exit::Reopen { .. })) {
+                // The next lazyrunner takes the screen over: the shell's screen doesn't flash in between.
+                let _ = ratatui::crossterm::terminal::disable_raw_mode();
+            } else {
+                ratatui::restore();
+            }
             result
         }
     };
