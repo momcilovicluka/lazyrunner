@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.6.1] - 2026-10-23
+
+### Fixed
+- The About box's "Report a bug" and "Suggest a feature" open the repository's bug and feature forms (the bug form's version and operating system filled in), not a blank issue (#5)
+
+### Changed
+- A letter in the , menu (and the x menu) highlights the item it runs, so a toggled setting is the one in view (#4)
+- The About box thanks the people whose bug reports and ideas shaped lazyrunner
+
 ## [1.6.0] - 2026-10-23
 
 ### Added

@@ -20,11 +20,15 @@ const VERSION: &str = changelog::VERSION;
 const INNER: usize = 72;
 /// Who makes lazyrunner, and what they do for it.
 const CONTRIBUTORS: [(&str, &str); 1] = [("Luka Momčilović", "creator · maintainer")];
+/// Who reported the bugs and asked for the features that shaped lazyrunner (their GitHub names).
+const REPORTERS: [(&str, &str); 1] = [("Ognjen Maričić", "@ognjen004028")];
 const RAINBOW: [C; 6] = [C::Red, C::Yellow, C::Green, C::Cyan, C::Blue, C::Magenta];
 const SPARKLES: [&str; 4] = ["✦", "✧", "⋆", "✧"];
 /// How fast the rainbow flows across the logo and its rule.
 const RAINBOW_BANDS_PER_SECOND: f64 = 5.0;
 const LABEL_CELLS: usize = 22;
+/// The names of the contributors, padded so what they do lines up.
+const NAME_CELLS: usize = 18;
 
 /// What a link does: opens a page in the browser, or runs one of lazyrunner's own actions.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,22 +51,26 @@ fn link(key: &'static str, icon: Icon, label: &'static str, hint: &'static str, 
 
 fn links() -> Vec<Link> {
     let page = |path: &str| Does::Open(format!("{DEFAULT_REPO}{path}"));
-    let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
-    let body =
-        format!("lazyrunner v{VERSION} on {os} {arch}\n\nWhat happened:\n\nWhat I expected:\n\nHow to get there:\n");
-    let bug = format!("/issues/new?labels=bug&body={}", encode(&body));
+    // The repository's issue forms, the bug report's version and operating system filled in.
+    let os = match std::env::consts::OS {
+        "windows" => "Windows",
+        "linux" => "Linux",
+        "macos" => "macOS",
+        _ => "Other",
+    };
+    let bug = format!("/issues/new?template=bug_report.yml&version={}&os={}", encode(VERSION), encode(os));
     vec![
         link("r", Icon::Readme, "README", "setting it up, and every key", page("#readme")),
         link("c", Icon::Changelog, "What's new", "the changelog, right here", Does::Run(Run::Changelog)),
         link("e", Icon::Releases, "Releases", "every version, on GitHub", page("/releases")),
         link("l", Icon::License, "License", "source-available; free to use, at work too", page("/blob/main/LICENSE")),
-        link("b", Icon::Bug, "Report a bug", "a GitHub issue, this version filled in", page(&bug)),
+        link("b", Icon::Bug, "Report a bug", "the bug form, this version filled in", page(&bug)),
         link(
             "f",
             Icon::Idea,
             "Suggest a feature",
-            "a GitHub issue with your idea",
-            page("/issues/new?labels=enhancement"),
+            "the feature form, for your idea",
+            page("/issues/new?template=feature_request.yml"),
         ),
         link("s", Icon::Source, "Source", "the code, on GitHub", page("")),
         link("u", Icon::Update, "Check for an update", "the startup checklist, now", Does::Run(Run::Checklist)),
@@ -143,8 +151,15 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     for (name, role) in CONTRIBUTORS {
         lines.push(vec![
             seg(format!("   {} ", icons::icon(nerd, Icon::Person)), C::Magenta),
-            seg(format!("{name}   "), C::White),
+            seg(format!("{name:<NAME_CELLS$}"), C::White),
             seg(role, C::DarkGray),
+        ]);
+    }
+    for (name, github) in REPORTERS {
+        lines.push(vec![
+            seg(format!("   {} ", icons::icon(nerd, Icon::Idea)), C::Yellow),
+            seg(format!("{name:<NAME_CELLS$}"), C::White),
+            seg(format!("bug reports & ideas · {github}"), C::DarkGray),
         ]);
     }
     lines.push(Vec::new());

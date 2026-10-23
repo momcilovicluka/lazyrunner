@@ -1222,12 +1222,18 @@ async fn the_about_box_shows_the_version_and_who_makes_it_and_opens_its_links() 
     screen.press(", A");
     assert_eq!(overlay(&screen), Some("about"));
     let frame = screen.frame();
-    for text in ["v<version> · released", "Luka Momčilović", "README", "License", "Report a bug", "made with ♥"] {
+    for text in [
+        "v<version> · released",
+        "Luka Momčilović",
+        "Ognjen Maričić    bug reports & ideas · @ognjen004028",
+        "Report a bug",
+        "made with ♥",
+    ] {
         assert!(frame.contains(text), "{text}: {frame}");
     }
     screen.press("b");
     let opened = OPENED.with(|opened| opened.borrow().clone());
-    let report = "https://github.com/momcilovicluka/lazyrunner/issues/new?labels=bug&body=lazyrunner%20v";
+    let report = "https://github.com/momcilovicluka/lazyrunner/issues/new?template=bug_report.yml&version=";
     assert!(opened.last().is_some_and(|url| url.starts_with(report)), "{opened:?}");
     assert_eq!(overlay(&screen), Some("about"), "a page leaves the box open");
     screen.press("Down Enter");
@@ -1420,4 +1426,26 @@ async fn a_saved_change_counts_down_to_the_rebuild_on_the_running_apis() {
     let orders = frame.lines().next().unwrap_or_default();
     assert!(orders.contains("change noticed") && orders.contains("rebuilding in"), "{frame}");
     assert!(screen.ui.is_animating(&screen.controller), "it counts down");
+}
+
+#[tokio::test]
+async fn the_about_boxs_issue_links_open_the_repositorys_forms() {
+    let mut screen = screen("about-forms", json!({}));
+    screen.press(", A b f");
+    let opened = OPENED.with(|opened| opened.borrow().clone());
+    let os = if cfg!(windows) { "Windows" } else { "" };
+    let bug = format!("issues/new?template=bug_report.yml&version={}&os={os}", lazyrunner_core::changelog::VERSION);
+    assert!(opened.iter().any(|url| url.ends_with(&bug)), "{opened:?}");
+    assert!(opened.iter().any(|url| url.ends_with("issues/new?template=feature_request.yml")), "{opened:?}");
+}
+
+#[tokio::test]
+async fn a_settings_letter_also_highlights_the_setting_it_toggles() {
+    let mut screen = screen("settings-letter", json!({}));
+    screen.press(", f");
+    let items = super::overlays::menu_items(&screen.ui, &screen.controller);
+    let wanted = items.iter().position(|item| item.key == "f");
+    let Some(Overlay::Settings { index }) = &screen.ui.overlay else { panic!("the settings stay open") };
+    assert_eq!(Some(*index), wanted);
+    assert!(screen.controller.setting(Toggle::ReducedMotion));
 }
