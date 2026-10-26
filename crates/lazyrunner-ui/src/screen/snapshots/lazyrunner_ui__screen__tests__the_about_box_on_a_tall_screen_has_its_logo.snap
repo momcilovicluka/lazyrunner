@@ -5,7 +5,6 @@ expression: "screen.render(SIZE.0, 44)"
 
 
 
-
                  ┌─ ✦ About lazyrunner ─────────────────────────────────────────────────────┐
                  │                                                                          │
                  │                 █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                  │
@@ -13,12 +12,12 @@ expression: "screen.render(SIZE.0, 44)"
                  │                 ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                  │
                  │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                  │
                  │                                                                          │
-                 │   ⇩ v<version> · released <date>    · windows x86_64 · running Sample       │
+                 │   ⇩ v<version> · released <date>    · windows x86_64 · running Sample      │
                  │   Runs a project's .NET and npm apps side by side.                       │
                  │                                                                          │
                  │   Core contributors                                                      │
-                 │    • Luka Momčilović   creator · maintainer                              │
-                 │    ☼ Ognjen Maričić    bug reports & ideas · @ognjen004028               │
+                 │    • Luka Momčilović    creator · maintainer · @momcilovicluka           │
+                 │    • Ognjen Maričić     1 PR · 2 bug reports · 7 ideas · @ognjen004028   │
                  │                                                                          │
                  │   Links                                                                  │
                  │  ▸ r  ¶  README                setting it up, and every key              │
@@ -29,6 +28,7 @@ expression: "screen.render(SIZE.0, 44)"
                  │    f  ☼  Suggest a feature     the feature form, for your idea           │
                  │    s  ⑂  Source                the code, on GitHub                       │
                  │    u  ⇣  Check for an update   the startup checklist, now                │
+                 │    p  •  Contributors          everyone, with their commits, on GitHub   │
                  │                                                                          │
                  │   made with ♥ and ⚙ Rust · lazyrunner License 1.1                        │
                  │ a letter, or j k + Enter · Esc closes                                    │

@@ -410,6 +410,11 @@ pub fn tag_of(location: &str) -> Option<Release> {
     changelog::version(version).map(|_| Release { tag: tag.to_string(), version: version.to_string() })
 }
 
+/// A small text file from the release repo (contributors.json), at most `max` bytes; `None` when it can't be had.
+pub(crate) fn fetch_text(url: &str, source: &Source, max: u64) -> Option<String> {
+    get(url, source, CHECK_TIMEOUT).ok()?.into_body().with_config().limit(max).read_to_string().ok()
+}
+
 /// GETs a release file, following the redirects by hand (the agent follows none, so `latest` can read its Location).
 fn get(url: &str, source: &Source, timeout: Duration) -> Result<Response, String> {
     let name = url.rsplit('/').next().unwrap_or(url).to_string();

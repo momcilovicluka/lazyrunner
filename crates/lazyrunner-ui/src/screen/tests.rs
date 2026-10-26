@@ -1284,7 +1284,9 @@ async fn the_about_box_shows_the_version_and_who_makes_it_and_opens_its_links() 
     for text in [
         "v<version> · released",
         "Luka Momčilović",
-        "Ognjen Maričić    bug reports & ideas · @ognjen004028",
+        "Luka Momčilović    creator · maintainer · @momcilovicluka",
+        "Ognjen Maričić     1 PR · 2 bug reports · 7 ideas · @ognjen004028",
+        "Contributors",
         "Report a bug",
         "made with ♥",
     ] {

@@ -19,6 +19,10 @@ terms below, so the project keeps one owner and one official repository.
 5. Once the pull request is merged or closed, delete your fork if you no longer
    need it for another pull request.
 
+A merged pull request, or three issues (bug reports and ideas count too), puts
+you in lazyrunner's About box - it is kept up to date from GitHub (README,
+"Contributors").
+
 ## Contributor Agreement
 
 When you submit a contribution (code, documentation, themes, images, or anything

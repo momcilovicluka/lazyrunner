@@ -92,6 +92,7 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
         name: "lazyrunner".into(),
         run: Box::new(move |report: Report| {
             let outcome = update::update(&config, &state_dir, false, &mut update::Progress::new(report));
+            crate::contributors::refresh(&config, &state_dir);
             let status = match outcome.status {
                 update::Status::Ok => Status::Ok,
                 update::Status::Warn => Status::Warn,

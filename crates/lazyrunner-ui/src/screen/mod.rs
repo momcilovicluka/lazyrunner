@@ -184,6 +184,8 @@ pub struct Ui {
     pub search: Option<Search>,
     pub overlay: Option<Overlay>,
     pub picker: Option<Picker>,
+    /// Who makes lazyrunner, for the About box (read again each time it opens).
+    pub contributors: lazyrunner_core::contributors::Contributors,
     /// `L` was pressed: the loop opens the git tool.
     pub git_tool_wanted: bool,
     /// The git tool has the terminal (its name): nothing is drawn, and quitting or switching versions waits.
@@ -247,6 +249,7 @@ impl Ui {
             search: None,
             overlay: None,
             picker: None,
+            contributors: lazyrunner_core::contributors::built_in(),
             git_tool_wanted: false,
             away: None,
             pending_g: None,
