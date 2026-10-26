@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.8.0] - 2026-10-26
+
+### Added
+- `"args"` in a .NET app's profile: arguments `dotnet run` passes the app besides lazyrunner's own (configuration for local runs, say); the column's start line shows them
+- The requests view, while it's empty, names the .NET apps that are up but print no ASP.NET log to the console - they log somewhere else (Serilog to Seq, say), so their requests can't show - and how `"args"` can switch that off
+
 ## [1.7.0] - 2026-10-23
 
 ### Changed

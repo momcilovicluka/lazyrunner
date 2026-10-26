@@ -760,6 +760,7 @@ mod tests {
                 project: "services/Shop/Shop.csproj".into(),
                 launch_profile: "Api".into(),
                 swagger: None,
+                args: Vec::new(),
             },
         };
         let mut docs = npm("docs", "web/docs");

@@ -97,12 +97,15 @@ impl Commands for Tools {
 
 pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCommand> {
     match &app.kind {
-        AppKind::Dotnet { project, launch_profile, .. } => {
+        AppKind::Dotnet { project, launch_profile, args: extra, .. } => {
             let dir = root.join(project).parent().map_or_else(|| root.to_path_buf(), Path::to_path_buf);
-            // After --: ASP.NET logs each request it finished, for the requests view (H).
-            let args = ["run", "--no-build", "--launch-profile", launch_profile, "--", super::requests::LOG_REQUESTS]
-                .map(OsString::from)
-                .to_vec();
+            // After --: ASP.NET logs each request it finished, for the requests view (H); then the profile's own.
+            let mut args =
+                ["run", "--no-build", "--launch-profile", launch_profile, "--", super::requests::LOG_REQUESTS]
+                    .map(OsString::from)
+                    .to_vec();
+            args.extend(extra.iter().map(OsString::from));
+            let shown: String = extra.iter().map(|arg| format!(" {arg}")).collect();
             Ok(ServerCommand {
                 spec: Spec {
                     program: find_on_path("dotnet").unwrap_or_else(|| "dotnet".into()),
@@ -110,7 +113,10 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
                     dir,
                     env: Vec::new(),
                 },
-                label: format!("dotnet run --launch-profile {launch_profile}"),
+                label: format!(
+                    "dotnet run --launch-profile {launch_profile}{}",
+                    if shown.is_empty() { String::new() } else { format!(" --{shown}") }
+                ),
                 script: None,
             })
         }
@@ -297,8 +303,8 @@ mod tests {
     }
 
     #[test]
-    fn a_dotnet_app_runs_its_launch_profile_without_building() {
-        let app = App {
+    fn a_dotnet_app_runs_its_launch_profile_without_building_and_its_own_args_follow() {
+        let mut app = App {
             key: "orders".into(),
             name: "Orders".into(),
             icon: None,
@@ -309,6 +315,7 @@ mod tests {
                 project: crate::profile::native("services/Orders/Orders.csproj"),
                 launch_profile: "Orders".into(),
                 swagger: None,
+                args: Vec::new(),
             },
         };
         let root = Path::new("repo");
@@ -320,5 +327,11 @@ mod tests {
             command.spec.args,
             ["run", "--no-build", "--launch-profile", "Orders", "--", logs].map(OsString::from)
         );
+        if let AppKind::Dotnet { args, .. } = &mut app.kind {
+            *args = vec!["--Seq:ApiKey=".into()];
+        }
+        let command = server_command(root, &app, &[]).unwrap();
+        assert_eq!(command.spec.args.last(), Some(&OsString::from("--Seq:ApiKey=")), "after lazyrunner's own");
+        assert_eq!(command.label, "dotnet run --launch-profile Orders -- --Seq:ApiKey=");
     }
 }

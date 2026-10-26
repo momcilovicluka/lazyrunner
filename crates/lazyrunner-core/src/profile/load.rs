@@ -212,6 +212,7 @@ fn to_app(app: &Value) -> App {
             project: native(&text(field(app, "project"))),
             launch_profile: text(field(app, "launchProfile")),
             swagger: optional("swagger"),
+            args: list(field(app, "args")).into_iter().map(text).collect(),
         }
     } else {
         let variants = list(field(app, "variants")).into_iter().map(to_variant).collect();

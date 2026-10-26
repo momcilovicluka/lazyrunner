@@ -69,8 +69,17 @@ pub struct Variant {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppKind {
-    Dotnet { project: String, launch_profile: String, swagger: Option<String> },
-    Npm { dir: String, variants: Vec<Variant> },
+    /// `args`: what `dotnet run` passes the app besides its own (`"args"`): configuration, say.
+    Dotnet {
+        project: String,
+        launch_profile: String,
+        swagger: Option<String>,
+        args: Vec<String>,
+    },
+    Npm {
+        dir: String,
+        variants: Vec<Variant>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -429,6 +429,7 @@ PORT=4100",
                 project: crate::profile::native("tests/Shop.Tests/Shop.Tests.csproj"),
                 launch_profile: "Shop.Tests".into(),
                 swagger: None,
+                args: Vec::new(),
             },
         };
         let problems =
