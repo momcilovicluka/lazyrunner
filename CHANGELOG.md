@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.9.1] - 2026-10-26
+
+### Fixed
+- A link's letter in the About box highlights that link before opening it, like the `,` and `x` menus, so `Enter` and `j` / `k` go on from it (#7, thanks @ognjen004028)
+
 ## [1.9.0] - 2026-10-26
 
 ### Added
