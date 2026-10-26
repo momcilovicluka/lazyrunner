@@ -361,6 +361,9 @@ fn request_rows(view: &View, controller: &Controller, list: &[&Request], width: 
             "No request matches the filters."
         };
         out.push(vec![seg(format!("  {why}"), C::DarkGray)]);
+        if controller.requests.items.is_empty() {
+            out.extend(silent_apps(controller));
+        }
     }
     let top = view.index.saturating_sub(height / 2).min(list.len().saturating_sub(height));
     for (index, request) in list.iter().enumerate().skip(top).take(height) {
@@ -382,6 +385,39 @@ fn request_rows(view: &View, controller: &Controller, list: &[&Request], width: 
         out.push(aim(row, Target::Item(index)));
     }
     out
+}
+
+/// The .NET apps up but without ASP.NET's own log in their output ("Now listening on"): they log somewhere else
+/// (Serilog to Seq, say), so their requests can't show here - and what to do about it.
+fn silent_apps(controller: &Controller) -> Vec<Vec<Seg>> {
+    let silent: Vec<&str> = controller
+        .apps
+        .iter()
+        .zip(&controller.states)
+        .filter(|(app, state)| {
+            app.traits().builds
+                && state.is_up()
+                && !state.output.newest_first(0).any(|line| line.text.contains("Now listening on"))
+        })
+        .map(|(app, _)| app.name.as_str())
+        .collect();
+    if silent.is_empty() {
+        return Vec::new();
+    }
+    let (names, print) =
+        if silent.len() == 1 { (silent[0].to_string(), "prints") } else { (silent.join(", "), "print") };
+    vec![
+        Vec::new(),
+        vec![seg(
+            format!("  {names} {print} no ASP.NET log to the console: it logs somewhere else (Serilog to Seq, say),"),
+            C::Yellow,
+        )],
+        vec![seg(
+            "  so its requests can't show here. \"args\" in its profile can switch that off for local runs,",
+            C::Yellow,
+        )],
+        vec![seg("  e.g. \"args\": [\"--Seq:ApiKey=\"] - README, Requests.", C::Yellow)],
+    ]
 }
 
 fn endpoint_rows(

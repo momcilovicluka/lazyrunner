@@ -304,7 +304,7 @@ mod tests {
 
     fn app(dotnet: bool) -> App {
         let kind = if dotnet {
-            AppKind::Dotnet { project: "a.csproj".into(), launch_profile: "A".into(), swagger: None }
+            AppKind::Dotnet { project: "a.csproj".into(), launch_profile: "A".into(), swagger: None, args: Vec::new() }
         } else {
             AppKind::Npm { dir: "web".into(), variants: Vec::<Variant>::new() }
         };

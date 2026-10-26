@@ -1488,3 +1488,16 @@ async fn the_hints_follow_the_focused_apps_state() {
     );
     assert!(!screen.frame().contains("[x] auto-update"), "the settings live in the , menu");
 }
+
+#[tokio::test]
+async fn an_empty_requests_view_names_the_api_that_logs_somewhere_else() {
+    let mut screen = screen("requests-silent", json!({}));
+    screen.running();
+    let at = screen.ui.now;
+    screen.controller.states[0].output.clear();
+    screen.controller.states[0].output.push("assignedTime: 11", at);
+    screen.press("H");
+    let frame = screen.frame();
+    assert!(frame.contains("Orders prints no ASP.NET log to the console"), "{frame}");
+    assert!(frame.contains("\"args\": [\"--Seq:ApiKey=\"]"), "{frame}");
+}

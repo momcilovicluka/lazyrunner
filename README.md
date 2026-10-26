@@ -373,6 +373,15 @@ context); each asks first, naming the database.
 
 ## Requests (`H`)
 
+An API that logs through Serilog (or anything else that replaces ASP.NET's logging) to somewhere other than the
+console - Seq, Application Insights - prints no request for lazyrunner to read, and the view says which one when it
+stays empty. `"args"` in that app's profile passes it what turns that off for local runs, after `dotnet run ... --`;
+an app that only logs to Seq when it has a Seq key, say:
+
+```json
+{ "key": "api", "type": "dotnet", "project": "src/Api/Api.csproj", "launchProfile": "Api", "args": ["--Seq:ApiKey="] }
+```
+
 lazyrunner starts the .NET apps with ASP.NET's request log turned on (`--Logging:LogLevel:Microsoft.AspNetCore.
 Hosting.Diagnostics=Information`) and keeps those lines out of the columns: `H` lists the requests instead - time,
 app, method, status, milliseconds and path, newest first (`s`: slowest first). Serilog's request logging (`HTTP GET /x

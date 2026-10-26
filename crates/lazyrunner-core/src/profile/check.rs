@@ -26,7 +26,19 @@ pub struct Fields {
 pub const FIELDS: Fields = Fields {
     top: &["$schema", "schemaVersion", "extends", "id", "name", "detect", "watch", "apps"],
     detect: &["anyFile"],
-    dotnet: &["key", "name", "icon", "nerdIcon", "type", "project", "launchProfile", "swagger", "tests", "migrations"],
+    dotnet: &[
+        "key",
+        "name",
+        "icon",
+        "nerdIcon",
+        "type",
+        "project",
+        "launchProfile",
+        "swagger",
+        "args",
+        "tests",
+        "migrations",
+    ],
     npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "tests"],
     variant: &["label", "when", "script", "port", "servedBy", "ready"],
     when: &["packageScript"],
@@ -177,6 +189,11 @@ fn check_app<'a>(app: &'a Value, index: usize, keys: &mut HashMap<String, &'a Va
             let swagger = field(app, "swagger");
             if !swagger.is_null() && !text(swagger).starts_with('/') {
                 problems.push(format!("{at}.swagger must start with /, e.g. '/swagger'"));
+            }
+            let args = field(app, "args");
+            let all_text = |args: &Vec<Value>| args.iter().all(|arg| arg.as_str().is_some_and(|arg| !arg.is_empty()));
+            if !args.is_null() && !args.as_array().is_some_and(all_text) {
+                problems.push(format!("{at}.args must be a list of arguments, e.g. [\"--Seq:ApiKey=\"]"));
             }
             let setup = field(app, "migrations");
             if !setup.is_null() {

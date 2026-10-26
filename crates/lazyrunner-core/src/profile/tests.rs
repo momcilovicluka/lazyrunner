@@ -53,6 +53,7 @@ fn a_profile_loads_into_the_settings_lazyrunner_runs_with() {
         project: native("services/Orders/Orders.csproj"),
         launch_profile: "Orders".into(),
         swagger: Some("/swagger".into()),
+        args: Vec::new(),
     };
     assert_eq!(project.app("orders").unwrap().kind, expected, "this OS's separators");
     let icons: Vec<(&str, &str)> =
@@ -148,6 +149,12 @@ fn broken_profiles_get_one_clear_message_naming_the_field() {
             "a two-letter icon",
             Box::new(|d| d["apps"][0]["icon"] = json!("ab")),
             "apps[0] (orders).icon must be one character",
+            false,
+        ),
+        (
+            "args that aren't a list of text",
+            Box::new(|d| d["apps"][0]["args"] = json!("--Seq:ApiKey=")),
+            "apps[0] (orders).args must be a list of arguments",
             false,
         ),
         (
