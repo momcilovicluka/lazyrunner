@@ -67,6 +67,8 @@ pub struct AppState {
     last_level: String,
     /// The line before was a request log entry's header (its message comes next).
     request_header: bool,
+    /// Its requests started and not finished yet.
+    in_flight: requests::InFlight,
     log: Option<BufWriter<File>>,
     /// What the log file holds (so it starts over at `LOG_CAP`).
     log_bytes: u64,
@@ -101,6 +103,7 @@ impl AppState {
             flash_until: None,
             last_level: "info".into(),
             request_header: false,
+            in_flight: requests::InFlight::default(),
             log: None,
             log_bytes: 0,
             log_path: None,
@@ -203,7 +206,13 @@ impl AppState {
                     self.log_line(&text);
                     return None;
                 }
-                requests::Line::Finished(request) => {
+                requests::Line::Started(started) => {
+                    self.in_flight.start(started, self.output.total());
+                    self.log_line(&text);
+                    return None;
+                }
+                requests::Line::Finished(mut request) => {
+                    self.in_flight.finish(&mut request, self.output.total());
                     self.log_line(&text);
                     return Some(request);
                 }
@@ -254,6 +263,7 @@ impl AppState {
         self.warnings = 0;
         self.requests = 0;
         self.request_header = false;
+        self.in_flight.clear();
         self.cpu = None;
         for history in
             [&mut self.cpu_history, &mut self.memory_history, &mut self.response_history, &mut self.request_history]

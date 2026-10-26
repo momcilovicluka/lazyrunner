@@ -785,9 +785,41 @@ fn with_requests(screen: &mut Screen) {
         ("orders", "GET", "/api/orders/43", 200, 9.6),
     ] {
         let (method, path) = (method.to_string(), path.to_string());
-        let request = Finished { method, path, status, ms, length: "512".into(), content: "application/json".into() };
+        let (length, content) = ("512".into(), "application/json".into());
+        let request = Finished { method, path, status, ms, length, content, ..Finished::default() };
         screen.controller.requests.add(app, request, at);
     }
+}
+
+/// The failed request with what it logged meanwhile: a query, the exception; another request ran beside it.
+fn with_logged_request(screen: &mut Screen) {
+    use chrono::TimeZone;
+    use lazyrunner_core::run::requests::Finished;
+    let at = chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap();
+    let now = screen.ui.now;
+    let billing = screen.controller.states.iter_mut().find(|state| state.key == "billing").expect("billing");
+    let from = billing.output.total() + 1;
+    for (line, hue) in [
+        ("info: Microsoft.EntityFrameworkCore.Database.Command[20101]", Hue::Gray),
+        ("      Executed DbCommand (1,204ms) [Parameters=[@p0='7'], CommandType='Text']", Hue::Gray),
+        ("fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]", Hue::Red),
+        ("      System.InvalidOperationException: Invoice 7 has no currency.", Hue::Red),
+    ] {
+        billing.output.push_hued(line, Some(hue), now);
+    }
+    let request = Finished {
+        method: "POST".into(),
+        path: "/api/invoices/7/send".into(),
+        status: 500,
+        ms: 1530.0,
+        proto: "HTTP/2".into(),
+        sent_content: "application/json".into(),
+        sent_length: "86".into(),
+        logs: Some((from, billing.output.total())),
+        mixed: true,
+        ..Finished::default()
+    };
+    screen.controller.requests.add("billing", request, at);
 }
 
 #[tokio::test]
@@ -800,6 +832,42 @@ async fn the_requests_view_lists_the_newest_first_and_sums_up_endpoints() {
     let frame = screen.frame();
     let line = frame.lines().find(|line| line.contains("/api/orders/{id}")).expect("the endpoint");
     assert!(line.contains("      2      0"), "two requests, no errors: {line}");
+}
+
+#[tokio::test]
+async fn a_requests_details_show_what_it_logged_its_queries_and_what_it_sent() {
+    let mut screen = screen("requests-details", json!({}));
+    with_requests(&mut screen);
+    with_logged_request(&mut screen);
+    screen.press("H");
+    assert!(!screen.render(160, 30).contains("Log  4 lines"), "the details stay closed until asked for");
+    screen.press("Enter");
+    let frame = screen.render(160, 30);
+    assert!(frame.contains("500 Internal Server Error · 1530 ms"), "{frame}");
+    assert!(frame.contains("Billing · 09:41:07 · HTTP/2"), "{frame}");
+    assert!(frame.contains("sent      application/json · 86 bytes"), "{frame}");
+    assert!(frame.contains("Log  4 lines · 2 errors"), "{frame}");
+    assert!(frame.contains("DB 1 commands · 1204 ms · 79% of its time"), "{frame}");
+    assert!(frame.contains("Possibly mixed"), "{frame}");
+    assert!(frame.contains("  System.InvalidOperationException: Invoice 7"), "{frame}");
+    screen.press("j");
+    assert!(screen.render(160, 30).contains("Its log lines aren't known"), "a request without a start line");
+    screen.press("Esc");
+    assert!(!screen.render(160, 30).contains("Its log lines aren't known"), "Esc closes the details");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Requests(_))), "and only the details");
+}
+
+#[tokio::test]
+async fn an_endpoints_details_show_its_times_statuses_and_slowest_and_failing_requests() {
+    let mut screen = screen("endpoint-details", json!({}));
+    with_requests(&mut screen);
+    screen.press("H Tab j j Space");
+    let frame = screen.render(160, 30);
+    assert!(frame.contains("Orders · 2 requests · 0 errors (0%)"), "{frame}");
+    assert!(frame.contains("statuses  200 ×2"), "{frame}");
+    assert!(frame.contains("     12 ms  09:41:07  /api/orders/42"), "the slowest first: {frame}");
+    screen.press("g");
+    assert!(screen.render(160, 30).contains("Latest failing"), "{}", screen.render(160, 30));
 }
 
 #[tokio::test]

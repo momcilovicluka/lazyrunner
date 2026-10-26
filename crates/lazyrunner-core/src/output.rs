@@ -120,6 +120,14 @@ impl Output {
         self.total
     }
 
+    /// The lines numbered `first..=last` still kept (the first line ever pushed is 1).
+    pub fn numbered(&self, first: u64, last: u64) -> impl Iterator<Item = &OutputLine> {
+        let oldest = self.total + 1 - self.lines.len() as u64;
+        let skip = first.saturating_sub(oldest) as usize;
+        let take = (last + 1).saturating_sub(first.max(oldest)) as usize;
+        self.lines.iter().skip(skip).take(take)
+    }
+
     pub fn errors(&self) -> u64 {
         self.errors
     }

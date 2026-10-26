@@ -54,6 +54,10 @@ async fn request_lines_go_to_the_requests_view_and_the_probe_is_left_out() {
     for line in [
         "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
         "      Request finished HTTP/1.1 GET http://localhost:58201/swagger/index.html - 200 - text/html 3.1ms",
+        "info: Microsoft.AspNetCore.Hosting.Diagnostics[1]",
+        "      Request starting HTTP/1.1 GET http://localhost:58201/api/orders/7 - - -",
+        "warn: Orders.Api[0]",
+        "      Order 7 not found",
         "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
         "      Request finished HTTP/1.1 GET http://localhost:58201/api/orders/7 - 404 0 - 12.5ms",
         "info: Orders.Api[0]",
@@ -65,7 +69,10 @@ async fn request_lines_go_to_the_requests_view_and_the_probe_is_left_out() {
     assert_eq!(paths, ["/api/orders/7"], "not the probe");
     assert_eq!(sample.requests.items[0].endpoint, "/api/orders/{id}");
     assert_eq!(sample.states[0].requests, 1, "the req/s count");
-    assert_eq!(sample.states[0].output.len(), 1, "only the app's own line shows in its column");
+    assert_eq!(sample.states[0].output.len(), 3, "only the app's own lines show in its column");
+    let (first, last) = sample.requests.items[0].logs.expect("its start line was seen");
+    let logged: Vec<&str> = sample.states[0].output.numbered(first, last).map(|line| line.text.as_str()).collect();
+    assert_eq!(logged, ["warn: Orders.Api[0]", "      Order 7 not found"], "what it logged while it ran");
 }
 
 #[tokio::test]

@@ -10,39 +10,90 @@
 <text x="215.6" y="61.7" fill="#6c7086" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> endpoints    10 shown · </text>
 <text x="425.6" y="61.7" fill="#f38ba8" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 errors</text>
 <text x="492.8" y="61.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> · avg 166 ms</text>
-<text x="14.0" y="79.7" fill="#6c7086" textLength="1058.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Tab requests/endpoints · j k choose · e errors only · a app · s sort (time) · / filter · y copy · w open · c clear · Esc back</text>
+<text x="14.0" y="79.7" fill="#6c7086" textLength="1260.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Tab requests/endpoints · j k choose · Enter details · e errors only · a app · s sort (time) · / filter · y copy · w open · o log · c clear · Esc back</text>
 <text x="14.0" y="97.7" fill="#89dceb" textLength="403.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> TIME      APP       METHOD STATUS      MS  PATH</text>
-<rect x="14.0" y="102.0" width="1428.0" height="18" fill="#cba6f7"/>
-<text x="14.0" y="115.7" fill="#1e1e2e" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:52  Orders    GET       404       4  /api/vouchers/SPRING                                                                                                          </text>
+<text x="652.4" y="97.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="97.7" fill="#ffffff" textLength="184.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">GET /api/invoices/1042</text>
+<text x="14.0" y="115.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:52  Orders    GET   </text>
+<text x="240.8" y="115.7" fill="#f9e2af" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    404</text>
+<text x="299.6" y="115.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       4  /api/vouchers/SPRING            </text>
+<text x="652.4" y="115.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="115.7" fill="#f38ba8" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">500 Internal Server Error</text>
+<text x="879.2" y="115.7" fill="#f9e2af" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> · 1532 ms</text>
 <text x="14.0" y="133.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:47  Orders    GET   </text>
 <text x="240.8" y="133.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    200</text>
-<text x="299.6" y="133.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      12  /api/orders?page=2                                                                                                            </text>
+<text x="299.6" y="133.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      12  /api/orders?page=2              </text>
+<text x="652.4" y="133.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="133.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Billing · 09:40:21 · HTTP/1.1</text>
 <text x="14.0" y="151.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:41  Billing   GET   </text>
 <text x="240.8" y="151.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    200</text>
-<text x="299.6" y="151.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       5  /api/invoices/1041                                                                                                            </text>
+<text x="299.6" y="151.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       5  /api/invoices/1041              </text>
+<text x="652.4" y="151.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="14.0" y="169.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:33  Orders    PUT   </text>
 <text x="240.8" y="169.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    204</text>
-<text x="299.6" y="169.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      32  /api/orders/1043/items                                                                                                        </text>
+<text x="299.6" y="169.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      32  /api/orders/1043/items          </text>
+<text x="652.4" y="169.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="169.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">sent      </text>
+<text x="753.2" y="169.7" fill="#cdd6f4" textLength="688.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">no body                                                                           </text>
 <text x="14.0" y="187.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:28  Orders    GET   </text>
 <text x="240.8" y="187.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    200</text>
-<text x="299.6" y="187.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       6  /api/orders/1043                                                                                                              </text>
-<text x="14.0" y="205.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:21  Billing   GET   </text>
-<text x="240.8" y="205.7" fill="#f38ba8" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    500</text>
-<text x="299.6" y="205.7" fill="#f9e2af" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    1532</text>
-<text x="366.8" y="205.7" fill="#cdd6f4" textLength="1075.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  /api/invoices/1042                                                                                                            </text>
+<text x="299.6" y="187.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       6  /api/orders/1043                </text>
+<text x="652.4" y="187.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="187.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">returned  </text>
+<text x="753.2" y="187.7" fill="#cdd6f4" textLength="688.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">application/json · 512 bytes                                                      </text>
+<rect x="14.0" y="192.0" width="638.4" height="18" fill="#cba6f7"/>
+<text x="14.0" y="205.7" fill="#1e1e2e" textLength="638.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:21  Billing   GET       500    1532  /api/invoices/1042              </text>
+<text x="652.4" y="205.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="14.0" y="223.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:15  Orders    POST  </text>
 <text x="240.8" y="223.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    201</text>
-<text x="299.6" y="223.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      43  /api/orders                                                                                                                   </text>
+<text x="299.6" y="223.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      43  /api/orders                     </text>
+<text x="652.4" y="223.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="223.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Log </text>
+<text x="702.8" y="223.7" fill="#cdd6f4" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 10 lines</text>
+<text x="778.4" y="223.7" fill="#f38ba8" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> · 4 errors</text>
 <text x="14.0" y="241.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:09  Billing   GET   </text>
 <text x="240.8" y="241.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    200</text>
-<text x="299.6" y="241.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       9  /api/invoices                                                                                                                 </text>
+<text x="299.6" y="241.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       9  /api/invoices                   </text>
+<text x="652.4" y="241.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="241.7" fill="#94e2d5" textLength="495.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">DB 2 commands · 1499 ms · 98% of its time · slowest 1488 ms</text>
 <text x="14.0" y="259.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:04  Orders    GET   </text>
 <text x="240.8" y="259.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    200</text>
-<text x="299.6" y="259.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       7  /api/orders/1042                                                                                                              </text>
+<text x="299.6" y="259.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       7  /api/orders/1042                </text>
+<text x="652.4" y="259.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="259.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.EntityFrameworkCore.Database.Command[20101]                                 </text>
 <text x="14.0" y="277.7" fill="#6c7086" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:40:00  Orders    GET   </text>
 <text x="240.8" y="277.7" fill="#a6e3a1" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    200</text>
-<text x="299.6" y="277.7" fill="#cdd6f4" textLength="1142.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      14  /api/orders?page=1                                                                                                            </text>
-<text x="14.0" y="601.7" fill="#ffffff" textLength="747.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> GET /api/vouchers/SPRING   404 · 4 ms · 512 bytes · application/json · Orders · 09:40:52</text>
+<text x="299.6" y="277.7" fill="#cdd6f4" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      14  /api/orders?page=1              </text>
+<text x="652.4" y="277.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="277.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Executed DbCommand (11ms) [Parameters=[@__id_0='1042'], CommandType='Text', CommandTimeout</text>
+<text x="652.4" y="295.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="295.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">='30']                                                                                      </text>
+<text x="652.4" y="313.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="313.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  SELECT TOP(1) [i].[Id], [i].[Total] FROM [Invoices] AS [i] WHERE [i].[Id] = @__id_0       </text>
+<text x="652.4" y="331.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="331.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.EntityFrameworkCore.Database.Command[20101]                                 </text>
+<text x="652.4" y="349.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="349.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Executed DbCommand (1488ms) [Parameters=[@__id_0='1042'], CommandType='Text', CommandTimeo</text>
+<text x="652.4" y="367.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="367.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ut='30']                                                                                    </text>
+<text x="652.4" y="385.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="385.7" fill="#cdd6f4" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  SELECT [l].[Id], [l].[Amount] FROM [InvoiceLines] AS [l] WHERE [l].[InvoiceId] = @__id_0  </text>
+<text x="652.4" y="403.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="403.7" fill="#f38ba8" textLength="621.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]</text>
+<text x="652.4" y="421.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="421.7" fill="#f38ba8" textLength="554.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  An unhandled exception has occurred while executing the request.</text>
+<text x="652.4" y="439.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="439.7" fill="#f38ba8" textLength="546.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  System.InvalidOperationException: Invoice 1042 has no currency.</text>
+<text x="652.4" y="457.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="669.2" y="457.7" fill="#f38ba8" textLength="730.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">     at Billing.Invoices.InvoiceTotals.Sum(Invoice invoice) in InvoiceTotals.cs:line 31</text>
+<text x="652.4" y="475.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="652.4" y="493.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="652.4" y="511.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="652.4" y="529.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="652.4" y="547.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="652.4" y="565.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="652.4" y="583.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="652.4" y="601.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="14.0" y="619.7" fill="#6c7086" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Catppuccin Mocha </text>
 <rect x="14.0" y="624.0" width="100.8" height="18" fill="#94e2d5"/>
 <text x="14.0" y="637.7" fill="#11111b" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> lazyrunner </text>

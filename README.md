@@ -375,8 +375,18 @@ app, method, status, milliseconds and path, newest first (`s`: slowest first). S
 responded 200 in 12 ms`) shows too. `Tab` sums them up per endpoint (ids in paths become `{id}`): count, errors,
 average, 95th percentile and slowest, sorted by total time (`s` for the others).
 
-`e` shows errors only, `a` one app, `/` filters by path; `y` copies the selected row, `w` (or a double click) opens a
-GET request in the browser, `c` clears the list, `Esc` / `q` / `H` close. The top row follows new requests; any other
+`Enter` (or `Space`, or a double click) shows the selected row's details in a panel on the right, and again hides
+it; `Esc` hides it too. A request's: its status,
+time, protocol, what it sent and returned, and - once its endpoint has a few requests - how it compares with them (p50,
+p95). Below, what the app logged while it ran, from ASP.NET's "Request starting" line to its "Request finished" one:
+the line count, the errors, the EF Core database commands (`Executed DbCommand`: how many, their total time and its
+share of the request's, the slowest), then the lines themselves, the newest that fit. When other requests of the app ran
+at the same time some of those lines may be theirs, and the panel says so. An endpoint's: count and errors, average,
+p50, p95 and slowest, a sparkline of its latest times, its statuses, its slowest and its latest failing requests.
+Serilog's request log has no start line, so its requests come without their log lines.
+
+`e` shows errors only, `a` one app, `/` filters by path; `y` copies the selected row, `w` opens a GET request in the
+browser, `o` opens the selected row's app log, `c` clears the list, `Esc` / `q` / `H` close. The top row follows new requests; any other
 row stays put as new ones arrive. The last 5,000 are kept while lazyrunner runs (lazyrunner's own response-time probe
 isn't among them); the full lines are still in each app's log file.
 
