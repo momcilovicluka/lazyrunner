@@ -5,13 +5,18 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
+use std::time::Duration;
 
 use lazyrunner_core::config::Toggle;
-use lazyrunner_core::run::tools::find_on_path;
+use lazyrunner_core::profile::native;
+use lazyrunner_core::run::tools::{find_on_path, git, running_in};
 use serde_json::Value;
 
 /// What `"gitTool"` is when the settings don't say.
 pub const DEFAULT: &str = "lazygit";
+
+/// How long a pane opened beside takes to show its tool: `L` again meanwhile doesn't open another.
+pub const BESIDE_STARTING: Duration = Duration::from_secs(3);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GitTool {
@@ -59,6 +64,16 @@ impl GitTool {
     /// Runs it in this terminal (the caller has handed the terminal over) until it quits.
     pub fn run(&self, root: &Path) -> std::io::Result<ExitStatus> {
         Command::new(&self.program).args(&self.args).current_dir(root).status()
+    }
+
+    /// Whether it already runs in the project: in its folder, or in its repo's top folder (lazygit moves there when
+    /// the project is a subfolder) - in a pane beside lazyrunner, or anywhere else.
+    pub fn is_open_in(&self, root: &Path) -> bool {
+        let name = self.program.file_name().map_or(self.name.clone(), |name| name.to_string_lossy().into_owned());
+        let top = git(root, &["rev-parse", "--show-toplevel"]).map(|top| PathBuf::from(native(&top)));
+        let mut dirs = vec![root];
+        dirs.extend(top.as_deref());
+        running_in(&name, &dirs)
     }
 
     /// Opens it in a Windows Terminal pane beside this one; returns at once.
