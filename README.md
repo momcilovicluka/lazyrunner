@@ -632,8 +632,8 @@ The repo has to be public: the installer and the self-update download its releas
 
 The About box lists who makes lazyrunner from [contributors.json](contributors.json), which nobody edits by hand: the
 `contributors` workflow (`.github/workflows/contributors.yml`) writes it from the repo whenever an issue is opened or
-closed, a pull request is merged, and once a day. Code counts by commits and merged pull requests; bug reports and
-ideas by the issue forms' labels (`bug`, `enhancement`). Someone with a merged pull request or three issues is listed;
+closed, a pull request is merged, and once a day. Code counts by merged pull requests (not commits: they change
+with every push); bug reports and ideas by the issue forms' labels (`bug`, `enhancement`). Someone with a merged pull request or three issues is listed;
 [.github/contributors-overrides.json](.github/contributors-overrides.json) pins people first (with a role or a name),
 hides them, or changes those thresholds. To run it by hand: `GITHUB_TOKEN=<token> node .github/scripts/contributors.mjs`.
 

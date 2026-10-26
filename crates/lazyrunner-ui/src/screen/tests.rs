@@ -1271,6 +1271,18 @@ async fn a_click_on_a_link_opens_the_url_or_the_file_at_its_line() {
 
 // ---------------------------------------------------------------- about
 
+/// A fixed list of contributors in the state folder, newer than the one built in - which the repo's workflow keeps
+/// changing.
+fn with_contributors(screen: &Screen) {
+    let dir = &screen.controller.paths().state_dir;
+    std::fs::create_dir_all(dir).unwrap();
+    let list = json!({ "updated": "2999-01-01", "people": [
+        { "login": "momcilovicluka", "name": "Luka Momčilović", "role": "creator · maintainer" },
+        { "login": "ognjen004028", "name": "Ognjen Maričić", "prs": 1, "bugs": 2, "ideas": 7, "issues": 9 },
+    ] });
+    std::fs::write(dir.join("contributors.json"), list.to_string()).unwrap();
+}
+
 fn overlay(screen: &Screen) -> Option<&'static str> {
     screen.ui.overlay.as_ref().map(Overlay::kind)
 }
@@ -1278,6 +1290,7 @@ fn overlay(screen: &Screen) -> Option<&'static str> {
 #[tokio::test]
 async fn the_about_box_shows_the_version_and_who_makes_it_and_opens_its_links() {
     let mut screen = screen("about", json!({}));
+    with_contributors(&screen);
     screen.press(", A");
     assert_eq!(overlay(&screen), Some("about"));
     let frame = screen.frame();
@@ -1318,6 +1331,7 @@ async fn the_palette_finds_the_about_box_and_a_double_click_opens_a_link() {
 #[tokio::test]
 async fn the_about_box_on_a_tall_screen_has_its_logo() {
     let mut screen = screen("about-tall", json!({ "reducedMotion": true }));
+    with_contributors(&screen);
     screen.press(", A");
     insta::assert_snapshot!(screen.render(SIZE.0, 44));
 }
