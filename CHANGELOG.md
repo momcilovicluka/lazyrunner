@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.10.2] - 2026-10-26
+
+### Fixed
+- `L` with `"gitBeside"` on opens the git tool beside lazyrunner once: more presses while its pane starts are ignored, and while it runs in the project - its folder or its repo's top one, beside lazyrunner or in another window - the log says so instead of opening another (#13, thanks @ognjen004028)
+
 ## [1.10.1] - 2026-10-26
 
 ### Changed

@@ -127,6 +127,11 @@ pub fn has_tools(tools: &[&str]) -> bool {
 /// A clock tests move by hand: set a controller's `now` to `clock::now`, then `clock::advance`. Per thread (each
 /// test runs on its own).
 pub mod clock {
+    #![allow(
+        clippy::missing_const_for_thread_local,
+        reason = "clippy 1.99 flags `thread_local!` blocks whose statics are already `const { .. }` or can't be"
+    )]
+
     use std::cell::Cell;
     use std::time::{Duration, Instant};
 
