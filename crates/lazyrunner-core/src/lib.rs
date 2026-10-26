@@ -3,6 +3,7 @@
 pub mod apptypes;
 pub mod changelog;
 pub mod config;
+pub mod contributors;
 pub mod ipc;
 pub mod json;
 pub mod links;

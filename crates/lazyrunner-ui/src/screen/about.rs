@@ -1,9 +1,11 @@
-//! The About box (`,` then `A`, or `:` about): lazyrunner's version, who makes it, and where to go next - the
-//! README, the changelog, the releases, the license, a bug report or an idea, the source, an update check. Its logo
+//! The About box (`,` then `A`, or `:` about): lazyrunner's version, who makes it - from the repo, by way of
+//! contributors.json - and where to go next: the README, the changelog, the releases, the license, a bug report or an
+//! idea, the source, an update check, everyone who contributed. Its logo
 //! shimmers in rainbow colours over a flowing rule, the title sparkles and the heart beats (all still with reduced
 //! motion).
 
 use lazyrunner_core::changelog;
+use lazyrunner_core::contributors;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::update::DEFAULT_REPO;
 use unicode_width::UnicodeWidthStr;
@@ -18,10 +20,6 @@ use super::{Overlay, Ui, keys};
 
 const VERSION: &str = changelog::VERSION;
 const INNER: usize = 72;
-/// Who makes lazyrunner, and what they do for it.
-const CONTRIBUTORS: [(&str, &str); 1] = [("Luka Momčilović", "creator · maintainer")];
-/// Who reported the bugs and asked for the features that shaped lazyrunner (their GitHub names).
-const REPORTERS: [(&str, &str); 1] = [("Ognjen Maričić", "@ognjen004028")];
 const RAINBOW: [C; 6] = [C::Red, C::Yellow, C::Green, C::Cyan, C::Blue, C::Magenta];
 const SPARKLES: [&str; 4] = ["✦", "✧", "⋆", "✧"];
 /// How fast the rainbow flows across the logo and its rule.
@@ -74,6 +72,13 @@ fn links() -> Vec<Link> {
         ),
         link("s", Icon::Source, "Source", "the code, on GitHub", page("")),
         link("u", Icon::Update, "Check for an update", "the startup checklist, now", Does::Run(Run::Checklist)),
+        link(
+            "p",
+            Icon::Person,
+            "Contributors",
+            "everyone, with their commits, on GitHub",
+            page("/graphs/contributors"),
+        ),
     ]
 }
 
@@ -87,7 +92,9 @@ fn encode(text: &str) -> String {
         .collect()
 }
 
-pub fn open(ui: &mut Ui) {
+/// Opens it with the newest list of contributors there is (the startup checklist may have fetched one since).
+pub fn open(ui: &mut Ui, controller: &Controller) {
+    ui.contributors = contributors::load(&controller.paths().state_dir);
     ui.overlay = Some(Overlay::About { index: 0 });
 }
 
@@ -155,18 +162,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         Vec::new(),
         vec![seg("  Core contributors", C::DarkCyan)],
     ];
-    for (name, role) in CONTRIBUTORS {
+    for person in &ui.contributors.people {
+        let (icon, color) = if person.builds() { (Icon::Person, C::Magenta) } else { (Icon::Idea, C::Yellow) };
+        let name = pad(&person.name, NAME_CELLS);
         lines.push(vec![
-            seg(format!("   {} ", icons::icon(nerd, Icon::Person)), C::Magenta),
-            seg(format!("{name:<NAME_CELLS$}"), C::White),
-            seg(role, C::DarkGray),
-        ]);
-    }
-    for (name, github) in REPORTERS {
-        lines.push(vec![
-            seg(format!("   {} ", icons::icon(nerd, Icon::Idea)), C::Yellow),
-            seg(format!("{name:<NAME_CELLS$}"), C::White),
-            seg(format!("bug reports & ideas · {github}"), C::DarkGray),
+            seg(format!("   {} ", icons::icon(nerd, icon)), color),
+            seg(format!("{name} "), C::White),
+            seg(format!("{} · @{}", person.summary(), person.login), C::DarkGray),
         ]);
     }
     lines.push(Vec::new());
