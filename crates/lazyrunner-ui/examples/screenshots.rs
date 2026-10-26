@@ -170,7 +170,28 @@ fn migrations(demo: &mut Demo) {
     demo.ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
 }
 
-/// The requests view: what the APIs served over the last minute, a slow one and a failed one among them.
+/// What Billing logged while it failed the slow request: two queries, the second slow, then the exception.
+const FAILED_LOG: [(&str, Hue); 10] = [
+    ("info: Microsoft.EntityFrameworkCore.Database.Command[20101]", Hue::Gray),
+    (
+        "      Executed DbCommand (11ms) [Parameters=[@__id_0='1042'], CommandType='Text', CommandTimeout='30']",
+        Hue::Gray,
+    ),
+    ("      SELECT TOP(1) [i].[Id], [i].[Total] FROM [Invoices] AS [i] WHERE [i].[Id] = @__id_0", Hue::Gray),
+    ("info: Microsoft.EntityFrameworkCore.Database.Command[20101]", Hue::Gray),
+    (
+        "      Executed DbCommand (1488ms) [Parameters=[@__id_0='1042'], CommandType='Text', CommandTimeout='30']",
+        Hue::Gray,
+    ),
+    ("      SELECT [l].[Id], [l].[Amount] FROM [InvoiceLines] AS [l] WHERE [l].[InvoiceId] = @__id_0", Hue::Gray),
+    ("fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]", Hue::Red),
+    ("      An unhandled exception has occurred while executing the request.", Hue::Red),
+    ("      System.InvalidOperationException: Invoice 1042 has no currency.", Hue::Red),
+    ("         at Billing.Invoices.InvoiceTotals.Sum(Invoice invoice) in InvoiceTotals.cs:line 31", Hue::Red),
+];
+
+/// The requests view: what the APIs served over the last minute, a slow one and a failed one among them - that one
+/// selected, with what it logged.
 fn requests(demo: &mut Demo) {
     let served = [
         ("orders", "GET", "/api/orders?page=1", 200, 14.2, 0),
@@ -184,18 +205,37 @@ fn requests(demo: &mut Demo) {
         ("orders", "GET", "/api/orders?page=2", 200, 12.0, 47),
         ("orders", "GET", "/api/vouchers/SPRING", 404, 3.9, 52),
     ];
+    let now = demo.ui.now;
     for (app, method, path, status, ms, second) in served {
-        let request = Finished {
+        let mut request = Finished {
             method: method.into(),
             path: path.into(),
             status,
             ms,
             length: "512".into(),
             content: "application/json".into(),
+            proto: "HTTP/1.1".into(),
+            ..Finished::default()
         };
+        if method != "GET" {
+            (request.sent_content, request.sent_length) = ("application/json".into(), "86".into());
+        }
+        if let Some(state) = demo.controller.states.iter_mut().find(|state| state.key == app) {
+            let from = state.output.total() + 1;
+            if status == 500 {
+                for (line, hue) in FAILED_LOG {
+                    state.output.push_hued(line, Some(hue), now);
+                }
+            }
+            request.logs = Some((from, state.output.total()));
+        }
         demo.controller.requests.add(app, request, today(9, 40, second));
     }
     demo.press(KeyCode::Char('H'));
+    for _ in 0..5 {
+        demo.press(KeyCode::Char('j'));
+    }
+    demo.press(KeyCode::Enter);
 }
 
 fn about(demo: &mut Demo) {

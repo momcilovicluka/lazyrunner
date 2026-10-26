@@ -79,8 +79,8 @@
 <text x="1030.4" y="205.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="408.8" y="223.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="425.6" y="223.7" fill="#f9e2af" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ⇩ </text>
-<text x="459.2" y="223.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">v1.7.0</text>
-<text x="509.6" y="223.7" fill="#6c7086" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> · released 2026-10-23 · windows x86_64 · running Sample</text>
+<text x="459.2" y="223.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">v1.9.0</text>
+<text x="509.6" y="223.7" fill="#6c7086" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> · released 2026-10-26 · windows x86_64 · running Sample</text>
 <text x="1030.4" y="223.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="408.8" y="241.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="425.6" y="241.7" fill="#cdd6f4" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Runs a project's .NET and npm apps side by side.                      </text>

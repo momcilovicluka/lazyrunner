@@ -1,12 +1,14 @@
 //! H: the HTTP requests the .NET apps served, newest (or slowest) first, or summed up per endpoint: count, errors,
 //! average, 95th percentile, slowest. Errors only, one app, a path filter; y copies a row, w opens a GET request.
+//! Enter (or Space) shows the selected row's details in a panel on the right: a request's log lines, database
+//! commands and how it compares with its endpoint; an endpoint's times, statuses, slowest and failing requests.
 
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
 
-use super::columns::{contains_ignore_case, fit};
+use super::columns::{contains_ignore_case, fit, line_color};
 use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg, take_cells};
@@ -24,6 +26,21 @@ const APP_CELLS: usize = 8;
 const REQUEST_FIXED: usize = 46;
 const ENDPOINT_FIXED: usize = 54;
 const SORTS: [&str; 2] = ["time", "slowest"];
+/// The details panel takes at least this many columns; on a screen too narrow for it the selected request fits the
+/// last row.
+const PANEL_MIN: usize = 40;
+/// The list's share of a wide screen, in twentieths, and the least room it leaves the path (or endpoint).
+const LIST_SHARE: usize = 9;
+const LIST_PATH: usize = 20;
+/// A log line wraps onto this many rows at most.
+const LOG_WRAP: usize = 4;
+/// An endpoint's slowest and failing requests listed, at most.
+const LISTED: usize = 5;
+/// An endpoint's latest request times in its sparkline, at most.
+const SPARK_MAX: usize = 60;
+/// An endpoint with fewer requests isn't compared with.
+const USUAL_MIN: usize = 5;
+const SPARKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const ENDPOINT_SORTS: [&str; 5] = ["total", "avg", "max", "count", "errors"];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -48,6 +65,8 @@ pub struct View {
     pub endpoint_sort: usize,
     pub filter: String,
     pub typing: bool,
+    /// The details panel is open (Enter / Space).
+    pub details: bool,
 }
 
 impl Default for View {
@@ -63,6 +82,7 @@ impl Default for View {
             endpoint_sort: 0,
             filter: String::new(),
             typing: false,
+            details: false,
         }
     }
 }
@@ -103,8 +123,9 @@ fn summed(view: &View, controller: &Controller) -> Vec<Endpoint> {
     list
 }
 
-/// Tab requests / endpoints, j k choose, e errors only, a app, s sort, / filter by path, y copy, w / Enter open a
-/// GET request, c clear, Esc / q / H back; false for a key it doesn't use.
+/// Tab requests / endpoints, j k choose, Enter / Space details, e errors only, a app, s sort, / filter by path, y copy,
+/// w open a GET request, o the app's log, c clear, Esc the details or back, q / H back; false for a key it doesn't
+/// use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) -> bool {
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return false };
     if view.typing {
@@ -127,7 +148,9 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         Tab::Endpoints => summed(view, controller).len(),
     };
     match name {
+        "Escape" if view.details => view.details = false,
         "Escape" | "q" | "H" => ui.overlay = None,
+        "Enter" | "Space" => view.details = !view.details,
         "Tab" => {
             view.tab = if view.tab == Tab::Requests { Tab::Endpoints } else { Tab::Requests };
             (view.index, view.follow) = (0, true);
@@ -169,9 +192,13 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             let view = view.clone();
             copy_row(ui, controller, &view);
         }
-        "w" | "Enter" => {
+        "w" => {
             let view = view.clone();
             open_row(ui, controller, &view);
+        }
+        "o" => {
+            let view = view.clone();
+            open_log(ui, controller, &view);
         }
         _ => return false,
     }
@@ -238,6 +265,23 @@ fn open_row(ui: &Ui, controller: &mut Controller, view: &View) {
     }
 }
 
+/// o: the log of the selected row's app - all it printed, the request lines too.
+fn open_log(ui: &Ui, controller: &mut Controller, view: &View) {
+    let app = match view.tab {
+        Tab::Requests => shown(view, controller).get(view.index).map(|request| request.app.clone()),
+        Tab::Endpoints => summed(view, controller).get(view.index).map(|endpoint| endpoint.app.clone()),
+    };
+    let Some(state) = app.and_then(|app| controller.states.iter_mut().find(|state| state.key == app)) else { return };
+    state.flush_log();
+    match state.log_path.clone().filter(|path| path.exists()) {
+        Some(path) if (ui.opener)(&path.display().to_string()) => {
+            controller.add_log(format!("Opened {}", path.display()), Hue::DarkGray);
+        }
+        Some(path) => controller.add_log(format!("✗ Couldn't open {}", path.display()), Hue::Red),
+        None => controller.add_log("No log yet.", Hue::DarkGray),
+    }
+}
+
 // ---------------------------------------------------------------- the view
 
 fn ms(ms: f64) -> String {
@@ -280,7 +324,18 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     }
     let height = rows.saturating_sub(4);
     let mut out = vec![header(view, controller, &list, width, cursor, nerd), hint(view, controller, width)];
+    let least = if view.tab == Tab::Requests { REQUEST_FIXED } else { ENDPOINT_FIXED } + LIST_PATH;
+    let side_width = (width * LIST_SHARE / 20).max(least);
+    let side = view.details && width >= side_width + 2 + PANEL_MIN;
+    let list_width = if side { side_width } else { width };
+    let panel = (width.saturating_sub(list_width + 2), height + 2);
     match view.tab {
+        Tab::Requests if side => {
+            view.index = view.index.min(list.len().saturating_sub(1));
+            let left = request_rows(view, controller, &list, list_width, height + 1);
+            let right = request_details(controller, list.get(view.index).copied(), panel.0, panel.1);
+            out.extend(beside(left, right, list_width, panel));
+        }
         Tab::Requests => {
             view.index = view.index.min(list.len().saturating_sub(1));
             out.extend(request_rows(view, controller, &list, width, height));
@@ -290,7 +345,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         Tab::Endpoints => {
             let summed = summed(view, controller);
             view.index = view.index.min(summed.len().saturating_sub(1));
-            out.extend(endpoint_rows(view, controller, &summed, width, height + 1));
+            let left = endpoint_rows(view, controller, &summed, list_width, height + 1);
+            if side {
+                let right = endpoint_details(view, controller, summed.get(view.index), panel.0, panel.1);
+                out.extend(beside(left, right, list_width, panel));
+            } else {
+                out.extend(left);
+            }
         }
     }
     out.resize(rows, Vec::new());
@@ -305,6 +366,266 @@ fn detail(controller: &Controller, request: Option<&Request>) -> String {
     let (name, at) = (app_name(controller, &request.app), request.at.format("%H:%M:%S"));
     let (method, path, status) = (&request.method, &request.path, request.status);
     format!(" {method} {path}   {status} · {} ms{length}{content} · {name} · {at}", ms(request.ms))
+}
+
+/// The list on the left, the details on the right.
+fn beside(
+    left: Vec<Vec<Seg>>,
+    right: Vec<Vec<Seg>>,
+    list_width: usize,
+    (width, rows): (usize, usize),
+) -> Vec<Vec<Seg>> {
+    (0..rows)
+        .map(|row| {
+            let mut line = fit(left.get(row).cloned().unwrap_or_default(), list_width);
+            line.push(seg("│ ", C::FocusBorder));
+            line.extend(fit(right.get(row).cloned().unwrap_or_default(), width));
+            line
+        })
+        .collect()
+}
+
+/// `text` in lines of `cells`, at most `most` of them (the last one cut with "…").
+fn wrap(text: &str, cells: usize, most: usize) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut lines: Vec<String> = chars.chunks(cells.max(1)).map(|chunk| chunk.iter().collect()).collect();
+    if lines.len() > most {
+        let rest: String = lines[most - 1..].concat();
+        lines.truncate(most - 1);
+        lines.push(cut(&rest, cells));
+    }
+    lines
+}
+
+/// `text` in lines of at most `cells`, broken between words.
+fn words(text: &str, cells: usize) -> Vec<String> {
+    let mut lines = vec![String::new()];
+    for word in text.split_whitespace() {
+        let line = lines.last_mut().expect("a line");
+        if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > cells {
+            lines.push(word.to_string());
+        } else {
+            if !line.is_empty() {
+                line.push(' ');
+            }
+            line.push_str(word);
+        }
+    }
+    lines
+}
+
+fn reason(status: u16) -> &'static str {
+    match status {
+        200 => "OK",
+        201 => "Created",
+        202 => "Accepted",
+        204 => "No Content",
+        301 => "Moved Permanently",
+        302 => "Found",
+        304 => "Not Modified",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        403 => "Forbidden",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        409 => "Conflict",
+        415 => "Unsupported Media Type",
+        422 => "Unprocessable Entity",
+        429 => "Too Many Requests",
+        500 => "Internal Server Error",
+        502 => "Bad Gateway",
+        503 => "Service Unavailable",
+        504 => "Gateway Timeout",
+        _ => "",
+    }
+}
+
+/// A body's content type and length, or that there was none.
+fn body(content: &str, length: &str) -> String {
+    let length = if length.is_empty() || length == "0" { String::new() } else { format!("{length} bytes") };
+    match (content.is_empty(), length.is_empty()) {
+        (true, true) => "no body".into(),
+        (false, false) => format!("{content} · {length}"),
+        _ => format!("{content}{length}"),
+    }
+}
+
+/// How long a database command took, from EF Core's "Executed DbCommand (12ms)".
+fn db_ms(text: &str) -> Option<f64> {
+    let rest = text.split_once("Executed DbCommand (")?.1;
+    rest.split_once("ms)")?.0.replace(',', "").trim().parse().ok()
+}
+
+/// The selected request: what it was, how it compares with its endpoint, what it sent and returned, what it logged.
+fn request_details(controller: &Controller, request: Option<&Request>, width: usize, height: usize) -> Vec<Vec<Seg>> {
+    let Some(request) = request else { return vec![vec![seg("No request selected.", C::DarkGray)]] };
+    let mut lines: Vec<Vec<Seg>> = wrap(&format!("{} {}", request.method, request.path), width, 3)
+        .into_iter()
+        .map(|line| vec![seg(line, C::White)])
+        .collect();
+    let proto = if request.proto.is_empty() { String::new() } else { format!(" · {}", request.proto) };
+    let (name, at) = (app_name(controller, &request.app), request.at.format("%H:%M:%S"));
+    lines.push(vec![
+        seg(
+            format!("{} {}", request.status, reason(request.status)).trim_end().to_string(),
+            status_color(request.status),
+        ),
+        seg(format!(" · {} ms", ms(request.ms)), ms_color(request.ms)),
+    ]);
+    lines.push(vec![seg(format!("{name} · {at}{proto}"), C::DarkGray)]);
+    let same = controller.requests.items.iter().filter(|other| {
+        other.app == request.app && other.method == request.method && other.endpoint == request.endpoint
+    });
+    if let Some(usual) = endpoints(same).pop().filter(|usual| usual.count >= USUAL_MIN) {
+        let (verdict, color) = if request.ms > usual.p95 {
+            ("slower than 95% of them", C::Yellow)
+        } else if request.ms <= usual.p50 {
+            ("faster than half of them", C::Green)
+        } else {
+            ("as usual", C::DarkGray)
+        };
+        lines.push(vec![
+            seg(format!("{} requests · p50 {} · p95 {} ms · ", usual.count, ms(usual.p50), ms(usual.p95)), C::DarkGray),
+            seg(verdict, color),
+        ]);
+    }
+    lines.push(Vec::new());
+    lines.push(vec![seg("sent      ", C::DarkGray), seg(body(&request.sent_content, &request.sent_length), C::Gray)]);
+    lines.push(vec![seg("returned  ", C::DarkGray), seg(body(&request.content, &request.length), C::Gray)]);
+    lines.push(Vec::new());
+    let Some((first, last)) = request.logs else {
+        let why = "Its log lines aren't known: the app logs no \"Request starting\" line for it (Serilog's request log \
+                   says only when one finished).";
+        lines.extend(words(why, width).into_iter().map(|line| vec![seg(line, C::DarkGray)]));
+        return lines;
+    };
+    let logged: Vec<_> =
+        controller.state(&request.app).map_or_else(Vec::new, |state| state.output.numbered(first, last).collect());
+    let expected = (last + 1).saturating_sub(first) as usize;
+    let errors = logged.iter().filter(|line| line_color(line) == C::Red).count();
+    lines.push(vec![
+        seg("Log ", C::White),
+        seg(format!(" {expected} lines"), C::Gray),
+        seg(format!(" · {errors} errors"), if errors > 0 { C::Red } else { C::DarkGray }),
+    ]);
+    let times: Vec<f64> = logged.iter().filter_map(|line| db_ms(&line.text)).collect();
+    if !times.is_empty() {
+        let total: f64 = times.iter().sum();
+        let slowest = times.iter().copied().fold(0.0, f64::max);
+        let share = if request.ms > 0.0 {
+            format!(" · {:.0}% of its time", total / request.ms * 100.0)
+        } else {
+            String::new()
+        };
+        let text = format!("DB {} commands · {} ms{share} · slowest {} ms", times.len(), ms(total), ms(slowest));
+        lines.extend(words(&text, width).into_iter().map(|line| vec![seg(line, C::Cyan)]));
+    }
+    if request.mixed {
+        let text = "Possibly mixed: other requests of the app ran meanwhile, some lines may be theirs.";
+        lines.extend(words(text, width).into_iter().map(|line| vec![seg(line, C::Yellow)]));
+    }
+    if expected == 0 {
+        lines.push(vec![seg("It logged nothing.", C::DarkGray)]);
+        return lines;
+    }
+    if logged.len() < expected {
+        lines.push(vec![seg(format!("{} older lines aren't kept any more.", expected - logged.len()), C::DarkGray)]);
+    }
+    let wrapped: Vec<Vec<Vec<Seg>>> = logged
+        .iter()
+        .map(|line| {
+            let text = line.text.strip_prefix("      ").map_or_else(|| line.text.clone(), |rest| format!("  {rest}"));
+            wrap(&text, width, LOG_WRAP).into_iter().map(|row| vec![seg(row, line_color(line))]).collect()
+        })
+        .collect();
+    // The newest lines that fit, below a note of how many more there are.
+    let room = height.saturating_sub(lines.len()).max(1);
+    let mut kept = wrapped.len();
+    if wrapped.iter().map(Vec::len).sum::<usize>() > room {
+        let mut used = 1;
+        kept = wrapped
+            .iter()
+            .rev()
+            .take_while(|rows| (used + rows.len() <= room).then(|| used += rows.len()).is_some())
+            .count();
+        lines.push(vec![seg(format!("… {} more lines above (o opens the log)", wrapped.len() - kept), C::DarkGray)]);
+    }
+    let skip = wrapped.len() - kept;
+    lines.extend(wrapped.into_iter().skip(skip).flatten());
+    lines
+}
+
+/// The selected endpoint: its times, a sparkline of the latest, its statuses, its slowest and latest failing requests.
+fn endpoint_details(
+    view: &View,
+    controller: &Controller,
+    endpoint: Option<&Endpoint>,
+    width: usize,
+    height: usize,
+) -> Vec<Vec<Seg>> {
+    let Some(endpoint) = endpoint else { return vec![vec![seg("No endpoint selected.", C::DarkGray)]] };
+    let all = shown(&View { sort: 0, ..view.clone() }, controller);
+    let requests: Vec<&Request> = all
+        .into_iter()
+        .filter(|request| {
+            request.app == endpoint.app && request.method == endpoint.method && request.endpoint == endpoint.endpoint
+        })
+        .collect();
+    let mut lines: Vec<Vec<Seg>> = wrap(&format!("{} {}", endpoint.method, endpoint.endpoint), width, 2)
+        .into_iter()
+        .map(|line| vec![seg(line, C::White)])
+        .collect();
+    let share = endpoint.errors * 100 / endpoint.count.max(1);
+    lines.push(vec![
+        seg(format!("{} · {} requests · ", app_name(controller, &endpoint.app), endpoint.count), C::DarkGray),
+        seg(format!("{} errors ({share}%)", endpoint.errors), if endpoint.errors > 0 { C::Red } else { C::DarkGray }),
+    ]);
+    let mut times = vec![seg("avg", C::DarkGray)];
+    for (label, value) in
+        [("", endpoint.avg), (" · p50", endpoint.p50), (" · p95", endpoint.p95), (" · max", endpoint.max)]
+    {
+        times.push(seg(format!("{label} "), C::DarkGray));
+        times.push(seg(ms(value), ms_color(value)));
+    }
+    times.push(seg(" ms", C::DarkGray));
+    lines.push(times);
+    let latest: Vec<f64> = requests.iter().take(width.min(SPARK_MAX)).rev().map(|request| request.ms).collect();
+    let top = latest.iter().copied().fold(1.0, f64::max);
+    let spark: String = latest.iter().map(|ms| SPARKS[((ms / top * 7.999).floor() as usize).min(7)]).collect();
+    lines.push(vec![seg(spark, C::Cyan), seg("  latest", C::DarkGray)]);
+    let mut statuses: Vec<(u16, usize)> = Vec::new();
+    for request in &requests {
+        match statuses.iter_mut().find(|(status, _)| *status == request.status) {
+            Some((_, count)) => *count += 1,
+            None => statuses.push((request.status, 1)),
+        }
+    }
+    statuses.sort_unstable();
+    let mut row = vec![seg("statuses", C::DarkGray)];
+    row.extend(statuses.iter().map(|(status, count)| seg(format!("  {status} ×{count}"), status_color(*status))));
+    lines.push(row);
+    let listed = |request: &Request, first: Seg| {
+        let at = request.at.format("%H:%M:%S");
+        let path = cut(&request.path, width.saturating_sub(20));
+        vec![seg("  ", C::Gray), first, seg(format!("  {at}  "), C::DarkGray), seg(path, C::Gray)]
+    };
+    let mut slowest = requests.clone();
+    slowest.sort_by(|a, b| b.ms.total_cmp(&a.ms));
+    lines.push(Vec::new());
+    lines.push(vec![seg("Slowest", C::White)]);
+    for request in slowest.iter().take(LISTED) {
+        lines.push(listed(request, seg(format!("{:>7} ms", ms(request.ms)), ms_color(request.ms))));
+    }
+    let failing: Vec<&&Request> = requests.iter().filter(|request| request.status >= 400).take(LISTED).collect();
+    if !failing.is_empty() {
+        lines.push(Vec::new());
+        lines.push(vec![seg("Latest failing", C::White)]);
+        for request in failing {
+            lines.push(listed(request, seg(format!("{:>7}   ", request.status), status_color(request.status))));
+        }
+    }
+    lines.truncate(height);
+    lines
 }
 
 fn header(view: &View, controller: &Controller, list: &[&Request], width: usize, cursor: &str, nerd: bool) -> Vec<Seg> {
@@ -344,8 +665,8 @@ fn hint(view: &View, controller: &Controller, width: usize) -> Vec<Seg> {
         Tab::Endpoints => ENDPOINT_SORTS[view.endpoint_sort],
     };
     let text = format!(
-        " Tab requests/endpoints · j k choose · e errors only · a app · s sort ({sort}) · / filter · y copy · w open · \
-         c clear · Esc back"
+        " Tab requests/endpoints · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · \
+         y copy · w open · o log · c clear · Esc back"
     );
     fit(vec![seg(text, C::DarkGray)], width)
 }

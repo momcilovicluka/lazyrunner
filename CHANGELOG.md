@@ -3,6 +3,16 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.9.0] - 2026-10-26
+
+### Added
+- Details beside the requests view (`H`): `Enter` or `Space` (or a double click) shows and hides them, `Esc` hides them. A request's: status, time, protocol, what it sent and returned, how it compares with its endpoint (p50, p95), and what the app logged while it ran - errors, EF Core database commands (count, total, share of the request, slowest) and the lines themselves, marked possibly mixed when other requests ran at the same time
+- An endpoint's details: average, p50, p95 and slowest, a sparkline of its latest times, its statuses, its slowest and latest failing requests
+- `o` in the requests view opens the selected row's app log
+
+### Changed
+- In the requests view `Enter` and a double click show a row's details; `w` opens a GET request in the browser, as before
+
 ## [1.8.0] - 2026-10-26
 
 ### Added
