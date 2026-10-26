@@ -595,7 +595,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
                 ui.overlay = Some(Overlay::Changelog { lines, top: 0 });
             }
         }
-        Run::About => super::about::open(ui),
+        Run::About => super::about::open(ui, controller),
         Run::ReloadProfile => {
             let start = controller.states.iter().any(|state| state.is_running());
             reopen(ui, controller, controller.root.clone(), start, "reloading the project profile");

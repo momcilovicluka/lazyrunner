@@ -1,0 +1,39 @@
+name: contributors
+
+# Keeps contributors.json - the About box's list, which lazyrunner fetches once a day - in step with the repo: who
+# wrote code and who reported bugs and ideas. It checks out main only, never a pull request's code.
+on:
+  issues:
+    types: [opened, closed, reopened, labeled, unlabeled, deleted, transferred]
+  pull_request_target:
+    types: [closed]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: contributors
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.merged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: node .github/scripts/contributors.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit when it changed
+        run: |
+          git diff --quiet -- contributors.json && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add contributors.json
+          git commit -m "chore: contributors.json from GitHub"
+          git push origin HEAD:main

@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.10.0] - 2026-10-26
+
+### Added
+- The About box's contributors come from the repo: who wrote code (merged pull requests, commits) and who reported bugs and ideas, with what each did ("1 PR · 2 bug reports · 7 ideas"). A GitHub workflow keeps `contributors.json` up to date; lazyrunner fetches it at most once a day as it checks for updates and keeps the one built in for offline
+- `p` in the About box opens everyone who contributed, on GitHub
+
 ## [1.9.1] - 2026-10-26
 
 ### Fixed

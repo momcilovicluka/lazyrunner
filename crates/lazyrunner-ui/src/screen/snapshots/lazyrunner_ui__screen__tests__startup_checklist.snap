@@ -4,13 +4,13 @@ expression: screen.frame()
 ---
 
 
-           ┌─ ✧ lazyrunner v<version> · startup checklist ────────────────────────────────────────────┐
+           ┌─ ✧ lazyrunner v<version> · startup checklist ───────────────────────────────────────────┐
            │                                                                                      │
            │    █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                                           │
            │    █   █▀█ ▄▀  ▀█▀ █▀▄ █ █ █ █ █ █ █▀  █▀▄                                           │
            │    ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                                           │
            │                                                                                      │
-           │  ✓ lazyrunner         v<version>                                                         │
+           │  ✓ lazyrunner         v<version>                                                        │
            │  ✓ git                2.50                                                           │
            │  ! .NET SDK           9.0 - the apps want 10.0                                       │
            │  ⠋ Ports                                                                             │

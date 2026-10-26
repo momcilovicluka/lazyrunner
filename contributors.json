@@ -1,0 +1,25 @@
+{
+  "updated": "2026-10-26",
+  "people": [
+    {
+      "login": "momcilovicluka",
+      "name": "Luka Momčilović",
+      "role": "creator · maintainer",
+      "commits": 94,
+      "prs": 0,
+      "bugs": 0,
+      "ideas": 0,
+      "issues": 0
+    },
+    {
+      "login": "ognjen004028",
+      "name": "Ognjen Maričić",
+      "role": "",
+      "commits": 0,
+      "prs": 1,
+      "bugs": 2,
+      "ideas": 7,
+      "issues": 9
+    }
+  ]
+}
