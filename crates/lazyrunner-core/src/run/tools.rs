@@ -274,10 +274,47 @@ pub fn branch(git_dir: &Path) -> Option<String> {
     })
 }
 
+/// Whether a program with this name (`lazygit`, its `.exe` or not) runs with `dir` as its working folder. Processes
+/// whose folder can't be read (another user's, elevated) don't count.
+pub fn running_in(name: &str, dir: &Path) -> bool {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+    let stem = |text: &str| {
+        let lower = text.to_lowercase();
+        lower.strip_suffix(".exe").map_or(lower.clone(), str::to_string)
+    };
+    // Windows' folders differ in case and a trailing separator; `/` and `\` are the same.
+    let folder = |path: &Path| {
+        let text = path.to_string_lossy().replace('\\', "/");
+        let text = text.trim_end_matches('/');
+        if cfg!(windows) { text.to_lowercase() } else { text.to_string() }
+    };
+    let (name, dir) = (stem(name), folder(dir));
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::nothing().with_cwd(UpdateKind::OnlyIfNotSet),
+    );
+    system.processes().values().any(|process| {
+        stem(&process.name().to_string_lossy()) == name && process.cwd().is_some_and(|cwd| folder(cwd) == dir)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::testing::{TempDir, write};
+
+    #[test]
+    fn a_program_runs_in_its_working_folder_and_not_elsewhere() {
+        let me = std::env::current_exe().unwrap();
+        let name = me.file_name().unwrap().to_string_lossy().to_uppercase();
+        let here = std::env::current_dir().unwrap();
+        assert!(running_in(&name, &here));
+        assert!(running_in(&name, Path::new(&format!("{}/", here.display()))), "a trailing separator is the same");
+        assert!(!running_in(&name, &here.join("no-such-folder")));
+        assert!(!running_in("no-such-program-here", &here));
+    }
 
     #[test]
     fn the_branch_comes_from_head() {

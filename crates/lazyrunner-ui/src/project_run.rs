@@ -137,6 +137,8 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
     let far = started + Duration::from_secs(365 * 24 * 3600);
     // The git tool running in this terminal (L): lazyrunner neither draws nor reads keys until it quits.
     let mut git_tool: Option<(String, tokio::task::JoinHandle<io::Result<std::process::ExitStatus>>)> = None;
+    // When L last opened it in a pane beside lazyrunner.
+    let mut opened_beside: Option<Instant> = None;
 
     loop {
         let mut dirty = false;
@@ -277,7 +279,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         }
         notify(&mut controller, options.headless);
         if std::mem::take(&mut ui.git_tool_wanted) && git_tool.is_none() {
-            match open_git_tool(&mut controller) {
+            match open_git_tool(&mut controller, &mut opened_beside) {
                 Some(tool) => {
                     terminal_events = Box::pin(futures_util::stream::pending()); // its keys are its own
                     mouse.set(false);
@@ -360,8 +362,9 @@ fn terminal_input(headless: bool) -> Pin<Box<dyn Stream<Item = io::Result<Event>
 }
 
 /// L: the git tool found, or why not (in the log). Beside lazyrunner (Windows Terminal, "gitBeside") it opens there
-/// and `None` comes back too; here, the caller hands it the terminal.
-fn open_git_tool(controller: &mut Controller) -> Option<GitTool> {
+/// and `None` comes back too; here, the caller hands it the terminal. Beside, it opens once: not again while the
+/// pane it opened (`opened_beside`) is starting, or while it runs in the project's folder.
+fn open_git_tool(controller: &mut Controller, opened_beside: &mut Option<Instant>) -> Option<GitTool> {
     let tool = match GitTool::from_config(&controller.config) {
         Ok(tool) => tool,
         Err(why) => {
@@ -377,8 +380,18 @@ fn open_git_tool(controller: &mut Controller) -> Option<GitTool> {
         controller.add_log(format!("{} - q comes back to lazyrunner; the apps keep running", tool.name), Hue::Cyan);
         return Some(tool);
     }
+    if opened_beside.is_some_and(|at| at.elapsed() < git_tool::BESIDE_STARTING) {
+        return None; // L pressed again while its pane opens: that pane is the one
+    }
+    if tool.is_open_in(&controller.root) {
+        controller.add_log(format!("{} is already open beside lazyrunner", tool.name), Hue::DarkGray);
+        return None;
+    }
     match tool.open_beside(&controller.root) {
-        Ok(()) => controller.add_log(format!("Opened {} beside lazyrunner", tool.name), Hue::Cyan),
+        Ok(()) => {
+            *opened_beside = Some(Instant::now());
+            controller.add_log(format!("Opened {} beside lazyrunner", tool.name), Hue::Cyan);
+        }
         Err(why) => controller.add_log(format!("✗ {why}"), Hue::Red),
     }
     None
