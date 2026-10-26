@@ -35,7 +35,6 @@ pub struct Person {
     pub name: String,
     /// What they are to lazyrunner, when the maintainer says ("creator · maintainer").
     pub role: String,
-    pub commits: u32,
     pub prs: u32,
     pub bugs: u32,
     pub ideas: u32,
@@ -45,7 +44,7 @@ pub struct Person {
 impl Person {
     /// Wrote code for it, or has a role in it (the rest reported bugs and ideas).
     pub fn builds(&self) -> bool {
-        !self.role.is_empty() || self.prs > 0 || self.commits > 0
+        !self.role.is_empty() || self.prs > 0
     }
 
     /// What they did, in a few words: their role, or their pull requests and issues.
@@ -138,7 +137,7 @@ mod tests {
 
     #[test]
     fn a_summary_is_the_role_or_what_they_did() {
-        let maintainer = Person { role: "creator · maintainer".into(), commits: 90, ..person("a") };
+        let maintainer = Person { role: "creator · maintainer".into(), ..person("a") };
         assert_eq!(maintainer.summary(), "creator · maintainer");
         let reporter = Person { prs: 1, bugs: 2, ideas: 1, issues: 4, ..person("b") };
         assert_eq!(reporter.summary(), "1 PR · 2 bug reports · 1 idea · 1 issue");

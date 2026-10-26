@@ -1,6 +1,7 @@
-// Writes contributors.json - the About box's list - from GitHub: who wrote code (commits, merged pull requests) and
-// who reported bugs and ideas (issues, by the forms' labels). .github/contributors-overrides.json pins people (with a
-// role or name), hides them, and sets who counts as core. `updated` changes only when the list does.
+// Writes contributors.json - the About box's list - from GitHub: who wrote code (merged pull requests) and who
+// reported bugs and ideas (issues, by the forms' labels). No commit counts: they change with every push, and the list
+// would with them. .github/contributors-overrides.json pins people (with a role or name), hides them, and sets who
+// counts as core. `updated` changes only when the list does.
 //
 // In the contributors workflow; locally: GITHUB_TOKEN=<token> node .github/scripts/contributors.mjs
 
@@ -41,13 +42,10 @@ const isBot = (user) => !user || user.type === "Bot" || user.login.endsWith("[bo
 
 const people = new Map();
 function person(login) {
-  if (!people.has(login)) people.set(login, { login, commits: 0, prs: 0, bugs: 0, ideas: 0, issues: 0 });
+  if (!people.has(login)) people.set(login, { login, prs: 0, bugs: 0, ideas: 0, issues: 0 });
   return people.get(login);
 }
 
-for (const contributor of await all(`/repos/${REPO}/contributors`)) {
-  if (!isBot(contributor)) person(contributor.login).commits = contributor.contributions;
-}
 for (const pull of await all(`/repos/${REPO}/pulls?state=closed`)) {
   if (pull.merged_at && !isBot(pull.user)) person(pull.user.login).prs++;
 }
@@ -61,12 +59,13 @@ for (const issue of await all(`/repos/${REPO}/issues?state=all`)) {
 }
 
 const order = Object.keys(pinned);
+for (const login of order) person(login);
 const listed = [...people.values()]
   .filter((one) => !hidden.has(one.login))
   .filter((one) => one.login in pinned || one.prs >= core.prs || one.issues >= core.issues)
   .sort((a, b) => {
     const at = (one) => (order.includes(one.login) ? order.indexOf(one.login) : order.length);
-    return at(a) - at(b) || b.prs - a.prs || b.issues - a.issues || b.commits - a.commits || a.login.localeCompare(b.login);
+    return at(a) - at(b) || b.prs - a.prs || b.issues - a.issues || a.login.localeCompare(b.login);
   });
 
 for (const one of listed) {
@@ -75,8 +74,8 @@ for (const one of listed) {
   one.role = own.role ?? "";
 }
 
-const shaped = listed.map(({ login, name, role, commits, prs, bugs, ideas, issues }) => ({
-  login, name, role, commits, prs, bugs, ideas, issues,
+const shaped = listed.map(({ login, name, role, prs, bugs, ideas, issues }) => ({
+  login, name, role, prs, bugs, ideas, issues,
 }));
 const before = existsSync(OUT) ? JSON.parse(readFileSync(OUT, "utf8")) : {};
 const same = JSON.stringify(before.people) === JSON.stringify(shaped);
