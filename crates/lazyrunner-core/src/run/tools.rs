@@ -274,9 +274,9 @@ pub fn branch(git_dir: &Path) -> Option<String> {
     })
 }
 
-/// Whether a program with this name (`lazygit`, its `.exe` or not) runs with `dir` as its working folder. Processes
-/// whose folder can't be read (another user's, elevated) don't count.
-pub fn running_in(name: &str, dir: &Path) -> bool {
+/// Whether a program with this name (`lazygit`, its `.exe` or not) runs with one of `dirs` as its working folder.
+/// Processes whose folder can't be read (another user's, elevated) don't count.
+pub fn running_in(name: &str, dirs: &[&Path]) -> bool {
     use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
     let stem = |text: &str| {
         let lower = text.to_lowercase();
@@ -288,7 +288,7 @@ pub fn running_in(name: &str, dir: &Path) -> bool {
         let text = text.trim_end_matches('/');
         if cfg!(windows) { text.to_lowercase() } else { text.to_string() }
     };
-    let (name, dir) = (stem(name), folder(dir));
+    let (name, dirs): (String, Vec<String>) = (stem(name), dirs.iter().map(|dir| folder(dir)).collect());
     let mut system = System::new();
     system.refresh_processes_specifics(
         ProcessesToUpdate::All,
@@ -296,7 +296,7 @@ pub fn running_in(name: &str, dir: &Path) -> bool {
         ProcessRefreshKind::nothing().with_cwd(UpdateKind::OnlyIfNotSet),
     );
     system.processes().values().any(|process| {
-        stem(&process.name().to_string_lossy()) == name && process.cwd().is_some_and(|cwd| folder(cwd) == dir)
+        stem(&process.name().to_string_lossy()) == name && process.cwd().is_some_and(|cwd| dirs.contains(&folder(cwd)))
     })
 }
 
@@ -310,10 +310,12 @@ mod tests {
         let me = std::env::current_exe().unwrap();
         let name = me.file_name().unwrap().to_string_lossy().to_uppercase();
         let here = std::env::current_dir().unwrap();
-        assert!(running_in(&name, &here));
-        assert!(running_in(&name, Path::new(&format!("{}/", here.display()))), "a trailing separator is the same");
-        assert!(!running_in(&name, &here.join("no-such-folder")));
-        assert!(!running_in("no-such-program-here", &here));
+        let elsewhere = here.join("no-such-folder");
+        assert!(running_in(&name, &[&here]));
+        assert!(running_in(&name, &[Path::new(&format!("{}/", here.display()))]), "a trailing separator is the same");
+        assert!(running_in(&name, &[&elsewhere, &here]), "any of the folders");
+        assert!(!running_in(&name, &[&elsewhere]));
+        assert!(!running_in("no-such-program-here", &[&here]));
     }
 
     #[test]

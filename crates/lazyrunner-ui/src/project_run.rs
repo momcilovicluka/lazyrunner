@@ -384,7 +384,10 @@ fn open_git_tool(controller: &mut Controller, opened_beside: &mut Option<Instant
         return None; // L pressed again while its pane opens: that pane is the one
     }
     if tool.is_open_in(&controller.root) {
-        controller.add_log(format!("{} is already open beside lazyrunner", tool.name), Hue::DarkGray);
+        controller.add_log(
+            format!("{} is already running in this project (beside lazyrunner, or in another window)", tool.name),
+            Hue::DarkGray,
+        );
         return None;
     }
     match tool.open_beside(&controller.root) {

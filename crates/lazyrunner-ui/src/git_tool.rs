@@ -8,7 +8,8 @@ use std::process::{Command, ExitStatus};
 use std::time::Duration;
 
 use lazyrunner_core::config::Toggle;
-use lazyrunner_core::run::tools::{find_on_path, running_in};
+use lazyrunner_core::profile::native;
+use lazyrunner_core::run::tools::{find_on_path, git, running_in};
 use serde_json::Value;
 
 /// What `"gitTool"` is when the settings don't say.
@@ -65,10 +66,14 @@ impl GitTool {
         Command::new(&self.program).args(&self.args).current_dir(root).status()
     }
 
-    /// Whether it's already open in the project's folder: in a pane beside lazyrunner, or anywhere else.
+    /// Whether it already runs in the project: in its folder, or in its repo's top folder (lazygit moves there when
+    /// the project is a subfolder) - in a pane beside lazyrunner, or anywhere else.
     pub fn is_open_in(&self, root: &Path) -> bool {
         let name = self.program.file_name().map_or(self.name.clone(), |name| name.to_string_lossy().into_owned());
-        running_in(&name, root)
+        let top = git(root, &["rev-parse", "--show-toplevel"]).map(|top| PathBuf::from(native(&top)));
+        let mut dirs = vec![root];
+        dirs.extend(top.as_deref());
+        running_in(&name, &dirs)
     }
 
     /// Opens it in a Windows Terminal pane beside this one; returns at once.
