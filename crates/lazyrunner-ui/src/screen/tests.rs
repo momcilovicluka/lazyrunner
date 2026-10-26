@@ -1295,7 +1295,8 @@ async fn the_about_box_shows_the_version_and_who_makes_it_and_opens_its_links() 
     let report = "https://github.com/momcilovicluka/lazyrunner/issues/new?template=bug_report.yml&version=";
     assert!(opened.last().is_some_and(|url| url.starts_with(report)), "{opened:?}");
     assert_eq!(overlay(&screen), Some("about"), "a page leaves the box open");
-    screen.press("Down Enter");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::About { index: 4 })), "the letter's link is highlighted");
+    screen.press("Home Down Enter");
     assert_eq!(overlay(&screen), Some("changelog"), "What's new");
 }
 

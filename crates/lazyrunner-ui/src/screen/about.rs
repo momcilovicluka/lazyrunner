@@ -119,7 +119,14 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
             return;
         }
         "Enter" | "Space" => all.get(*index),
-        _ => all.iter().find(|link| link.key == name),
+        // The link a letter opens gets the highlight too, as if chosen with j k.
+        _ => match all.iter().position(|link| link.key == name) {
+            Some(at) => {
+                *index = at;
+                all.get(at)
+            }
+            None => return,
+        },
     };
     let Some(link) = chosen else { return };
     match &link.does {
