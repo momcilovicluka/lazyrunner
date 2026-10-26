@@ -1,6 +1,11 @@
 //! Snapshot tests of every screen (insta: `cargo insta review` after a deliberate change), and the keys that
 //! change what the screen shows. The sample project, without starting anything: the apps' states are set by hand.
 
+#![allow(
+    clippy::missing_const_for_thread_local,
+    reason = "clippy 1.99 flags `thread_local!` blocks whose statics are already `const { .. }` or can't be"
+)]
+
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
