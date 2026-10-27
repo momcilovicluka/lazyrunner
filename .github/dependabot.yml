@@ -1,0 +1,25 @@
+# Weekly updates for the crates and the workflows' actions. They go to `rust`, where the work happens, and reach `main`
+# with the next release; minor and patch versions come as one pull request.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    target-branch: rust
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "area: ci"]
+    groups:
+      crates:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: rust
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "area: ci"]
+    groups:
+      actions:
+        update-types: [minor, patch]

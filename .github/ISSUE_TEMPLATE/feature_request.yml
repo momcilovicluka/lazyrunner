@@ -1,7 +1,7 @@
 name: Feature request
 description: Suggest an improvement to lazyrunner
 title: "[Feature]: "
-labels: ["enhancement"]
+labels: ["enhancement", "needs-triage"]
 body:
   - type: textarea
     id: problem

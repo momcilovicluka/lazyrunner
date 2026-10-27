@@ -14,8 +14,9 @@ terms below, so the project keeps one owner and one official repository.
 3. Run the tests: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`
    and `cargo test` (README, "Development"). The PowerShell version (0.1) is
    frozen on the `powershell` branch and takes no more changes.
-4. Open a pull request to `main`, and tick the Contributor Agreement box in the
-   pull request description.
+4. Open a pull request to `main`, fill in its checklist and tick the Contributor
+   Agreement box. It can be merged once the `lint` and `test` checks pass and
+   review comments are resolved; its branch is deleted after the merge.
 5. Once the pull request is merged or closed, delete your fork if you no longer
    need it for another pull request.
 

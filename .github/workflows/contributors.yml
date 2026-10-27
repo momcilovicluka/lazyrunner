@@ -1,7 +1,9 @@
 name: contributors
 
 # Keeps contributors.json - the About box's list, which lazyrunner fetches once a day - in step with the repo: who
-# wrote code and who reported bugs and ideas. It checks out main only, never a pull request's code.
+# wrote code and who reported bugs and ideas. It checks out main only, never a pull request's code. It pushes with the
+# CONTRIBUTORS_DEPLOY_KEY deploy key: main takes other changes only through pull requests, and deploy keys may bypass
+# that (the workflow's own token can't, in a personal repo).
 on:
   issues:
     types: [opened, closed, reopened, labeled, unlabeled, deleted, transferred]
@@ -26,6 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          ssh-key: ${{ secrets.CONTRIBUTORS_DEPLOY_KEY }}
       - run: node .github/scripts/contributors.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

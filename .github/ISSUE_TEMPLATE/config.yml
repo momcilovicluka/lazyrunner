@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: A question, or help setting it up
+    url: https://github.com/momcilovicluka/lazyrunner/discussions/categories/q-a
+    about: Ask in Discussions - how something works, or why a profile doesn't do what you expect
+  - name: A security problem
+    url: https://github.com/momcilovicluka/lazyrunner/security/advisories/new
+    about: Report it privately (SECURITY.md), not as a public issue
