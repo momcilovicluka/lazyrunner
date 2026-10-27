@@ -1,0 +1,8 @@
+{
+  "name": "demo-shop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs 47311"
+  }
+}
