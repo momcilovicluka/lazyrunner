@@ -58,6 +58,9 @@ async fn request_lines_go_to_the_requests_view_and_the_probe_is_left_out() {
         "      Request starting HTTP/1.1 GET http://localhost:47201/api/orders/7 - - -",
         "warn: Orders.Api[0]",
         "      Order 7 not found",
+        "info: Microsoft.EntityFrameworkCore.Database.Command[20101]",
+        "      Executed DbCommand (3ms) [Parameters=[@p0='7'], CommandType='Text']",
+        "      SELECT [o].[Id] FROM [Orders] AS [o] WHERE [o].[Id] = @p0",
         "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
         "      Request finished HTTP/1.1 GET http://localhost:47201/api/orders/7 - 404 0 - 12.5ms",
         "info: Orders.Api[0]",
@@ -69,10 +72,12 @@ async fn request_lines_go_to_the_requests_view_and_the_probe_is_left_out() {
     assert_eq!(paths, ["/api/orders/7"], "not the probe");
     assert_eq!(sample.requests.items[0].endpoint, "/api/orders/{id}");
     assert_eq!(sample.states[0].requests, 1, "the req/s count");
-    assert_eq!(sample.states[0].output.len(), 3, "only the app's own lines show in its column");
+    assert_eq!(sample.states[0].output.len(), 6, "only the app's own lines show in its column");
     let (first, last) = sample.requests.items[0].logs.expect("its start line was seen");
     let logged: Vec<&str> = sample.states[0].output.numbered(first, last).map(|line| line.text.as_str()).collect();
-    assert_eq!(logged, ["warn: Orders.Api[0]", "      Order 7 not found"], "what it logged while it ran");
+    assert_eq!(logged[..2], ["warn: Orders.Api[0]", "      Order 7 not found"], "what it logged while it ran");
+    let db = sample.requests.items[0].db.clone().expect("its query, summed up as it finished");
+    assert_eq!((db.commands, db.total_ms, db.repeated), (1, 3.0, None));
 }
 
 #[tokio::test]

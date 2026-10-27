@@ -213,6 +213,10 @@ impl AppState {
                 }
                 requests::Line::Finished(mut request) => {
                     self.in_flight.finish(&mut request, self.output.total());
+                    if let Some((first, last)) = request.logs {
+                        request.db =
+                            requests::db_summary(self.output.numbered(first, last).map(|line| line.text.as_str()));
+                    }
                     self.log_line(&text);
                     return Some(request);
                 }

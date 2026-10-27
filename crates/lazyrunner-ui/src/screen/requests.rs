@@ -6,7 +6,7 @@
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
-use lazyrunner_core::run::requests::{Endpoint, Request, db_command_ms, endpoints};
+use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
 
 use super::columns::{contains_ignore_case, fit, line_color};
 use super::icons::{self, Icon};
@@ -38,6 +38,8 @@ const LOG_WRAP: usize = 4;
 const LISTED: usize = 5;
 /// An endpoint's latest request times in its sparkline, at most.
 const SPARK_MAX: usize = 60;
+/// The repeated query in an N+1's details, at most.
+const N_PLUS_ONE_SQL: usize = 160;
 /// An endpoint with fewer requests isn't compared with.
 const USUAL_MIN: usize = 5;
 const SPARKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -502,17 +504,25 @@ fn request_details(controller: &Controller, request: Option<&Request>, width: us
         seg(format!(" {expected} lines"), C::Gray),
         seg(format!(" · {errors} errors"), if errors > 0 { C::Red } else { C::DarkGray }),
     ]);
-    let times: Vec<f64> = logged.iter().filter_map(|line| db_command_ms(&line.text)).collect();
-    if !times.is_empty() {
-        let total: f64 = times.iter().sum();
-        let slowest = times.iter().copied().fold(0.0, f64::max);
+    if let Some(db) = &request.db {
         let share = if request.ms > 0.0 {
-            format!(" · {:.0}% of its time", total / request.ms * 100.0)
+            format!(" · {:.0}% of its time", db.total_ms / request.ms * 100.0)
         } else {
             String::new()
         };
-        let text = format!("DB {} commands · {} ms{share} · slowest {} ms", times.len(), ms(total), ms(slowest));
+        let (commands, total, slowest) = (db.commands, ms(db.total_ms), ms(db.slowest_ms));
+        let text = format!("DB {commands} commands · {total} ms{share} · slowest {slowest} ms");
         lines.extend(words(&text, width).into_iter().map(|line| vec![seg(line, C::Cyan)]));
+        if let Some(repeated) = &db.repeated {
+            let text = format!(
+                "N+1? The same query ran {} times ({} ms) - a loop loading one row at a time; Include() or one query \
+                 for all of them fixes it: {}",
+                repeated.count,
+                ms(repeated.total_ms),
+                cut(&repeated.sql, N_PLUS_ONE_SQL)
+            );
+            lines.extend(words(&text, width).into_iter().map(|line| vec![seg(line, C::Yellow)]));
+        }
     }
     if request.mixed {
         let text = "Possibly mixed: other requests of the app ran meanwhile, some lines may be theirs.";
@@ -598,6 +608,13 @@ fn endpoint_details(
     let mut row = vec![seg("statuses", C::DarkGray)];
     row.extend(statuses.iter().map(|(status, count)| seg(format!("  {status} ×{count}"), status_color(*status))));
     lines.push(row);
+    if endpoint.n_plus_one > 0 {
+        let text = format!(
+            "N+1 in {} of its {} requests: the same query over and over (a request's details show it)",
+            endpoint.n_plus_one, endpoint.count
+        );
+        lines.extend(words(&text, width).into_iter().map(|line| vec![seg(line, C::Yellow)]));
+    }
     let listed = |request: &Request, first: Seg| {
         let at = request.at.format("%H:%M:%S");
         let path = cut(&request.path, width.saturating_sub(20));
@@ -684,10 +701,12 @@ fn request_rows(view: &View, controller: &Controller, list: &[&Request], width: 
     for (index, request) in list.iter().enumerate().skip(top).take(height) {
         let time = request.at.format("%H:%M:%S").to_string();
         let app = pad(&cut(&app_name(controller, &request.app), APP_CELLS), APP_CELLS);
-        let path = cut(&request.path, path_cells);
+        let n_plus_one = request.db.as_ref().is_some_and(|db| db.repeated.is_some());
+        let tag = if n_plus_one { "  N+1" } else { "" };
+        let path = cut(&request.path, path_cells.saturating_sub(tag.len()));
         let (method, status, took) = (&request.method, request.status, ms(request.ms));
         let row = if index == view.index {
-            let text = format!(" {time:<8}  {app}  {method:<6} {status:>6} {took:>7}  {path}");
+            let text = format!(" {time:<8}  {app}  {method:<6} {status:>6} {took:>7}  {path}{tag}");
             vec![on(pad(&text, width), C::FocusText, C::FocusBack)]
         } else {
             vec![
@@ -695,6 +714,7 @@ fn request_rows(view: &View, controller: &Controller, list: &[&Request], width: 
                 seg(format!(" {status:>6}"), status_color(status)),
                 seg(format!(" {took:>7}"), ms_color(request.ms)),
                 seg(format!("  {path}"), C::Gray),
+                seg(tag, C::Yellow),
             ]
         };
         out.push(aim(row, Target::Item(index)));

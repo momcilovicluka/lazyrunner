@@ -9,7 +9,7 @@ use std::path::Path;
 use lazyrunner_core::changelog::VERSION;
 use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::Hue;
-use lazyrunner_core::run::requests::{Endpoint, Request, db_command_ms, endpoints};
+use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
 use lazyrunner_core::run::suites::{Outcome, Suite};
 use lazyrunner_core::run::{Command, Controller, Origin};
 use serde_json::{Value, json};
@@ -222,9 +222,9 @@ fn ms(ms: f64) -> f64 {
     (ms * 10.0).round() / 10.0
 }
 
-/// A request in a list: `id` is what get_request takes.
+/// A request in a list: `id` is what get_request takes; `n_plus_one` (the times one query ran) when it looks like one.
 fn request_row(request: &Request) -> Value {
-    json!({
+    let mut row = json!({
         "id": request.seq,
         "at": request.at.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
         "app": request.app,
@@ -233,7 +233,11 @@ fn request_row(request: &Request) -> Value {
         "endpoint": request.endpoint,
         "status": request.status,
         "ms": ms(request.ms),
-    })
+    });
+    if let Some(repeated) = request.db.as_ref().and_then(|db| db.repeated.as_ref()) {
+        row["n_plus_one"] = json!(repeated.count);
+    }
+    row
 }
 
 fn endpoint_row(endpoint: &Endpoint) -> Value {
@@ -248,6 +252,7 @@ fn endpoint_row(endpoint: &Endpoint) -> Value {
         "p95_ms": ms(endpoint.p95),
         "max_ms": ms(endpoint.max),
         "total_ms": ms(endpoint.total),
+        "n_plus_one_requests": endpoint.n_plus_one,
     })
 }
 
@@ -332,8 +337,6 @@ fn one_request(controller: &Controller, args: &Value) -> Answer {
     let output = controller.state(&request.app).map(|state| &state.output);
     let kept: Vec<_> = output.map_or_else(Vec::new, |output| output.numbered(first, last).collect());
     let oldest = output.map_or(first, |output| output.total() + 1 - output.len() as u64).max(first);
-    let times: Vec<f64> = kept.iter().filter_map(|line| db_command_ms(&line.text)).collect();
-    let total: f64 = times.iter().sum();
     let lines: Vec<Value> = (oldest..)
         .zip(kept.iter())
         .skip(kept.len().saturating_sub(REQUEST_LOG_LINES))
@@ -347,12 +350,23 @@ fn one_request(controller: &Controller, args: &Value) -> Answer {
         "possibly_mixed": request.mixed,
         "lines": lines,
     });
-    let share = if request.ms > 0.0 { (total / request.ms * 100.0).round() / 100.0 } else { 0.0 };
+    let db = request.db.clone().unwrap_or_default();
+    let share = if request.ms > 0.0 { (db.total_ms / request.ms * 100.0).round() / 100.0 } else { 0.0 };
+    let repeated = db.repeated.map(|repeated| {
+        json!({
+            "sql": repeated.sql,
+            "count": repeated.count,
+            "total_ms": ms(repeated.total_ms),
+            "hint": "the same query over and over - an N+1: a loop loading one row at a time; Include() or one query \
+                     for all of them fixes it",
+        })
+    });
     answer["database"] = json!({
-        "commands": times.len(),
-        "total_ms": ms(total),
-        "slowest_ms": ms(times.iter().copied().fold(0.0, f64::max)),
+        "commands": db.commands,
+        "total_ms": ms(db.total_ms),
+        "slowest_ms": ms(db.slowest_ms),
         "share_of_request": share,
+        "repeated": repeated,
     });
     Ok(answer)
 }

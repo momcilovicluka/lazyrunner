@@ -812,6 +812,9 @@ fn with_logged_request(screen: &mut Screen) {
     ] {
         app.output.push_hued(line, Some(hue), now);
     }
+    let db = lazyrunner_core::run::requests::db_summary(
+        app.output.numbered(from, app.output.total()).map(|line| line.text.as_str()),
+    );
     let request = Finished {
         method: "POST".into(),
         path: "/api/invoices/7/send".into(),
@@ -822,9 +825,46 @@ fn with_logged_request(screen: &mut Screen) {
         sent_length: "86".into(),
         logs: Some((from, app.output.total())),
         mixed: true,
+        db,
         ..Finished::default()
     };
     screen.controller.requests.add("billing", request, at);
+}
+
+#[tokio::test]
+async fn a_request_that_runs_one_query_over_and_over_is_marked_n_plus_one() {
+    use lazyrunner_core::run::requests::{Finished, db_summary};
+    let mut screen = screen("requests-n-plus-one", json!({}));
+    with_requests(&mut screen);
+    let now = screen.ui.now;
+    let app = screen.controller.states.iter_mut().find(|state| state.key == "orders").expect("Orders");
+    let from = app.output.total() + 1;
+    for id in 1..=12 {
+        app.output.push("info: Microsoft.EntityFrameworkCore.Database.Command[20101]", now);
+        app.output
+            .push(&format!("      Executed DbCommand (2ms) [Parameters=[@__id_0='{id}'], CommandType='Text']"), now);
+        app.output.push("      SELECT [l].[Id] FROM [Lines] AS [l] WHERE [l].[OrderId] = @__id_0", now);
+    }
+    let db = db_summary(app.output.numbered(from, app.output.total()).map(|line| line.text.as_str()));
+    let request = Finished {
+        method: "GET".into(),
+        path: "/api/orders/7/lines".into(),
+        status: 200,
+        ms: 90.0,
+        logs: Some((from, app.output.total())),
+        db,
+        ..Finished::default()
+    };
+    screen.controller.requests.add("orders", request, chrono::Local::now());
+    screen.press("H");
+    assert!(screen.render(160, 30).contains("/api/orders/7/lines  N+1"), "{}", screen.render(160, 30));
+    screen.press("Enter");
+    let frame = screen.render(160, 30);
+    assert!(frame.contains("N+1? The same query ran 12 times (24 ms)"), "{frame}");
+    let rows = agent(&mut screen, "request", json!({ "id": 5 }), None);
+    assert_eq!(rows["result"]["database"]["repeated"]["count"], 12, "{rows}");
+    let listed = agent(&mut screen, "requests", json!({ "limit": 1 }), None);
+    assert_eq!(listed["result"]["requests"][0]["n_plus_one"], 12, "{listed}");
 }
 
 #[tokio::test]
