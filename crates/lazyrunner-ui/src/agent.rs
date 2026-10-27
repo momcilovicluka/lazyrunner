@@ -257,7 +257,8 @@ fn endpoint_row(endpoint: &Endpoint) -> Value {
 }
 
 /// The requests the .NET apps served (the requests view): newest first, or slowest; after `since` (a request's id),
-/// of one app, errors only (400 and up), with `path` in them (ignoring case) - or, with `endpoints`, summed up per
+/// of one app, errors only (400 and up), with `path` in them (ignoring case), of one `endpoint` (and `method`) - or,
+/// with `endpoints`, summed up per
 /// endpoint, the most time first. `next` is the id to pass as `since` for what comes after.
 fn requests(controller: &Controller, args: &Value) -> Answer {
     let app = match &args["app"] {
@@ -276,6 +277,8 @@ fn requests(controller: &Controller, args: &Value) -> Answer {
     let since = args["since"].as_u64().unwrap_or(0);
     let errors_only = args["errors_only"].as_bool().unwrap_or(false);
     let path = args["path"].as_str().map(str::to_lowercase);
+    let endpoint = args["endpoint"].as_str();
+    let method = args["method"].as_str();
     let limit = args["limit"].as_u64().map_or(REQUESTS, |limit| (limit as usize).clamp(1, MAX_REQUESTS));
     let mut list: Vec<&Request> = controller
         .requests
@@ -286,6 +289,8 @@ fn requests(controller: &Controller, args: &Value) -> Answer {
         .filter(|request| app.as_ref().is_none_or(|app| *app == request.app))
         .filter(|request| !errors_only || request.status >= 400)
         .filter(|request| path.as_ref().is_none_or(|path| request.path.to_lowercase().contains(path)))
+        .filter(|request| endpoint.is_none_or(|endpoint| request.endpoint.eq_ignore_ascii_case(endpoint)))
+        .filter(|request| method.is_none_or(|method| request.method.eq_ignore_ascii_case(method)))
         .collect();
     let mut answer = json!({ "next": controller.requests.seq });
     if controller.requests.items.is_empty() {
