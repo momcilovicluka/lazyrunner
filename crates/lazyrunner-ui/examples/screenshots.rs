@@ -20,6 +20,7 @@ use lazyrunner_core::run::migrations::{Context, Migration, Status as MigrationSt
 use lazyrunner_core::run::requests::Finished;
 use lazyrunner_core::run::suites::{Outcome, Runner, Status as SuiteStatus, Suite, TestResult};
 use lazyrunner_core::testing::{TempDir, sample_profile, sample_repo};
+use lazyrunner_ui::screen::overlays::LOGO;
 use lazyrunner_ui::screen::{self, Overlay, Ui};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -67,6 +68,128 @@ async fn main() {
         std::fs::write(&path, demo.svg(size)).expect("the screenshot");
         println!("wrote {}", path.display());
     }
+    for (name, svg) in [("demo", demo_animation()), ("banner", banner())] {
+        let path = out.join(format!("{name}.svg"));
+        std::fs::write(&path, svg).expect("the picture");
+        println!("wrote {}", path.display());
+    }
+}
+
+// ---------------------------------------------------------------- the README's banner and animation
+
+/// One moment of the made-up project starting: whether it has, which apps are up, how many lines each printed, how
+/// much of the log there is, how long ago it started, and how long the frame shows.
+struct Stage {
+    started: bool,
+    up: &'static [&'static str],
+    lines: usize,
+    log: usize,
+    started_ago: u64,
+    seconds: f64,
+}
+
+const ALL_APPS: &[&str] = &["orders", "billing", "shop", "docs", "console"];
+const ALL_UP: Stage =
+    Stage { started: true, up: ALL_APPS, lines: usize::MAX, log: usize::MAX, started_ago: 180, seconds: 4.0 };
+/// lazyrunner opens; everything starts; the frontends come up while the APIs build; everything is up.
+const STAGES: [Stage; 4] = [
+    Stage { started: false, up: &[], lines: 0, log: 0, started_ago: 0, seconds: 1.6 },
+    Stage { started: true, up: &[], lines: 2, log: 1, started_ago: 2, seconds: 1.4 },
+    Stage { started: true, up: &["shop", "docs", "console"], lines: 5, log: 3, started_ago: 9, seconds: 1.6 },
+    ALL_UP,
+];
+/// The banner's logo: one square per half block.
+const PIXEL: f64 = 14.0;
+const BANNER: (f64, f64) = (860.0, 190.0);
+/// catppuccin-mocha's red, yellow, green, sky, blue and mauve, the About box's rainbow.
+const RAINBOW: [&str; 6] = ["#f38ba8", "#f9e2af", "#a6e3a1", "#89dceb", "#89b4fa", "#cba6f7"];
+
+/// lazyrunner starting the made-up project, frame after frame, over and over; with reduced motion, everything up.
+fn demo_animation() -> String {
+    let frames: Vec<(Buffer, f64)> = STAGES
+        .iter()
+        .map(|stage| {
+            let mut demo = Demo::new("demo");
+            demo.stage(stage);
+            (demo.buffer(SIZE), stage.seconds)
+        })
+        .collect();
+    let (fg, bg) = Demo::new("demo-colors").colors();
+    let total: f64 = frames.iter().map(|(_, seconds)| seconds).sum();
+    let mut style = format!(
+        ".frame{{opacity:0;animation:{total:.1}s step-end infinite}}.frame:last-of-type{{opacity:1}}\n\
+         @media (prefers-reduced-motion:reduce){{.frame{{animation:none}}}}\n"
+    );
+    let mut at = 0.0;
+    for (index, (_, seconds)) in frames.iter().enumerate() {
+        let (from, to) = (at / total * 100.0, (at + seconds) / total * 100.0);
+        at += seconds;
+        let keys = match (index, to >= 99.9) {
+            (0, _) => format!("0%{{opacity:1}}{to:.1}%{{opacity:0}}100%{{opacity:0}}"),
+            (_, true) => format!("0%{{opacity:0}}{from:.1}%{{opacity:1}}100%{{opacity:1}}"),
+            _ => format!("0%{{opacity:0}}{from:.1}%{{opacity:1}}{to:.1}%{{opacity:0}}100%{{opacity:0}}"),
+        };
+        let _ = writeln!(style, "@keyframes f{index}{{{keys}}}.f{index}{{animation-name:f{index}}}");
+    }
+    let mut svg = svg_head(frames[0].0.area, &fg, &bg);
+    let _ = writeln!(svg, "<style>{style}</style>");
+    for (index, (buffer, _)) in frames.iter().enumerate() {
+        let _ = writeln!(svg, r#"<g class="frame f{index}">"#);
+        svg.push_str(&svg_cells(buffer, &fg));
+        svg.push_str("</g>\n");
+    }
+    svg.push_str("</svg>\n");
+    svg
+}
+
+/// The README's banner: the logo drawn in squares (no font can change it), in the About box's rainbow, and the
+/// tagline under it.
+fn banner() -> String {
+    let (width, height) = BANNER;
+    let columns = LOGO[0].chars().count() as f64;
+    let left = (width - columns * PIXEL) / 2.0;
+    let top = 34.0;
+    let stops: String = RAINBOW
+        .iter()
+        .enumerate()
+        .map(|(at, color)| {
+            format!(r#"<stop offset="{:.2}" stop-color="{color}"/>"#, at as f64 / (RAINBOW.len() - 1) as f64)
+        })
+        .collect();
+    let mut svg = format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="{width:.0}" height="{height:.0}" viewBox="0 0 {width:.0} {height:.0}" font-family="{FONT}">
+<defs><linearGradient id="rainbow" gradientUnits="userSpaceOnUse" x1="{left:.0}" y1="0" x2="{:.0}" y2="0">{stops}</linearGradient></defs>
+<rect width="100%" height="100%" rx="14" fill="#1e1e2e"/>
+<g fill="url(#rainbow)" shape-rendering="crispEdges">
+"##,
+        left + columns * PIXEL
+    );
+    for (row, line) in LOGO.iter().enumerate() {
+        for (column, block) in line.chars().enumerate() {
+            let (upper, lower) = match block {
+                '█' => (true, true),
+                '▀' => (true, false),
+                '▄' => (false, true),
+                _ => (false, false),
+            };
+            for (half, filled) in [(0.0, upper), (1.0, lower)] {
+                if filled {
+                    let (x, y) = (left + column as f64 * PIXEL, top + (row as f64 * 2.0 + half) * PIXEL);
+                    let _ = writeln!(svg, r#"<rect x="{x:.0}" y="{y:.0}" width="{PIXEL:.0}" height="{PIXEL:.0}"/>"#);
+                }
+            }
+        }
+    }
+    let tagline = top + LOGO.len() as f64 * 2.0 * PIXEL + 42.0;
+    let _ = write!(
+        svg,
+        r##"</g>
+<text x="{:.0}" y="{tagline:.0}" fill="#bac2de" font-size="18" text-anchor="middle">Your .NET APIs and npm frontends, side by side, from one terminal</text>
+</svg>
+"##,
+        width / 2.0
+    );
+    svg
 }
 
 // ---------------------------------------------------------------- the scenes
@@ -304,8 +427,16 @@ impl Demo {
 
     /// Every app up for a few minutes, with output, metrics and a log of how they got there.
     fn running(&mut self) {
-        let long_ago = self.ui.now - Duration::from_secs(180);
-        let shown = self.ui.now - Duration::from_secs(30);
+        self.stage(&ALL_UP);
+    }
+
+    /// The made-up project at one moment of starting (`ALL_UP`: every app up for a few minutes).
+    fn stage(&mut self, stage: &Stage) {
+        if !stage.started {
+            return;
+        }
+        let long_ago = self.ui.now - Duration::from_secs(stage.started_ago);
+        let shown = self.ui.now - Duration::from_secs(stage.started_ago.min(30));
         let apps = [
             DemoApp { key: "orders", up_after: 4.2, cpu: 3.0, memory: 212.0, ms: 12, lines: ORDERS },
             DemoApp { key: "billing", up_after: 3.7, cpu: 1.0, memory: 168.0, ms: 8, lines: BILLING },
@@ -314,7 +445,8 @@ impl Demo {
             DemoApp { key: "console", up_after: 2.6, cpu: 2.0, memory: 129.0, ms: 4, lines: CONSOLE },
         ];
         for (index, DemoApp { key, up_after, cpu, memory, ms, lines }) in apps.into_iter().enumerate() {
-            if ms > 0 {
+            let up = stage.up.contains(&key);
+            if ms > 0 && up {
                 self.controller.answered(key, ms);
             }
             let app = self.controller.apps.iter().find(|app| app.key == key).cloned().expect("a sample app");
@@ -322,12 +454,15 @@ impl Demo {
             state.status = Status::Running;
             state.generation = 1;
             state.started_at = Some(long_ago);
-            state.up_generation = Some(1);
-            state.up_after = Some(up_after);
-            for line in lines {
+            state.up_generation = up.then_some(1);
+            state.up_after = up.then_some(up_after);
+            for line in lines.iter().take(stage.lines) {
                 state.receive(&app, line, shown);
             }
             state.flash_until = None;
+            if !up {
+                continue;
+            }
             state.cpu = Some(cpu);
             state.memory_mb = Some(memory);
             for n in 0..30 {
@@ -347,19 +482,31 @@ impl Demo {
             ("Starting Orders + Billing", Hue::Cyan),
             ("● Orders is listening on :47201 - up in 4s", Hue::Green),
             ("Ready in 38s", Hue::Green),
-        ] {
+        ]
+        .into_iter()
+        .take(stage.log)
+        {
             self.controller.log.push_back(LogEntry { time: "09:41:07".into(), text: text.into(), hue });
         }
     }
 
     /// The screen as a terminal window: an SVG of every cell, in the theme's colours.
     fn svg(&mut self, size: (u16, u16)) -> String {
+        let buffer = self.buffer(size);
+        let (fg, bg) = self.colors();
+        render_svg(&buffer, &fg, &bg)
+    }
+
+    fn buffer(&mut self, size: (u16, u16)) -> Buffer {
         let mut terminal = Terminal::new(TestBackend::new(size.0, size.1)).expect("a test terminal");
         terminal.draw(|frame| screen::draw(frame, &mut self.ui, &self.controller)).expect("a frame");
+        terminal.backend().buffer().clone()
+    }
+
+    /// The theme's text and background, or a terminal's.
+    fn colors(&self) -> (String, String) {
         let (fg, bg) = self.ui.theme.terminal.clone().unwrap_or((None, None));
-        let fg = fg.unwrap_or_else(|| DEFAULT_FG.into());
-        let bg = bg.unwrap_or_else(|| DEFAULT_BG.into());
-        render_svg(terminal.backend().buffer(), &fg, &bg)
+        (fg.unwrap_or_else(|| DEFAULT_FG.into()), bg.unwrap_or_else(|| DEFAULT_BG.into()))
     }
 }
 
@@ -377,7 +524,14 @@ struct Run {
 }
 
 fn render_svg(buffer: &Buffer, default_fg: &str, default_bg: &str) -> String {
-    let area = buffer.area;
+    let mut svg = svg_head(buffer.area, default_fg, default_bg);
+    svg.push_str(&svg_cells(buffer, default_fg));
+    svg.push_str("</svg>\n");
+    svg
+}
+
+/// The window: its size, background, title bar and buttons.
+fn svg_head(area: ratatui::layout::Rect, default_fg: &str, default_bg: &str) -> String {
     let width = PAD * 2.0 + f64::from(area.width) * CELL.0;
     let height = TITLE_BAR + PAD * 2.0 + f64::from(area.height) * CELL.1;
     let mut svg = String::new();
@@ -391,6 +545,13 @@ fn render_svg(buffer: &Buffer, default_fg: &str, default_bg: &str) -> String {
 "##,
         width / 2.0
     );
+    svg
+}
+
+/// Every cell: the backgrounds, then the text, a run of cells in the same colours at a time.
+fn svg_cells(buffer: &Buffer, default_fg: &str) -> String {
+    let area = buffer.area;
+    let mut svg = String::new();
     for y in 0..area.height {
         let runs = row_runs(buffer, y, default_fg);
         let top = TITLE_BAR + PAD + f64::from(y) * CELL.1;
@@ -419,7 +580,6 @@ fn render_svg(buffer: &Buffer, default_fg: &str, default_bg: &str) -> String {
             );
         }
     }
-    svg.push_str("</svg>\n");
     svg
 }
 

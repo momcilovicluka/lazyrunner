@@ -34,9 +34,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Commit when it changed
         run: |
-          git diff --quiet -- contributors.json && exit 0
+          git diff --quiet -- contributors.json README.md && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add contributors.json
-          git commit -m "chore: contributors.json from GitHub"
+          git add contributors.json README.md
+          git commit -m "chore: contributors from GitHub"
           git push origin HEAD:main
