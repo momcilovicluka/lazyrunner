@@ -79,8 +79,8 @@
 <text x="1030.4" y="187.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="408.8" y="205.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="425.6" y="205.7" fill="#f9e2af" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ⇩ </text>
-<text x="459.2" y="205.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">v1.10.2</text>
-<text x="518.0" y="205.7" fill="#6c7086" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> · released 2026-10-26 · windows x86_64 · running Sample</text>
+<text x="459.2" y="205.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">v1.10.3</text>
+<text x="518.0" y="205.7" fill="#6c7086" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> · released 2026-10-27 · windows x86_64 · running Sample</text>
 <text x="1030.4" y="205.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="408.8" y="223.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="425.6" y="223.7" fill="#cdd6f4" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Runs a project's .NET and npm apps side by side.                      </text>
@@ -98,7 +98,7 @@
 <text x="408.8" y="295.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="425.6" y="295.7" fill="#f5c2e7" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   • </text>
 <text x="467.6" y="295.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Ognjen Maričić     </text>
-<text x="627.2" y="295.7" fill="#6c7086" textLength="386.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1 PR · 3 bug reports · 7 ideas · @ognjen004028</text>
+<text x="627.2" y="295.7" fill="#6c7086" textLength="394.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 PRs · 3 bug reports · 7 ideas · @ognjen004028</text>
 <text x="1030.4" y="295.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="408.8" y="313.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="1030.4" y="313.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>

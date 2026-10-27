@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.10.3] - 2026-10-27
+
+### Security
+- HTTPS to GitHub - the self-update and the contributors list - no longer accepts certificates that chain through the distrusted emSign intermediates, whose private keys are public (rustls-webpki 0.103.16, RUSTSEC-2026-0382)
+
+### Fixed
+- `y` copies with clipboard-win 5.4.3: 5.4.1 was yanked
+
 ## [1.10.2] - 2026-10-26
 
 ### Fixed

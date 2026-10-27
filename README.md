@@ -628,6 +628,10 @@ after changing that file, `dist generate`). Installs pick it up the next time th
 
 The repo has to be public: the installer and the self-update download its releases without signing in.
 
+`main` takes changes through pull requests whose `lint` and `test` checks pass, with review comments resolved; the
+maintainer merges the releases into it and is the only one who can push `v*` tags, so only they publish a release
+(the repo's rulesets). Dependabot opens weekly updates for the crates and the actions against `rust`.
+
 ### Contributors (the About box)
 
 The About box lists who makes lazyrunner from [contributors.json](contributors.json), which nobody edits by hand: the
@@ -637,9 +641,19 @@ with every push); bug reports and ideas by the issue forms' labels (`bug`, `enha
 [.github/contributors-overrides.json](.github/contributors-overrides.json) pins people first (with a role or a name),
 hides them, or changes those thresholds. To run it by hand: `GITHUB_TOKEN=<token> node .github/scripts/contributors.mjs`.
 
+The workflow pushes with a deploy key (secret `CONTRIBUTORS_DEPLOY_KEY`), which `main`'s ruleset lets through.
 lazyrunner builds the file in, and fetches the current one from `main` at most once a day as the update check runs
 (not with auto-update off), into its state folder; offline it keeps the one it has. The workflow commits to `main`,
 so pull before merging a branch into it.
+
+## Community
+
+- **Roadmap**: what's next is the [Up next](https://github.com/momcilovicluka/lazyrunner/milestone/1) milestone;
+  ideas wait in the [feature requests](https://github.com/momcilovicluka/lazyrunner/issues?q=is%3Aopen+label%3Aenhancement).
+- **Questions**: [Discussions](https://github.com/momcilovicluka/lazyrunner/discussions), not issues.
+- **Bugs and ideas**: the [issue forms](https://github.com/momcilovicluka/lazyrunner/issues/new/choose).
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md); everyone follows the [code of conduct](CODE_OF_CONDUCT.md).
+- **Security problems**: privately, as [SECURITY.md](SECURITY.md) says.
 
 ## License
 
