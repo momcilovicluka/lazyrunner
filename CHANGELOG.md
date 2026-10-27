@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.11.1] - 2026-10-27
+
+### Fixed
+- An npm app whose package.json lists no packages - a script that needs only Node - starts: npm ci makes no node_modules for it, and lazyrunner no longer waits for one
+- The startup checklist's database check doesn't warn when the APIs keep no user secrets: there is nothing to check
+
 ## [1.11.0] - 2026-10-27
 
 ### Added

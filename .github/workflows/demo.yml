@@ -32,12 +32,11 @@ jobs:
         run: |
           cargo build --release -p lazyrunner
           sudo cp target/release/lazyrunner /usr/local/bin/
-      - name: Prepare the demo (restore its packages, as a first run would have)
+      - name: Restore the demo's NuGet packages (a first build would, more slowly)
         working-directory: examples/demo
         run: |
           dotnet restore services/Orders/Orders.csproj
           dotnet restore services/Billing/Billing.csproj
-          npm ci --prefix web/shop
       - uses: charmbracelet/vhs-action@v2
         with:
           path: docs/demo.tape

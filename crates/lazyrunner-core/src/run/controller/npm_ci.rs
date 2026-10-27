@@ -159,7 +159,7 @@ impl Controller {
             return Some(focused.to_string());
         }
         let missing = keys.iter().find(|key| {
-            self.app(key).is_some_and(|app| matches!(&app.kind, AppKind::Npm { dir, .. } if !self.root.join(dir).join("node_modules").exists()))
+            self.app(key).is_some_and(|app| matches!(&app.kind, AppKind::Npm { dir, .. } if !super::super::tools::has_packages(&self.root.join(dir))))
         });
         missing.or(keys.first()).cloned()
     }

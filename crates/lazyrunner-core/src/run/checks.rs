@@ -186,7 +186,10 @@ pub fn sql_endpoint(server: &str) -> Result<(String, u16), String> {
 fn database_check(controller: &Controller) -> Check {
     let path = secrets::secrets_path(&controller.root, &controller.apps);
     check("Database", move || {
-        let Some(text) = path.and_then(|path| std::fs::read_to_string(path).ok()) else {
+        let Some(path) = path else {
+            return (Status::Skip, "the APIs keep no user secrets - nothing to check".into());
+        };
+        let Ok(text) = std::fs::read_to_string(path) else {
             return (Status::Warn, "no secrets.json - the APIs use appsettings".into());
         };
         let active = secrets::groups(&text)
@@ -218,11 +221,14 @@ fn packages_check(controller: &Controller, key: &str) -> Check {
     let dir = dir.clone();
     let in_sync = controller.lock_in_sync(key);
     check(name, move || {
-        if !folder.join("node_modules").exists() {
+        if !tools::has_packages(&folder) {
             return (
                 Status::Fail,
                 format!("{} is missing - press i (npm ci)", crate::profile::join(&dir, "node_modules")),
             );
+        }
+        if !folder.join("node_modules").exists() {
+            return (Status::Ok, "nothing to install - package.json lists no packages".into());
         }
         match in_sync {
             None => (Status::Ok, "installed (no npm ci from lazyrunner yet to compare with)".into()),

@@ -11,7 +11,6 @@ ASP.NET APIs and a frontend.
 Needs the .NET SDK (10) and Node.js. Then, in this folder:
 
 ```
-npm ci --prefix web/shop
 lazyrunner
 ```
 
