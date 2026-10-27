@@ -34,10 +34,11 @@ pub enum Toggle {
     GitBeside,
     NerdIcons,
     CheckMigrationsOnOpen,
+    LinksOnAltClick,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 13] = [
+    pub const ALL: [Toggle; 14] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -51,6 +52,7 @@ impl Toggle {
         Toggle::GitBeside,
         Toggle::NerdIcons,
         Toggle::CheckMigrationsOnOpen,
+        Toggle::LinksOnAltClick,
     ];
 
     /// Its name in the settings file.
@@ -69,6 +71,7 @@ impl Toggle {
             Toggle::GitBeside => "gitBeside",
             Toggle::NerdIcons => "nerdIcons",
             Toggle::CheckMigrationsOnOpen => "checkMigrationsOnOpen",
+            Toggle::LinksOnAltClick => "linksOnAltClick",
         }
     }
 

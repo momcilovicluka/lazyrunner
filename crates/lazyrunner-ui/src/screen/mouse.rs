@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use lazyrunner_core::config::Toggle;
+use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 
 use super::actions::Run;
@@ -92,7 +93,8 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, event: MouseEvent) -> bo
             // A double click is the end of a pair: a third click starts a new one.
             ui.last_click = if double { None } else { Some((ui.now, x, y)) };
             let boxes = (ui.overlay.is_some(), ui.picker.is_some());
-            click(ui, controller, target, double);
+            let modified = event.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
+            click(ui, controller, target, double, modified);
             if (ui.overlay.is_some(), ui.picker.is_some()) != boxes {
                 ui.last_click = None; // a box opened or closed: the next click is on what is there now
             }
@@ -102,7 +104,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, event: MouseEvent) -> bo
     true
 }
 
-fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool) {
+fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool, modified: bool) {
     ui.reload = None; // a click ends the reload show too
     if let Some(target) = target {
         ui.motion.flash(super::motion::Spot::Clicked(target), ui.now);
@@ -139,7 +141,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
                 }
             }
             Some(Target::Box) => {}
-            Some(Target::Link { link, .. }) => super::links::open(ui, controller, link),
+            Some(Target::Link { link, .. }) => open_link(ui, controller, link, None, modified),
             _ => press(ui, controller, KeyCode::Esc), // outside the box: closes it, as Esc
         }
         return;
@@ -158,9 +160,19 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::Link { column, link }) => {
             ui.focus = column;
-            super::links::open(ui, controller, link);
+            open_link(ui, controller, link, Some(column), modified);
         }
         _ => {}
+    }
+}
+
+/// A link opens on Alt+click (`linksOnAltClick`, the default; Ctrl+click too, where the terminal doesn't take it for
+/// its own links - Windows Terminal does, on URLs) or on any click; a plain click on one says so, once.
+fn open_link(ui: &mut Ui, controller: &mut Controller, link: usize, app: Option<usize>, modified: bool) {
+    if modified || !controller.setting(Toggle::LinksOnAltClick) {
+        super::links::open(ui, controller, link, app);
+    } else if !std::mem::replace(&mut ui.link_hint_shown, true) {
+        controller.add_log("Alt+click opens a link (, then l: a click does)", Hue::DarkGray);
     }
 }
 

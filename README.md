@@ -258,6 +258,7 @@ at once while the palette wipes away.
 | `g` | `L` opens the git tool beside lazyrunner, in a Windows Terminal pane |
 | `i` | Nerd Font icons (on by default): the title bars, the status line, the views' headers and marks |
 | `o` | `M` checks the migrations against the database when it opens (off: `r` / `R` in it) |
+| `l` | Links in the output open on Alt+click (on by default; off: on a plain click) |
 | `c` | What's new: the changelog |
 | `A` | About lazyrunner (below) |
 
@@ -269,7 +270,11 @@ when they're on.
 
 ### Mouse
 
-A click focuses a column; a double click on its title zooms it (again: back). The wheel scrolls the column under the
+A click focuses a column; a double click on its title zooms it (again: back). A link in the output - a URL, or a
+place in a file, which opens in your editor (`"editor"`) at its line - opens on Alt+click, so a click to focus a column
+never opens one by accident; `,` then `l` makes a plain click open them. Ctrl+click works too where the terminal leaves
+it alone: Windows Terminal opens the URLs it finds itself on Ctrl+click, row by row, so a wrapped one comes out cut. A
+file's path may be relative to its app's folder (an Angular app's `libs/...`) or to the repo. The wheel scrolls the column under the
 pointer, whichever has the focus. In the menus, the command palette and the database and theme pickers a click picks
 an item and a double click runs it; a click outside a box closes it. What the
 pointer is over lights up, and what you click shows pressed for a moment. While the mouse is on, the terminal leaves text selection to
@@ -559,6 +564,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
 | `nerdIcons` | `true` | Nerd Font icons in the chrome; for a terminal whose font is a Nerd Font (a "Mono" one) |
 | `checkMigrationsOnOpen` | `false` | `M` checks every DbContext against the database when it opens, and again after a database or branch switch |
+| `linksOnAltClick` | `true` | Links in the output open on Alt+click (Ctrl+click too, where the terminal allows); off, on a plain click |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |

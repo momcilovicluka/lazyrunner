@@ -245,7 +245,7 @@ pub(crate) struct MenuToggle {
     pub label: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 11] = [
+const MENU_TOGGLES: [MenuToggle; 12] = [
     MenuToggle { letter: "a", toggle: Toggle::AutoRestartOnBranchChange, label: "Auto-restart on branch change" },
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
     MenuToggle { letter: "s", toggle: Toggle::StopFrontendOnStop, label: "Stop/Restart all include the frontend" },
@@ -269,6 +269,7 @@ const MENU_TOGGLES: [MenuToggle; 11] = [
         toggle: Toggle::CheckMigrationsOnOpen,
         label: "Check the migrations against the database when M opens",
     },
+    MenuToggle { letter: "l", toggle: Toggle::LinksOnAltClick, label: "Links open on Alt+click (off: on a click)" },
 ];
 
 /// The , menu's toggles that apply here (whether Stop/Restart all include the frontend only with one).
