@@ -1,7 +1,8 @@
 //! The startup checklist: a short animated splash that checks the tools, ports, the database server and the
 //! frontend packages before lazyrunner starts anything ("startupChecklist": false turns it off; , then r runs it
 //! any time). The checks run side by side, each in a thread of its own, so the screen stays live. At startup the
-//! apps don't wait long for the update check: it goes on in the background (`StillChecking`).
+//! apps don't wait long for the update check: it goes on in the background (`StillChecking`). Once every check is
+//! done, r runs the ones that failed or warned again (a failed update, say).
 
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
@@ -96,6 +97,59 @@ impl Checklist {
             others_done_at: None,
             continuing: Vec::new(),
             late: Vec::new(),
+        }
+    }
+
+    /// r: every check is done, none goes on in the background, some failed or warned, and nothing is about to reopen
+    /// lazyrunner on a new version.
+    pub fn can_retry(&self) -> bool {
+        matches!(self.phase, Phase::Holding { .. })
+            && self.continuing.is_empty()
+            && (self.manual || self.updated_to.is_none())
+            && self.items.iter().any(|item| matches!(item.status, Status::Warn | Status::Fail))
+    }
+
+    /// r: runs the checks that failed or warned again, in place; the others keep their results. False when there is
+    /// nothing to retry.
+    pub fn retry(&mut self, controller: &mut Controller) -> bool {
+        if !self.can_retry() {
+            return false;
+        }
+        let failed: Vec<usize> = (0..self.items.len())
+            .filter(|&index| matches!(self.items[index].status, Status::Warn | Status::Fail))
+            .collect();
+        let (sender, results) = channel();
+        for check in checks::checks(controller) {
+            let Some(index) = failed.iter().copied().find(|&index| self.items[index].name == check.name) else {
+                continue;
+            };
+            let sender = sender.clone();
+            std::thread::spawn(move || run_check(index, check, &sender));
+        }
+        drop(sender);
+        let names: Vec<&str> = failed.iter().map(|&index| self.items[index].name.as_str()).collect();
+        controller.add_log(format!("Checking again: {}", names.join(", ")), Hue::Cyan);
+        for &index in &failed {
+            let item = &mut self.items[index];
+            (item.status, item.detail) = (Status::Pending, String::new());
+            if let Some(done) = self.done.get_mut(index) {
+                *done = false;
+            }
+        }
+        self.results = results;
+        self.phase = Phase::Checking;
+        self.others_done_at = None;
+        self.footer = "checking again…".into();
+        true
+    }
+
+    /// What r would retry, for the footer: the one check's name, or how many.
+    fn retry_hint(&self) -> String {
+        let failed: Vec<&Item> =
+            self.items.iter().filter(|item| matches!(item.status, Status::Warn | Status::Fail)).collect();
+        match failed.as_slice() {
+            [one] => format!("r retries {}", one.name),
+            many => format!("r retries those {}", many.len()),
         }
     }
 
@@ -215,14 +269,15 @@ impl Checklist {
             return true;
         }
         let left = until.saturating_duration_since(now).as_secs_f64().ceil() as u64;
+        let retry = if self.can_retry() { format!(" · {}", self.retry_hint()) } else { String::new() };
         self.footer = if let Some(version) = self.updated_to.as_ref().filter(|_| !self.manual) {
             format!("v{version} installed - reopening lazyrunner…")
         } else if self.manual {
-            "any key closes".into()
+            format!("any key closes{retry}")
         } else if !self.news.is_empty() {
-            format!("what's new above (, then c shows the whole changelog) - any key continues ({left} s)")
+            format!("what's new above (, then c shows the whole changelog) - any key continues ({left} s){retry}")
         } else if problems > 0 {
-            format!("{problems} to look at (also in the log below) - any key continues ({left} s)")
+            format!("{problems} to look at (also in the log below) - any key continues ({left} s){retry}")
         } else {
             "all good - starting…".into()
         };
@@ -329,7 +384,11 @@ mod tests {
     use super::*;
 
     fn item(status: Status) -> Item {
-        Item { name: "git".into(), status, detail: String::new() }
+        item_named("git", status)
+    }
+
+    fn item_named(name: &str, status: Status) -> Item {
+        Item { name: name.into(), status, detail: String::new() }
     }
 
     #[test]
@@ -400,6 +459,41 @@ mod tests {
         assert!(!list.update(Instant::now() + Duration::from_secs(30), &mut controller));
         assert_eq!(list.items[0].status, Status::Running);
         assert!(list.still_checking().is_none());
+    }
+
+    #[test]
+    fn r_runs_the_checks_that_failed_again_and_keeps_the_others() {
+        let (_temp, mut controller) = crate::screen::tests::controller("checklist-retry");
+        let git = Item { name: "git".into(), status: Status::Fail, detail: "not found on PATH".into() };
+        let mut list = Checklist::fixed(vec![item_named("lazyrunner", Status::Ok), git], Vec::new(), "checking…");
+        list.manual = true;
+        let now = Instant::now();
+        assert!(!list.update(now, &mut controller), "holding, with the problem");
+        assert_eq!(list.footer, "any key closes · r retries git");
+        assert!(list.retry(&mut controller));
+        assert_eq!((list.items[0].status, list.items[1].status), (Status::Ok, Status::Pending));
+        assert_eq!(controller.log.back().unwrap().text, "Checking again: git");
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while list.items[1].status != Status::Ok && list.items[1].status != Status::Fail && Instant::now() < deadline {
+            list.update(Instant::now(), &mut controller);
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        list.update(Instant::now(), &mut controller);
+        assert_eq!(list.items[1].status, Status::Ok, "git is there: {}", list.items[1].detail);
+        assert_eq!(list.footer, "any key closes", "nothing left to retry");
+        assert!(!list.retry(&mut controller));
+    }
+
+    #[test]
+    fn there_is_nothing_to_retry_while_a_check_goes_on_or_lazyrunner_reopens() {
+        let (_temp, mut controller) = crate::screen::tests::controller("checklist-no-retry");
+        let checking = Checklist::fixed(vec![item(Status::Running), item(Status::Fail)], Vec::new(), "checking…");
+        assert!(!checking.can_retry(), "still checking");
+        let mut updated = Checklist::fixed(vec![item(Status::Warn)], Vec::new(), "checking…");
+        updated.update(Instant::now(), &mut controller);
+        assert!(updated.can_retry());
+        updated.updated_to = Some("9.9.9".into());
+        assert!(!updated.can_retry(), "a new version is about to open");
     }
 
     #[test]

@@ -319,7 +319,9 @@ When lazyrunner opens, a short splash checks for a lazyrunner update, git, the .
 apps' ports are free, whether the active database's server answers, each npm app's packages against its
 `package-lock.json`, and which project and branch it runs. The checks run side by side. The apps don't wait long for
 the update check: once everything else is done it gets 2 s more, then goes on in the background (an update it installs
-is switched to when nothing is in the way). Problems also go to the panel log. Turn it off with `,` then `w`.
+is switched to when nothing is in the way). Problems also go to the panel log. Once every check is done, `r` runs the
+ones that failed or warned again - a failed update, a port that was busy - without closing it; any other key closes it.
+Turn it off with `,` then `w`.
 
 ## Database picker (`d`)
 
