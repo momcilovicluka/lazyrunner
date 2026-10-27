@@ -576,6 +576,11 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
   then start without building again.
 - **Port already in use:** something else runs the app (an IDE, say). The panel names the process; `!` kills it and
   starts.
+- **A port reserved by Windows:** Hyper-V, WSL and Docker reserve blocks of the dynamic range (49152-65535) at boot;
+  nothing holds such a port, yet no app can listen on it ("access forbidden"). lazyrunner doesn't start that app, says
+  so in the log and the startup checklist, and the others start. `net stop winnat`, then `net start winnat`, in an
+  elevated terminal frees the ports (`netsh int ipv4 show excludedportrange protocol=tcp` lists them); for good, give
+  the app a port below 49152.
 - **An app is quiet:** some apps log to other sinks than the console; the `● … ms` in the title shows it's up and
   answering.
 - **The terminal is too small:** lazyrunner needs at least 60×15; `z` zooms one column to full width, and `|` stacks

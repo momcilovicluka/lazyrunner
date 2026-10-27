@@ -317,6 +317,18 @@ mod scripted {
     }
 
     #[tokio::test]
+    async fn an_app_whose_port_windows_reserved_doesnt_start_and_the_log_says_why() {
+        let (_temp, mut sample, _events) = scripted("scripted-reserved-port", Vec::new());
+        sample.reserved = || vec![(CONSOLE_PORT - 5, CONSOLE_PORT + 5)];
+        sample.start(Some(&keys(&["console"])), false);
+        assert!(!sample.is_running("console"));
+        let text = log(&sample);
+        assert!(text.contains(&format!("✗ Console can't start: port {CONSOLE_PORT} is reserved by Windows")), "{text}");
+        assert!(text.contains("net stop winnat"), "{text}");
+        assert!(sample.conflicts.is_empty(), "! can't free a reserved port");
+    }
+
+    #[tokio::test]
     async fn a_start_waits_for_a_port_only_as_long_as_a_stop_may_take() {
         let Ok(holder) = std::net::TcpListener::bind(("127.0.0.1", CONSOLE_PORT)) else {
             eprintln!("skipped: something else holds port {CONSOLE_PORT}");

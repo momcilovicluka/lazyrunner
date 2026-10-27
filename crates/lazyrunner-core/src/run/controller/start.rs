@@ -6,7 +6,7 @@ use crate::output::Hue;
 use crate::run::app::Status;
 use crate::run::build;
 use crate::run::child::Child;
-use crate::run::net::Listening;
+use crate::run::net::{self, Listening};
 use crate::run::{Tag, tools};
 
 /// How long a stopped app's port may stay held.
@@ -74,6 +74,10 @@ impl Controller {
         }
         if keys.is_empty() {
             self.add_log("Already running.", Hue::Gray);
+            return;
+        }
+        let keys = self.without_reserved_ports(keys);
+        if keys.is_empty() {
             return;
         }
         if self.find_port_conflicts(&keys) {
@@ -204,6 +208,9 @@ impl Controller {
             self.add_log(format!("{name} starts after npm ci"), Hue::DarkGray);
             return;
         }
+        if self.without_reserved_ports(vec![key.to_string()]).is_empty() {
+            return;
+        }
         if self.find_port_conflicts(&[key.to_string()]) {
             return;
         }
@@ -253,6 +260,27 @@ impl Controller {
     }
 
     // ---------------------------------------------------------------- port conflicts
+
+    /// The apps but those whose port Windows reserved: they couldn't listen on it, so they don't start, and the log
+    /// says why and what frees it. The others start.
+    fn without_reserved_ports(&mut self, keys: Vec<String>) -> Vec<String> {
+        let ranges = (self.reserved)();
+        if ranges.is_empty() {
+            return keys;
+        }
+        let mut starting = Vec::new();
+        for key in keys {
+            let port = self.port(&key);
+            let Some((port, range)) = port.and_then(|port| net::reserved(port, &ranges).map(|range| (port, range)))
+            else {
+                starting.push(key);
+                continue;
+            };
+            let name = self.app(&key).map_or_else(|| key.clone(), |app| app.name.clone());
+            self.add_log(format!("✗ {name} can't start: {}", net::reserved_advice(port, range)), Hue::Red);
+        }
+        starting
+    }
 
     /// Whether anything else holds a port these apps need (each said in the log).
     fn find_port_conflicts(&mut self, keys: &[String]) -> bool {
