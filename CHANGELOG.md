@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.16.0] - 2026-10-27
+
+### Changed
+- Links in the output - URLs, and places in files that open in your editor - open on Alt+click, so a click that focuses a column never opens one by accident; a plain click on a link says so once. Ctrl+click works too where the terminal leaves it alone (Windows Terminal takes it for the URLs it finds, cut where they wrap). `,` then `l` (`linksOnAltClick`) brings back the plain click (#11, thanks @ognjen004028)
+
+### Fixed
+- A file link in an app's output is looked for in that app's folder first: an Angular app's `libs/...` paths open, also in a repo too big to search through
+
 ## [1.15.1] - 2026-10-27
 
 ### Added

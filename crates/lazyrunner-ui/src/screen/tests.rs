@@ -167,6 +167,17 @@ impl Screen {
         mouse::click_at(&mut self.ui, &mut self.controller, x, y, now);
     }
 
+    /// A click with Alt held: what opens a link by default (Ctrl+click too).
+    fn alt_click_at(&mut self, x: u16, y: u16) {
+        self.modified_click_at(x, y, crossterm::event::KeyModifiers::ALT);
+    }
+
+    fn modified_click_at(&mut self, x: u16, y: u16, modifiers: crossterm::event::KeyModifiers) {
+        use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+        let kind = MouseEventKind::Down(MouseButton::Left);
+        mouse::handle(&mut self.ui, &mut self.controller, MouseEvent { kind, column: x, row: y, modifiers });
+    }
+
     fn running(&mut self) {
         let at = self.ui.now - Duration::from_secs(5);
         let orders: &[&str] = &[
@@ -1083,7 +1094,7 @@ async fn in_the_tests_view_a_click_picks_a_suite_and_a_link_in_a_stack_opens() {
     let link = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Link { .. })).map(|hit| (hit.x, hit.y));
     let (x, y) = link.expect("the stack frame's place in the file is a link");
     screen.ui.now += Duration::from_secs(1);
-    screen.click_at(x, y);
+    screen.alt_click_at(x, y);
     assert!(screen.ui.overlay.is_some(), "the view stays open");
     assert!(screen.last_log().contains("CartTests.cs isn't in"), "{}", screen.last_log());
 }
@@ -1330,13 +1341,53 @@ async fn a_click_on_a_link_opens_the_url_or_the_file_at_its_line() {
     };
     let (x, y) = spot(&screen, 1);
     screen.click_at(x, y);
+    assert!(OPENED.with(|opened| opened.borrow().is_empty()), "a plain click opens nothing by default");
+    assert_eq!(screen.last_log(), "Alt+click opens a link (, then l: a click does)");
+    let said = screen.controller.log.len();
+    screen.ui.now += Duration::from_secs(1);
+    screen.click_at(x, y);
+    assert_eq!(screen.controller.log.len(), said, "it says so once");
+    screen.ui.now += Duration::from_secs(1);
+    screen.alt_click_at(x, y);
     let (x, y) = spot(&screen, 0);
     screen.ui.now += Duration::from_secs(1); // not a double click
-    screen.click_at(x, y);
+    screen.modified_click_at(x, y, crossterm::event::KeyModifiers::CONTROL); // Ctrl+click too
     let opened = OPENED.with(|opened| opened.borrow().clone());
     assert_eq!(opened[0], "http://localhost:47202/");
     assert!(opened[1].starts_with("myeditor --goto ") && opened[1].ends_with("Checkout.cs:12"), "{opened:?}");
     assert!(screen.last_log().starts_with("Opening Checkout.cs:12 in myeditor"), "{}", screen.last_log());
+}
+
+#[tokio::test]
+async fn a_file_link_is_found_in_its_apps_own_folder_first() {
+    let mut screen = screen("links-app-folder", json!({ "editor": "myeditor --goto {file}:{line}" }));
+    let repo = screen.temp.join("repo");
+    let wanted = repo.join("web/shop/libs/shared/sections/attachments.component.ts");
+    std::fs::create_dir_all(wanted.parent().unwrap()).unwrap();
+    std::fs::write(&wanted, "").unwrap();
+    screen.controller.root = repo;
+    let shop = screen.controller.apps.iter().position(|app| app.key == "shop").expect("the sample's Shop");
+    let at = screen.ui.now - Duration::from_secs(5);
+    screen.controller.states[shop].output.push("  libs/shared/sections/attachments.component.ts:30:16", at);
+    screen.frame();
+    let hit = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Link { column, .. } if column == shop));
+    let (x, y) = hit.map(|hit| (hit.x, hit.y)).expect("the path is a link");
+    screen.alt_click_at(x, y);
+    let opened = OPENED.with(|opened| opened.borrow().clone());
+    assert!(opened.last().is_some_and(|it| it.ends_with("attachments.component.ts:30")), "{opened:?}");
+    assert!(screen.last_log().starts_with("Opening attachments.component.ts:30 in myeditor"), "{}", screen.last_log());
+}
+
+#[tokio::test]
+async fn with_links_on_alt_click_off_a_plain_click_opens_a_link() {
+    let mut screen = screen("links-plain", json!({ "linksOnAltClick": false }));
+    let at = screen.ui.now - Duration::from_secs(5);
+    screen.controller.states[1].output.push("  Local:   http://localhost:47202/", at);
+    screen.frame();
+    let hit = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Link { .. })).map(|hit| (hit.x, hit.y));
+    let (x, y) = hit.expect("a link on screen");
+    screen.click_at(x, y);
+    assert_eq!(OPENED.with(|opened| opened.borrow().clone()), ["http://localhost:47202/"]);
 }
 
 // ---------------------------------------------------------------- about

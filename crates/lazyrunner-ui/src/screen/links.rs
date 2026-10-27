@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 
 use lazyrunner_core::links::{self, Target};
 use lazyrunner_core::output::Hue;
+use lazyrunner_core::profile::AppKind;
 use lazyrunner_core::run::Controller;
 
 use super::Ui;
@@ -19,18 +20,29 @@ pub fn open_url(ui: &Ui, controller: &mut Controller, url: &str) {
     }
 }
 
-pub fn open(ui: &mut Ui, controller: &mut Controller, link: usize) {
+/// A link: `app` is the column it is in, whose folder a file's path may be relative to (an Angular app's
+/// `libs/...`).
+pub fn open(ui: &mut Ui, controller: &mut Controller, link: usize, app: Option<usize>) {
     let Some(target) = ui.links.get(link).cloned() else { return };
     match target {
         Target::Url(url) => open_url(ui, controller, &url),
         Target::File { path, line, column } => {
-            let Some(file) = links::resolve(&controller.root, &path) else {
+            let own = app.and_then(|app| app_folder(controller, app)).and_then(|folder| links::resolve(&folder, &path));
+            let Some(file) = own.or_else(|| links::resolve(&controller.root, &path)) else {
                 let root = controller.root.display().to_string();
                 controller.add_log(format!("{path} isn't in {root} (outside build output and packages)"), Hue::Yellow);
                 return;
             };
             open_file(ui, controller, &file, line, column);
         }
+    }
+}
+
+/// Where an app's own files are: an npm app's folder, a .NET app's project folder.
+fn app_folder(controller: &Controller, app: usize) -> Option<std::path::PathBuf> {
+    match &controller.apps.get(app)?.kind {
+        AppKind::Npm { dir, .. } => Some(controller.root.join(dir)),
+        AppKind::Dotnet { project, .. } => controller.root.join(project).parent().map(Path::to_path_buf),
     }
 }
 

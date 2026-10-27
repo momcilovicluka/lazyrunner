@@ -198,6 +198,8 @@ pub struct Ui {
     /// Starts a program without waiting (the editor for a link); tests swap it for one that only records.
     pub launcher: fn(&std::path::Path, &[String]) -> bool,
     pub last_click: Option<(Instant, u16, u16)>,
+    /// A plain click on a link that needs Alt said so (once).
+    pub link_hint_shown: bool,
     /// What the mouse pointer is over (the tests view marks it).
     pub hover: Option<mouse::Target>,
     /// The view (tests, requests) a box or the database picker was opened from: it comes back when that closes.
@@ -257,6 +259,7 @@ impl Ui {
             links: Vec::new(),
             launcher: links::launch,
             last_click: None,
+            link_hint_shown: false,
             hover: None,
             behind: None,
             reload: None,
