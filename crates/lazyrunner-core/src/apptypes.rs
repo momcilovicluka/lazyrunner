@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn a_url_gives_its_port_or_the_schemes_default() {
-        assert_eq!(url_port("http://localhost:58201"), Some(58201));
+        assert_eq!(url_port("http://localhost:47201"), Some(47201));
         assert_eq!(url_port("https://localhost:7001/swagger"), Some(7001));
         assert_eq!(url_port("http://localhost"), Some(80));
         assert_eq!(url_port("https://example.test/a"), Some(443));

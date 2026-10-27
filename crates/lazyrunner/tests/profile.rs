@@ -89,7 +89,7 @@ fn check_passes_the_sample_repo_and_names_each_problem_of_a_broken_profile() {
     data["apps"][0]["launchProfile"] = json!("Ordres");
     data["apps"][1]["project"] = json!("services/Billing/Billing2.csproj");
     data["apps"][3]["variants"][0]["script"] = json!("serve");
-    data["apps"][4]["variants"][1]["port"] = json!(58301); // Shop's port
+    data["apps"][4]["variants"][1]["port"] = json!(47301); // Shop's port
     data["apps"][4]["variants"][0]["when"]["packageScript"] = json!("dev:mock");
     let broken = repo.join("broken.lazyrunner.json");
     write(&broken, &serde_json::to_string_pretty(&data).unwrap());
@@ -115,7 +115,7 @@ fn check_passes_the_sample_repo_and_names_each_problem_of_a_broken_profile() {
         find(&report, "info", "apps[4] (console).variants[0]", &["has no dev:mock on this branch"]).is_some(),
         "{report}"
     );
-    assert!(find(&report, "error", "apps", &["Shop and Console both use port 58301"]).is_some(), "{report}");
+    assert!(find(&report, "error", "apps", &["Shop and Console both use port 47301"]).is_some(), "{report}");
     let text = lazyrunner(&temp, &repo, &["check", "broken.lazyrunner.json"]);
     assert!(text.out.contains("  x apps[0] (orders).launchProfile: 'Ordres' is not in "), "{}", text.out);
     assert!(text.out.lines().last().unwrap_or_default().ends_with("- fix and check again"), "{}", text.out);
@@ -165,7 +165,7 @@ fn init_proposes_a_profile_from_the_checkout() {
     assert_eq!(apps[0]["launchProfile"], "Billing");
     assert_eq!(
         (apps[2]["variants"][0]["port"].clone(), apps[3]["variants"][0]["port"].clone()),
-        (json!(58303), json!(58301)),
+        (json!(47303), json!(47301)),
         "the ports their scripts name"
     );
     assert_eq!(

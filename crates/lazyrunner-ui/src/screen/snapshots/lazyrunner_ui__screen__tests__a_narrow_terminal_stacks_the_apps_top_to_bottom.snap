@@ -2,18 +2,18 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders  :58201  ● checking…  up in 3s ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ▸ ◆ Orders  :47201  ● checking…  up in 3s ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
 info: Microsoft.Hosting.Lifetime[14]
-      Now listening on: http://localhost:58201
+      Now listening on: http://localhost:47201
 warn: an error happened once
 info: Application started.
- ■ Billing  :58202  ○ starting 5s ────────────────────────────────────────────────────────────────────────────
+ ■ Billing  :47202  ○ starting 5s ────────────────────────────────────────────────────────────────────────────
 
 Building...
 error: Billing.cs(3,1): something is off
- ■ Shop  :58301  ○ stopped ───────────────────────────────────────────────────────────────────────────────────
+ ■ Shop  :47301  ○ stopped ───────────────────────────────────────────────────────────────────────────────────
    dev server · dev
 
 
@@ -21,7 +21,7 @@ error: Billing.cs(3,1): something is off
    watch build · watch
 
 
- ■ Console  :58303  ○ stopped ────────────────────────────────────────────────────────────────────────────────
+ ■ Console  :47303  ○ stopped ────────────────────────────────────────────────────────────────────────────────
    live · dev
 
 

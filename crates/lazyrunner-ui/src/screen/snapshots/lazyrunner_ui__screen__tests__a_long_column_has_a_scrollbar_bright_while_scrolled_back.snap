@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders  :58201  ┳ ■ Billing  :58202  ○┬ ■ Shop  :58301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :58303  ○
+ ▸ ◆ Orders  :47201  ┳ ■ Billing  :47202  ○┬ ■ Shop  :47301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :47303  ○
  ⏸ ↑60 · G follows   ┃                     │   dev server · dev  │   watch build · watc│   live · dev
 orders line 39       ┃                     │                     │                     │
 orders line 40       ┃                     │                     │                     │

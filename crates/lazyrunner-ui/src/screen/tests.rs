@@ -171,7 +171,7 @@ impl Screen {
         let at = self.ui.now - Duration::from_secs(5);
         let orders: &[&str] = &[
             "info: Microsoft.Hosting.Lifetime[14]",
-            "      Now listening on: http://localhost:58201",
+            "      Now listening on: http://localhost:47201",
             "warn: an error happened once",
             "info: Application started.",
         ];
@@ -285,10 +285,10 @@ async fn reduced_motion_keeps_a_search_cursor_and_starting_status_static() {
     let second = screen.frame();
     assert!(first.contains("/e▏"), "{}", first);
     assert!(second.contains("/e▏"), "{}", second);
-    assert!(first.contains(" :58202  ●"), "{}", first);
-    assert!(second.contains(" :58202  ●"), "{}", second);
-    assert!(!first.contains(" :58202  ○"), "{}", first);
-    assert!(!second.contains(" :58202  ○"), "{}", second);
+    assert!(first.contains(" :47202  ●"), "{}", first);
+    assert!(second.contains(" :47202  ●"), "{}", second);
+    assert!(!first.contains(" :47202  ○"), "{}", first);
+    assert!(!second.contains(" :47202  ○"), "{}", second);
 }
 
 #[tokio::test]
@@ -475,7 +475,7 @@ async fn ctrl_c_quits_from_anywhere() {
 async fn opening_the_focused_api_opens_its_swagger() {
     let mut screen = screen("keys-open", json!({}));
     screen.press("w");
-    assert_eq!(screen.last_log(), "Opened http://localhost:58201/swagger");
+    assert_eq!(screen.last_log(), "Opened http://localhost:47201/swagger");
 }
 
 #[test]
@@ -619,7 +619,7 @@ async fn y_copies_a_failed_builds_errors_with_their_full_paths() {
 #[tokio::test]
 async fn y_says_when_there_is_nothing_to_copy_or_the_clipboard_refuses() {
     let mut screen = screen("copy-nothing", json!({}));
-    screen.output(&["info: Now listening on: http://localhost:58201"]);
+    screen.output(&["info: Now listening on: http://localhost:47201"]);
     screen.press("y y");
     assert!(copied().is_empty());
     assert_eq!(screen.last_log(), "Nothing to copy: no error in Orders's output (/ finds a line to copy).");
@@ -884,9 +884,9 @@ async fn in_the_requests_view_filters_copy_and_open_narrow_and_act_on_the_select
     screen.press("e / 4 2 Enter");
     assert!(screen.frame().contains("[/42]"), "{}", screen.frame());
     screen.press("y");
-    assert_eq!(copied(), ["GET http://localhost:58201/api/orders/42 -> 200 in 12 ms (Orders, 2026-10-22 09:41:07)"]);
+    assert_eq!(copied(), ["GET http://localhost:47201/api/orders/42 -> 200 in 12 ms (Orders, 2026-10-22 09:41:07)"]);
     screen.press("w");
-    assert_eq!(OPENED.with(|opened| opened.borrow().clone()), ["http://localhost:58201/api/orders/42"]);
+    assert_eq!(OPENED.with(|opened| opened.borrow().clone()), ["http://localhost:47201/api/orders/42"]);
     screen.press("/ Esc s");
     assert!(screen.frame().contains("sort (slowest)"));
     screen.click(Target::Item(1));
@@ -1257,7 +1257,7 @@ async fn a_click_on_a_link_opens_the_url_or_the_file_at_its_line() {
     screen.controller.root = repo;
     let at = screen.ui.now - Duration::from_secs(5);
     screen.controller.states[0].output.push("Checkout.cs(12,5): error CS1002: ; expected", at);
-    screen.controller.states[1].output.push("  Local:   http://localhost:58202/", at);
+    screen.controller.states[1].output.push("  Local:   http://localhost:47202/", at);
     screen.frame();
     let spot = |screen: &Screen, column: usize| {
         let hit = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Link { column: c, .. } if c == column));
@@ -1269,7 +1269,7 @@ async fn a_click_on_a_link_opens_the_url_or_the_file_at_its_line() {
     screen.ui.now += Duration::from_secs(1); // not a double click
     screen.click_at(x, y);
     let opened = OPENED.with(|opened| opened.borrow().clone());
-    assert_eq!(opened[0], "http://localhost:58202/");
+    assert_eq!(opened[0], "http://localhost:47202/");
     assert!(opened[1].starts_with("myeditor --goto ") && opened[1].ends_with("Checkout.cs:12"), "{opened:?}");
     assert!(screen.last_log().starts_with("Opening Checkout.cs:12 in myeditor"), "{}", screen.last_log());
 }
@@ -1354,7 +1354,7 @@ async fn an_agent_reads_the_status_and_numbered_logs_and_the_last_error() {
     let mut screen = screen("agent", json!({}));
     let (at, base) = (screen.ui.now, screen.controller.states[0].output.total());
     let lines = [
-        "info: Now listening on: http://localhost:58201",
+        "info: Now listening on: http://localhost:47201",
         "fail: Orders.Api.Checkout[0]",
         "      System.InvalidOperationException: the basket is empty",
         r"         at Orders.Api.Checkout.Pay() in C:\src\Checkout.cs:line 42",

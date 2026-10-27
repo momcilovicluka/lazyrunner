@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders  :58201  ┳ ■ Billing  :58202  ○┬ ■ Shop  :58301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :58303  ○
+ ▸ ◆ Orders  :47201  ┳ ■ Billing  :47202  ○┬ ■ Shop  :47301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :47303  ○
                      ┃                     │   dev server · dev  │   watch build · watc│   live · dev
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
@@ -19,8 +19,8 @@ expression: screen.frame()
 info: Microsoft.Hosti┃                     │                     │                     │
 ng.Lifetime[14]      ┃                     │                     │                     │
       Now listening o┃                     │                     │                     │
-n: http://localhost:5┃                     │                     │                     │
-8201                 ┃                     │                     │                     │
+n: http://localhost:4┃                     │                     │                     │
+7201                 ┃                     │                     │                     │
 warn: an error happen┃                     │                     │                     │
 ed once              ┃Building...          │                     │                     │
 info: Application sta┃error: Billing.cs(3,1│                     │                     │
