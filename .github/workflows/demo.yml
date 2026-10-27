@@ -1,7 +1,8 @@
 name: demo
 
-# Records the README's demo (docs/demo.gif) with VHS: the real lazyrunner, on the demo shop (examples/demo), in a real
-# terminal. It runs by hand, and when the tape or the demo changes on rust; the GIF comes back as an artifact to commit.
+# Records the README's demo with VHS: the real lazyrunner, on the demo shop (examples/demo), in a real terminal. It
+# runs by hand, and when the tape or the demo changes on rust, and replaces demo.gif on the `demo` release, where the
+# README shows it from - so the GIF never lands in git's history.
 on:
   workflow_dispatch:
   push:
@@ -12,7 +13,7 @@ on:
       - .github/workflows/demo.yml
 
 permissions:
-  contents: read
+  contents: write # replacing the demo release's GIF
 
 jobs:
   record:
@@ -41,7 +42,7 @@ jobs:
         with:
           path: docs/demo.tape
           install-fonts: true
-      - uses: actions/upload-artifact@v7
-        with:
-          name: demo
-          path: docs/demo.gif
+      - name: Replace the README's GIF
+        run: gh release upload demo docs/demo.gif --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

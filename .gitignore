@@ -1,2 +1,4 @@
 lazyrunner.config.json
 /target/
+# The demo recording (docs/demo.tape) - it lives on the demo release, not in git.
+docs/demo.gif

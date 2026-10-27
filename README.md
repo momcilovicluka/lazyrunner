@@ -17,7 +17,7 @@ and zoom.
 
 Inspired by lazygit: one command instead of a row of terminal tabs.
 
-<p align="center"><img src="docs/demo.gif" alt="lazyrunner opening the demo shop: trusting its profile, the startup checklist, building and starting two APIs and a frontend, then the requests view, a request's details and the command palette" width="100%"></p>
+<p align="center"><img src="https://github.com/momcilovicluka/lazyrunner/releases/download/demo/demo.gif" alt="lazyrunner opening the demo shop: trusting its profile, the startup checklist, building and starting two APIs and a frontend, then the requests view, a request's details and the command palette" width="100%"></p>
 
 > [!IMPORTANT]
 > lazyrunner is source-available, not open source. It is free to use - personally, for a non-profit, or at work -
@@ -604,9 +604,13 @@ cargo test --workspace                                # unit tests, snapshots of
 cargo insta review                                    # look at changed screen snapshots
 LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference   # rewrite the guide's field reference
 cargo run -p lazyrunner-ui --example screenshots      # redraw the screenshots above (docs/screenshots) after visible changes
-vhs docs/demo.tape                                    # re-record docs/demo.gif (or run the demo workflow on GitHub)
+vhs docs/demo.tape                                    # record the demo GIF locally (docs/demo.gif, not committed)
 dist plan                                             # what a release would build (cargo-dist)
 ```
+
+The README's recording lives on the [`demo` release](https://github.com/momcilovicluka/lazyrunner/releases/tag/demo),
+not in git: the `demo` workflow records it with VHS (`docs/demo.tape`, on the demo shop in `examples/demo`) and replaces
+it there whenever the demo or its tape changes on `rust`, or when you run the workflow by hand.
 
 The end-to-end tests run the sample repo with real dotnet, npm and node (skipped without them), and update an installed
 copy of lazyrunner from a local stand-in for GitHub Releases.
