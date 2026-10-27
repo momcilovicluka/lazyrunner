@@ -326,12 +326,12 @@ mod tests {
     fn aspnet_and_serilog_request_lines_are_read() {
         let lines = read(&[
             "info: Microsoft.AspNetCore.Hosting.Diagnostics[1]",
-            "      Request starting HTTP/1.1 GET http://localhost:58201/api/orders/42?full=1 - - -",
+            "      Request starting HTTP/1.1 GET http://localhost:47201/api/orders/42?full=1 - - -",
             "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
-            "      Request finished HTTP/1.1 GET http://localhost:58201/api/orders/42?full=1 - 200 512 application/json;+charset=utf-8 12,3456ms",
+            "      Request finished HTTP/1.1 GET http://localhost:47201/api/orders/42?full=1 - 200 512 application/json;+charset=utf-8 12,3456ms",
             "info: Orders.Api[0]",
             "[10:00:00 INF] HTTP POST /api/orders responded 500 in 1532.1 ms",
-            "      Request finished HTTP/1.1 GET http://localhost:58201/ - - - 404 0 - 0.5ms",
+            "      Request finished HTTP/1.1 GET http://localhost:47201/ - - - 404 0 - 0.5ms",
         ]);
         assert_eq!(lines[0], Line::Hidden);
         let Line::Started(started) = &lines[1] else { panic!("{:?}", lines[1]) };

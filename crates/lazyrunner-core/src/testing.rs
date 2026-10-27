@@ -9,10 +9,10 @@ pub fn sample_profile() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/sample.json")
 }
 
-pub const ORDERS_PORT: u16 = 58201;
-pub const BILLING_PORT: u16 = 58202;
-pub const SHOP_PORT: u16 = 58301;
-pub const CONSOLE_PORT: u16 = 58303;
+pub const ORDERS_PORT: u16 = 47201;
+pub const BILLING_PORT: u16 = 47202;
+pub const SHOP_PORT: u16 = 47301;
+pub const CONSOLE_PORT: u16 = 47303;
 
 /// A folder of its own under the temp folder, removed when dropped.
 pub struct TempDir(PathBuf);

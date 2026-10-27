@@ -53,13 +53,13 @@ async fn request_lines_go_to_the_requests_view_and_the_probe_is_left_out() {
     let generation = sample.states[0].generation;
     for line in [
         "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
-        "      Request finished HTTP/1.1 GET http://localhost:58201/swagger/index.html - 200 - text/html 3.1ms",
+        "      Request finished HTTP/1.1 GET http://localhost:47201/swagger/index.html - 200 - text/html 3.1ms",
         "info: Microsoft.AspNetCore.Hosting.Diagnostics[1]",
-        "      Request starting HTTP/1.1 GET http://localhost:58201/api/orders/7 - - -",
+        "      Request starting HTTP/1.1 GET http://localhost:47201/api/orders/7 - - -",
         "warn: Orders.Api[0]",
         "      Order 7 not found",
         "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]",
-        "      Request finished HTTP/1.1 GET http://localhost:58201/api/orders/7 - 404 0 - 12.5ms",
+        "      Request finished HTTP/1.1 GET http://localhost:47201/api/orders/7 - 404 0 - 12.5ms",
         "info: Orders.Api[0]",
     ] {
         let tag = crate::run::Tag::App { key: "orders".into(), generation };
@@ -138,14 +138,14 @@ async fn apps_turned_off_on_this_machine_get_no_column() {
     let temp = TempDir::new("controller-off");
     let (controller, _rx) = controller(&temp, json!({ "projects": { "sample": { "frontend": false } } }));
     assert_eq!(controller.keys(), ["orders", "billing"]);
-    assert_eq!(controller.port("orders"), Some(58201), "ports come from the launch settings");
+    assert_eq!(controller.port("orders"), Some(47201), "ports come from the launch settings");
 }
 
 #[tokio::test]
 async fn variants_decide_ports_and_a_missing_script_skips_the_app() {
     let temp = TempDir::new("controller-variants");
     let (mut controller, _rx) = controller(&temp, json!({}));
-    assert_eq!(controller.port("console"), Some(58303), "the live variant: package.json has no dev:mock");
+    assert_eq!(controller.port("console"), Some(47303), "the live variant: package.json has no dev:mock");
     assert_eq!(controller.port("docs"), None, "a watch build has no port");
     crate::testing::write(controller.root.join("web/shop/package.json"), r#"{ "scripts": { "build": "x" } }"#);
     controller.start(Some(&["shop".to_string()]), false);

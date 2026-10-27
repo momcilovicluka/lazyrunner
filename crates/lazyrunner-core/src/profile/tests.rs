@@ -60,7 +60,7 @@ fn a_profile_loads_into_the_settings_lazyrunner_runs_with() {
         project.apps.iter().filter_map(|app| Some((app.key.as_str(), app.icon.as_deref()?))).collect();
     assert_eq!(icons, [("orders", "◆")], "the rest get the default");
     let shop = &variants(&project, "shop")[0];
-    assert_eq!((shop.port, shop.label.as_str()), (Some(58301), "dev server"));
+    assert_eq!((shop.port, shop.label.as_str()), (Some(47301), "dev server"));
     let docs = &variants(&project, "docs")[0];
     assert_eq!(docs.served_by.as_deref(), Some("orders"));
     assert_eq!(docs.ready_file, Some(native("dist/index.html")));
@@ -68,7 +68,7 @@ fn a_profile_loads_into_the_settings_lazyrunner_runs_with() {
     let console = variants(&project, "console");
     assert_eq!(console.len(), 2);
     assert_eq!(console[0].when.as_deref(), Some("dev:mock"));
-    assert_eq!((console[1].when.clone(), console[1].port), (None, Some(58303)));
+    assert_eq!((console[1].when.clone(), console[1].port), (None, Some(47303)));
 }
 
 #[test]

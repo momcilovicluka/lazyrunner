@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: "screen.render(60, 15)"
 ---
- ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop  :58┬ ■ Docs   ○ ┬ ■ Conso
+ ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop  :47┬ ■ Docs   ○ ┬ ■ Conso
             ┃            │   dev serve│   watch bui│   live
 once        ┃error: Billi│            │            │
 info: Applic┃ng.cs(3,1): │            │            │

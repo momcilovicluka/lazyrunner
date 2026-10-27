@@ -211,8 +211,8 @@ mod tests {
     #[test]
     fn urls_and_places_in_files_are_found() {
         assert_eq!(
-            targets("  ➜  Local:   http://localhost:58301/."),
-            [("http://localhost:58301/".into(), Target::Url("http://localhost:58301/".into()))]
+            targets("  ➜  Local:   http://localhost:47301/."),
+            [("http://localhost:47301/".into(), Target::Url("http://localhost:47301/".into()))]
         );
         assert_eq!(
             targets("Orders.cs(12,5): error CS1002: ; expected"),
@@ -229,7 +229,7 @@ mod tests {
             targets("    at Object.<anonymous> (src/cart/cart.test.ts:18:7)"),
             [("src/cart/cart.test.ts:18:7".into(), file("src/cart/cart.test.ts", 18, Some(7)))]
         );
-        assert!(targets("info: Now listening on: localhost:58201 (12 ms)").is_empty());
+        assert!(targets("info: Now listening on: localhost:47201 (12 ms)").is_empty());
     }
 
     #[test]
@@ -255,13 +255,13 @@ mod tests {
                 Target::Url("https://en.wikipedia.org/wiki/Rust_(programming_language)".into())
             )]
         );
-        assert_eq!(targets("(at http://localhost:58201/)")[0].0, "http://localhost:58201/");
+        assert_eq!(targets("(at http://localhost:47201/)")[0].0, "http://localhost:47201/");
         assert!(targets("bare http://. here").is_empty());
     }
 
     #[test]
     fn a_url_with_a_file_in_it_is_one_link() {
-        let found = targets("GET http://localhost:58301/src/main.ts:12 404");
+        let found = targets("GET http://localhost:47301/src/main.ts:12 404");
         assert_eq!(found.len(), 1);
         assert!(matches!(found[0].1, Target::Url(_)));
     }

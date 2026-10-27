@@ -345,7 +345,7 @@ impl Demo {
             ("✓ Orders built in 21s (14 projects)", Hue::Green),
             ("✓ Billing built in 9s (6 projects)", Hue::Green),
             ("Starting Orders + Billing", Hue::Cyan),
-            ("● Orders is listening on :58201 - up in 4s", Hue::Green),
+            ("● Orders is listening on :47201 - up in 4s", Hue::Green),
             ("Ready in 38s", Hue::Green),
         ] {
             self.controller.log.push_back(LogEntry { time: "09:41:07".into(), text: text.into(), hue });
@@ -520,7 +520,7 @@ fn escape(text: &str) -> String {
 
 const ORDERS: &[&str] = &[
     "info: Microsoft.Hosting.Lifetime[14]",
-    "      Now listening on: http://localhost:58201",
+    "      Now listening on: http://localhost:47201",
     "info: Microsoft.Hosting.Lifetime[0]",
     "      Application started.",
     "info: Shop.Orders.Api[0]",
@@ -539,7 +539,7 @@ const ORDERS: &[&str] = &[
 
 const BILLING: &[&str] = &[
     "info: Microsoft.Hosting.Lifetime[14]",
-    "      Now listening on: http://localhost:58202",
+    "      Now listening on: http://localhost:47202",
     "info: Microsoft.Hosting.Lifetime[0]",
     "      Application started.",
     "info: Shop.Billing.Api[0]",
@@ -552,11 +552,11 @@ const BILLING: &[&str] = &[
 
 const SHOP: &[&str] = &[
     "> shop@1.4.0 dev",
-    "> vite --port 58301",
+    "> vite --port 47301",
     "",
     "  VITE v5.4.10  ready in 812 ms",
     "",
-    "  ➜  Local:   http://localhost:58301/",
+    "  ➜  Local:   http://localhost:47301/",
     "  ➜  Network: use --host to expose",
     "09:39:12 [vite] hmr update /src/cart/CartPage.tsx",
     "09:40:31 [vite] hmr update /src/cart/CartPage.tsx, /src/cart/cart.css",
@@ -577,10 +577,10 @@ const DOCS: &[&str] = &[
 
 const CONSOLE: &[&str] = &[
     "> console@1.4.0 dev",
-    "> vite --port 58303",
+    "> vite --port 47303",
     "",
     "  VITE v5.4.10  ready in 604 ms",
     "",
-    "  ➜  Local:   http://localhost:58303/",
+    "  ➜  Local:   http://localhost:47303/",
     "09:40:55 [vite] hmr update /src/reports/Daily.tsx",
 ];
