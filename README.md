@@ -587,6 +587,9 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 
 ## Roadmap
 
+What's next, in order, is on the [roadmap board](https://github.com/users/momcilovicluka/projects/3): feature requests
+and fixes move Backlog → Next → In progress → Done, one release each. Further out:
+
 - Publish Linux and macOS release binaries.
 - Expand profile recipes for common multi-service setups.
 - Keep improving startup diagnostics and recovery feedback in the UI.
@@ -648,8 +651,8 @@ so pull before merging a branch into it.
 
 ## Community
 
-- **Roadmap**: what's next is the [Up next](https://github.com/momcilovicluka/lazyrunner/milestone/1) milestone;
-  ideas wait in the [feature requests](https://github.com/momcilovicluka/lazyrunner/issues?q=is%3Aopen+label%3Aenhancement).
+- **Roadmap**: what's next is on the [roadmap board](https://github.com/users/momcilovicluka/projects/3) (and the
+  [Up next](https://github.com/momcilovicluka/lazyrunner/milestone/1) milestone); further out, [Roadmap](#roadmap).
 - **Questions**: [Discussions](https://github.com/momcilovicluka/lazyrunner/discussions), not issues.
 - **Bugs and ideas**: the [issue forms](https://github.com/momcilovicluka/lazyrunner/issues/new/choose).
 - **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md); everyone follows the [code of conduct](CODE_OF_CONDUCT.md).
