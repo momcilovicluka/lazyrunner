@@ -16,6 +16,7 @@ Set Padding 18
 Set Theme "Catppuccin Mocha"
 Set WindowBar Colorful
 Set TypingSpeed 70ms
+Set Framerate 24
 
 Env LAZYRUNNER_CONFIG_PATH "/tmp/lazyrunner-demo/config.json"
 Env LAZYRUNNER_STATE_DIR "/tmp/lazyrunner-demo/state"
@@ -23,7 +24,8 @@ Env LAZYRUNNER_STATE_DIR "/tmp/lazyrunner-demo/state"
 Hide
 Type `mkdir -p /tmp/lazyrunner-demo && echo '{"theme":"catppuccin-mocha","nerdIcons":false,"autoStartOnOpen":true}' > /tmp/lazyrunner-demo/config.json`
 Enter
-Type "cd examples/demo && clear"
+# The demo as a project of its own - its own folder and git repo, on main - as it would be on your machine.
+Type `cp -r examples/demo ~/demo-shop && cd ~/demo-shop && git init -q -b main && git add -A && git -c user.name=demo -c user.email=demo@example.com commit -qm "Demo shop" && clear`
 Enter
 Show
 
