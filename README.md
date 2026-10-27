@@ -463,6 +463,8 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_status` | Each app's state, port, url and error count; what's busy; the test totals; the settings; what's on screen |
 | `get_logs` | An app's output, numbered: `since` (only what's new), `limit`, `grep`, `errors_only` |
 | `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
+| `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path - or summed up per endpoint (p50, p95, max) |
+| `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused |
 | `get_screen` | The screen as you see it, as text |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
@@ -476,7 +478,8 @@ open, the tools say so; open it and the agent carries on. Run lazyrunner and the
 doesn't let an agent that isn't elevated drive a lazyrunner opened with "Run as administrator". After an update, restart lazyrunner (`q`, then
 `lazyrunner`) so it speaks the same version as `lazyrunner mcp`. To let Claude Code read without asking each time,
 allow `mcp__lazyrunner__get_status`, `mcp__lazyrunner__get_logs`, `mcp__lazyrunner__get_errors`,
-`mcp__lazyrunner__get_screen`, `mcp__lazyrunner__list_tests`, `mcp__lazyrunner__get_test_results`,
+`mcp__lazyrunner__get_screen`, `mcp__lazyrunner__get_requests`, `mcp__lazyrunner__get_request`,
+`mcp__lazyrunner__list_tests`, `mcp__lazyrunner__get_test_results`,
 `mcp__lazyrunner__get_migrations` and `mcp__lazyrunner__wait` in its permissions.
 
 ## npm apps

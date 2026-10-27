@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.13.0] - 2026-10-27
+
+### Added
+- Requests over MCP: `get_requests` lists what the .NET apps served - newest or slowest first, only the new ones (`since`), one app, errors only, a path - or sums it up per endpoint (count, errors, avg, p50, p95, max); `get_request` has one in full: what it sent and returned, its endpoint's times, the log lines its app wrote while it ran and its EF Core database commands. An agent can now find a slow or failing endpoint and see why on its own (#17)
+
 ## [1.12.0] - 2026-10-27
 
 ### Added

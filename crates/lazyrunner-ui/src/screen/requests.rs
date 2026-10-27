@@ -6,7 +6,7 @@
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
-use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
+use lazyrunner_core::run::requests::{Endpoint, Request, db_command_ms, endpoints};
 
 use super::columns::{contains_ignore_case, fit, line_color};
 use super::icons::{self, Icon};
@@ -450,12 +450,6 @@ fn body(content: &str, length: &str) -> String {
     }
 }
 
-/// How long a database command took, from EF Core's "Executed DbCommand (12ms)".
-fn db_ms(text: &str) -> Option<f64> {
-    let rest = text.split_once("Executed DbCommand (")?.1;
-    rest.split_once("ms)")?.0.replace(',', "").trim().parse().ok()
-}
-
 /// The selected request: what it was, how it compares with its endpoint, what it sent and returned, what it logged.
 fn request_details(controller: &Controller, request: Option<&Request>, width: usize, height: usize) -> Vec<Vec<Seg>> {
     let Some(request) = request else { return vec![vec![seg("No request selected.", C::DarkGray)]] };
@@ -508,7 +502,7 @@ fn request_details(controller: &Controller, request: Option<&Request>, width: us
         seg(format!(" {expected} lines"), C::Gray),
         seg(format!(" · {errors} errors"), if errors > 0 { C::Red } else { C::DarkGray }),
     ]);
-    let times: Vec<f64> = logged.iter().filter_map(|line| db_ms(&line.text)).collect();
+    let times: Vec<f64> = logged.iter().filter_map(|line| db_command_ms(&line.text)).collect();
     if !times.is_empty() {
         let total: f64 = times.iter().sum();
         let slowest = times.iter().copied().fold(0.0, f64::max);

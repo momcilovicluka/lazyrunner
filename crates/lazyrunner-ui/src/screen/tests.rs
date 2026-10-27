@@ -1350,6 +1350,46 @@ fn agent(screen: &mut Screen, op: &str, args: Value, repo: Option<&std::path::Pa
 }
 
 #[tokio::test]
+async fn an_agent_reads_the_requests_their_endpoints_and_one_request_in_full() {
+    let mut screen = screen("agent-requests", json!({}));
+    let empty = agent(&mut screen, "requests", json!({}), None);
+    assert!(empty["result"]["hint"].as_str().unwrap().contains("No requests yet"), "{empty}");
+    with_requests(&mut screen);
+    with_logged_request(&mut screen);
+    let ids = |answer: &Value, field: &str| -> Vec<u64> {
+        answer["result"]["requests"].as_array().unwrap().iter().map(|row| row[field].as_u64().unwrap()).collect()
+    };
+
+    let newest = agent(&mut screen, "requests", json!({ "limit": 2 }), None);
+    assert_eq!(ids(&newest, "id"), [5, 4]);
+    assert_eq!((newest["result"]["matching"].as_u64(), newest["result"]["next"].as_u64()), (Some(5), Some(5)));
+    let failed = agent(&mut screen, "requests", json!({ "errors_only": true, "sort": "slowest" }), None);
+    assert_eq!(ids(&failed, "status"), [500, 500]);
+    let orders = agent(&mut screen, "requests", json!({ "app": "Orders", "path": "/API/ORDERS/4", "since": 1 }), None);
+    assert_eq!(ids(&orders, "id"), [4], "{orders}");
+    let summed = agent(&mut screen, "requests", json!({ "endpoints": true }), None);
+    let endpoints = summed["result"]["endpoints"].as_array().unwrap();
+    let first = &endpoints[0];
+    assert_eq!((first["total_ms"].as_f64(), first["errors"].as_u64()), (Some(1530.0), Some(1)), "the most time first");
+    let orders = endpoints.iter().find(|row| row["endpoint"] == "/api/orders/{id}").unwrap();
+    assert_eq!((orders["count"].as_u64(), orders["p50_ms"].as_f64()), (Some(2), Some(12.4)), "{summed}");
+    assert_eq!(agent(&mut screen, "requests", json!({ "sort": "oldest" }), None)["code"], "bad_args");
+
+    let answer = agent(&mut screen, "request", json!({ "id": 5 }), None);
+    let one = &answer["result"];
+    assert_eq!((one["status"].as_u64(), one["protocol"].as_str()), (Some(500), Some("HTTP/2")), "{answer}");
+    assert_eq!(one["sent"]["content_type"], "application/json");
+    assert_eq!((one["log"]["known"].as_bool(), one["log"]["count"].as_u64()), (Some(true), Some(4)));
+    assert_eq!(one["log"]["possibly_mixed"], true);
+    assert_eq!(one["log"]["lines"][3]["text"], "      System.InvalidOperationException: Invoice 7 has no currency.");
+    assert_eq!((one["database"]["commands"].as_u64(), one["database"]["total_ms"].as_f64()), (Some(1), Some(1204.0)));
+    let unlogged = agent(&mut screen, "request", json!({ "id": 1 }), None);
+    assert_eq!(unlogged["result"]["log"]["known"], false);
+    assert_eq!(unlogged["result"]["endpoint_stats"]["count"], 2, "GET /api/orders/{{id}} twice");
+    assert_eq!(agent(&mut screen, "request", json!({ "id": 99 }), None)["code"], "not_found");
+}
+
+#[tokio::test]
 async fn an_agent_reads_the_status_and_numbered_logs_and_the_last_error() {
     let mut screen = screen("agent", json!({}));
     let (at, base) = (screen.ui.now, screen.controller.states[0].output.total());
