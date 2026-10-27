@@ -916,6 +916,31 @@ async fn an_endpoints_details_show_its_times_statuses_and_slowest_and_failing_re
 }
 
 #[tokio::test]
+async fn l_on_an_endpoint_lists_its_requests_and_h_goes_back_to_its_row() {
+    let mut screen = screen("endpoint-requests", json!({}));
+    with_requests(&mut screen);
+    screen.press("H Tab j j");
+    assert!(screen.frame().contains("l its requests"), "{}", screen.frame());
+    screen.press("l");
+    let frame = screen.frame();
+    assert!(frame.contains("[GET /api/orders/{id} · Orders]"), "{frame}");
+    assert!(frame.contains("2 shown") && frame.contains("h endpoints"), "{frame}");
+    assert!(frame.contains("/api/orders/42") && !frame.contains("/api/invoices/7"), "{frame}");
+    screen.press("h");
+    let Some(Overlay::Requests(view)) = &screen.ui.overlay else { panic!("still the requests view") };
+    assert_eq!((view.tab, view.index, view.endpoint.is_none()), (super::requests::Tab::Endpoints, 2, true));
+    screen.press("l Enter Esc");
+    assert!(
+        matches!(&screen.ui.overlay, Some(Overlay::Requests(view)) if view.endpoint.is_some()),
+        "Esc closes the details first"
+    );
+    screen.press("Esc");
+    assert!(matches!(&screen.ui.overlay, Some(Overlay::Requests(view)) if view.endpoint.is_none()), "then goes back");
+    let orders = agent(&mut screen, "requests", json!({ "endpoint": "/API/orders/{id}", "method": "get" }), None);
+    assert_eq!(orders["result"]["matching"], 2, "{orders}");
+}
+
+#[tokio::test]
 async fn in_the_requests_view_filters_copy_and_open_narrow_and_act_on_the_selection() {
     let mut screen = screen("requests-keys", json!({}));
     with_requests(&mut screen);

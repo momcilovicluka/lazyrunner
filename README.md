@@ -400,7 +400,8 @@ at a time: its row says `N+1`, its details show the query, how often and how lon
 many of its requests do it. lazyrunner sums a request's database commands up as it finishes, so they stay after its
 log lines scroll away.
 
-`e` shows errors only, `a` one app, `/` filters by path; `y` copies the selected row, `w` opens a GET request in the
+`l` (or →) on an endpoint lists its requests; `h` (or ←, `Tab`, `Esc`) goes back to it. `e` shows errors only, `a` one
+app, `/` filters by path; `y` copies the selected row, `w` opens a GET request in the
 browser, `o` opens the selected row's app log, `c` clears the list, `Esc` / `q` / `H` close. The top row follows new requests; any other
 row stays put as new ones arrive. The last 5,000 are kept while lazyrunner runs (lazyrunner's own response-time probe
 isn't among them); the full lines are still in each app's log file.
@@ -468,7 +469,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_status` | Each app's state, port, url and error count; what's busy; the test totals; the settings; what's on screen |
 | `get_logs` | An app's output, numbered: `since` (only what's new), `limit`, `grep`, `errors_only` |
 | `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
-| `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path - or summed up per endpoint (p50, p95, max); N+1s marked |
+| `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path, one endpoint - or summed up per endpoint (p50, p95, max); N+1s marked |
 | `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1) |
 | `get_screen` | The screen as you see it, as text |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |

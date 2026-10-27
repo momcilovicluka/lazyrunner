@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.15.0] - 2026-10-27
+
+### Added
+- `l` (or →) on an endpoint in the requests view lists its requests, the filter in the header; `h` (or ←, Tab, Esc) goes back to its row. `get_requests` takes an `endpoint` (and `method`) for the same (#20)
+
 ## [1.14.0] - 2026-10-27
 
 ### Added

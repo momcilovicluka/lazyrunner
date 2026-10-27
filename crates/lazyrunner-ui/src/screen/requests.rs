@@ -69,6 +69,9 @@ pub struct View {
     pub typing: bool,
     /// The details panel is open (Enter / Space).
     pub details: bool,
+    /// Only one endpoint's requests (l on its row): app, method and endpoint; and its row, to go back to (h).
+    pub endpoint: Option<(String, String, String)>,
+    pub endpoint_row: usize,
 }
 
 impl Default for View {
@@ -85,6 +88,8 @@ impl Default for View {
             filter: String::new(),
             typing: false,
             details: false,
+            endpoint: None,
+            endpoint_row: 0,
         }
     }
 }
@@ -104,6 +109,11 @@ fn shown<'a>(view: &View, controller: &'a Controller) -> Vec<&'a Request> {
         .filter(|request| !view.errors_only || request.status >= 400)
         .filter(|request| view.app.as_ref().is_none_or(|app| *app == request.app))
         .filter(|request| view.filter.is_empty() || contains_ignore_case(&request.path, &view.filter))
+        .filter(|request| {
+            view.endpoint.as_ref().is_none_or(|(app, method, endpoint)| {
+                request.app == *app && request.method == *method && request.endpoint == *endpoint
+            })
+        })
         .collect();
     if SORTS[view.sort] == "slowest" {
         list.sort_by(|a, b| b.ms.total_cmp(&a.ms));
@@ -125,9 +135,9 @@ fn summed(view: &View, controller: &Controller) -> Vec<Endpoint> {
     list
 }
 
-/// Tab requests / endpoints, j k choose, Enter / Space details, e errors only, a app, s sort, / filter by path, y copy,
-/// w open a GET request, o the app's log, c clear, Esc the details or back, q / H back; false for a key it doesn't
-/// use.
+/// Tab requests / endpoints, j k choose, Enter / Space details, l an endpoint's requests (h, Esc back to it), e errors
+/// only, a app, s sort, / filter by path, y copy, w open a GET request, o the app's log, c clear, Esc the details or
+/// back, q / H back; false for a key it doesn't use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) -> bool {
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return false };
     if view.typing {
@@ -151,8 +161,16 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
     };
     match name {
         "Escape" if view.details => view.details = false,
+        "Escape" | "h" | "LeftArrow" | "Tab" if view.endpoint.is_some() => back_to_endpoints(view),
         "Escape" | "q" | "H" => ui.overlay = None,
         "Enter" | "Space" => view.details = !view.details,
+        "l" | "RightArrow" if view.tab == Tab::Endpoints => {
+            let Some(endpoint) = summed(view, controller).into_iter().nth(view.index) else { return true };
+            view.endpoint = Some((endpoint.app, endpoint.method, endpoint.endpoint));
+            view.endpoint_row = view.index;
+            view.tab = Tab::Requests;
+            (view.index, view.follow) = (0, true);
+        }
         "Tab" => {
             view.tab = if view.tab == Tab::Requests { Tab::Endpoints } else { Tab::Requests };
             (view.index, view.follow) = (0, true);
@@ -205,6 +223,14 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         _ => return false,
     }
     true
+}
+
+/// h: from one endpoint's requests back to the endpoints, on its row.
+fn back_to_endpoints(view: &mut View) {
+    view.endpoint = None;
+    view.tab = Tab::Endpoints;
+    view.index = view.endpoint_row;
+    view.follow = view.index == 0;
 }
 
 /// Moves the selection; the top row follows new requests, another one stays on its request.
@@ -653,6 +679,9 @@ fn header(view: &View, controller: &Controller, list: &[&Request], width: usize,
     if !view.filter.is_empty() || view.typing {
         filters.push(format!("/{}{}", view.filter, if view.typing { cursor } else { "" }));
     }
+    if let Some((app, method, endpoint)) = &view.endpoint {
+        filters.push(format!("{method} {endpoint} · {}", app_name(controller, app)));
+    }
     let chip = format!(" {} Requests ", icons::icon(nerd, Icon::Requests));
     let mut segs = vec![on(chip, C::Black, C::Cyan), seg("  ", C::Gray)];
     for (tab, label) in [(Tab::Requests, " requests "), (Tab::Endpoints, " endpoints ")] {
@@ -675,10 +704,17 @@ fn hint(view: &View, controller: &Controller, width: usize) -> Vec<Seg> {
         Tab::Requests => SORTS[view.sort],
         Tab::Endpoints => ENDPOINT_SORTS[view.endpoint_sort],
     };
-    let text = format!(
-        " Tab requests/endpoints · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · \
-         y copy · w open · o log · c clear · Esc back"
-    );
+    let text = match (view.tab, view.endpoint.is_some()) {
+        (Tab::Endpoints, _) => format!(
+            " Tab requests/endpoints · j k choose · l its requests · Enter details · e errors only · a app · \
+             s sort ({sort}) · / filter · y copy · o log · c clear · Esc back"
+        ),
+        (Tab::Requests, filtered) => format!(
+            " {} · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · y copy · \
+             w open · o log · c clear · Esc back",
+            if filtered { "h endpoints" } else { "Tab requests/endpoints" }
+        ),
+    };
     fit(vec![seg(text, C::DarkGray)], width)
 }
 

@@ -304,7 +304,8 @@ impl<C: Channel> Server<C> {
                 "The HTTP requests the .NET apps served (lazyrunner's requests view, from ASP.NET's request log): \
                  id, method, path, endpoint, status and milliseconds, newest first or slowest first (sort), after \
                  `since` (pass the last answer's `next` for only the new ones), of one app, errors only (status 400 \
-                 and up), or with `path` in them; `limit` (50, at most 500). With endpoints: true, summed up per \
+                 and up), with `path` in them, or of one `endpoint` as the endpoints list names it (and `method`); \
+                 `limit` (50, at most 500). With endpoints: true, summed up per \
                  endpoint instead - count, errors, avg, p50, p95, max. `n_plus_one` marks a request that ran one \
                  query over and over (and n_plus_one_requests an endpoint's); get_request has one in full.",
                 json!({
@@ -313,6 +314,8 @@ impl<C: Channel> Server<C> {
                     "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
                     "errors_only": { "type": "boolean" },
                     "path": { "type": "string" },
+                    "endpoint": { "type": "string", "description": "As endpoints: true names it, e.g. /api/orders/{id}" },
+                    "method": { "type": "string" },
                     "sort": { "type": "string", "enum": ["newest", "slowest"] },
                     "endpoints": { "type": "boolean" },
                 }),
