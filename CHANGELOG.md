@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.14.0] - 2026-10-27
+
+### Added
+- N+1 warnings: a request that runs the same query 10 times or more (its parameters aside) says `N+1` in the requests view; its details show the query, how often and how long it ran, and the usual fix, and an endpoint's details how many of its requests do it. `get_request` has the query (`repeated`), `get_requests` marks them (#18)
+
+### Changed
+- A request's database commands are summed up as it finishes, so its details (and get_request) keep them after the app's log lines scroll away
+
 ## [1.13.0] - 2026-10-27
 
 ### Added

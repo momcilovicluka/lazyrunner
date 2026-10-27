@@ -290,6 +290,9 @@ fn requests(demo: &mut Demo) {
                 }
             }
             request.logs = Some((from, state.output.total()));
+            request.db = lazyrunner_core::run::requests::db_summary(
+                state.output.numbered(from, state.output.total()).map(|line| line.text.as_str()),
+            );
         }
         demo.controller.requests.add(app, request, today(9, 40, second));
     }

@@ -11,6 +11,8 @@ use regex::Regex;
 pub const MAX_REQUESTS: usize = 5000;
 /// Requests an app has in flight that are followed, the newest (one that never finishes is forgotten).
 const MAX_IN_FLIGHT: usize = 256;
+/// One request running the same query this many times looks like an N+1: a loop loading one row at a time.
+pub const N_PLUS_ONE: usize = 10;
 /// What `dotnet run` passes an app so ASP.NET logs each request it finished.
 pub const LOG_REQUESTS: &str = "--Logging:LogLevel:Microsoft.AspNetCore.Hosting.Diagnostics=Information";
 
@@ -71,6 +73,66 @@ pub struct Finished {
     pub logs: Option<(u64, u64)>,
     /// Other requests of the app ran at the same time, so some of those lines may be theirs.
     pub mixed: bool,
+    /// Its EF Core commands, from the lines it logged (summed up as it finishes: the lines may be gone later).
+    pub db: Option<DbSummary>,
+}
+
+/// What a request did in the database: its EF Core commands - how many, their total and the slowest - and the query
+/// it ran over and over, when that looks like an N+1.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DbSummary {
+    pub commands: usize,
+    pub total_ms: f64,
+    pub slowest_ms: f64,
+    pub repeated: Option<Repeated>,
+}
+
+/// One query run `count` times by a request (its parameters aside), `total_ms` in all.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Repeated {
+    pub sql: String,
+    pub count: usize,
+    pub total_ms: f64,
+}
+
+/// The EF Core commands among a request's log lines: each "Executed DbCommand (12ms) [Parameters=...]" and the SQL on
+/// the indented lines after it, up to the next log entry. `None` without any.
+pub fn db_summary<'a>(lines: impl IntoIterator<Item = &'a str>) -> Option<DbSummary> {
+    let mut commands: Vec<(f64, String)> = Vec::new();
+    let mut in_command = false;
+    for line in lines {
+        if let Some(ms) = db_command_ms(line) {
+            commands.push((ms, String::new()));
+            in_command = true;
+        } else if in_command && line.starts_with(char::is_whitespace) {
+            let sql = &mut commands.last_mut().expect("a command").1;
+            if !sql.is_empty() {
+                sql.push(' ');
+            }
+            sql.push_str(line.trim());
+        } else {
+            in_command = false;
+        }
+    }
+    if commands.is_empty() {
+        return None;
+    }
+    let mut same: HashMap<&str, (usize, f64)> = HashMap::new();
+    for (ms, sql) in commands.iter().filter(|(_, sql)| !sql.is_empty()) {
+        let entry = same.entry(sql.as_str()).or_default();
+        (entry.0, entry.1) = (entry.0 + 1, entry.1 + ms);
+    }
+    let repeated = same
+        .into_iter()
+        .filter(|(_, (count, _))| *count >= N_PLUS_ONE)
+        .max_by(|a, b| a.1.0.cmp(&b.1.0).then(b.0.cmp(a.0)))
+        .map(|(sql, (count, total_ms))| Repeated { sql: sql.to_string(), count, total_ms });
+    Some(DbSummary {
+        commands: commands.len(),
+        total_ms: commands.iter().map(|(ms, _)| ms).sum(),
+        slowest_ms: commands.iter().map(|(ms, _)| *ms).fold(0.0, f64::max),
+        repeated,
+    })
 }
 
 /// What an app's output line is to the requests view.
@@ -229,6 +291,7 @@ pub struct Request {
     /// See [`Finished::logs`].
     pub logs: Option<(u64, u64)>,
     pub mixed: bool,
+    pub db: Option<DbSummary>,
 }
 
 /// The requests served, oldest first.
@@ -241,7 +304,7 @@ pub struct Requests {
 impl Requests {
     pub fn add(&mut self, app: &str, request: Finished, at: chrono::DateTime<chrono::Local>) {
         self.seq += 1;
-        let Finished { method, path, status, ms, length, content, proto, sent_content, sent_length, logs, mixed } =
+        let Finished { method, path, status, ms, length, content, proto, sent_content, sent_length, logs, mixed, db } =
             request;
         let endpoint = endpoint(&path);
         let seq = self.seq;
@@ -261,6 +324,7 @@ impl Requests {
             sent_length,
             logs,
             mixed,
+            db,
         });
         while self.items.len() > MAX_REQUESTS {
             self.items.pop_front();
@@ -281,24 +345,39 @@ pub struct Endpoint {
     pub p95: f64,
     pub max: f64,
     pub total: f64,
+    /// Its requests that look like an N+1 (`DbSummary::repeated`).
+    pub n_plus_one: usize,
+}
+
+/// One endpoint's requests while they're summed up.
+struct Group<'a> {
+    app: &'a str,
+    method: &'a str,
+    endpoint: &'a str,
+    times: Vec<f64>,
+    errors: usize,
+    n_plus_one: usize,
 }
 
 /// The requests per app, method and endpoint, in the order they first appear.
 pub fn endpoints<'a>(requests: impl Iterator<Item = &'a Request>) -> Vec<Endpoint> {
-    let mut groups: Vec<(&str, &str, &str, Vec<f64>, usize)> = Vec::new();
+    let mut groups: Vec<Group> = Vec::new();
     let mut index: HashMap<(&str, &str, &str), usize> = HashMap::new();
     for request in requests {
         let key = (request.app.as_str(), request.method.as_str(), request.endpoint.as_str());
         let at = *index.entry(key).or_insert_with(|| {
-            groups.push((key.0, key.1, key.2, Vec::new(), 0));
+            let (app, method, endpoint) = key;
+            groups.push(Group { app, method, endpoint, times: Vec::new(), errors: 0, n_plus_one: 0 });
             groups.len() - 1
         });
-        groups[at].3.push(request.ms);
-        groups[at].4 += usize::from(request.status >= 400);
+        let group = &mut groups[at];
+        group.times.push(request.ms);
+        group.errors += usize::from(request.status >= 400);
+        group.n_plus_one += usize::from(request.db.as_ref().is_some_and(|db| db.repeated.is_some()));
     }
     groups
         .into_iter()
-        .map(|(app, method, endpoint, mut times, errors)| {
+        .map(|Group { app, method, endpoint, mut times, errors, n_plus_one }| {
             times.sort_by(f64::total_cmp);
             let total: f64 = times.iter().sum();
             let count = times.len();
@@ -314,6 +393,7 @@ pub fn endpoints<'a>(requests: impl Iterator<Item = &'a Request>) -> Vec<Endpoin
                 p95: percentile(0.95),
                 max: times[count - 1],
                 total,
+                n_plus_one,
             }
         })
         .collect()
@@ -417,5 +497,34 @@ mod tests {
         let mut unknown = done("/never-started");
         flights.finish(&mut unknown, 31);
         assert_eq!(unknown.logs, None, "Serilog logs no start line");
+    }
+
+    #[test]
+    fn the_same_query_run_over_and_over_is_an_n_plus_one() {
+        let mut lines: Vec<String> = [
+            "info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]",
+            "      Executing endpoint",
+            "info: Microsoft.EntityFrameworkCore.Database.Command[20101]",
+            "      Executed DbCommand (40ms) [Parameters=[], CommandType='Text', CommandTimeout='30']",
+            "      SELECT [o].[Id] FROM [Orders] AS [o]",
+        ]
+        .map(String::from)
+        .to_vec();
+        for (id, ms) in ["2", "3", "1"].iter().cycle().take(12).enumerate() {
+            lines.push("info: Microsoft.EntityFrameworkCore.Database.Command[20101]".into());
+            lines.push(format!("      Executed DbCommand ({ms}ms) [Parameters=[@__id_0='{id}'], CommandType='Text']"));
+            lines.push("      SELECT [l].[Id], [l].[Amount]".into());
+            lines.push("      FROM [Lines] AS [l] WHERE [l].[OrderId] = @__id_0".into());
+        }
+        lines.push("info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]".into());
+        let db = db_summary(lines.iter().map(String::as_str)).expect("commands");
+        assert_eq!((db.commands, db.slowest_ms), (13, 40.0));
+        assert_eq!(db.total_ms, 40.0 + 4.0 * (2.0 + 3.0 + 1.0));
+        let repeated = db.repeated.expect("an N+1");
+        assert_eq!(repeated.sql, "SELECT [l].[Id], [l].[Amount] FROM [Lines] AS [l] WHERE [l].[OrderId] = @__id_0");
+        assert_eq!((repeated.count, repeated.total_ms), (12, 4.0 * (2.0 + 3.0 + 1.0)));
+        let few = db_summary(lines[..25].iter().map(String::as_str)).expect("commands");
+        assert_eq!(few.repeated, None, "five times isn't a loop");
+        assert_eq!(db_summary(["info: nothing", "      else"]), None);
     }
 }

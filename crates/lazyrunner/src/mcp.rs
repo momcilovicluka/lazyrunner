@@ -305,7 +305,8 @@ impl<C: Channel> Server<C> {
                  id, method, path, endpoint, status and milliseconds, newest first or slowest first (sort), after \
                  `since` (pass the last answer's `next` for only the new ones), of one app, errors only (status 400 \
                  and up), or with `path` in them; `limit` (50, at most 500). With endpoints: true, summed up per \
-                 endpoint instead - count, errors, avg, p50, p95, max. get_request has one in full.",
+                 endpoint instead - count, errors, avg, p50, p95, max. `n_plus_one` marks a request that ran one \
+                 query over and over (and n_plus_one_requests an endpoint's); get_request has one in full.",
                 json!({
                     "app": app,
                     "since": { "type": "integer", "minimum": 0 },
@@ -323,7 +324,8 @@ impl<C: Channel> Server<C> {
                 "One request in full, by its id from get_requests: what it sent and returned, its endpoint's times \
                  to compare with (p50, p95, slower_than_p95), the log lines its app wrote while it ran \
                  (possibly_mixed: other requests ran meanwhile, so some lines may be theirs), and its EF Core \
-                 database commands: how many, their total and the slowest.",
+                 database commands: how many, their total and the slowest, and `repeated` - the query it ran over \
+                 and over (10 times or more), an N+1.",
                 json!({ "id": { "type": "integer", "minimum": 1 } }),
                 &["id"],
                 true,
