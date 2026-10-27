@@ -1,11 +1,15 @@
 // Writes contributors.json - the About box's list - from GitHub: who wrote code (merged pull requests) and who
 // reported bugs and ideas (issues, by the forms' labels). No commit counts: they change with every push, and the list
 // would with them. .github/contributors-overrides.json pins people (with a role or name), hides them, and sets who
-// counts as core. `updated` changes only when the list does.
+// counts as core. `updated` changes only when the list does. The README's contributors (between its markers) are the
+// same list, as avatars.
 //
 // In the contributors workflow; locally: GITHUB_TOKEN=<token> node .github/scripts/contributors.mjs
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+
+const README = "README.md";
+const MARKERS = ["<!-- contributors:start -->", "<!-- contributors:end -->"];
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "momcilovicluka/lazyrunner";
 const TOKEN = process.env.GITHUB_TOKEN;
@@ -82,3 +86,25 @@ const same = JSON.stringify(before.people) === JSON.stringify(shaped);
 const updated = same && before.updated ? before.updated : new Date().toISOString().slice(0, 10);
 writeFileSync(OUT, JSON.stringify({ updated, people: shaped }, null, 2) + "\n");
 console.log(`${shaped.length} people${same ? " (unchanged)" : ""}: ${shaped.map((one) => one.login).join(", ")}`);
+
+/// What someone did, as the About box says it: their role, or their pull requests and issues.
+function summary(one) {
+  if (one.role) return one.role;
+  const count = (n, single, many) => (n === 0 ? null : n === 1 ? `1 ${single}` : `${n} ${many}`);
+  const other = Math.max(one.issues - one.bugs - one.ideas, 0);
+  return [count(one.prs, "PR", "PRs"), count(one.bugs, "bug report", "bug reports"), count(one.ideas, "idea", "ideas"),
+    count(other, "issue", "issues")].filter(Boolean).join(" · ");
+}
+
+if (existsSync(README)) {
+  const readme = readFileSync(README, "utf8");
+  const [start, end] = MARKERS.map((marker) => readme.indexOf(marker));
+  if (start >= 0 && end > start) {
+    const avatars = shaped.map((one) => {
+      const title = `${one.name} (@${one.login}) - ${summary(one)}`.replaceAll('"', "&quot;");
+      return `<a href="https://github.com/${one.login}" title="${title}"><img src="https://github.com/${one.login}.png?size=96" width="56" height="56" alt="${one.name}"></a>`;
+    });
+    const block = `${MARKERS[0]}\n<p>\n${avatars.join("\n")}\n</p>\n`;
+    writeFileSync(README, readme.slice(0, start) + block + readme.slice(end));
+  }
+}

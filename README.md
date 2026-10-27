@@ -1,20 +1,13 @@
-# lazyrunner
+<p align="center"><img src="docs/screenshots/banner.svg" alt="lazyrunner" width="760"></p>
 
-[![CI](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml/badge.svg)](https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml)
-[![Latest release](https://img.shields.io/github/v/release/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/releases/latest)
-[![Commits since release](https://img.shields.io/github/commits-since/momcilovicluka/lazyrunner/latest)](https://github.com/momcilovicluka/lazyrunner/commits/main)
-[![Last commit](https://img.shields.io/github/last-commit/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/commits/main)
-[![Downloads](https://img.shields.io/github/downloads/momcilovicluka/lazyrunner/total)](https://github.com/momcilovicluka/lazyrunner/releases)
-[![Stars](https://img.shields.io/github/stars/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/stargazers)
-[![License](https://img.shields.io/badge/license-lazyrunner%20License-lightgrey)](https://github.com/momcilovicluka/lazyrunner/blob/main/LICENSE)
-[![MSRV](https://img.shields.io/badge/rust-1.99%2B-orange?logo=rust)](https://www.rust-lang.org)
-[![Platform](https://img.shields.io/badge/platform-Windows%20release%20%7C%20Linux%2FmacOS%20source-blue)](https://github.com/momcilovicluka/lazyrunner/releases)
-[![Downloads latest](https://img.shields.io/github/downloads/momcilovicluka/lazyrunner/latest/total)](https://github.com/momcilovicluka/lazyrunner/releases/latest)
-[![Issues](https://img.shields.io/github/issues/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/issues)
-[![Pull requests](https://img.shields.io/github/issues-pr/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/pulls)
-[![Contributors](https://img.shields.io/github/contributors/momcilovicluka/lazyrunner)](https://github.com/momcilovicluka/lazyrunner/graphs/contributors)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/momcilovicluka/lazyrunner/blob/main/CONTRIBUTING.md)
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L4L2NNFN1)
+<p align="center">
+  <a href="https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml"><img src="https://github.com/momcilovicluka/lazyrunner/actions/workflows/rust.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/momcilovicluka/lazyrunner/releases/latest"><img src="https://img.shields.io/github/v/release/momcilovicluka/lazyrunner" alt="Latest release"></a>
+  <a href="https://github.com/momcilovicluka/lazyrunner/releases"><img src="https://img.shields.io/github/downloads/momcilovicluka/lazyrunner/total" alt="Downloads"></a>
+  <a href="https://github.com/momcilovicluka/lazyrunner/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-lazyrunner%20License-lightgrey" alt="License"></a>
+  <a href="https://github.com/momcilovicluka/lazyrunner/releases"><img src="https://img.shields.io/badge/platform-Windows%20release%20%7C%20Linux%2FmacOS%20source-blue" alt="Platform"></a>
+  <a href="https://ko-fi.com/L4L2NNFN1"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support lazyrunner on Ko-fi" height="20"></a>
+</p>
 
 **Run your entire local development stack from one terminal.**
 
@@ -23,6 +16,8 @@ everything on the right ports, tells you when each app is up, and keeps live log
 and zoom.
 
 Inspired by lazygit: one command instead of a row of terminal tabs.
+
+<p align="center"><img src="docs/screenshots/demo.svg" alt="lazyrunner opening a project: everything starts, the frontends come up while the APIs build, then every app is up" width="100%"></p>
 
 > [!IMPORTANT]
 > lazyrunner is source-available, not open source. It is free to use - personally, for a non-profit, or at work -
@@ -645,7 +640,8 @@ with every push); bug reports and ideas by the issue forms' labels (`bug`, `enha
 hides them, or changes those thresholds. To run it by hand: `GITHUB_TOKEN=<token> node .github/scripts/contributors.mjs`.
 
 The workflow pushes with a deploy key (secret `CONTRIBUTORS_DEPLOY_KEY`), which `main`'s ruleset lets through.
-lazyrunner builds the file in, and fetches the current one from `main` at most once a day as the update check runs
+The same run writes the README's [Contributors](#contributors) avatars between their markers. lazyrunner builds the
+file in, and fetches the current one from `main` at most once a day as the update check runs
 (not with auto-update off), into its state folder; offline it keeps the one it has. The workflow commits to `main`,
 so pull before merging a branch into it.
 
@@ -657,6 +653,18 @@ so pull before merging a branch into it.
 - **Bugs and ideas**: the [issue forms](https://github.com/momcilovicluka/lazyrunner/issues/new/choose).
 - **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md); everyone follows the [code of conduct](CODE_OF_CONDUCT.md).
 - **Security problems**: privately, as [SECURITY.md](SECURITY.md) says.
+
+## Contributors
+
+Everyone who builds lazyrunner, or tells it what to do next - kept up to date from GitHub, like the About box
+([README, "Contributors"](#contributors-the-about-box)):
+
+<!-- contributors:start -->
+<p>
+<a href="https://github.com/momcilovicluka" title="Luka Momčilović (@momcilovicluka) - creator · maintainer"><img src="https://github.com/momcilovicluka.png?size=96" width="56" height="56" alt="Luka Momčilović"></a>
+<a href="https://github.com/ognjen004028" title="Ognjen Maričić (@ognjen004028) - 2 PRs · 3 bug reports · 7 ideas"><img src="https://github.com/ognjen004028.png?size=96" width="56" height="56" alt="Ognjen Maričić"></a>
+</p>
+<!-- contributors:end -->
 
 ## License
 
