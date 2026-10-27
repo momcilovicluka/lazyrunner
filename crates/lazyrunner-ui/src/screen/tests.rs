@@ -802,15 +802,15 @@ fn with_logged_request(screen: &mut Screen) {
     use lazyrunner_core::run::requests::Finished;
     let at = chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap();
     let now = screen.ui.now;
-    let billing = screen.controller.states.iter_mut().find(|state| state.key == "billing").expect("billing");
-    let from = billing.output.total() + 1;
+    let app = screen.controller.states.iter_mut().find(|state| state.key == "billing").expect("the Billing app");
+    let from = app.output.total() + 1;
     for (line, hue) in [
         ("info: Microsoft.EntityFrameworkCore.Database.Command[20101]", Hue::Gray),
         ("      Executed DbCommand (1,204ms) [Parameters=[@p0='7'], CommandType='Text']", Hue::Gray),
         ("fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]", Hue::Red),
         ("      System.InvalidOperationException: Invoice 7 has no currency.", Hue::Red),
     ] {
-        billing.output.push_hued(line, Some(hue), now);
+        app.output.push_hued(line, Some(hue), now);
     }
     let request = Finished {
         method: "POST".into(),
@@ -820,7 +820,7 @@ fn with_logged_request(screen: &mut Screen) {
         proto: "HTTP/2".into(),
         sent_content: "application/json".into(),
         sent_length: "86".into(),
-        logs: Some((from, billing.output.total())),
+        logs: Some((from, app.output.total())),
         mixed: true,
         ..Finished::default()
     };
