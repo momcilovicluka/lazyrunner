@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.15.1] - 2026-10-27
+
+### Added
+- `,` then `P` (or the palette) opens the project profile - the `.lazyrunner.json` lazyrunner runs, or your own - in your editor (`"editor"`), as log links open files (#10, thanks @ognjen004028)
+
 ## [1.15.0] - 2026-10-27
 
 ### Added

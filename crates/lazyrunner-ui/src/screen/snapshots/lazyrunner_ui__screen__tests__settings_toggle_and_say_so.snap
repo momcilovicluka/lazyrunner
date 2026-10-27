@@ -20,9 +20,9 @@ expression: screen.frame()
                      │  c      What's new: the lazyrunner changelog                     │
                      │  A      About lazyrunner: version, contributors, links           │
                      │  p      Reload the project profile                               │
+                     │  P      Open the project profile in your editor  sample.json     │
                      │ press a letter to toggle, or j k + Enter · Esc / , close         │
                      └──────────────────────────────────────────────────────────────────┘
-
 
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────

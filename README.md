@@ -251,6 +251,7 @@ at once while the palette wipes away.
 | `w` | Startup checklist when lazyrunner opens |
 | `r` | Run the startup checklist now (and check for an update) |
 | `p` | Reload the project profile (reopens lazyrunner; on Windows the running apps carry on, unless their entry changed) |
+| `P` | Open the project profile in your editor (`"editor"`): the `.lazyrunner.json` lazyrunner runs, or your own |
 | `v` | Auto-update lazyrunner when it opens |
 | `m` | The mouse (below); off, the terminal selects text again |
 | `f` | Reduced motion: nothing blinks, spins, glides or fades |
