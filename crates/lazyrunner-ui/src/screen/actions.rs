@@ -55,6 +55,8 @@ pub enum Run {
     Changelog,
     About,
     ReloadProfile,
+    /// , then P: the project profile in the editor.
+    OpenProfile,
 }
 
 #[derive(Clone, Debug)]
@@ -291,6 +293,8 @@ pub fn settings(controller: &Controller) -> Vec<Action> {
     ]);
     let changed = if controller.profile_changed { " (this branch changed it)" } else { "" };
     list.push(action("Settings", "p", &format!("Reload the project profile{changed}"), "", Run::ReloadProfile));
+    let file = controller.project.path.file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
+    list.push(action("Settings", "P", "Open the project profile in your editor", &file, Run::OpenProfile).safe());
     list
 }
 

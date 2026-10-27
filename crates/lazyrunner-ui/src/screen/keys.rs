@@ -599,6 +599,10 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             }
         }
         Run::About => super::about::open(ui, controller),
+        Run::OpenProfile => {
+            let profile = controller.project.path.clone();
+            super::links::open_file(ui, controller, &profile, None, None);
+        }
         Run::ReloadProfile => {
             let start = controller.states.iter().any(|state| state.is_running());
             reopen(ui, controller, controller.root.clone(), start, "reloading the project profile");

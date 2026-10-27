@@ -1386,6 +1386,19 @@ async fn the_about_box_shows_the_version_and_who_makes_it_and_opens_its_links() 
 }
 
 #[tokio::test]
+async fn shift_p_in_the_settings_opens_the_project_profile_in_the_editor() {
+    let mut screen = screen("open-profile", json!({ "editor": "auto" }));
+    let profile = screen.controller.project.path.clone();
+    screen.press(",");
+    assert!(screen.frame().contains("Open the project profile in your editor"), "{}", screen.frame());
+    screen.press("P");
+    let opened = OPENED.with(|opened| opened.borrow().clone());
+    let wanted = profile.display().to_string();
+    assert!(opened.last().is_some_and(|it| it.contains(&wanted)), "{opened:?} should open {wanted}");
+    assert!(screen.controller.log.back().unwrap().text.starts_with("Opening "), "{:?}", screen.controller.log.back());
+}
+
+#[tokio::test]
 async fn the_palette_finds_the_about_box_and_a_double_click_opens_a_link() {
     let mut screen = screen("about-palette", json!({}));
     screen.press(": a b o u t Enter");
