@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.12.0] - 2026-10-27
+
+### Added
+- An app whose port Windows reserved (Hyper-V, WSL and Docker take blocks of 49152-65535 at boot) doesn't start - it couldn't listen there - and the log says so and how to free the port; the other apps start. The startup checklist's ports check fails for it, next to the ports another process holds (#16)
+
 ## [1.11.1] - 2026-10-27
 
 ### Fixed

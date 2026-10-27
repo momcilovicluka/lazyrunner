@@ -148,20 +148,32 @@ fn ports_check(controller: &Controller) -> Check {
         .iter()
         .filter_map(|app| Some((controller.port(&app.key)?, controller.is_running(&app.key))))
         .collect();
-    check("Ports", move || {
-        let listening = Listening::now();
-        let taken: Vec<String> = wanted
-            .iter()
-            .filter(|(port, running)| !running && listening.contains(*port))
-            .map(|(port, _)| format!("{port} used by {}", listening.ports[port].name))
-            .collect();
-        if taken.is_empty() {
-            let ports: Vec<String> = wanted.iter().map(|(port, _)| port.to_string()).collect();
-            (Status::Ok, format!("{} free", ports.join(", ")))
-        } else {
-            (Status::Warn, taken.join("; "))
+    check("Ports", move || ports_report(&wanted, &Listening::now(), &super::net::reserved_ranges()))
+}
+
+/// The apps' ports (and whether each app runs): free, held by another process (! frees those at start), or reserved
+/// by Windows - which no app can listen on.
+fn ports_report(wanted: &[(u16, bool)], listening: &Listening, reserved: &[super::net::PortRange]) -> Outcome {
+    let mut taken = Vec::new();
+    let mut blocked = Vec::new();
+    for &(port, _) in wanted.iter().filter(|(_, running)| !running) {
+        if let Some(owner) = listening.ports.get(&port) {
+            taken.push(format!("{port} used by {}", owner.name));
+        } else if let Some((first, last)) = super::net::reserved(port, reserved) {
+            blocked.push(format!(
+                "{port} reserved by Windows ({first}-{last}) - net stop winnat, then net start winnat, in an \
+                 elevated terminal frees it"
+            ));
         }
-    })
+    }
+    if !blocked.is_empty() {
+        return (Status::Fail, blocked.into_iter().chain(taken).collect::<Vec<_>>().join("; "));
+    }
+    if !taken.is_empty() {
+        return (Status::Warn, taken.join("; "));
+    }
+    let ports: Vec<String> = wanted.iter().map(|(port, _)| port.to_string()).collect();
+    (Status::Ok, format!("{} free", ports.join(", ")))
 }
 
 /// Where a SQL Server listens: host and port, or why it isn't checked.
@@ -259,6 +271,24 @@ fn project_check(controller: &Controller) -> Check {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::run::net::Owner;
+
+    #[test]
+    fn a_reserved_port_fails_the_ports_check_and_a_busy_one_warns() {
+        let mut listening = Listening::default();
+        listening.ports.insert(47301, Owner { pid: 42, name: "node.exe".into() });
+        let reserved = [(58121, 58220)];
+        let (status, detail) = ports_report(&[(47201, false), (47202, false)], &listening, &reserved);
+        assert_eq!((status, detail.as_str()), (Status::Ok, "47201, 47202 free"));
+        let (status, detail) = ports_report(&[(47301, false)], &listening, &reserved);
+        assert_eq!((status, detail.as_str()), (Status::Warn, "47301 used by node.exe"));
+        let (status, detail) = ports_report(&[(58201, false), (47301, false)], &listening, &reserved);
+        assert_eq!(status, Status::Fail);
+        assert!(detail.starts_with("58201 reserved by Windows (58121-58220) - net stop winnat"), "{detail}");
+        assert!(detail.ends_with("; 47301 used by node.exe"), "{detail}");
+        let (status, _) = ports_report(&[(58201, true)], &listening, &reserved);
+        assert_eq!(status, Status::Ok, "an app that runs has its port");
+    }
 
     #[test]
     fn sql_servers_resolve_to_a_host_and_port() {

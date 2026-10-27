@@ -203,6 +203,8 @@ pub struct Controller {
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
     pub(crate) commands: Arc<dyn super::tools::Commands>,
     pub(crate) now: fn() -> Instant,
+    /// The ports Windows reserved (`net::reserved_ranges`; the tests set their own).
+    pub(crate) reserved: fn() -> Vec<super::net::PortRange>,
 }
 
 impl Controller {
@@ -299,6 +301,7 @@ impl Controller {
             metric_roots,
             commands: Arc::new(super::tools::Tools),
             now: Instant::now,
+            reserved: super::net::reserved_ranges,
         };
         if let Some(problem) = controller.durations.problem.take() {
             controller.add_log(problem, Hue::Yellow);

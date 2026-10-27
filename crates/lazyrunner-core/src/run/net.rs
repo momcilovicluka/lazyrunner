@@ -1,7 +1,8 @@
 //! The network side of running apps: which TCP ports are listening and who holds them (readiness, port
-//! conflicts), and response probes (how long an app takes to answer).
+//! conflicts), which ones Windows reserved, and response probes (how long an app takes to answer).
 
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -41,6 +42,63 @@ impl Listening {
     pub fn contains(&self, port: u16) -> bool {
         self.ports.contains_key(&port)
     }
+}
+
+/// How long the reserved ranges are kept: reading them runs netsh, and they change at boot, not by the minute.
+const RESERVED_FOR: Duration = Duration::from_secs(60);
+
+/// Ports reserved together: the first and the last.
+pub type PortRange = (u16, u16);
+/// When the reserved ranges were read, and what they were.
+type Reserved = (Instant, Vec<PortRange>);
+static RESERVED: Mutex<Option<Reserved>> = Mutex::new(None);
+
+/// The TCP port ranges Windows reserved, first to last port: Hyper-V, WSL and Docker take blocks of the dynamic range
+/// (49152-65535) at boot. Nothing listens on them, yet no app can either ("access forbidden"). From netsh, kept a
+/// minute; none elsewhere.
+pub fn reserved_ranges() -> Vec<PortRange> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+    let mut cached = RESERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some((at, ranges)) = cached.as_ref()
+        && at.elapsed() < RESERVED_FOR
+    {
+        return ranges.clone();
+    }
+    let ranges = std::process::Command::new("netsh")
+        .args(["interface", "ipv4", "show", "excludedportrange", "protocol=tcp"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| parse_reserved(&String::from_utf8_lossy(&output.stdout)))
+        .unwrap_or_default();
+    *cached = Some((Instant::now(), ranges.clone()));
+    ranges
+}
+
+/// The ranges in netsh's excludedportrange table: the lines that start with two port numbers (its headings are in
+/// the system's language).
+pub fn parse_reserved(text: &str) -> Vec<PortRange> {
+    text.lines()
+        .filter_map(|line| {
+            let mut words = line.split_whitespace();
+            Some((words.next()?.parse().ok()?, words.next()?.parse().ok()?))
+        })
+        .collect()
+}
+
+/// The reserved range `port` is in.
+pub fn reserved(port: u16, ranges: &[PortRange]) -> Option<PortRange> {
+    ranges.iter().copied().find(|(first, last)| (*first..=*last).contains(&port))
+}
+
+/// Why an app can't have `port`, and what frees it.
+pub fn reserved_advice(port: u16, (first, last): PortRange) -> String {
+    format!(
+        "port {port} is reserved by Windows ({first}-{last}, which Hyper-V, WSL or Docker took) - in an elevated \
+         terminal net stop winnat, then net start winnat, frees it; or give the app a port below 49152"
+    )
 }
 
 /// One probe: whether the app answered, its HTTP status, and how long it took.
@@ -84,6 +142,18 @@ async fn get(port: u16, path: &str) -> Option<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn netshs_reserved_ranges_are_read_in_any_language() {
+        let english = "\nProtocol tcp Port Exclusion Ranges\n\nStart Port    End Port\n----------    --------\n      5357        5357\n     49700       49799\n     50000       50059     *\n     58121       58220\n\n* - Administered port exclusions.\n";
+        let ranges = parse_reserved(english);
+        assert_eq!(ranges, [(5357, 5357), (49700, 49799), (50000, 50059), (58121, 58220)]);
+        let german = "Protokoll tcp Portausschlussbereiche\nStartport    Endport\n  58121   58220\n";
+        assert_eq!(parse_reserved(german), [(58121, 58220)]);
+        assert_eq!(reserved(58201, &ranges), Some((58121, 58220)));
+        assert_eq!(reserved(47201, &ranges), None);
+        assert_eq!(reserved(5357, &ranges), Some((5357, 5357)), "a range of one port");
+    }
     use tokio::net::TcpListener;
 
     #[tokio::test]
