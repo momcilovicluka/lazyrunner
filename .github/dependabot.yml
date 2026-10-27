@@ -13,9 +13,13 @@ updates:
       crates:
         update-types: [minor, patch]
 
+  # Not release.yml: cargo-dist generates it, refuses to release from a changed copy, and updates its actions itself
+  # (`dist generate` after upgrading cargo-dist).
   - package-ecosystem: github-actions
     directory: /
     target-branch: rust
+    exclude-paths:
+      - .github/workflows/release.yml
     schedule:
       interval: weekly
       day: monday
