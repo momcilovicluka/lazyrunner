@@ -1,0 +1,12 @@
+{
+  "$schema": "../../projects/profile.schema.json",
+  "schemaVersion": 1,
+  "id": "demo-shop",
+  "name": "Demo shop",
+  "watch": ["services"],
+  "apps": [
+    { "key": "orders", "name": "Orders", "icon": "◆", "type": "dotnet", "project": "services/Orders/Orders.csproj", "launchProfile": "Orders" },
+    { "key": "billing", "name": "Billing", "icon": "◇", "type": "dotnet", "project": "services/Billing/Billing.csproj", "launchProfile": "Billing" },
+    { "key": "shop", "name": "Shop", "icon": "▲", "type": "npm", "dir": "web/shop", "variants": [{ "script": "dev", "port": 47311 }] }
+  ]
+}

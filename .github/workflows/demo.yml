@@ -1,0 +1,47 @@
+name: demo
+
+# Records the README's demo (docs/demo.gif) with VHS: the real lazyrunner, on the demo shop (examples/demo), in a real
+# terminal. It runs by hand, and when the tape or the demo changes on rust; the GIF comes back as an artifact to commit.
+on:
+  workflow_dispatch:
+  push:
+    branches: [rust]
+    paths:
+      - docs/demo.tape
+      - examples/demo/**
+      - .github/workflows/demo.yml
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build lazyrunner
+        run: |
+          cargo build --release -p lazyrunner
+          sudo cp target/release/lazyrunner /usr/local/bin/
+      - name: Restore the demo's NuGet packages (a first build would, more slowly)
+        working-directory: examples/demo
+        run: |
+          dotnet restore services/Orders/Orders.csproj
+          dotnet restore services/Billing/Billing.csproj
+      - uses: charmbracelet/vhs-action@v2
+        with:
+          path: docs/demo.tape
+          install-fonts: true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: demo
+          path: docs/demo.gif

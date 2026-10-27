@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Orders": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:47211",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

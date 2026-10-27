@@ -315,7 +315,7 @@ pub fn setup_problems(root: &Path, app: &App, at: &str, active: &[App]) -> Vec<P
                 );
                 problems.push(Problem::new(Severity::Warning, at, message));
             }
-            if !root.join(dir).join("node_modules").exists() {
+            if !crate::run::tools::has_packages(&root.join(dir)) {
                 let message = format!(
                     "{} is missing: install the packages first (i in lazyrunner runs npm ci)",
                     join(dir, "node_modules")

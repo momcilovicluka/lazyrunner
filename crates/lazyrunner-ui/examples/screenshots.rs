@@ -68,79 +68,18 @@ async fn main() {
         std::fs::write(&path, demo.svg(size)).expect("the screenshot");
         println!("wrote {}", path.display());
     }
-    for (name, svg) in [("demo", demo_animation()), ("banner", banner())] {
-        let path = out.join(format!("{name}.svg"));
-        std::fs::write(&path, svg).expect("the picture");
-        println!("wrote {}", path.display());
-    }
+    let path = out.join("banner.svg");
+    std::fs::write(&path, banner()).expect("the banner");
+    println!("wrote {}", path.display());
 }
 
-// ---------------------------------------------------------------- the README's banner and animation
+// ---------------------------------------------------------------- the README's banner
 
-/// One moment of the made-up project starting: whether it has, which apps are up, how many lines each printed, how
-/// much of the log there is, how long ago it started, and how long the frame shows.
-struct Stage {
-    started: bool,
-    up: &'static [&'static str],
-    lines: usize,
-    log: usize,
-    started_ago: u64,
-    seconds: f64,
-}
-
-const ALL_APPS: &[&str] = &["orders", "billing", "shop", "docs", "console"];
-const ALL_UP: Stage =
-    Stage { started: true, up: ALL_APPS, lines: usize::MAX, log: usize::MAX, started_ago: 180, seconds: 4.0 };
-/// lazyrunner opens; everything starts; the frontends come up while the APIs build; everything is up.
-const STAGES: [Stage; 4] = [
-    Stage { started: false, up: &[], lines: 0, log: 0, started_ago: 0, seconds: 1.6 },
-    Stage { started: true, up: &[], lines: 2, log: 1, started_ago: 2, seconds: 1.4 },
-    Stage { started: true, up: &["shop", "docs", "console"], lines: 5, log: 3, started_ago: 9, seconds: 1.6 },
-    ALL_UP,
-];
 /// The banner's logo: one square per half block.
 const PIXEL: f64 = 14.0;
 const BANNER: (f64, f64) = (860.0, 190.0);
 /// catppuccin-mocha's red, yellow, green, sky, blue and mauve, the About box's rainbow.
 const RAINBOW: [&str; 6] = ["#f38ba8", "#f9e2af", "#a6e3a1", "#89dceb", "#89b4fa", "#cba6f7"];
-
-/// lazyrunner starting the made-up project, frame after frame, over and over; with reduced motion, everything up.
-fn demo_animation() -> String {
-    let frames: Vec<(Buffer, f64)> = STAGES
-        .iter()
-        .map(|stage| {
-            let mut demo = Demo::new("demo");
-            demo.stage(stage);
-            (demo.buffer(SIZE), stage.seconds)
-        })
-        .collect();
-    let (fg, bg) = Demo::new("demo-colors").colors();
-    let total: f64 = frames.iter().map(|(_, seconds)| seconds).sum();
-    let mut style = format!(
-        ".frame{{opacity:0;animation:{total:.1}s step-end infinite}}.frame:last-of-type{{opacity:1}}\n\
-         @media (prefers-reduced-motion:reduce){{.frame{{animation:none}}}}\n"
-    );
-    let mut at = 0.0;
-    for (index, (_, seconds)) in frames.iter().enumerate() {
-        let (from, to) = (at / total * 100.0, (at + seconds) / total * 100.0);
-        at += seconds;
-        let keys = match (index, to >= 99.9) {
-            (0, _) => format!("0%{{opacity:1}}{to:.1}%{{opacity:0}}100%{{opacity:0}}"),
-            (_, true) => format!("0%{{opacity:0}}{from:.1}%{{opacity:1}}100%{{opacity:1}}"),
-            _ => format!("0%{{opacity:0}}{from:.1}%{{opacity:1}}{to:.1}%{{opacity:0}}100%{{opacity:0}}"),
-        };
-        let _ = writeln!(style, "@keyframes f{index}{{{keys}}}.f{index}{{animation-name:f{index}}}");
-    }
-    let mut svg = svg_head(frames[0].0.area, &fg, &bg);
-    let _ = writeln!(svg, "<style>{style}</style>");
-    for (index, (buffer, _)) in frames.iter().enumerate() {
-        let _ = writeln!(svg, r#"<g class="frame f{index}">"#);
-        svg.push_str(&svg_cells(buffer, &fg));
-        svg.push_str("</g>\n");
-    }
-    svg.push_str("</svg>\n");
-    svg
-}
 
 /// The README's banner: the logo drawn in squares (no font can change it), in the About box's rainbow, and the
 /// tagline under it.
@@ -427,16 +366,8 @@ impl Demo {
 
     /// Every app up for a few minutes, with output, metrics and a log of how they got there.
     fn running(&mut self) {
-        self.stage(&ALL_UP);
-    }
-
-    /// The made-up project at one moment of starting (`ALL_UP`: every app up for a few minutes).
-    fn stage(&mut self, stage: &Stage) {
-        if !stage.started {
-            return;
-        }
-        let long_ago = self.ui.now - Duration::from_secs(stage.started_ago);
-        let shown = self.ui.now - Duration::from_secs(stage.started_ago.min(30));
+        let long_ago = self.ui.now - Duration::from_secs(180);
+        let shown = self.ui.now - Duration::from_secs(30);
         let apps = [
             DemoApp { key: "orders", up_after: 4.2, cpu: 3.0, memory: 212.0, ms: 12, lines: ORDERS },
             DemoApp { key: "billing", up_after: 3.7, cpu: 1.0, memory: 168.0, ms: 8, lines: BILLING },
@@ -445,8 +376,7 @@ impl Demo {
             DemoApp { key: "console", up_after: 2.6, cpu: 2.0, memory: 129.0, ms: 4, lines: CONSOLE },
         ];
         for (index, DemoApp { key, up_after, cpu, memory, ms, lines }) in apps.into_iter().enumerate() {
-            let up = stage.up.contains(&key);
-            if ms > 0 && up {
+            if ms > 0 {
                 self.controller.answered(key, ms);
             }
             let app = self.controller.apps.iter().find(|app| app.key == key).cloned().expect("a sample app");
@@ -454,15 +384,12 @@ impl Demo {
             state.status = Status::Running;
             state.generation = 1;
             state.started_at = Some(long_ago);
-            state.up_generation = up.then_some(1);
-            state.up_after = up.then_some(up_after);
-            for line in lines.iter().take(stage.lines) {
+            state.up_generation = Some(1);
+            state.up_after = Some(up_after);
+            for line in lines {
                 state.receive(&app, line, shown);
             }
             state.flash_until = None;
-            if !up {
-                continue;
-            }
             state.cpu = Some(cpu);
             state.memory_mb = Some(memory);
             for n in 0..30 {
@@ -482,10 +409,7 @@ impl Demo {
             ("Starting Orders + Billing", Hue::Cyan),
             ("● Orders is listening on :47201 - up in 4s", Hue::Green),
             ("Ready in 38s", Hue::Green),
-        ]
-        .into_iter()
-        .take(stage.log)
-        {
+        ] {
             self.controller.log.push_back(LogEntry { time: "09:41:07".into(), text: text.into(), hue });
         }
     }

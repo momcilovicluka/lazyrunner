@@ -17,7 +17,7 @@ and zoom.
 
 Inspired by lazygit: one command instead of a row of terminal tabs.
 
-<p align="center"><img src="docs/screenshots/demo.svg" alt="lazyrunner opening a project: everything starts, the frontends come up while the APIs build, then every app is up" width="100%"></p>
+<p align="center"><img src="docs/demo.gif" alt="lazyrunner opening the demo shop: trusting its profile, the startup checklist, building and starting two APIs and a frontend, then the requests view, a request's details and the command palette" width="100%"></p>
 
 > [!IMPORTANT]
 > lazyrunner is source-available, not open source. It is free to use - personally, for a non-profit, or at work -
@@ -604,6 +604,7 @@ cargo test --workspace                                # unit tests, snapshots of
 cargo insta review                                    # look at changed screen snapshots
 LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference   # rewrite the guide's field reference
 cargo run -p lazyrunner-ui --example screenshots      # redraw the screenshots above (docs/screenshots) after visible changes
+vhs docs/demo.tape                                    # re-record docs/demo.gif (or run the demo workflow on GitHub)
 dist plan                                             # what a release would build (cargo-dist)
 ```
 

@@ -125,7 +125,7 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
                 bail!("{} on this branch", apptypes::no_mode_reason(root, app, active));
             };
             let folder = root.join(dir);
-            if !folder.join("node_modules").exists() {
+            if !has_packages(&folder) {
                 bail!("{} is missing - run 'npm install' in {} first", join(dir, "node_modules"), folder.display());
             }
             let (program, mut args) = npm_launcher()?;
@@ -223,6 +223,21 @@ pub fn nx_script(workspace: &Path) -> Option<PathBuf> {
         .find(|script| script.is_file())
 }
 
+/// Whether an npm app's packages are there: its node_modules, or nothing to install - npm ci makes no node_modules
+/// for a package.json without dependencies (a script that needs only Node).
+pub fn has_packages(folder: &Path) -> bool {
+    folder.join("node_modules").exists() || !wants_packages(folder)
+}
+
+/// A package.json that lists packages (or can't be read, so it may).
+fn wants_packages(folder: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(folder.join("package.json")) else { return true };
+    let Ok(package) = serde_json::from_str::<serde_json::Value>(&text) else { return true };
+    ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]
+        .iter()
+        .any(|kind| package[kind].as_object().is_some_and(|packages| !packages.is_empty()))
+}
+
 /// Why a suite can't run for want of packages (npm, Nx), if it can't.
 pub fn packages_problem(runner: &Runner) -> Option<String> {
     let folder = runner.npm_dir()?;
@@ -304,6 +319,23 @@ pub fn running_in(name: &str, dirs: &[&Path]) -> bool {
 mod tests {
     use super::*;
     use crate::testing::{TempDir, write};
+
+    #[test]
+    fn an_npm_app_without_dependencies_needs_no_node_modules() {
+        let temp = TempDir::new("has-packages");
+        let app = |name: &str, package: &str| {
+            let folder = temp.join(name);
+            write(folder.join("package.json"), package);
+            folder
+        };
+        let scripts = app("scripts", r#"{ "scripts": { "dev": "node server.mjs" }, "dependencies": {} }"#);
+        assert!(has_packages(&scripts), "npm ci makes no node_modules for it");
+        let vite = app("vite", r#"{ "devDependencies": { "vite": "^7.0.0" } }"#);
+        assert!(!has_packages(&vite), "its packages aren't installed");
+        write(vite.join("node_modules").join(".package-lock.json"), "{}");
+        assert!(has_packages(&vite));
+        assert!(!has_packages(&app("broken", "{ not json")), "a package.json it can't read may list packages");
+    }
 
     #[test]
     fn a_program_runs_in_its_working_folder_and_not_elsewhere() {
