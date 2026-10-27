@@ -42,7 +42,9 @@ const INSTRUCTIONS: &str = "lazyrunner runs this project's apps (.NET APIs, npm 
 watches, and builds, tests and checks migrations for them. While it's open, use its tools instead of running dotnet \
 or npm yourself: what you do shows in its log. Start every turn with get_status - the user may have changed things \
 since. Use wait instead of calling get_status in a loop. Keep get_logs small with since, grep or errors_only; after \
-a failed build or a crash, get_errors has the error with its stack. Tell the user before stopping or restarting apps \
+a failed build or a crash, get_errors has the error with its stack. For a slow or failing endpoint, get_requests \
+(errors_only, sort slowest, endpoints) and get_request show what the app logged and queried while serving it. Tell \
+the user before stopping or restarting apps \
 they may be using. With restartOnCodeChange on (get_status settings), your own edits rebuild the running APIs by \
 themselves a moment after the last save: wait for build_done instead of calling build.";
 
@@ -297,6 +299,35 @@ impl<C: Channel> Server<C> {
                 &["app"],
                 true,
             ),
+            tool(
+                "get_requests",
+                "The HTTP requests the .NET apps served (lazyrunner's requests view, from ASP.NET's request log): \
+                 id, method, path, endpoint, status and milliseconds, newest first or slowest first (sort), after \
+                 `since` (pass the last answer's `next` for only the new ones), of one app, errors only (status 400 \
+                 and up), or with `path` in them; `limit` (50, at most 500). With endpoints: true, summed up per \
+                 endpoint instead - count, errors, avg, p50, p95, max. get_request has one in full.",
+                json!({
+                    "app": app,
+                    "since": { "type": "integer", "minimum": 0 },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
+                    "errors_only": { "type": "boolean" },
+                    "path": { "type": "string" },
+                    "sort": { "type": "string", "enum": ["newest", "slowest"] },
+                    "endpoints": { "type": "boolean" },
+                }),
+                &[],
+                true,
+            ),
+            tool(
+                "get_request",
+                "One request in full, by its id from get_requests: what it sent and returned, its endpoint's times \
+                 to compare with (p50, p95, slower_than_p95), the log lines its app wrote while it ran \
+                 (possibly_mixed: other requests ran meanwhile, so some lines may be theirs), and its EF Core \
+                 database commands: how many, their total and the slowest.",
+                json!({ "id": { "type": "integer", "minimum": 1 } }),
+                &["id"],
+                true,
+            ),
             tool("get_screen", "lazyrunner's screen as the user sees it now, as text.", json!({}), &[], true),
             tool(
                 "start_apps",
@@ -386,6 +417,9 @@ impl<C: Channel> Server<C> {
             "get_status" => self.agent("status", json!({})).await,
             "get_logs" => self.agent("logs", args).await,
             "get_errors" => self.agent("errors", args).await,
+            "get_requests" => self.agent("requests", args).await,
+            "get_request" if !args["id"].is_u64() => Err("bad_args: which request? (an id from get_requests)".into()),
+            "get_request" => self.agent("request", args).await,
             "get_screen" => self.screen().await,
             "start_apps" => self.agent("start", args).await,
             "stop_apps" => self.agent("stop", args).await,
@@ -684,12 +718,14 @@ mod tests {
         let app = &tool("start_apps")["inputSchema"]["properties"]["app"];
         assert!(app["enum"].is_null() && app["description"].as_str().unwrap().contains(": orders, shop)"), "{app}");
         assert_eq!(tool("get_logs")["annotations"]["readOnlyHint"], true);
+        assert_eq!(tool("get_request")["annotations"]["readOnlyHint"], true);
+        assert_eq!(tool("get_request")["inputSchema"]["required"], json!(["id"]));
         assert_eq!(tool("build")["annotations"]["readOnlyHint"], false);
 
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 15));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 17));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);

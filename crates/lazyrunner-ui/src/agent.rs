@@ -9,6 +9,7 @@ use std::path::Path;
 use lazyrunner_core::changelog::VERSION;
 use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::Hue;
+use lazyrunner_core::run::requests::{Endpoint, Request, db_command_ms, endpoints};
 use lazyrunner_core::run::suites::{Outcome, Suite};
 use lazyrunner_core::run::{Command, Controller, Origin};
 use serde_json::{Value, json};
@@ -29,6 +30,14 @@ const FAILURE_LINES: usize = 15;
 const CLIENT_CHARS: usize = 40;
 const TEST_NAME_CHARS: usize = 300;
 const NO_MIGRATIONS: &str = "no EF Core migrations found in the .NET apps' projects";
+/// Requests (or endpoints) in an answer, by default and at most.
+const REQUESTS: usize = 50;
+const MAX_REQUESTS: usize = 500;
+/// A request's log lines in get_request, at most (the newest).
+const REQUEST_LOG_LINES: usize = 300;
+const NO_REQUESTS: &str = "No requests yet: they come from ASP.NET's request log of the .NET apps lazyrunner started. \
+                           An app that logs only somewhere else (Serilog to Seq, say) needs \"args\" in its profile to \
+                           log to the console (README, \"Requests\").";
 
 type Refusal = (&'static str, String);
 type Answer = Result<Value, Refusal>;
@@ -50,6 +59,8 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "errors" => errors(controller, args),
         "tests" => tests(controller, args),
         "migrations" => Ok(migrations(controller)),
+        "requests" => requests(controller, args),
+        "request" => one_request(controller, args),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
@@ -204,6 +215,146 @@ fn errors(controller: &Controller, args: &Value) -> Answer {
     };
     let (lines, entries) = copy::gather_app(controller, index, pick);
     Ok(json!({ "app": controller.apps[index].key, "entries": entries, "text": lines.join("\n") }))
+}
+
+/// Milliseconds to one decimal.
+fn ms(ms: f64) -> f64 {
+    (ms * 10.0).round() / 10.0
+}
+
+/// A request in a list: `id` is what get_request takes.
+fn request_row(request: &Request) -> Value {
+    json!({
+        "id": request.seq,
+        "at": request.at.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+        "app": request.app,
+        "method": request.method,
+        "path": request.path,
+        "endpoint": request.endpoint,
+        "status": request.status,
+        "ms": ms(request.ms),
+    })
+}
+
+fn endpoint_row(endpoint: &Endpoint) -> Value {
+    json!({
+        "app": endpoint.app,
+        "method": endpoint.method,
+        "endpoint": endpoint.endpoint,
+        "count": endpoint.count,
+        "errors": endpoint.errors,
+        "avg_ms": ms(endpoint.avg),
+        "p50_ms": ms(endpoint.p50),
+        "p95_ms": ms(endpoint.p95),
+        "max_ms": ms(endpoint.max),
+        "total_ms": ms(endpoint.total),
+    })
+}
+
+/// The requests the .NET apps served (the requests view): newest first, or slowest; after `since` (a request's id),
+/// of one app, errors only (400 and up), with `path` in them (ignoring case) - or, with `endpoints`, summed up per
+/// endpoint, the most time first. `next` is the id to pass as `since` for what comes after.
+fn requests(controller: &Controller, args: &Value) -> Answer {
+    let app = match &args["app"] {
+        Value::Null => None,
+        Value::String(_) => Some(controller.apps[app_index(controller, args)?].key.clone()),
+        _ => return Err(("bad_args", "\"app\" is an app's key".into())),
+    };
+    let slowest = match args["sort"].as_str().unwrap_or("newest") {
+        "newest" => false,
+        "slowest" => true,
+        other => {
+            let other = clean(other, CLIENT_CHARS);
+            return Err(("bad_args", format!("\"sort\" is newest or slowest, not '{other}'")));
+        }
+    };
+    let since = args["since"].as_u64().unwrap_or(0);
+    let errors_only = args["errors_only"].as_bool().unwrap_or(false);
+    let path = args["path"].as_str().map(str::to_lowercase);
+    let limit = args["limit"].as_u64().map_or(REQUESTS, |limit| (limit as usize).clamp(1, MAX_REQUESTS));
+    let mut list: Vec<&Request> = controller
+        .requests
+        .items
+        .iter()
+        .rev()
+        .filter(|request| request.seq > since)
+        .filter(|request| app.as_ref().is_none_or(|app| *app == request.app))
+        .filter(|request| !errors_only || request.status >= 400)
+        .filter(|request| path.as_ref().is_none_or(|path| request.path.to_lowercase().contains(path)))
+        .collect();
+    let mut answer = json!({ "next": controller.requests.seq });
+    if controller.requests.items.is_empty() {
+        answer["hint"] = json!(NO_REQUESTS);
+    }
+    if args["endpoints"].as_bool().unwrap_or(false) {
+        let mut summed = endpoints(list.into_iter());
+        summed.sort_by(|a, b| b.total.total_cmp(&a.total));
+        answer["matching"] = json!(summed.len());
+        answer["endpoints"] = summed.iter().take(limit).map(endpoint_row).collect();
+        return Ok(answer);
+    }
+    if slowest {
+        list.sort_by(|a, b| b.ms.total_cmp(&a.ms));
+    }
+    answer["matching"] = json!(list.len());
+    answer["requests"] = list.iter().take(limit).map(|request| request_row(request)).collect();
+    Ok(answer)
+}
+
+/// One request in full: what it sent and returned, its endpoint's times to compare with, the log lines its app wrote
+/// while it ran and the database commands among them (the requests view's details).
+fn one_request(controller: &Controller, args: &Value) -> Answer {
+    let Some(id) = args["id"].as_u64() else {
+        return Err(("bad_args", "which request? (\"id\", from get_requests)".into()));
+    };
+    let Some(request) = controller.requests.items.iter().find(|request| request.seq == id) else {
+        return Err(("not_found", format!("no request {id}: lazyrunner keeps the newest ones while it runs")));
+    };
+    let mut answer = request_row(request);
+    answer["protocol"] = json!(request.proto);
+    answer["sent"] = json!({ "content_type": request.sent_content, "length": request.sent_length });
+    answer["returned"] = json!({ "content_type": request.content, "length": request.length });
+    let same = controller.requests.items.iter().filter(|other| {
+        other.app == request.app && other.method == request.method && other.endpoint == request.endpoint
+    });
+    if let Some(usual) = endpoints(same).pop() {
+        let mut stats = endpoint_row(&usual);
+        stats["slower_than_p95"] = json!(request.ms > usual.p95);
+        answer["endpoint_stats"] = stats;
+    }
+    let Some((first, last)) = request.logs else {
+        answer["log"] = json!({
+            "known": false,
+            "why": "its app logs no \"Request starting\" line for it (Serilog's request log says only when one finished)",
+        });
+        return Ok(answer);
+    };
+    let output = controller.state(&request.app).map(|state| &state.output);
+    let kept: Vec<_> = output.map_or_else(Vec::new, |output| output.numbered(first, last).collect());
+    let oldest = output.map_or(first, |output| output.total() + 1 - output.len() as u64).max(first);
+    let times: Vec<f64> = kept.iter().filter_map(|line| db_command_ms(&line.text)).collect();
+    let total: f64 = times.iter().sum();
+    let lines: Vec<Value> = (oldest..)
+        .zip(kept.iter())
+        .skip(kept.len().saturating_sub(REQUEST_LOG_LINES))
+        .map(|(seq, line)| json!({ "seq": seq, "text": line.text }))
+        .collect();
+    answer["log"] = json!({
+        "known": true,
+        "count": (last + 1).saturating_sub(first),
+        "kept": kept.len(),
+        "errors": kept.iter().filter(|line| copy::is_error(line)).count(),
+        "possibly_mixed": request.mixed,
+        "lines": lines,
+    });
+    let share = if request.ms > 0.0 { (total / request.ms * 100.0).round() / 100.0 } else { 0.0 };
+    answer["database"] = json!({
+        "commands": times.len(),
+        "total_ms": ms(total),
+        "slowest_ms": ms(times.iter().copied().fold(0.0, f64::max)),
+        "share_of_request": share,
+    });
+    Ok(answer)
 }
 
 /// Starts finding the test suites (reading the projects), the first time they're asked for.

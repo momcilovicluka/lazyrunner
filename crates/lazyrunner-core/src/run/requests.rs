@@ -196,6 +196,12 @@ impl InFlight {
     }
 }
 
+/// How long a database command took, from EF Core's log line "Executed DbCommand (12ms)".
+pub fn db_command_ms(text: &str) -> Option<f64> {
+    let rest = text.split_once("Executed DbCommand (")?.1;
+    rest.split_once("ms)")?.0.replace(',', "").trim().parse().ok()
+}
+
 /// The endpoint a path belongs to: without the query, ids (numbers, GUIDs, long hex) as `{id}`.
 pub fn endpoint(path: &str) -> String {
     let path = path.split('?').next().unwrap_or_default();
