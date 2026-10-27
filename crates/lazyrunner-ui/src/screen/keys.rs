@@ -79,6 +79,9 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         return;
     }
     if let Some(Overlay::Checklist(list)) = &mut ui.overlay {
+        if name == "r" && list.retry(controller) {
+            return;
+        }
         // Skips what's still running; the loop closes the checklist and runs the key right away.
         list.skip = true;
         if !matches!(name.as_str(), "Escape" | "Enter" | "Space") {

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.11.0] - 2026-10-27
+
+### Added
+- `r` in the startup checklist runs the checks that failed or warned again - a failed update, a busy port - without closing it; the footer says which (#6, thanks @ognjen004028)
+
 ## [1.10.3] - 2026-10-27
 
 ### Security

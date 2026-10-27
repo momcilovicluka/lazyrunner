@@ -1481,6 +1481,23 @@ async fn a_key_ends_the_checklist_and_is_run_and_a_key_ends_the_reload_show() {
 }
 
 #[tokio::test]
+async fn r_in_the_checklist_retries_what_failed_and_another_key_still_closes_it() {
+    let mut screen = screen("checklist-retry-key", json!({}));
+    let failed = Item { name: "git".into(), status: Status::Fail, detail: "not found on PATH".into() };
+    let mut list = Checklist::fixed(vec![failed], Vec::new(), "checking…");
+    list.manual = true;
+    list.update(screen.ui.now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    assert!(screen.frame().contains("any key closes · r retries git"), "{}", screen.frame());
+    screen.press("r");
+    let Some(Overlay::Checklist(list)) = &screen.ui.overlay else { panic!("r keeps the checklist open") };
+    assert_eq!(list.items[0].status, Status::Pending, "git is checked again");
+    assert!(screen.ui.replay.is_none(), "and r isn't run as a key afterwards");
+    screen.press("T");
+    assert!(screen.ui.replay.is_some(), "any other key still closes it and is run");
+}
+
+#[tokio::test]
 async fn copied_lines_light_up_in_their_column() {
     let mut screen = screen("copy-flash", json!({}));
     screen.ui.motion.enabled = true;
