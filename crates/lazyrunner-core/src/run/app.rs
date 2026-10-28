@@ -12,7 +12,7 @@ use regex::Regex;
 
 use super::child::Child;
 use super::requests;
-use crate::output::{Hue, Output};
+use crate::output::{Hue, LevelFilter, Output};
 use crate::profile::App;
 
 /// Lines each column keeps.
@@ -59,6 +59,8 @@ pub struct AppState {
     pub child: Option<Child>,
     pub output: Output,
     pub scroll: usize,
+    /// Which of its lines the column shows (`f`), kept for the app between runs.
+    pub filter: LevelFilter,
     pub errors: u64,
     pub warnings: u64,
     pub requests: u64,
@@ -97,6 +99,7 @@ impl AppState {
             child: None,
             output: Output::new(MAX_PANE_LINES),
             scroll: 0,
+            filter: LevelFilter::All,
             errors: 0,
             warnings: 0,
             requests: 0,
@@ -178,7 +181,8 @@ impl AppState {
     /// A line in the column (and its log file).
     pub fn add_line(&mut self, text: &str, hue: Hue, now: Instant) {
         self.output.push_hued(text, Some(hue), now);
-        if self.scroll > 0 {
+        let shown = self.output.newest_first(0).next().is_some_and(|line| self.filter.admits(line));
+        if self.scroll > 0 && shown {
             self.scroll = (self.scroll + 1).min(self.output.len().saturating_sub(1)); // a scrolled-back view stays put
         }
         self.log_line(text);

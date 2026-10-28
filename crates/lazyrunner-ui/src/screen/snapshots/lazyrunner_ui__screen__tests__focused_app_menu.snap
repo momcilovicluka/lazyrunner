@@ -6,7 +6,6 @@ expression: screen.frame()
 
 
 
-
         ┌─ Orders ──────────────────────────────────────────────────────────────────────────────────┐
         │  Space  Start / stop the focused app  whichever it is not                                 │
         │  u      Start the focused app  builds it first if it changed                              │
@@ -18,6 +17,7 @@ expression: screen.frame()
         │  y      Copy (yank)  the last error, every error or warning, the search match, the output │
         │  /      Search the focused app's output  n older match, N newer                           │
         │  z      Zoom the focused column                                                           │
+        │  f      Filter the focused column by level  errors, warnings and errors, info and up, all │
         │ press a key, or j k + Enter · Esc / x close                                               │
         └───────────────────────────────────────────────────────────────────────────────────────────┘
 

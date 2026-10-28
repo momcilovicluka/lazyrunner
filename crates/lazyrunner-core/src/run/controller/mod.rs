@@ -222,6 +222,7 @@ impl Controller {
         let mut states: Vec<AppState> = apps.iter().map(|app| AppState::new(&app.key)).collect();
         let mut log_problems = Vec::new();
         for state in &mut states {
+            state.filter = apptypes::level_filter(&config, &state.key);
             if let Err(error) = state.open_log(&state_dir.join("logs")) {
                 log_problems.push(format!("! {}'s output isn't saved to a log file ({error})", state.key));
             }
@@ -669,6 +670,28 @@ impl Controller {
     /// Reads the settings file again (Ctrl+R): a hand edit counts from now on.
     pub fn reload_settings(&mut self) {
         self.config = self.config_file.load(Some(&self.project.id));
+        for state in &mut self.states {
+            state.filter = apptypes::level_filter(&self.config, &state.key);
+        }
+    }
+
+    /// f: which of an app's lines its column shows, from now on and next time (saved with the project's settings).
+    pub fn set_level_filter(&mut self, key: &str, filter: crate::output::LevelFilter) {
+        if let Some(state) = self.states.iter_mut().find(|state| state.key == key) {
+            (state.filter, state.scroll) = (filter, 0);
+        }
+        let mut apps = self.config["apps"].clone();
+        if !apps.is_object() {
+            apps = json!({});
+        }
+        if filter == crate::output::LevelFilter::All {
+            if let Some(app) = apps.get_mut(key).and_then(Value::as_object_mut) {
+                app.remove("filter");
+            }
+        } else {
+            apps[key]["filter"] = json!(filter.key());
+        }
+        self.set_setting("apps", apps);
     }
 
     /// An on/off setting.

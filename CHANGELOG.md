@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.23.0] - 2026-10-28
+
+### Added
+- `f` filters the focused column by level: errors only, warnings and errors, info and up, then all lines again. An entry's level counts for its indented lines too (an exception's stack stays with it), the column's top row says how many lines it hides, its title shows the filter, and the app keeps it between runs (#28)
+
 ## [1.22.1] - 2026-10-28
 
 ### Fixed

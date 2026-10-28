@@ -1947,6 +1947,51 @@ async fn a_long_row_widens_its_box_and_a_selected_one_still_too_long_scrolls() {
 }
 
 #[tokio::test]
+async fn f_filters_the_focused_column_by_level_and_says_what_it_hides() {
+    use lazyrunner_core::output::LevelFilter;
+    let mut screen = screen("level-filter", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    let key = screen.controller.states[0].key.clone();
+    for (line, hue) in [
+        ("info: Orders.Api[0]", Hue::Cyan),
+        ("      Listing orders", Hue::Gray),
+        ("fail: Orders.Api[1]", Hue::Red),
+        ("      System.TimeoutException: payment provider", Hue::Red),
+        ("warn: Orders.Api[2]", Hue::Yellow),
+        ("dbug: Orders.Cache[3]", Hue::DarkGray),
+    ] {
+        screen.controller.states[0].add_line(line, hue, at);
+    }
+    screen.press("z f");
+    assert_eq!(screen.controller.states[0].filter, LevelFilter::Errors);
+    let frame = screen.frame();
+    assert!(frame.contains("System.TimeoutException") && !frame.contains("Listing orders"), "{frame}");
+    assert!(frame.contains("errors only · 4 lines hidden - f shows all"), "{frame}");
+    assert_eq!(screen.controller.config["apps"][&key]["filter"], "errors", "kept for next time");
+    assert!(screen.last_log().contains("errors only (f: warnings and errors)"), "{}", screen.last_log());
+
+    screen.press("f");
+    let frame = screen.frame();
+    assert!(frame.contains("warn: Orders.Api[2]") && !frame.contains("Listing orders"), "{frame}");
+    screen.press("f");
+    let frame = screen.frame();
+    assert!(frame.contains("Listing orders") && !frame.contains("Orders.Cache"), "info and up: {frame}");
+
+    screen.controller.states[0].scroll = 1;
+    screen.controller.states[0].add_line("      Listing more orders", Hue::Gray, at);
+    assert_eq!(screen.controller.states[0].scroll, 2, "a line it shows: the scrolled-back view stays put");
+    screen.controller.set_level_filter(&key, LevelFilter::Errors);
+    screen.controller.states[0].scroll = 1;
+    screen.controller.states[0].add_line("      Listing yet more", Hue::Gray, at);
+    assert_eq!(screen.controller.states[0].scroll, 1, "a line it hides doesn't move it");
+
+    screen.press("f f f");
+    assert_eq!(screen.controller.states[0].filter, LevelFilter::All);
+    assert!(screen.frame().contains("Orders.Cache") && !screen.frame().contains("hidden - f shows all"));
+    assert!(screen.controller.config["apps"][&key].get("filter").is_none(), "all lines: nothing saved");
+}
+
+#[tokio::test]
 async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     let mut screen = screen("checklist-bar", json!({}));
     let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };

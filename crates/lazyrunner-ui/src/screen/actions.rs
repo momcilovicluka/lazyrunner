@@ -37,6 +37,7 @@ pub enum Run {
     Menu,
     Search,
     Zoom,
+    LevelFilter,
     Widen,
     Narrow,
     EqualWidths,
@@ -196,6 +197,15 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
         action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
         action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),
+        action(
+            "View",
+            "f",
+            "Filter the focused column by level",
+            "errors, warnings and errors, info and up, all",
+            Run::LevelFilter,
+        )
+        .safe()
+        .focused(),
         action("View", "+", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),
         action("View", "-", "Narrow the focused column", "shorter when the apps are stacked", Run::Narrow).safe(),
         action("View", "=", "Equal column widths", "", Run::EqualWidths).safe(),

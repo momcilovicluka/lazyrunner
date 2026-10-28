@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
     Debug,
     Info,
@@ -34,6 +34,82 @@ pub struct OutputLine {
     pub born: Instant,
     /// The colour lazyrunner gave the line (app output, its own notes); `None`: by its level.
     pub hue: Option<Hue>,
+}
+
+impl OutputLine {
+    /// How serious the line is: by the colour lazyrunner gave it (an entry's level, carried onto its indented lines),
+    /// else by its own words.
+    pub fn severity(&self) -> Level {
+        match self.hue {
+            Some(Hue::Red) => Level::Error,
+            Some(Hue::Yellow | Hue::DarkYellow) => Level::Warn,
+            Some(Hue::DarkGray) => Level::Debug,
+            Some(_) => Level::Info,
+            None => self.level,
+        }
+    }
+}
+
+/// Which lines a column shows (`f` cycles it): all of them, errors only, warnings and errors, or info and up.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LevelFilter {
+    #[default]
+    All,
+    Errors,
+    Warnings,
+    Info,
+}
+
+impl LevelFilter {
+    /// The next one `f` gives: all, errors, warnings and errors, info and up, all again.
+    pub fn next(self) -> Self {
+        match self {
+            Self::All => Self::Errors,
+            Self::Errors => Self::Warnings,
+            Self::Warnings => Self::Info,
+            Self::Info => Self::All,
+        }
+    }
+
+    /// Whether the column shows `line`.
+    pub fn admits(self, line: &OutputLine) -> bool {
+        let least = match self {
+            Self::All => return true,
+            Self::Errors => Level::Error,
+            Self::Warnings => Level::Warn,
+            Self::Info => Level::Info,
+        };
+        line.severity() >= least
+    }
+
+    /// Its name in the settings file (`"apps": { "<key>": { "filter": … } }`); all lines have none.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::All => "",
+            Self::Errors => "errors",
+            Self::Warnings => "warnings",
+            Self::Info => "info",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "errors" => Self::Errors,
+            "warnings" => Self::Warnings,
+            "info" => Self::Info,
+            _ => Self::All,
+        }
+    }
+
+    /// What it shows, as the column and the log say it.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::All => "all lines",
+            Self::Errors => "errors only",
+            Self::Warnings => "warnings and errors",
+            Self::Info => "info and up",
+        }
+    }
 }
 
 /// The colours lazyrunner gives lines, named as the themes name them.
@@ -233,6 +309,39 @@ pub fn age(then: Instant, now: Instant) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_level_filter_goes_by_the_lines_colour_and_cycles() {
+        let line = |text: &str, hue: Option<Hue>| OutputLine {
+            text: text.into(),
+            level: Level::of(text),
+            born: Instant::now(),
+            hue,
+        };
+        let stack = line("      at Orders.Api.Checkout()", Some(Hue::Red));
+        let warned = line("warn: Orders.Api[2]", Some(Hue::Yellow));
+        let said = line("      Listing orders", Some(Hue::Gray));
+        let noise = line("npm verb cli", Some(Hue::DarkGray));
+        let note = line("error: it broke", None);
+        assert!(
+            LevelFilter::Errors.admits(&stack) && LevelFilter::Errors.admits(&note),
+            "an entry's indented lines too"
+        );
+        assert!(!LevelFilter::Errors.admits(&warned) && LevelFilter::Warnings.admits(&warned));
+        assert!(!LevelFilter::Warnings.admits(&said) && LevelFilter::Info.admits(&said));
+        assert!(!LevelFilter::Info.admits(&noise) && LevelFilter::All.admits(&noise));
+        let mut filter = LevelFilter::All;
+        let cycle: Vec<LevelFilter> = (0..4)
+            .map(|_| {
+                filter = filter.next();
+                filter
+            })
+            .collect();
+        assert_eq!(cycle, [LevelFilter::Errors, LevelFilter::Warnings, LevelFilter::Info, LevelFilter::All]);
+        for filter in cycle {
+            assert_eq!(LevelFilter::from_key(filter.key()), filter);
+        }
+    }
 
     #[test]
     fn keeps_only_the_newest_lines_but_counts_them_all() {
