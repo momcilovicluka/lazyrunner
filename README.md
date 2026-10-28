@@ -412,7 +412,11 @@ many of its requests do it. lazyrunner sums a request's database commands up as 
 log lines scroll away.
 
 `l` (or →) on an endpoint lists its requests; `h` (or ←, `Tab`, `Esc`) goes back to it. `e` shows errors only, `a` one
-app, `/` filters by path; `y` copies the selected row, `w` opens a GET request in the
+app, `/` filters by path; `y` asks what to copy the selected request as - the row (`y` again), curl for
+bash (`c`), PowerShell (`p`), `curl.exe` for cmd (`w`), an `.http` request for REST Client, Rider and Visual Studio
+(`h`), JavaScript's `fetch` (`f`) or the URL (`u`); bodies aren't in ASP.NET's log, so a POST's comes empty, with
+its content type. `p` sends a GET (HEAD, OPTIONS) request again from lazyrunner: it shows as the newest, and the log
+says how it went. `w` opens a GET request in the
 browser, `o` opens the selected row's app log, `c` clears the list, `Esc` / `q` / `H` close. The top row follows new requests; any other
 row stays put as new ones arrive. The last 5,000 are kept while lazyrunner runs (lazyrunner's own response-time probe
 isn't among them); the full lines are still in each app's log file.

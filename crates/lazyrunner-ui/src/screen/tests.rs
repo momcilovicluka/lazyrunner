@@ -902,6 +902,54 @@ async fn the_migrations_view_shows_what_is_applied_and_asks_before_it_moves() {
 
 // ---------------------------------------------------------------- the requests view
 
+#[tokio::test]
+async fn y_copies_a_request_as_curl_powershell_and_more_and_p_sends_a_get_again() {
+    let mut screen = screen("requests-copy-as", json!({}));
+    with_requests(&mut screen);
+    screen.press("H / o r d e r s Enter j y");
+    assert!(screen.frame().contains("Copy POST /api/orders as"), "{}", screen.frame());
+    screen.press("c");
+    assert_eq!(copied().last().map(String::as_str), Some("curl -X POST 'http://localhost:47201/api/orders'"));
+    assert!(!screen.frame().contains("Copy POST"), "the box closes");
+    screen.press("y p");
+    assert_eq!(
+        copied().last().map(String::as_str),
+        Some("Invoke-WebRequest -Uri 'http://localhost:47201/api/orders' -Method POST")
+    );
+    screen.press("p");
+    assert!(screen.last_log().contains("a POST changes data"), "{}", screen.last_log());
+    screen.press("k p");
+    assert!(screen.last_log().contains("Orders isn't running"), "{}", screen.last_log());
+    screen.press("y Esc");
+    assert!(matches!(&screen.ui.overlay, Some(Overlay::Requests(view)) if view.copying.is_none()));
+}
+
+#[test]
+fn a_request_becomes_a_command_for_each_shell() {
+    use super::requests::{CopyAs, command};
+    let url = "http://localhost:47201/api/orders?q=it's";
+    assert_eq!(command(CopyAs::Curl, "GET", url, ""), "curl 'http://localhost:47201/api/orders?q=it'\\''s'");
+    assert_eq!(command(CopyAs::CurlExe, "HEAD", url, ""), "curl.exe -I \"http://localhost:47201/api/orders?q=it's\"");
+    assert_eq!(
+        command(CopyAs::PowerShell, "GET", url, ""),
+        "Invoke-WebRequest -Uri 'http://localhost:47201/api/orders?q=it''s'"
+    );
+    assert_eq!(
+        command(CopyAs::Curl, "POST", "http://h/x", "application/json"),
+        "curl -X POST 'http://h/x' -H 'Content-Type: application/json' --data-raw ''"
+    );
+    assert_eq!(
+        command(CopyAs::Http, "PUT", "http://h/x", "text/plain"),
+        "PUT http://h/x\nContent-Type: text/plain\n\n"
+    );
+    assert_eq!(command(CopyAs::Fetch, "GET", "http://h/x", ""), "await fetch('http://h/x');");
+    assert_eq!(
+        command(CopyAs::Fetch, "POST", "http://h/x", "application/json"),
+        "await fetch('http://h/x', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '' });"
+    );
+    assert_eq!(command(CopyAs::Url, "GET", "http://h/x", ""), "http://h/x");
+}
+
 /// Requests the sample's .NET apps served, by hand.
 fn with_requests(screen: &mut Screen) {
     use chrono::TimeZone;
@@ -1072,7 +1120,7 @@ async fn in_the_requests_view_filters_copy_and_open_narrow_and_act_on_the_select
     assert!(screen.frame().contains("1 shown"), "errors only");
     screen.press("e / 4 2 Enter");
     assert!(screen.frame().contains("[/42]"), "{}", screen.frame());
-    screen.press("y");
+    screen.press("y y");
     assert_eq!(copied(), ["GET http://localhost:47201/api/orders/42 -> 200 in 12 ms (Orders, 2026-10-22 09:41:07)"]);
     screen.press("w");
     assert_eq!(OPENED.with(|opened| opened.borrow().clone()), ["http://localhost:47201/api/orders/42"]);

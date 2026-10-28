@@ -259,6 +259,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 controller.tick();
                 update_checklist(&mut ui, &mut controller, &mut still_checking);
                 poll_quiet_update(&mut quiet, &mut ui, &mut controller);
+                screen::requests::poll_replays(&mut ui, &mut controller);
                 if let Some(version) = screen::about::poll_update(&mut ui, &mut controller) {
                     after_update(&mut ui, &mut controller, &version, true, false);
                 }

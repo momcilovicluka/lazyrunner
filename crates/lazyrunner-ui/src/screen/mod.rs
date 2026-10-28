@@ -191,6 +191,8 @@ pub struct Ui {
     pub contributors: lazyrunner_core::contributors::Contributors,
     /// The update check `u` in the About box runs.
     pub update_check: Option<about::UpdateCheck>,
+    /// Requests sent again (p in the requests view): how each went, once it has.
+    pub replays: Vec<std::sync::mpsc::Receiver<(lazyrunner_core::output::Hue, String)>>,
     /// `L` was pressed: the loop opens the git tool.
     pub git_tool_wanted: bool,
     /// The git tool has the terminal (its name): nothing is drawn, and quitting or switching versions waits.
@@ -266,6 +268,7 @@ impl Ui {
             picker: None,
             contributors: lazyrunner_core::contributors::built_in(),
             update_check: None,
+            replays: Vec::new(),
             git_tool_wanted: false,
             away: None,
             pending_g: None,

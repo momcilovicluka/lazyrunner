@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.22.0] - 2026-10-28
+
+### Added
+- `y` in the requests view asks what to copy the selected request as: the row (`y` again, as before), curl for bash, PowerShell's `Invoke-WebRequest`, `curl.exe` for cmd, an `.http` request (VS Code REST Client, Rider, Visual Studio), JavaScript's `fetch`, or just the URL. ASP.NET's log keeps no bodies, so a POST comes with its content type and an empty body, and the log says so (#19)
+- `p` sends the selected GET, HEAD or OPTIONS request again, right from lazyrunner: it shows as the newest request, and the log says how it went
+
 ## [1.21.0] - 2026-10-28
 
 ### Changed
