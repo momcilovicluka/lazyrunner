@@ -155,9 +155,9 @@ fn item(
     let caps_cells = width(&caps);
     let mut segs = vec![paint(format!(" {icon}  "), if on_bar { C::FocusText } else { C::Cyan })];
     let room = inner.saturating_sub(ICON_CELLS + caps_cells + 2);
-    let full = if action.hint.is_empty() { action.label.clone() } else { format!("{}  {}", action.label, action.hint) };
-    if on_bar && full.width() > room {
-        segs.push(paint(ui.scrolling(&full, room), fg));
+    let label = if action.hint.is_empty() { action.label.clone() } else { format!("{}  ", action.label) };
+    if on_bar && label.width() + action.hint.width() > room {
+        segs.push(paint(ui.scrolling_parts(&[&label, &action.hint], room), fg));
     } else {
         let label: Vec<char> = action.label.chars().collect();
         let shown = label.len().min(room);

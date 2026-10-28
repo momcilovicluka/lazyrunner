@@ -1911,6 +1911,20 @@ async fn the_menus_wrap_around_at_their_ends() {
 }
 
 #[tokio::test]
+async fn a_selected_row_keeps_its_key_and_label_and_scrolls_only_its_hint() {
+    let mut screen = screen("rows-tail", json!({}));
+    let parts = [" f  💡  ", "Suggest a feature  ", "the feature form, for your idea"];
+    let row = screen.ui.scrolling_parts(&parts, 44);
+    assert!(row.starts_with(" f  💡  Suggest a feature  the feature"), "{row:?}");
+    screen.ui.now += Duration::from_secs(3);
+    let later = screen.ui.scrolling_parts(&parts, 44);
+    assert!(later.starts_with(" f  💡  Suggest a feature  ") && later.trim_end().ends_with("your idea"), "{later:?}");
+    let tight = screen.ui.scrolling_parts(&parts, 24);
+    assert!(tight.starts_with(" f  💡  Sugg"), "too narrow for the label: all after the key scrolls: {tight:?}");
+    assert_eq!(screen.ui.scrolling_parts(&[" f  ", "Short  ", "fits"], 40).trim_end(), " f  Short  fits");
+}
+
+#[tokio::test]
 async fn a_long_row_widens_its_box_and_a_selected_one_still_too_long_scrolls() {
     let mut screen = screen("menus-long", json!({}));
     let label = "L opens the git tool beside lazyrunner (Windows Terminal)";

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.22.1] - 2026-10-28
+
+### Fixed
+- A selected row too long for the terminal no longer scrolls whole: its key, icon and label stay put, and only its hint scrolls, in the room they leave (all after the key when the label doesn't fit either) - in the menus, the palette, the About box and the other boxes (#45, thanks @ognjen004028)
+
 ## [1.22.0] - 2026-10-28
 
 ### Added
