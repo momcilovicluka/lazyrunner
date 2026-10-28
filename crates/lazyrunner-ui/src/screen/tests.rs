@@ -1728,6 +1728,24 @@ async fn s_cancels_a_build_from_inside_the_settings_menu_which_stays_open() {
 }
 
 #[tokio::test]
+async fn u_in_the_about_box_checks_for_an_update_right_there() {
+    let mut screen = screen("about-update", json!({ "autoUpdate": false }));
+    screen.press(", A u");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::About { .. })), "the box stays open");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while screen.ui.update_check.as_ref().is_some_and(|check| check.status.is_none()) && Instant::now() < deadline {
+        assert_eq!(super::about::poll_update(&mut screen.ui, &mut screen.controller), None, "nothing installed");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let frame = screen.frame();
+    assert!(frame.contains("↳ - v<version> · auto-update off"), "{frame}");
+    assert!(screen.last_log().starts_with("lazyrunner: v"), "{}", screen.last_log());
+
+    screen.press("Esc , A");
+    assert!(screen.ui.update_check.is_none(), "reopened, the box starts without the old outcome");
+}
+
+#[tokio::test]
 async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     let mut screen = screen("checklist-bar", json!({}));
     let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };
