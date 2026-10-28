@@ -610,12 +610,14 @@ struct Outside {
     tab: String,
     theme: Option<String>,
     colored: bool,
+    /// The terminal shows a light theme's background.
+    light: bool,
 }
 
 impl Outside {
     fn new(enabled: bool) -> Self {
         let title = enabled.then(status::Title::save);
-        Self { enabled, title, tab: String::new(), theme: None, colored: false }
+        Self { enabled, title, tab: String::new(), theme: None, colored: false, light: false }
     }
 
     fn write(sequence: &str) {
@@ -640,10 +642,12 @@ impl Outside {
             Self::write(&tab);
             self.tab = tab;
         }
-        if self.theme.as_deref() != Some(ui.theme.id.as_str()) {
+        if self.theme.as_deref() != Some(ui.theme.id.as_str()) && !screen::theme_picker::holds_terminal(ui, self.light)
+        {
             let colors = ui.theme.terminal.as_ref();
             Self::write(&status::terminal_colors(colors, self.colored));
             self.colored = colors.is_some();
+            self.light = ui.theme.light;
             self.theme = Some(ui.theme.id.clone());
         }
     }

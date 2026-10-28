@@ -224,6 +224,10 @@ pub struct Ui {
     pub height: usize,
     pub themes: Vec<Theme>,
     pub theme: Theme,
+    /// When `theme` last changed (the picker's preview too).
+    pub theme_changed: Instant,
+    /// A theme was just kept: it ripples out over the screen.
+    pub theme_ripple: Option<theme_picker::Ripple>,
     pub user_themes: Option<PathBuf>,
     pub exit: Option<Exit>,
     /// An installed lazyrunner version to switch to once nothing is in the way (the apps are handed over to it).
@@ -276,6 +280,8 @@ impl Ui {
             deferred: None,
             height: 40,
             theme: themes[0].clone(),
+            theme_changed: now,
+            theme_ripple: None,
             themes,
             user_themes,
             exit: None,
@@ -307,6 +313,7 @@ impl Ui {
     /// Uses theme `id` (the first theme when there is none by that id; none at all with NO_COLOR).
     pub fn set_theme(&mut self, id: &str) {
         let found = self.themes.iter().find(|theme| theme.id == id).unwrap_or(&self.themes[0]).clone();
+        self.theme_changed = self.now;
         self.theme = if theme::no_color() {
             let mut plain = Theme::no_color();
             plain.id = found.id; // the theme still counts as chosen, it just has no colours
@@ -338,7 +345,7 @@ impl Ui {
 
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
-        if self.reload.is_some() || self.motion.active(self.now) {
+        if self.reload.is_some() || self.theme_ripple.is_some() || self.motion.active(self.now) {
             return true;
         }
         if self.reduced_motion {
@@ -426,6 +433,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     for (y, row) in rows.iter().enumerate().take(height) {
         seg::draw(buf, area.x, area.y + y as u16, area.width, row, &ui.theme, &mut ui.hits, touch);
     }
+    theme_picker::paint_ripple(buf, area, ui);
     reload::paint(buf, area, ui);
 }
 

@@ -6,20 +6,20 @@ expression: screen.frame()
              ┃             │   dev server│   watch buil│   live · dev    ┃ › ▏
              ┃             │             │             │                 ┃────────────────────────────────────
              ┃             │             │             │                 ┃  • Default               ■■■■■■
+             ┃             │             │             │                 ┃ Dark ─────────────────────────────
              ┃             │             │             │                 ┃ ▸  Ayu Mirage            ■■■■■■
-             ┃             │             │             │                 ┃    Catppuccin Latte      ■■■■■■
              ┃             │             │             │                 ┃    Catppuccin Mocha      ■■■■■■
              ┃             │             │             │                 ┃    Dark                  ■■■■■■
              ┃             │             │             │                 ┃    Dracula               ■■■■■■
              ┃             │             │             │                 ┃    Evangelion            ■■■■■■
              ┃             │             │             │                 ┃    Everforest            ■■■■■■
              ┃             │             │             │                 ┃    GitHub Dark           ■■■■■■
-             ┃             │             │             │                 ┃    GitHub Light          ■■■■■■
              ┃             │             │             │                 ┃    Gruvbox               ■■■■■■
              ┃             │             │             │                 ┃    Hatsune Miku          ■■■■■■
              ┃             │             │             │                 ┃    High Contrast         ■■■■■■
              ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
-             ┃             │             │             │                 ┃    Light                 ■■■■■■
+             ┃             │             │             │                 ┃    Monokai Pro           ■■■■■■
+             ┃             │             │             │                 ┃    Night Owl             ■■■■■■
              ┃             │             │             │                 ┃────────────────────────────────────
              ┃             │             │             │                 ┃ Ayu's medium-dark blue-grey; also
              ┃             │             │             │                 ┃ recolours the terminal background
