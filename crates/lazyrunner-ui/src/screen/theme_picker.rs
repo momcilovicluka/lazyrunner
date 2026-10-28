@@ -75,8 +75,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             }
             return;
         }
-        "UpArrow" | "Ctrl+P" => *index = index.saturating_sub(1),
-        "DownArrow" | "Ctrl+N" => *index += 1,
+        "UpArrow" | "Ctrl+P" => *index = keys::wrapped(*index, -1, matches(&ui.themes, query).len()),
+        "DownArrow" | "Ctrl+N" => *index = keys::wrapped(*index, 1, matches(&ui.themes, query).len()),
         "PageUp" => *index = index.saturating_sub(PAGE),
         "PageDown" => *index += PAGE,
         "Home" => *index = 0,

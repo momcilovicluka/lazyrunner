@@ -352,11 +352,11 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                     None
                 }
                 "j" | "DownArrow" => {
-                    *index = (*index + 1).min(PICKS.len() - 1);
+                    *index = wrapped(*index, 1, PICKS.len());
                     None
                 }
                 "k" | "UpArrow" => {
-                    *index = index.saturating_sub(1);
+                    *index = wrapped(*index, -1, PICKS.len());
                     None
                 }
                 "<" | "Home" => {
@@ -377,8 +377,10 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         }
         Some(Overlay::Install { index }) => match name {
             "Escape" | "q" | "i" => ui.overlay = None,
-            "j" | "DownArrow" | ">" => *index = 1,
-            "k" | "UpArrow" | "<" => *index = 0,
+            "j" | "DownArrow" => *index = wrapped(*index, 1, 2),
+            "k" | "UpArrow" => *index = wrapped(*index, -1, 2),
+            ">" => *index = 1,
+            "<" => *index = 0,
             "c" | "n" | "Enter" | "Space" => {
                 let clean = name == "c" || (name != "n" && *index == 0);
                 ui.overlay = None;
@@ -399,8 +401,8 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
-            "UpArrow" | "Ctrl+P" => *index = index.saturating_sub(1),
-            "DownArrow" | "Ctrl+N" => *index = (*index + 1).min(palette_len.saturating_sub(1)),
+            "UpArrow" | "Ctrl+P" => *index = wrapped(*index, -1, palette_len),
+            "DownArrow" | "Ctrl+N" => *index = wrapped(*index, 1, palette_len),
             "Backspace" => {
                 query.pop();
                 *index = 0;
@@ -432,10 +434,10 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 "Escape" | "q" => ui.overlay = None,
                 _ if name == close => ui.overlay = None,
                 "S" if controller.building.is_some() => controller.cancel_start(),
-                "j" | "DownArrow" | "Ctrl+N" => *index = (*index + 1).min(items.len().saturating_sub(1)),
+                "j" | "DownArrow" | "Ctrl+N" => *index = wrapped(*index, 1, items.len()),
                 "<" | "Home" => *index = 0,
                 ">" | "End" => *index = items.len().saturating_sub(1),
-                "k" | "UpArrow" | "Ctrl+P" => *index = index.saturating_sub(1),
+                "k" | "UpArrow" | "Ctrl+P" => *index = wrapped(*index, -1, items.len()),
                 "Enter" | "Space" => {
                     if let Some(item) = items.get(*index).cloned() {
                         run_from_overlay(ui, controller, &item, settings);
@@ -451,6 +453,17 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             }
         }
         None => {}
+    }
+}
+
+/// Moves `by` through a list of `len` items: one step down from the last goes to the first, one step up from the first
+/// to the last; a bigger jump (a page, Home, End) stops at the end.
+pub fn wrapped(at: usize, by: isize, len: usize) -> usize {
+    let last = len.saturating_sub(1);
+    match by {
+        1 if at >= last => 0,
+        -1 if at == 0 => last,
+        _ => at.saturating_add_signed(by).min(last),
     }
 }
 
@@ -822,8 +835,8 @@ fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEve
                 picker.index = 0;
             }
         }
-        "k" | "UpArrow" => picker.index = picker.index.saturating_sub(1),
-        "j" | "DownArrow" => picker.index = (picker.index + 1).min(count.saturating_sub(1)),
+        "k" | "UpArrow" => picker.index = wrapped(picker.index, -1, count),
+        "j" | "DownArrow" => picker.index = wrapped(picker.index, 1, count),
         "Ctrl+U" | "PageUp" => picker.index = picker.index.saturating_sub(PICKER_PAGE),
         "Ctrl+D" | "PageDown" => picker.index = (picker.index + PICKER_PAGE).min(count.saturating_sub(1)),
         "Home" | "<" => picker.index = 0,
@@ -855,4 +868,20 @@ fn select_database(ui: &mut Ui, controller: &mut Controller, entry: &secrets::En
         return;
     }
     controller.switch_database(entry);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wrapped;
+
+    #[test]
+    fn one_step_wraps_around_a_list_and_a_bigger_jump_stops_at_its_end() {
+        assert_eq!(wrapped(0, -1, 5), 4, "up from the first: the last");
+        assert_eq!(wrapped(4, 1, 5), 0, "down from the last: the first");
+        assert_eq!(wrapped(2, 1, 5), 3);
+        assert_eq!(wrapped(3, 10, 5), 4, "a page stops at the end");
+        assert_eq!(wrapped(1, -10, 5), 0);
+        assert_eq!(wrapped(9, -1, 5), 4, "past the end, as after the list got shorter");
+        assert_eq!(wrapped(0, 1, 0), 0, "an empty list");
+    }
 }

@@ -558,12 +558,18 @@ async fn a_start_that_builds_says_it_checks_the_sources_first() {
 }
 
 #[tokio::test]
-async fn the_palette_selection_stops_at_its_last_command() {
+async fn the_palette_selection_wraps_around_its_commands() {
     let mut screen = screen("keys-palette-end", json!({}));
-    screen.press(": z o o m Down Down Down Down");
-    let Some(Overlay::Palette { index, .. }) = screen.ui.overlay else { panic!("the palette is open") };
+    screen.press(": z o o m Up");
+    let index = |screen: &Screen| match screen.ui.overlay {
+        Some(Overlay::Palette { index, .. }) => index,
+        _ => panic!("the palette is open"),
+    };
     let count = super::actions::palette(&screen.ui, &screen.controller, "zoom").len();
-    assert_eq!(index, count - 1);
+    assert!(count > 1, "zoom finds more than one command");
+    assert_eq!(index(&screen), count - 1, "up from the first: the last");
+    screen.press("Down");
+    assert_eq!(index(&screen), 0, "down from the last: the first");
 }
 
 #[tokio::test]
@@ -1770,6 +1776,33 @@ async fn u_in_the_about_box_checks_for_an_update_right_there() {
 
     screen.press("Esc , A");
     assert!(screen.ui.update_check.is_none(), "reopened, the box starts without the old outcome");
+}
+
+#[tokio::test]
+async fn the_menus_wrap_around_at_their_ends() {
+    let mut screen = screen("menus-wrap", json!({}));
+    let settings = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Settings { index }) => *index,
+        _ => panic!("the settings menu is open"),
+    };
+    screen.press(", k");
+    let count = super::overlays::menu_items(&screen.ui, &screen.controller).len();
+    assert_eq!(settings(&screen), count - 1, "up from the first item: the last");
+    screen.press("j");
+    assert_eq!(settings(&screen), 0, "down from the last: the first");
+
+    screen.press("Esc t Up");
+    let Some(Overlay::Themes { index, .. }) = &screen.ui.overlay else { panic!("the theme picker is open") };
+    assert_eq!(*index, screen.ui.themes.len() - 1, "the theme picker too");
+    screen.press("Down");
+    let Some(Overlay::Themes { index, .. }) = &screen.ui.overlay else { panic!("the theme picker is open") };
+    assert_eq!(*index, 0);
+
+    screen.press("Esc , A k");
+    let Some(Overlay::About { index }) = screen.ui.overlay else { panic!("the About box is open") };
+    assert!(index > 0, "and the About box's links");
+    screen.press("j");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::About { index: 0 })));
 }
 
 #[tokio::test]

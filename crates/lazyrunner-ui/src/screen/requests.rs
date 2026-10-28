@@ -235,7 +235,7 @@ fn back_to_endpoints(view: &mut View) {
 
 /// Moves the selection; the top row follows new requests, another one stays on its request.
 fn step(view: &mut View, controller: &Controller, by: isize, count: usize) {
-    view.index = view.index.saturating_add_signed(by).min(count.saturating_sub(1));
+    view.index = super::keys::wrapped(view.index, by, count);
     view.follow = view.index == 0;
     view.selected = match view.tab {
         Tab::Requests => shown(view, controller).get(view.index).map_or(0, |request| request.seq),
