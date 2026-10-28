@@ -231,6 +231,7 @@ at once while the palette wipes away.
 | `gg` / `G` (`Home` / `End`) | Oldest output / follow new output again |
 | `/`, `n` / `N`, `Esc` | Search the focused column (matches highlighted), older / newer match, clear. While typing: `Tab` shows only the matching lines (a line either side), `Alt+r` takes it as a regex, `Alt+c` minds case; the prompt counts the matches. `/` again brings the column's last search back |
 | `z` | Zoom: only the focused column |
+| `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks (`Enter` jumps, `d` unmarks). Marked lines show a `▌`; marks go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
 | `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
 | `<` / `>` | The first / last: the oldest output and following new output again in a column, the first and last item in a list or box (as in lazygit) |

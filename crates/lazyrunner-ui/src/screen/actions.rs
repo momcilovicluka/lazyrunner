@@ -38,6 +38,10 @@ pub enum Run {
     Search,
     Zoom,
     LevelFilter,
+    Mark,
+    PrevMark,
+    NextMark,
+    Marks,
     Widen,
     Narrow,
     EqualWidths,
@@ -206,6 +210,12 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         )
         .safe()
         .focused(),
+        action("View", "m", "Mark a line", "the one at the bottom, or the search match; again unmarks", Run::Mark)
+            .safe()
+            .focused(),
+        action("View", "[", "Older mark", "in the focused column", Run::PrevMark).safe(),
+        action("View", "]", "Newer mark", "in the focused column", Run::NextMark).safe(),
+        action("View", "'", "Marks: every column's, to jump to", "", Run::Marks).safe(),
         action("View", "+", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),
         action("View", "-", "Narrow the focused column", "shorter when the apps are stacked", Run::Narrow).safe(),
         action("View", "=", "Equal column widths", "", Run::EqualWidths).safe(),

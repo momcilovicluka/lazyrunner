@@ -61,6 +61,8 @@ pub struct AppState {
     pub scroll: usize,
     /// Which of its lines the column shows (`f`), kept for the app between runs.
     pub filter: LevelFilter,
+    /// The lines marked (`m`), by number, oldest first; they go when the app starts again.
+    pub marks: Vec<u64>,
     pub errors: u64,
     pub warnings: u64,
     pub requests: u64,
@@ -100,6 +102,7 @@ impl AppState {
             output: Output::new(MAX_PANE_LINES),
             scroll: 0,
             filter: LevelFilter::All,
+            marks: Vec::new(),
             errors: 0,
             warnings: 0,
             requests: 0,
@@ -267,6 +270,7 @@ impl AppState {
     /// Clears the counters and histories for a new run.
     pub fn reset_for_start(&mut self) {
         self.generation += 1;
+        self.marks.clear();
         self.errors = 0;
         self.warnings = 0;
         self.requests = 0;

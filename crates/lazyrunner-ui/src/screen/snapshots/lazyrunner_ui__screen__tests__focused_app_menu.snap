@@ -18,9 +18,9 @@ expression: screen.frame()
         │  /      Search the focused app's output  n older match, N newer                           │
         │  z      Zoom the focused column                                                           │
         │  f      Filter the focused column by level  errors, warnings and errors, info and up, all │
+        │  m      Mark a line  the one at the bottom, or the search match; again unmarks            │
         │ press a key, or j k + Enter · Esc / x close                                               │
         └───────────────────────────────────────────────────────────────────────────────────────────┘
-
 
 
 

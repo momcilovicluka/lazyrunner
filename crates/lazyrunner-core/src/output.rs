@@ -196,6 +196,17 @@ impl Output {
         self.total
     }
 
+    /// The number of the line at `position` among those kept (0 = the oldest); the first line ever pushed is 1.
+    pub fn number_at(&self, position: usize) -> u64 {
+        self.total + 1 - self.lines.len() as u64 + position as u64
+    }
+
+    /// Where line `number` is among those kept (0 = the oldest), while it still is.
+    pub fn position_of(&self, number: u64) -> Option<usize> {
+        let oldest = self.total + 1 - self.lines.len() as u64;
+        (number >= oldest && number <= self.total).then(|| (number - oldest) as usize)
+    }
+
     /// The lines numbered `first..=last` still kept (the first line ever pushed is 1).
     pub fn numbered(&self, first: u64, last: u64) -> impl Iterator<Item = &OutputLine> {
         let oldest = self.total + 1 - self.lines.len() as u64;
@@ -309,6 +320,19 @@ pub fn age(then: Instant, now: Instant) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_line_keeps_its_number_as_older_ones_go() {
+        let now = Instant::now();
+        let mut output = Output::new(3);
+        for text in ["one", "two", "three", "four"] {
+            output.push(text, now);
+        }
+        assert_eq!(output.number_at(0), 2, "one went");
+        assert_eq!(output.position_of(4), Some(2));
+        assert_eq!(output.position_of(1), None, "gone");
+        assert_eq!(output.numbered(3, 3).next().map(|line| line.text.as_str()), Some("three"));
+    }
 
     #[test]
     fn a_level_filter_goes_by_the_lines_colour_and_cycles() {

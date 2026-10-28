@@ -566,7 +566,9 @@ fn body(
                 base + found.len() - 1
             })
             .collect();
-        let chunks = chunk(&line.text, cells);
+        let marked = state.marks.binary_search(&state.output.number_at(position)).is_ok();
+        let room = if marked { cells.saturating_sub(1) } else { cells };
+        let chunks = chunk(&line.text, room);
         let starts: Vec<usize> = chunks
             .iter()
             .scan(0, |at, text| {
@@ -579,12 +581,15 @@ fn body(
             if result.len() >= rows {
                 break;
             }
-            let segs = if line_links.is_empty() {
-                let text = if back.is_some() { pad(text, cells) } else { text.clone() };
+            let mut segs = if line_links.is_empty() {
+                let text = if back.is_some() { pad(text, room) } else { text.clone() };
                 vec![Seg { text, fg: color, bg: back, style: None, target: None, underline: false }]
             } else {
                 linked(text, start, &line_links, &ids, color, index)
             };
+            if marked {
+                segs.insert(0, seg("▌", C::Magenta));
+            }
             result.push(fit(segs, cells));
         }
     }
@@ -615,6 +620,22 @@ fn body(
         result.insert(0, fit(vec![seg(note, C::DarkCyan)], column));
     }
     result
+}
+
+/// How far back to scroll so `found` (an index into `shown`) sits in the middle of a column `rows` tall and `cells`
+/// wide, counting the rows its newer lines wrap to.
+pub fn middle(shown: &[Shown], found: usize, cells: usize, rows: usize) -> usize {
+    let mut rows_below = 0;
+    let mut scroll = shown.len() - 1 - found;
+    for item in shown[found + 1..].iter().rev() {
+        let wrapped = chunk(&item.line.text, cells).len();
+        if rows_below + wrapped > rows / 2 {
+            break;
+        }
+        rows_below += wrapped;
+        scroll -= 1;
+    }
+    scroll
 }
 
 /// A line a column shows: where it is among the lines kept (0 = the oldest), and whether it's only there as context

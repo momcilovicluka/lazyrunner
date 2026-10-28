@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 
 use super::actions::{self, Action, Run};
 use super::checklist::Checklist;
-use super::columns::{self, chunk};
+use super::columns;
 use super::motion::Spot;
 use super::overlays::menu_items;
 use super::{Exit, Overlay, Picker, Search, Ui};
@@ -302,17 +302,7 @@ fn find_match(ui: &mut Ui, controller: &mut Controller, older: bool) {
     search.index = Some(shown[found].position);
     search.total = hits.len();
     search.position = hits.iter().filter(|&&at| at >= found).count(); // 1 = newest
-    // The match in the middle of the column, counting the rows its newer lines wrap to.
-    let mut rows_below = 0;
-    let mut scroll = shown.len() - 1 - found;
-    for item in shown[found + 1..].iter().rev() {
-        let rows = chunk(&item.line.text, cells).len();
-        if rows_below + rows > body_rows / 2 {
-            break;
-        }
-        rows_below += rows;
-        scroll -= 1;
-    }
+    let scroll = columns::middle(&shown, found, cells, body_rows);
     let line = shown[found].position;
     if let Some(state) = controller.states.get_mut(ui.focus) {
         state.scroll = scroll;
@@ -349,6 +339,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             "Escape" | "q" | "c" => ui.overlay = None,
             _ => scroll_box(top, name),
         },
+        Some(Overlay::Marks { .. }) => super::marks::key(ui, controller, name),
         Some(Overlay::Durations { top }) => match name {
             "Escape" | "q" | "D" => ui.overlay = None,
             _ => scroll_box(top, name),
@@ -597,6 +588,10 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             });
         }
         Run::Zoom => ui.zoom = !ui.zoom,
+        Run::Mark => super::marks::toggle(ui, controller),
+        Run::PrevMark => super::marks::jump(ui, controller, true),
+        Run::NextMark => super::marks::jump(ui, controller, false),
+        Run::Marks => super::marks::open(ui, controller),
         Run::LevelFilter => {
             let Some(state) = controller.states.get(ui.focus) else { return };
             let (key, filter) = (state.key.clone(), state.filter.next());

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.25.0] - 2026-10-28
+
+### Added
+- Marks: `m` marks the line at the bottom of the focused column (or the search match it is on; again unmarks), `[` / `]` jump to the older / newer mark, and `'` lists every column's marks - Enter jumps to one, `d` unmarks it. Marked lines show a `▌` in the margin; an app's marks go when it starts again (#30)
+
 ## [1.24.0] - 2026-10-28
 
 ### Added

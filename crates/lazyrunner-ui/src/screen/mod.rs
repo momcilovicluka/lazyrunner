@@ -11,6 +11,7 @@ pub mod durations;
 pub mod icons;
 pub mod keys;
 pub mod links;
+pub mod marks;
 pub mod migrations;
 pub mod motion;
 pub mod mouse;
@@ -128,6 +129,10 @@ pub enum Overlay {
     Durations {
         top: usize,
     },
+    /// `'`: every column's marks; the selected one.
+    Marks {
+        index: usize,
+    },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {
         index: usize,
@@ -174,6 +179,7 @@ impl Overlay {
             Self::Checklist(_) => "checklist",
             Self::Changelog { .. } => "changelog",
             Self::Durations { .. } => "durations",
+            Self::Marks { .. } => "marks",
             Self::Tests { .. } => "tests",
             Self::Requests(_) => "requests",
             Self::Install { .. } => "install",
@@ -239,6 +245,8 @@ pub struct Ui {
     pub replays: Vec<std::sync::mpsc::Receiver<(lazyrunner_core::output::Hue, String)>>,
     /// `L` was pressed: the loop opens the git tool.
     pub git_tool_wanted: bool,
+    /// The mark `[` / `]` jumped to last: its column and line, where the next jump goes on from.
+    pub mark_at: Option<(usize, usize)>,
     /// The git tool has the terminal (its name): nothing is drawn, and quitting or switching versions waits.
     pub away: Option<String>,
     pub pending_g: Option<Instant>,
@@ -314,6 +322,7 @@ impl Ui {
             update_check: None,
             replays: Vec::new(),
             git_tool_wanted: false,
+            mark_at: None,
             away: None,
             pending_g: None,
             hits: Vec::new(),
@@ -567,6 +576,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Palette { .. }) => return palette::rows(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
+        Some(Overlay::Marks { .. }) => return marks::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
         Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),
