@@ -697,7 +697,7 @@ Everyone who builds lazyrunner, or tells it what to do next - kept up to date fr
 <!-- contributors:start -->
 <p>
 <a href="https://github.com/momcilovicluka" title="Luka Momčilović (@momcilovicluka) - creator · maintainer"><img src="https://github.com/momcilovicluka.png?size=96" width="56" height="56" alt="Luka Momčilović"></a>
-<a href="https://github.com/ognjen004028" title="Ognjen Maričić (@ognjen004028) - 2 PRs · 4 bug reports · 9 ideas"><img src="https://github.com/ognjen004028.png?size=96" width="56" height="56" alt="Ognjen Maričić"></a>
+<a href="https://github.com/ognjen004028" title="Ognjen Maričić (@ognjen004028) - 2 PRs · 4 bug reports · 10 ideas"><img src="https://github.com/ognjen004028.png?size=96" width="56" height="56" alt="Ognjen Maričić"></a>
 </p>
 <!-- contributors:end -->
 
