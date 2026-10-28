@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.20.0] - 2026-10-28
+
+### Changed
+- The theme picker lists the dark themes, then the light ones under their own heading, and a light theme recolours the terminal's background only once you stay on it a moment - passing by (or wrapping from the top of the list) never flashes the whole terminal white. A theme of your own can say `"light": true`; without it lazyrunner goes by its terminal background (#42, thanks @ognjen004028)
+- Keeping a theme (`Enter` or `Tab` in the picker) ripples it out over the screen from where you picked it: a ring in the new theme's own colours, sparkles twinkling on it, the screen ahead dimmed until the wave gets there and the new theme glowing behind it. Previews stay instant; none with reduced motion
+
 ## [1.19.0] - 2026-10-28
 
 ### Changed

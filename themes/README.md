@@ -23,6 +23,7 @@ Every field is optional.
 |---|---|
 | `name` | Display name. Defaults to the file name. |
 | `description` | One line, shown in the panel log when you switch to it. |
+| `light` | `true` for a theme made for a light background: the picker lists it with the light themes, and while you only pass it by it doesn't light up the terminal's background. Defaults to whether `terminal.background` is light, else the theme it extends. |
 | `extends` | Theme id to start from. Defaults to `default`; `null` starts from the terminal's own colours. Only the colours you list are changed. |
 | `colors` | Sets the text and the background colour of a palette name. |
 | `foregrounds` / `backgrounds` | Sets only the text, or only the background, colour. |

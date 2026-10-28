@@ -497,6 +497,63 @@ async fn themes_with_the_same_name_show_their_ids() {
 }
 
 #[tokio::test]
+async fn the_picker_groups_dark_and_light_themes_and_a_light_one_waits_to_light_the_terminal() {
+    let mut screen = screen("themes-groups", json!({}));
+    screen.press("t");
+    let found = super::theme_picker::matches(&screen.ui.themes, "");
+    assert_eq!(screen.ui.themes[found[0]].id, "default");
+    let light: Vec<bool> = found.iter().map(|&at| screen.ui.themes[at].light).collect();
+    let first_light = light.iter().position(|&light| light).expect("there are light themes");
+    assert!(first_light > 1 && light[first_light..].iter().all(|&light| light), "dark, then light: {light:?}");
+    assert!(screen.frame().contains(" Dark ─"), "{}", screen.frame());
+
+    screen.press("Up");
+    assert!(screen.ui.theme.light, "up from Default wraps to the light end");
+    assert!(screen.frame().contains(" Light ─"), "{}", screen.frame());
+    assert!(super::theme_picker::holds_terminal(&screen.ui, false), "the terminal keeps its dark background a moment");
+    assert!(!super::theme_picker::holds_terminal(&screen.ui, true), "light already: nothing to wait for");
+    screen.ui.now += Duration::from_millis(400);
+    assert!(!super::theme_picker::holds_terminal(&screen.ui, false), "then it follows");
+}
+
+#[tokio::test]
+async fn keeping_a_theme_ripples_out_from_where_it_was_picked() {
+    use super::theme_picker::{RIPPLE, Ripple, paint_ripple};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Modifier};
+    let mut screen = screen("themes-ripple", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.press("t Down");
+    assert!(screen.ui.theme_ripple.is_none(), "a preview doesn't ripple");
+    screen.frame();
+    let picked =
+        screen.ui.hits.iter().find(|hit| hit.target == Target::Item(1)).map(|hit| (hit.x + hit.width / 2, hit.y));
+    screen.press("Enter");
+    let ripple = screen.ui.theme_ripple.expect("keeping one does");
+    assert!(picked.is_some() && ripple.from == picked, "from the picked theme's row: {:?}", ripple.from);
+
+    screen.ui.theme_ripple = Some(Ripple { started: ripple.started, from: Some((0, 0)) });
+    let area = Rect::new(0, 0, 60, 10);
+    let mut buf = Buffer::empty(area);
+    screen.ui.now = ripple.started + RIPPLE / 4;
+    paint_ripple(&mut buf, area, &mut screen.ui);
+    assert!(buf[(59, 9)].modifier.contains(Modifier::DIM), "the wave isn't there yet");
+    assert!(!buf[(0, 0)].modifier.contains(Modifier::DIM), "where it started, the new theme");
+    assert!(buf.content.iter().any(|cell| cell.bg != Color::Reset), "its ring in the theme's colours");
+    assert!(buf.content.iter().any(|cell| ["✦", "✧", "⋆", "·"].contains(&cell.symbol())), "sparkles on it");
+    screen.ui.now = ripple.started + RIPPLE;
+    paint_ripple(&mut buf, area, &mut screen.ui);
+    assert!(screen.ui.theme_ripple.is_none(), "it ends by itself");
+
+    let mut still = self::screen("themes-ripple-still", json!({ "reducedMotion": true }));
+    still.ui.motion.enabled = true;
+    still.frame();
+    still.press("t Down Enter");
+    assert!(still.ui.theme_ripple.is_none(), "none with reduced motion");
+}
+
+#[tokio::test]
 async fn esc_puts_back_the_theme_the_picker_opened_with() {
     let mut screen = screen("themes-undo", json!({ "theme": "nord" }));
     screen.press("t Down Down Esc");

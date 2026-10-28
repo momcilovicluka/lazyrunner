@@ -92,6 +92,8 @@ pub struct Theme {
     bg: HashMap<C, String>,
     /// Recolours the terminal itself while lazyrunner runs: (foreground, background) as #rrggbb.
     pub terminal: Option<(Option<String>, Option<String>)>,
+    /// Made for a light background: the picker lists it with the light themes.
+    pub light: bool,
 }
 
 impl Theme {
@@ -288,6 +290,12 @@ fn resolve(id: &str, files: &HashMap<String, Value>, chain: &[String]) -> Result
         Some(_) => None,
         None => parent.terminal.clone(),
     };
+    let own_background = data.get("terminal").and_then(|terminal| terminal.get("background")).and_then(Value::as_str);
+    let light = match (data.get("light").and_then(Value::as_bool), own_background) {
+        (Some(light), _) => light,
+        (None, Some(background)) => is_light(background),
+        (None, None) => parent.light,
+    };
     let text = |field: &str| data.get(field).and_then(Value::as_str).map(str::to_string);
     Ok(Theme {
         id: id.into(),
@@ -296,7 +304,14 @@ fn resolve(id: &str, files: &HashMap<String, Value>, chain: &[String]) -> Result
         fg,
         bg,
         terminal,
+        light,
     })
+}
+
+/// Whether a #rrggbb colour is a light one, as a light theme's background is.
+fn is_light(hex: &str) -> bool {
+    let channel = |at: usize| f64::from(u8::from_str_radix(hex.get(at..at + 2).unwrap_or("00"), 16).unwrap_or(0));
+    (0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)) / 255.0 > 0.5
 }
 
 /// Every theme, default first, then by display name; and the files that couldn't be used, with why.
@@ -382,6 +397,19 @@ mod tests {
         let tokyo = themes.iter().find(|theme| theme.id == "tokyo-night").unwrap();
         assert_eq!(tokyo.style(C::Red, None), Style::new().fg(Color::Rgb(0xf7, 0x76, 0x8e)));
         assert_eq!(tokyo.terminal.as_ref().and_then(|t| t.1.as_deref()), Some("#1a1b26"));
+    }
+
+    #[test]
+    fn light_themes_are_told_from_dark_ones() {
+        let (themes, _) = load(None);
+        let light = |id: &str| themes.iter().find(|theme| theme.id == id).unwrap().light;
+        for id in ["light", "github-light", "catppuccin-latte", "solarized-light"] {
+            assert!(light(id), "{id} is a light theme");
+        }
+        for id in ["default", "dark", "dracula", "solarized-dark", "evangelion"] {
+            assert!(!light(id), "{id} is a dark theme");
+        }
+        assert!(is_light("#fdf6e3") && !is_light("#282a36"));
     }
 
     #[test]

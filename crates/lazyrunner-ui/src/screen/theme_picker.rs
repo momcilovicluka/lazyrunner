@@ -4,9 +4,14 @@
 //! every project, Tab for this project alone (Tab on this project's own theme undoes it); Esc puts back the one the
 //! picker opened with. Themes are read again every time it opens.
 
+use std::time::{Duration, Instant};
+
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
 use serde_json::json;
 
 use super::actions::fuzzy_score;
@@ -20,6 +25,25 @@ const PAGE: usize = 10;
 const SWATCH: [C; 6] = [C::Red, C::Yellow, C::Green, C::Cyan, C::Blue, C::Magenta];
 /// Lines of the selected theme's description under the list.
 const DESCRIPTION_LINES: usize = 3;
+/// How long a light theme stays selected before it lights up the whole terminal's background too.
+pub const LIGHT_SETTLE: Duration = Duration::from_millis(350);
+/// Keeping a theme sends a ripple of its colours over the screen, this long.
+pub const RIPPLE: Duration = Duration::from_millis(550);
+/// The ripple's ring: how deep (in cells across; half as many rows), in the new theme's colours from the front back.
+const RING: f64 = 7.0;
+const RING_COLORS: [C; 6] = [C::Red, C::Yellow, C::Green, C::Cyan, C::Blue, C::Magenta];
+/// Behind the ring the new theme glows a little brighter for this many cells.
+const GLOW: f64 = 4.0;
+/// The sparkles on the ring, and how often they move.
+const SPARKLES: [&str; 4] = ["✦", "✧", "⋆", "·"];
+const TWINKLE_MS: u128 = 70;
+
+/// A theme just kept, rippling out over the screen from where it was picked (the picker's side when unknown).
+#[derive(Clone, Copy, Debug)]
+pub struct Ripple {
+    pub started: Instant,
+    pub from: Option<(u16, u16)>,
+}
 
 /// `t`: reads the themes again and opens the picker on the theme in use.
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
@@ -28,14 +52,42 @@ pub fn open(ui: &mut Ui, controller: &mut Controller) {
         controller.add_log(warning, Hue::Yellow);
     }
     ui.themes = themes;
-    let index = ui.themes.iter().position(|theme| theme.id == ui.theme.id).unwrap_or(0);
+    let index = matches(&ui.themes, "").iter().position(|&at| ui.themes[at].id == ui.theme.id).unwrap_or(0);
     let own = controller.own_setting("theme").and_then(|id| id.as_str().map(str::to_string));
     ui.overlay = Some(Overlay::Themes { query: String::new(), index, original: ui.theme.id.clone(), own });
 }
 
-/// The themes the picker lists (indexes into `themes`): all of them, or the fuzzy matches for `query` - by name and
-/// id, and by description only when no name matches (a few letters match some description far too easily).
+/// The themes the picker lists (indexes into `themes`): Default first, then the dark themes, then the light ones -
+/// all of them, or the fuzzy matches for `query` in that order.
 pub fn matches(themes: &[Theme], query: &str) -> Vec<usize> {
+    let mut found = found(themes, query);
+    found.sort_by_key(|&at| group(&themes[at])); // stable: each group keeps its order
+    found
+}
+
+/// Where a theme is listed: Default (your terminal's own colours), the dark themes, the light themes.
+fn group(theme: &Theme) -> u8 {
+    if theme.id == "default" {
+        0
+    } else if theme.light {
+        2
+    } else {
+        1
+    }
+}
+
+/// While the picker is open: whether the terminal's background should stay as it is a moment longer. A light theme
+/// only passed on the way through (or wrapped to from the top of the list) never flashes the whole terminal white.
+pub fn holds_terminal(ui: &Ui, lit: bool) -> bool {
+    matches!(ui.overlay, Some(Overlay::Themes { .. }))
+        && ui.theme.light
+        && !lit
+        && ui.now.saturating_duration_since(ui.theme_changed) < LIGHT_SETTLE
+}
+
+/// All the themes, or the fuzzy matches for `query` - by name and id, and by description only when no name matches
+/// (a few letters match some description far too easily).
+fn found(themes: &[Theme], query: &str) -> Vec<usize> {
     if query.trim().is_empty() {
         return (0..themes.len()).collect();
     }
@@ -66,13 +118,19 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         }
         "Enter" | "Tab" => {
             let picked = matches(&ui.themes, query).get(*index).map(|&at| ui.themes[at].id.clone());
+            let row = Target::Item(*index);
+            let from = ui.hits.iter().find(|hit| hit.target == row).map(|hit| (hit.x + hit.width / 2, hit.y));
             let (original, own) = (original.clone(), own.clone());
             ui.overlay = None;
             match picked {
                 Some(id) if name == "Tab" && own.as_deref() == Some(id.as_str()) => give_back(ui, controller),
                 Some(id) => save(ui, controller, &id, name == "Tab"),
-                None => ui.set_theme(&original),
+                None => {
+                    ui.set_theme(&original);
+                    return;
+                }
             }
+            ripple(ui, from);
             return;
         }
         "UpArrow" | "Ctrl+P" => *index = keys::wrapped(*index, -1, matches(&ui.themes, query).len()),
@@ -135,6 +193,66 @@ fn give_back(ui: &mut Ui, controller: &mut Controller) {
     );
 }
 
+/// A kept theme ripples out over the screen (not with reduced motion).
+fn ripple(ui: &mut Ui, from: Option<(u16, u16)>) {
+    if ui.motion.enabled && !ui.reduced_motion {
+        ui.theme_ripple = Some(Ripple { started: ui.now, from });
+    }
+}
+
+/// Paints the ripple over the frame just drawn: a ring in the new theme's own colours spreads from where it was
+/// picked, round (a cell is about twice as tall as wide), easing out, sparkles twinkling on it; behind it the new
+/// theme, glowing a moment, ahead of it the screen dimmed until the wave gets there. It ends by itself.
+pub fn paint_ripple(buf: &mut Buffer, area: Rect, ui: &mut Ui) {
+    let Some(ripple) = ui.theme_ripple else { return };
+    let elapsed = ui.now.saturating_duration_since(ripple.started);
+    let progress = elapsed.as_secs_f64() / RIPPLE.as_secs_f64();
+    if progress >= 1.0 {
+        ui.theme_ripple = None;
+        return;
+    }
+    let side = (area.right().saturating_sub(area.width / 6), area.y + area.height / 2);
+    let (ox, oy) = ripple.from.unwrap_or(side);
+    let distance = |x: u16, y: u16| (f64::from(x) - f64::from(ox)).hypot(2.0 * (f64::from(y) - f64::from(oy)));
+    let corners = [(area.x, area.y), (area.right(), area.y), (area.x, area.bottom()), (area.right(), area.bottom())];
+    let farthest = corners.into_iter().map(|(x, y)| distance(x, y)).fold(0.0, f64::max);
+    let radius = (1.0 - (1.0 - progress).powi(2)) * (farthest + RING + GLOW);
+    let ring = RING_COLORS.map(|color| ui.theme.style(C::Black, Some(color)));
+    let band =
+        |depth: f64, width: f64| ring[((depth / width * RING_COLORS.len() as f64) as usize).min(RING_COLORS.len() - 1)];
+    let (sparkle, glow, dim) = (
+        ui.theme.style(C::White, None).add_modifier(Modifier::BOLD),
+        Style::new().add_modifier(Modifier::BOLD),
+        Style::new().add_modifier(Modifier::DIM),
+    );
+    let twinkle = elapsed.as_millis() / TWINKLE_MS;
+    for y in area.y..area.bottom() {
+        for x in area.x..area.right() {
+            let behind = radius - distance(x, y);
+            let Some(cell) = buf.cell_mut((x, y)) else { continue };
+            if behind < 0.0 {
+                cell.set_style(dim);
+            } else if behind < RING {
+                cell.set_style(band(behind, RING));
+                if let Some(star) = sparkle_at(x, y, twinkle).filter(|_| cell.symbol() == " ") {
+                    cell.set_symbol(star).set_style(sparkle);
+                }
+            } else if behind < RING + GLOW {
+                cell.set_style(glow);
+            }
+        }
+    }
+}
+
+/// Whether a cell on the ring sparkles at this twinkle, and with what: about one in nine, moving as it twinkles.
+fn sparkle_at(x: u16, y: u16, twinkle: u128) -> Option<&'static str> {
+    let seed = u64::from(x).wrapping_mul(73_856_093)
+        ^ u64::from(y).wrapping_mul(19_349_663)
+        ^ (twinkle as u64).wrapping_mul(83_492_791);
+    let roll = seed % 97;
+    (roll < 11).then(|| SPARKLES[roll as usize % SPARKLES.len()])
+}
+
 /// The settings file's name, where a project's own theme is kept (not the project's .lazyrunner.json).
 fn settings_file(controller: &Controller) -> String {
     let path = &controller.paths().config_file;
@@ -165,10 +283,32 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     }
     footer.push(vec![seg(" ↑↓ preview · Esc undo", C::DarkGray)]);
     footer.push(vec![seg(" Enter keep · Tab this project", C::DarkGray)]);
+    enum Entry {
+        Heading(&'static str),
+        Theme(usize, usize),
+    }
+    let mut entries = Vec::new();
+    let mut last_group = None;
+    for (at, &theme_at) in found.iter().enumerate() {
+        let theme = &ui.themes[theme_at];
+        if group(theme) != 0 && last_group != Some(group(theme)) {
+            entries.push(Entry::Heading(if theme.light { "Light" } else { "Dark" }));
+        }
+        last_group = Some(group(theme));
+        entries.push(Entry::Theme(at, theme_at));
+    }
+    let selected = entries.iter().position(|entry| matches!(entry, Entry::Theme(at, _) if *at == index)).unwrap_or(0);
     let visible = rows.saturating_sub(lines.len() + footer.len()).max(1);
-    let first = index.saturating_sub(visible / 2).min(found.len().saturating_sub(visible));
+    let first = selected.saturating_sub(visible / 2).min(entries.len().saturating_sub(visible));
     let name_cells = cells.saturating_sub(15).max(8);
-    for (at, &theme_at) in found.iter().enumerate().skip(first).take(visible) {
+    for entry in entries.iter().skip(first).take(visible) {
+        let (at, theme_at) = match entry {
+            Entry::Heading(label) => {
+                lines.push(heading(label, cells));
+                continue;
+            }
+            Entry::Theme(at, theme_at) => (*at, *theme_at),
+        };
         let theme = &ui.themes[theme_at];
         let mark = match own {
             Some(own) if *own == theme.id => '◆',
@@ -197,6 +337,12 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     lines.extend(footer);
     lines.truncate(rows);
     lines.into_iter().map(|line| aim(line, Target::Box)).collect()
+}
+
+/// A group's heading in the list: its name on a rule.
+fn heading(label: &str, cells: usize) -> Vec<Seg> {
+    let rule = "─".repeat(cells.saturating_sub(label.chars().count() + 3));
+    vec![seg(format!(" {label} "), C::DarkCyan), seg(rule, C::DarkGray)]
 }
 
 /// The name in exactly `cells` characters: cut with … or padded.
