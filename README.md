@@ -197,7 +197,7 @@ at once while the palette wipes away.
 |-----|--------|
 | `space` | Start or stop the focused app, whichever it isn't |
 | `u` / `U` | Start the focused app / start everything (builds first if the code changed) |
-| `s` / `S` | Stop the focused app (or cancel its build or `npm ci`) / stop everything, cancelling a running build |
+| `s` / `S` | Stop the focused app (or cancel its build or `npm ci`) / stop everything, cancelling a running build - `S` also cancels it from inside the `,` and `x` menus, which stay open |
 | `r` / `R` | Restart the focused app / everything (rebuild if anything changed) |
 | `b` / `B` | Build the focused app / every app that builds (but the ones `S` leaves running): a full build, never skipped, that leaves them **stopped** (a running one is stopped first - it locks its build output). `u` / `U` then start them without building again. npm apps have no separate build step |
 | `!` | Kill whatever holds a port the apps need (offered when a port is taken) |
