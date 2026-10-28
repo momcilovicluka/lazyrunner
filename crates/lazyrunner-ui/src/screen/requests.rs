@@ -3,10 +3,12 @@
 //! Enter (or Space) shows the selected row's details in a panel on the right: a request's log lines, database
 //! commands and how it compares with its endpoint; an endpoint's times, statuses, slowest and failing requests.
 
+use std::sync::mpsc::{TryRecvError, channel};
+
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
-use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
+use lazyrunner_core::run::requests::{self, Endpoint, REPLAYABLE, Request, endpoints};
 
 use super::columns::{contains_ignore_case, fit, line_color};
 use super::icons::{self, Icon};
@@ -72,7 +74,32 @@ pub struct View {
     /// Only one endpoint's requests (l on its row): app, method and endpoint; and its row, to go back to (h).
     pub endpoint: Option<(String, String, String)>,
     pub endpoint_row: usize,
+    /// y on a request: the box asking what to copy it as is open, on this choice.
+    pub copying: Option<usize>,
 }
+
+/// What `y` copies a request as.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CopyAs {
+    Row,
+    Curl,
+    PowerShell,
+    CurlExe,
+    Http,
+    Fetch,
+    Url,
+}
+
+/// y's choices: what, its key, and how the box and the log say it.
+const COPY_AS: [(CopyAs, &str, &str, &str); 7] = [
+    (CopyAs::Row, "y", "the row, as it reads", "the selected row"),
+    (CopyAs::Curl, "c", "curl - bash, zsh, Git Bash", "curl"),
+    (CopyAs::PowerShell, "p", "PowerShell - Invoke-WebRequest", "PowerShell"),
+    (CopyAs::CurlExe, "w", "curl.exe - Windows cmd", "curl.exe"),
+    (CopyAs::Http, "h", ".http - REST Client, Rider, Visual Studio", "an .http request"),
+    (CopyAs::Fetch, "f", "fetch - JavaScript", "fetch"),
+    (CopyAs::Url, "u", "the URL", "a URL"),
+];
 
 impl Default for View {
     fn default() -> Self {
@@ -90,6 +117,7 @@ impl Default for View {
             details: false,
             endpoint: None,
             endpoint_row: 0,
+            copying: None,
         }
     }
 }
@@ -136,8 +164,8 @@ fn summed(view: &View, controller: &Controller) -> Vec<Endpoint> {
 }
 
 /// Tab requests / endpoints, j k choose, Enter / Space details, l an endpoint's requests (h, Esc back to it), e errors
-/// only, a app, s sort, / filter by path, y copy, w open a GET request, o the app's log, c clear, Esc the details or
-/// back, q / H back; false for a key it doesn't use.
+/// only, a app, s sort, / filter by path, y copy (a request: as the row, curl, PowerShell, ...), p send a GET again, w
+/// open a GET request, o the app's log, c clear, Esc the details or back, q / H back; false for a key it doesn't use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) -> bool {
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return false };
     if view.typing {
@@ -153,6 +181,31 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             _ => view.filter.extend(super::keys::typed(key)),
         }
         (view.index, view.follow) = (0, true);
+        return true;
+    }
+    if let Some(at) = view.copying {
+        let at = at.min(COPY_AS.len() - 1);
+        let kind = match name {
+            "Escape" | "q" => None,
+            "j" | "DownArrow" => {
+                view.copying = Some(super::keys::wrapped(at, 1, COPY_AS.len()));
+                return true;
+            }
+            "k" | "UpArrow" => {
+                view.copying = Some(super::keys::wrapped(at, -1, COPY_AS.len()));
+                return true;
+            }
+            "Enter" | "Space" => Some(COPY_AS[at].0),
+            other => match COPY_AS.iter().find(|(_, key, ..)| *key == other) {
+                Some((kind, ..)) => Some(*kind),
+                None => return true,
+            },
+        };
+        view.copying = None;
+        if let Some(kind) = kind {
+            let view = view.clone();
+            copy_as(ui, controller, &view, kind);
+        }
         return true;
     }
     let count = match view.tab {
@@ -208,9 +261,15 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             (view.index, view.follow) = (0, true);
             controller.add_log("Requests cleared.", Hue::DarkGray);
         }
+        "y" if view.tab == Tab::Requests && count > 0 => view.copying = Some(0),
         "y" => {
             let view = view.clone();
             copy_row(ui, controller, &view);
+        }
+        "p" if view.tab == Tab::Requests => {
+            let snapshot = view.clone();
+            (view.index, view.follow) = (0, true);
+            replay(ui, controller, &snapshot);
         }
         "w" => {
             let view = view.clone();
@@ -250,6 +309,151 @@ fn app_name(controller: &Controller, key: &str) -> String {
 fn url(controller: &Controller, request: &Request) -> String {
     let port = controller.port(&request.app).map_or(String::new(), |port| format!(":{port}"));
     format!("http://localhost{port}{}", request.path)
+}
+
+/// y then a key: the selected request as the row, as something to send it again with, or its URL.
+fn copy_as(ui: &Ui, controller: &mut Controller, view: &View, kind: CopyAs) {
+    if kind == CopyAs::Row {
+        copy_row(ui, controller, view);
+        return;
+    }
+    let Some(request) = shown(view, controller).get(view.index).map(|request| (*request).clone()) else { return };
+    let text = command(kind, &request.method, &url(controller, &request), &request.sent_content);
+    let name = COPY_AS.iter().find(|(choice, ..)| *choice == kind).map_or("", |(.., name)| *name);
+    copy::put(ui.clipboard, controller, &text, &format!("{} {} as {name}", request.method, request.path));
+    let body = request.sent_length.parse::<u64>().is_ok_and(|bytes| bytes > 0);
+    if body && kind != CopyAs::Url {
+        controller.add_log(
+            format!("Its body ({} bytes) isn't in the app's log: add it before sending it.", request.sent_length),
+            Hue::DarkGray,
+        );
+    }
+}
+
+/// A request as a command or snippet that sends it: `method` to `url`, with the content type it sent and an empty
+/// body (the log doesn't keep bodies).
+pub fn command(kind: CopyAs, method: &str, url: &str, content_type: &str) -> String {
+    let typed = !content_type.is_empty();
+    let header = format!("Content-Type: {content_type}");
+    match kind {
+        CopyAs::Row | CopyAs::Url => url.to_string(),
+        CopyAs::Curl | CopyAs::CurlExe => {
+            let quote = |text: &str| match kind {
+                CopyAs::Curl => format!("'{}'", text.replace('\'', "'\\''")),
+                _ => format!("\"{}\"", text.replace('"', "\\\"")),
+            };
+            let mut parts = vec![if kind == CopyAs::Curl { "curl" } else { "curl.exe" }.to_string()];
+            match method {
+                "GET" => {}
+                "HEAD" => parts.push("-I".into()),
+                other => parts.push(format!("-X {other}")),
+            }
+            parts.push(quote(url));
+            if typed {
+                parts.extend([format!("-H {}", quote(&header)), format!("--data-raw {}", quote(""))]);
+            }
+            parts.join(" ")
+        }
+        CopyAs::PowerShell => {
+            let quote = |text: &str| format!("'{}'", text.replace('\'', "''"));
+            let mut parts = vec![format!("Invoke-WebRequest -Uri {}", quote(url))];
+            if method != "GET" {
+                parts.push(format!("-Method {method}"));
+            }
+            if typed {
+                parts.push(format!("-ContentType {} -Body {}", quote(content_type), quote("")));
+            }
+            parts.join(" ")
+        }
+        CopyAs::Http => {
+            let headers = if typed { format!("{header}\n") } else { String::new() };
+            format!("{method} {url}\n{headers}\n")
+        }
+        CopyAs::Fetch => {
+            let quote = |text: &str| format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'"));
+            let mut options = Vec::new();
+            if method != "GET" {
+                options.push(format!("method: {}", quote(method)));
+            }
+            if typed {
+                options.push(format!("headers: {{ 'Content-Type': {} }}", quote(content_type)));
+                options.push("body: ''".to_string());
+            }
+            if options.is_empty() {
+                format!("await fetch({});", quote(url))
+            } else {
+                format!("await fetch({}, {{ {} }});", quote(url), options.join(", "))
+            }
+        }
+    }
+}
+
+/// p: sends the selected request again when that changes nothing (GET, HEAD, OPTIONS). The app logs it, so it shows
+/// here as the newest; how it went goes to the log.
+fn replay(ui: &mut Ui, controller: &mut Controller, view: &View) {
+    let Some(request) = shown(view, controller).get(view.index).map(|request| (*request).clone()) else { return };
+    let (method, path) = (request.method.clone(), request.path.clone());
+    if !REPLAYABLE.contains(&method.as_str()) {
+        controller.add_log(
+            format!(
+                "p sends GET, HEAD and OPTIONS requests again; a {method} changes data and its body isn't in the log - \
+                 y then c copies it as curl."
+            ),
+            Hue::DarkGray,
+        );
+        return;
+    }
+    if !controller.is_running(&request.app) {
+        let name = app_name(controller, &request.app);
+        controller.add_log(format!("{name} isn't running - start it to send {method} {path} again."), Hue::DarkGray);
+        return;
+    }
+    let url = url(controller, &request);
+    let (sender, results) = channel();
+    let (sent_method, sent_path) = (method.clone(), path.clone());
+    std::thread::spawn(move || {
+        let outcome = match requests::replay(&sent_method, &url) {
+            Ok((status, took)) => {
+                let hue = if status >= 400 { Hue::Yellow } else { Hue::Cyan };
+                (hue, format!("↻ {sent_method} {sent_path} sent again → {status} in {} ms", ms(took)))
+            }
+            Err(error) => (Hue::Red, format!("✗ {sent_method} {sent_path} couldn't be sent again: {error}")),
+        };
+        let _ = sender.send(outcome);
+    });
+    ui.replays.push(results);
+    controller.add_log(format!("↻ Sending {method} {path} again…"), Hue::DarkGray);
+}
+
+/// How the requests sent again went, to the log.
+pub fn poll_replays(ui: &mut Ui, controller: &mut Controller) {
+    ui.replays.retain(|results| match results.try_recv() {
+        Ok((hue, line)) => {
+            controller.add_log(line, hue);
+            false
+        }
+        Err(TryRecvError::Empty) => true,
+        Err(TryRecvError::Disconnected) => false,
+    });
+}
+
+/// y on a request: what to copy it as, in a box over the list.
+fn copy_menu(ui: &Ui, at: usize, title: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    const INNER: usize = 50;
+    let lines = COPY_AS
+        .iter()
+        .enumerate()
+        .map(|(choice, (_, key, label, _))| {
+            let key = pad(&format!(" {key}"), 5);
+            if choice == at {
+                vec![on(ui.scrolling(&format!("{key}{label}"), INNER), C::Black, C::Cyan)]
+            } else {
+                vec![seg(key, C::Cyan), seg(*label, C::White)]
+            }
+        })
+        .collect();
+    let title = format!("Copy {title} as");
+    super::overlays::boxed(&title, lines, "a key, or j k + Enter · Esc close", cells, rows, INNER)
 }
 
 fn copy_row(ui: &Ui, controller: &mut Controller, view: &View) {
@@ -382,7 +586,16 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
             }
         }
     }
+    let (copying, picked) =
+        (view.copying, list.get(view.index).map(|request| format!("{} {}", request.method, request.path)));
     out.resize(rows, Vec::new());
+    if let (Some(at), Some(picked)) = (copying, picked) {
+        for (row, line) in out.iter_mut().zip(copy_menu(ui, at, &picked, width, rows)) {
+            if !line.is_empty() {
+                *row = line;
+            }
+        }
+    }
     out.into_iter().map(|row| aim(fit(row, width), Target::Box)).collect()
 }
 
@@ -710,8 +923,8 @@ fn hint(view: &View, controller: &Controller, width: usize) -> Vec<Seg> {
              s sort ({sort}) · / filter · y copy · o log · c clear · Esc back"
         ),
         (Tab::Requests, filtered) => format!(
-            " {} · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · y copy · \
-             w open · o log · c clear · Esc back",
+            " {} · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · y copy (curl…) · \
+             p send again · w open · o log · c clear · Esc back",
             if filtered { "h endpoints" } else { "Tab requests/endpoints" }
         ),
     };

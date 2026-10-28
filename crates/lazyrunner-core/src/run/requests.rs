@@ -4,6 +4,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 
 use regex::Regex;
 
@@ -399,9 +400,49 @@ pub fn endpoints<'a>(requests: impl Iterator<Item = &'a Request>) -> Vec<Endpoin
         .collect()
 }
 
+/// How long a request sent again may take.
+const REPLAY_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The methods lazyrunner sends again: they change nothing, and have no body (the log doesn't keep bodies).
+pub const REPLAYABLE: [&str; 3] = ["GET", "HEAD", "OPTIONS"];
+
+/// Sends a request again, `method` to `url` with no body: the status it got and how long it took (ms), or why not.
+pub fn replay(method: &str, url: &str) -> Result<(u16, f64), String> {
+    let agent: ureq::Agent =
+        ureq::Agent::config_builder().timeout_global(Some(REPLAY_TIMEOUT)).http_status_as_error(false).build().into();
+    let started = Instant::now();
+    let sent = match method {
+        "HEAD" => agent.head(url).call(),
+        "OPTIONS" => agent.options(url).call(),
+        _ => agent.get(url).call(),
+    };
+    let response = sent.map_err(|error| error.to_string())?;
+    Ok((response.status().as_u16(), started.elapsed().as_secs_f64() * 1000.0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_request_is_sent_again_and_its_status_comes_back() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut asked = [0; 1024];
+            let _ = stream.read(&mut asked);
+            let _ = stream.write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n");
+        });
+        let (status, ms) = replay("GET", &format!("http://127.0.0.1:{port}/api/orders/42")).unwrap();
+        assert_eq!(status, 204);
+        assert!(ms >= 0.0);
+        let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let closed = dead.local_addr().unwrap().port();
+        drop(dead);
+        assert!(replay("GET", &format!("http://127.0.0.1:{closed}/")).is_err(), "nothing listens there");
+    }
 
     fn read(lines: &[&str]) -> Vec<Line> {
         let mut header = false;
