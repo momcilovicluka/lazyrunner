@@ -1667,6 +1667,33 @@ async fn r_in_the_checklist_retries_what_failed_and_another_key_still_closes_it(
 }
 
 #[tokio::test]
+async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
+    let mut screen = screen("checklist-bar", json!({}));
+    let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };
+    let mut list = Checklist::fixed(vec![warned], Vec::new(), "checking…");
+    list.update(screen.ui.now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    let edge = |screen: &mut Screen| {
+        let rows = super::overlays::checklist(&screen.ui, 120, 40);
+        let bottom = rows.into_iter().rev().find(|row| row.iter().any(|seg| seg.text.contains('└'))).unwrap();
+        bottom
+            .iter()
+            .filter(|seg| seg.text.contains('─'))
+            .map(|seg| (seg.fg, seg.text.chars().count()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(edge(&mut screen).len(), 1, "full at first");
+    screen.ui.now += Duration::from_secs(4);
+    let drained = edge(&mut screen);
+    assert_eq!(
+        drained.iter().map(|(fg, _)| *fg).collect::<Vec<_>>(),
+        [super::theme::C::Cyan, super::theme::C::DarkGray],
+        "{drained:?}"
+    );
+    assert!(drained[0].1.abs_diff(drained[1].1) <= 2, "half gone at half time: {drained:?}");
+}
+
+#[tokio::test]
 async fn copied_lines_light_up_in_their_column() {
     let mut screen = screen("copy-flash", json!({}));
     screen.ui.motion.enabled = true;

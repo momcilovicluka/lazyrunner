@@ -35,6 +35,19 @@ pub fn boxed(
     rows: usize,
     max_inner: usize,
 ) -> Vec<Vec<Seg>> {
+    draining_box(title, lines, footer, cells, rows, max_inner, None)
+}
+
+/// A box whose bottom edge drains from the right as `drain` goes from 1 to 0: the time until it closes by itself.
+fn draining_box(
+    title: &str,
+    lines: Vec<Vec<Seg>>,
+    footer: &str,
+    cells: usize,
+    rows: usize,
+    max_inner: usize,
+    drain: Option<f64>,
+) -> Vec<Vec<Seg>> {
     let inner = cells.saturating_sub(8).min(max_inner).max(20);
     let left = " ".repeat(cells.saturating_sub(inner + 4) / 2);
     let mut boxed = vec![vec![
@@ -59,7 +72,13 @@ pub fn boxed(
     if !footer.is_empty() {
         boxed.push(vec![seg("│ ", C::Cyan), seg(pad(footer, inner), C::DarkGray), seg(" │", C::Cyan)]);
     }
-    boxed.push(vec![seg(format!("└{}┘", "─".repeat(inner + 2)), C::Cyan)]);
+    let edge = inner + 2;
+    let lit = drain.map_or(edge, |drain| (drain.clamp(0.0, 1.0) * edge as f64).round() as usize);
+    boxed.push(if lit == edge {
+        vec![seg(format!("└{}┘", "─".repeat(edge)), C::Cyan)]
+    } else {
+        vec![seg(format!("└{}", "─".repeat(lit)), C::Cyan), seg(format!("{}┘", "─".repeat(edge - lit)), C::DarkGray)]
+    });
     // Inside the box a click keeps it open (an item's click picks it); the margin around it is outside.
     let boxed: Vec<Vec<Seg>> = boxed
         .into_iter()
@@ -468,7 +487,8 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         lines.push(Vec::new());
     }
     let sparkle = if animated { SPARKLE[(tick / 3) as usize % 2] } else { SPARKLE[0] };
-    boxed(&format!("{sparkle} lazyrunner v{VERSION} · startup checklist"), lines, &list.footer, cells, rows, 84)
+    let title = format!("{sparkle} lazyrunner v{VERSION} · startup checklist");
+    draining_box(&title, lines, &list.footer, cells, rows, 84, list.draining(ui.now))
 }
 
 pub fn changelog(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
