@@ -27,7 +27,7 @@ expression: "screen.render(SIZE.0, 44)"
                  │    b  ⚑  Report a bug          the bug form, this version filled in      │
                  │    f  ☼  Suggest a feature     the feature form, for your idea           │
                  │    s  ⑂  Source                the code, on GitHub                       │
-                 │    u  ⇣  Check for an update   the startup checklist, now                │
+                 │    u  ⇣  Check for an update   right here, and install it                │
                  │    p  •  Contributors          everyone, with their commits, on GitHub   │
                  │                                                                          │
                  │   made with ♥ and ⚙ Rust · lazyrunner License 1.1                        │

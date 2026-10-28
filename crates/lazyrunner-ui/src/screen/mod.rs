@@ -187,6 +187,8 @@ pub struct Ui {
     pub picker: Option<Picker>,
     /// Who makes lazyrunner, for the About box (read again each time it opens).
     pub contributors: lazyrunner_core::contributors::Contributors,
+    /// The update check `u` in the About box runs.
+    pub update_check: Option<about::UpdateCheck>,
     /// `L` was pressed: the loop opens the git tool.
     pub git_tool_wanted: bool,
     /// The git tool has the terminal (its name): nothing is drawn, and quitting or switching versions waits.
@@ -253,6 +255,7 @@ impl Ui {
             overlay: None,
             picker: None,
             contributors: lazyrunner_core::contributors::built_in(),
+            update_check: None,
             git_tool_wanted: false,
             away: None,
             pending_g: None,

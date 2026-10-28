@@ -259,6 +259,9 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 controller.tick();
                 update_checklist(&mut ui, &mut controller, &mut still_checking);
                 poll_quiet_update(&mut quiet, &mut ui, &mut controller);
+                if let Some(version) = screen::about::poll_update(&mut ui, &mut controller) {
+                    after_update(&mut ui, &mut controller, &version, true, false);
+                }
                 poll_still_checking(&mut still_checking, &mut ui, &mut controller);
                 for panic in crate::panics::take() {
                     controller.add_log(format!("✗ Internal error in {panic} - lazyrunner carries on"), Hue::Red);

@@ -1,16 +1,20 @@
 //! The About box (`,` then `A`, or `:` about): lazyrunner's version, who makes it - from the repo, by way of
 //! contributors.json - and where to go next: the README, the changelog, the releases, the license, a bug report or an
-//! idea, the source, an update check, everyone who contributed. Its logo
+//! idea, the source, an update check (run right there, its outcome under its link), everyone who contributed. Its logo
 //! shimmers in rainbow colours over a flowing rule, the title sparkles and the heart beats (all still with reduced
 //! motion).
 
+use std::sync::mpsc::{Receiver, TryRecvError, channel};
+
 use lazyrunner_core::changelog;
 use lazyrunner_core::contributors;
+use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
-use lazyrunner_core::update::DEFAULT_REPO;
+use lazyrunner_core::update::{self, DEFAULT_REPO};
 use unicode_width::UnicodeWidthStr;
 
 use super::actions::Run;
+use super::columns::spinner;
 use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::overlays::{LOGO, boxed};
@@ -28,11 +32,27 @@ const LABEL_CELLS: usize = 22;
 /// The names of the contributors, padded so what they do lines up.
 const NAME_CELLS: usize = 18;
 
-/// What a link does: opens a page in the browser, or runs one of lazyrunner's own actions.
+/// What a link does: opens a page in the browser, runs one of lazyrunner's own actions, or checks for an update
+/// with the box kept open.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Does {
     Open(String),
     Run(Run),
+    CheckUpdate,
+}
+
+/// `u`: the update check, the startup checklist's own, running in the background; what it is doing and how it ended
+/// show under its link.
+pub struct UpdateCheck {
+    results: Receiver<Message>,
+    pub line: String,
+    /// None while it runs.
+    pub status: Option<update::Status>,
+}
+
+enum Message {
+    Progress(String),
+    Done(update::Outcome),
 }
 
 struct Link {
@@ -71,7 +91,7 @@ fn links() -> Vec<Link> {
             page("/issues/new?template=feature_request.yml"),
         ),
         link("s", Icon::Source, "Source", "the code, on GitHub", page("")),
-        link("u", Icon::Update, "Check for an update", "the startup checklist, now", Does::Run(Run::Checklist)),
+        link("u", Icon::Update, "Check for an update", "right here, and install it", Does::CheckUpdate),
         link(
             "p",
             Icon::Person,
@@ -92,10 +112,57 @@ fn encode(text: &str) -> String {
         .collect()
 }
 
-/// Opens it with the newest list of contributors there is (the startup checklist may have fetched one since).
+/// Opens it with the newest list of contributors there is (the startup checklist may have fetched one since), and
+/// without the outcome of an update check that ended before.
 pub fn open(ui: &mut Ui, controller: &Controller) {
     ui.contributors = contributors::load(&controller.paths().state_dir);
+    if ui.update_check.as_ref().is_some_and(|check| check.status.is_some()) {
+        ui.update_check = None;
+    }
     ui.overlay = Some(Overlay::About { index: 0 });
+}
+
+/// `u`: starts the update check, unless one is running.
+fn check_update(ui: &mut Ui, controller: &Controller) {
+    if ui.update_check.as_ref().is_some_and(|check| check.status.is_none()) {
+        return;
+    }
+    let (sender, results) = channel();
+    let (config, state_dir) = (controller.config.clone(), controller.paths().state_dir.clone());
+    std::thread::spawn(move || {
+        let progress = sender.clone();
+        let mut report = |text: &str| {
+            let _ = progress.send(Message::Progress(text.to_string()));
+        };
+        let outcome = update::update(&config, &state_dir, false, &mut update::Progress::new(&mut report));
+        let _ = sender.send(Message::Done(outcome));
+    });
+    ui.update_check = Some(UpdateCheck { results, line: "checking…".into(), status: None });
+}
+
+/// Takes what the update check said since, the outcome to the log too; the version it installed, once.
+pub fn poll_update(ui: &mut Ui, controller: &mut Controller) -> Option<String> {
+    let check = ui.update_check.as_mut().filter(|check| check.status.is_none())?;
+    loop {
+        match check.results.try_recv() {
+            Ok(Message::Progress(text)) => check.line = text,
+            Ok(Message::Done(outcome)) => {
+                let hue = match outcome.status {
+                    update::Status::Ok => Hue::Green,
+                    update::Status::Warn => Hue::Yellow,
+                    update::Status::Skip => Hue::DarkGray,
+                };
+                controller.add_log(format!("lazyrunner: {}", outcome.detail), hue);
+                (check.status, check.line) = (Some(outcome.status), outcome.detail);
+                return outcome.updated_to;
+            }
+            Err(TryRecvError::Empty) => return None,
+            Err(TryRecvError::Disconnected) => {
+                (check.status, check.line) = (Some(update::Status::Warn), "the update check didn't finish".into());
+                return None;
+            }
+        }
+    }
 }
 
 /// The About box's keys: a link's letter, or j k (< >) + Enter; Esc or q closes it. A page opens with the box kept
@@ -142,6 +209,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
             ui.overlay = None;
             keys::run(ui, controller, run);
         }
+        Does::CheckUpdate => check_update(ui, controller),
     }
 }
 
@@ -187,6 +255,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             ]
         };
         lines.push(aim(line, Target::Item(at)));
+        if link.does == Does::CheckUpdate
+            && let Some(check) = &ui.update_check
+        {
+            lines.push(update_line(check, animated, tick));
+        }
     }
     lines.push(Vec::new());
     lines.push(made_with(nerd, animated, tick));
@@ -248,6 +321,19 @@ fn version_line(controller: &Controller, nerd: bool) -> Vec<Seg> {
         seg(format!("v{VERSION}"), C::White),
         seg(format!("{released} · {os} {arch} · running {}", controller.project.name), C::DarkGray),
     ]
+}
+
+/// Under the update link: a spinner and what the check is doing, then how it ended.
+fn update_line(check: &UpdateCheck, animated: bool, tick: u64) -> Vec<Seg> {
+    let (mark, color) = match check.status {
+        None if animated => (spinner(tick).to_string(), C::Yellow),
+        None => ("…".to_string(), C::Yellow),
+        Some(update::Status::Ok) => ("✓".to_string(), C::Green),
+        Some(update::Status::Warn) => ("!".to_string(), C::Yellow),
+        Some(update::Status::Skip) => ("-".to_string(), C::DarkGray),
+    };
+    let text = if check.status == Some(update::Status::Warn) { C::Yellow } else { C::Gray };
+    vec![seg(format!("      ↳ {mark} "), color), seg(check.line.clone(), text)]
 }
 
 /// "made with ♥ and Rust", the heart beating.

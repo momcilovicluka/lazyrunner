@@ -265,7 +265,8 @@ at once while the palette wipes away.
 **About lazyrunner** (`,` then `A`, or `:` about): the version and when it was released, who makes lazyrunner, and
 its links - a letter (or `j` `k` and Enter, or a double click) opens the README, the changelog, the releases, the
 license, a bug report with the version and OS already filled in, a feature request or the source, or checks for an
-update. Its logo shimmers in rainbow colours over a flowing rule (still with reduced motion), with Nerd Font icons
+update right there (`u`: what the check is doing, then how it ended, under its link; an update it finds is installed,
+as the startup checklist does). Its logo shimmers in rainbow colours over a flowing rule (still with reduced motion), with Nerd Font icons
 when they're on.
 
 ### Mouse
