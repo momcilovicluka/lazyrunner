@@ -11,11 +11,11 @@ expression: screen.frame()
 
 
 
-             ┌─ Install Shop's packages ────────────────────────────────────────────────────────┐
-             │  c   npm ci  a clean install of exactly what package-lock.json says              │
-             │  n   npm install  adds and updates packages to match package.json (the lock fil… │
-             │ c or n, or j k + Enter · Esc / i close                                           │
-             └──────────────────────────────────────────────────────────────────────────────────┘
+       ┌─ Install Shop's packages ────────────────────────────────────────────────────────────────────┐
+       │  c   npm ci  a clean install of exactly what package-lock.json says                          │
+       │  n   npm install  adds and updates packages to match package.json (the lock file may change) │
+       │ c or n, or j k + Enter · Esc / i close                                                       │
+       └──────────────────────────────────────────────────────────────────────────────────────────────┘
 
 
 

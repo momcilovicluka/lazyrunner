@@ -97,6 +97,17 @@ fn selected(text: &str, inner: usize) -> Vec<Seg> {
     vec![on(pad(text, inner), C::Black, C::Cyan)]
 }
 
+/// A selected item that scrolls sideways when it doesn't fit (`Ui::scrolling`).
+fn selected_moving(ui: &Ui, text: &str, inner: usize) -> Vec<Seg> {
+    vec![on(ui.scrolling(text, inner), C::Black, C::Cyan)]
+}
+
+/// A box's inner width: room for its widest row, at least `usual` (so boxes keep their size), never more than the
+/// terminal has.
+pub fn fit_inner(cells: usize, usual: usize, widest: usize) -> usize {
+    cells.saturating_sub(8).min(usual.max(widest)).max(20)
+}
+
 pub fn picker(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let cursor = ui.cursor();
     let Some(picker) = ui.picker.as_mut() else { return Vec::new() };
@@ -181,6 +192,12 @@ pub fn menu_items(ui: &Ui, controller: &Controller) -> Vec<Action> {
 pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let items = menu_items(ui, controller);
     const INNER: usize = 64;
+    let widest = items
+        .iter()
+        .map(|item| 8 + item.label.width() + if item.hint.is_empty() { 0 } else { 2 + item.hint.width() })
+        .max()
+        .unwrap_or(0);
+    let inner = fit_inner(cells, INNER, widest);
     let index = match &mut ui.overlay {
         Some(Overlay::Menu { index } | Overlay::Settings { index }) => {
             *index = (*index).min(items.len().saturating_sub(1));
@@ -197,11 +214,11 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             let flipped = matches!(&item.run, actions::Run::Setting { toggle, .. }
                 if ui.motion.lit(&super::motion::Spot::Setting(*toggle), ui.now).is_some());
             if flipped {
-                let line = pad(&format!("{key}{}{hint}", item.label), INNER);
+                let line = pad(&format!("{key}{}{hint}", item.label), inner);
                 return aim(vec![on(line, C::Black, C::Green)], Target::Item(i));
             }
             if i == index {
-                return aim(selected(&format!("{key}{}{hint}", item.label), INNER), Target::Item(i));
+                return aim(selected_moving(ui, &format!("{key}{}{hint}", item.label), inner), Target::Item(i));
             }
             let label_color = if item.label.starts_with("[x]") { C::Green } else { C::White };
             aim(vec![seg(key, C::Cyan), seg(item.label.clone(), label_color), seg(hint, C::DarkGray)], Target::Item(i))
@@ -209,9 +226,9 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         .collect();
     if matches!(ui.overlay, Some(Overlay::Menu { .. })) {
         let name = controller.apps.get(ui.focus).map_or(String::new(), |app| app.name.clone());
-        boxed(&name, lines, "press a key, or j k + Enter · Esc / x close", cells, rows, INNER)
+        boxed(&name, lines, "press a key, or j k + Enter · Esc / x close", cells, rows, inner)
     } else {
-        boxed("Settings (saved)", lines, "press a letter to toggle, or j k + Enter · Esc / , close", cells, rows, INNER)
+        boxed("Settings (saved)", lines, "press a letter to toggle, or j k + Enter · Esc / , close", cells, rows, inner)
     }
 }
 
@@ -224,6 +241,8 @@ const INSTALLS: [(&str, &str, &str); 2] = [
 /// i: npm ci or npm install, for the npm app i installs.
 pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     const INNER: usize = 80;
+    let widest = INSTALLS.iter().map(|(_, command, hint)| 7 + command.width() + hint.width()).max().unwrap_or(0);
+    let inner = fit_inner(cells, INNER, widest);
     let index = match &mut ui.overlay {
         Some(Overlay::Install { index }) => {
             *index = (*index).min(INSTALLS.len() - 1);
@@ -237,7 +256,7 @@ pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
         .map(|(i, (key, command, hint))| {
             let key = pad(&format!(" {key}"), 5);
             if i == index {
-                return aim(selected(&format!("{key}{command}  {hint}"), INNER), Target::Item(i));
+                return aim(selected_moving(ui, &format!("{key}{command}  {hint}"), inner), Target::Item(i));
             }
             aim(
                 vec![seg(key, C::Cyan), seg(*command, C::White), seg(format!("  {hint}"), C::DarkGray)],
@@ -250,7 +269,7 @@ pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
         .npm_ci_key(focused)
         .and_then(|key| controller.app(&key))
         .map_or(String::new(), |app| app.name.clone());
-    boxed(&format!("Install {app}'s packages"), lines, "c or n, or j k + Enter · Esc / i close", cells, rows, INNER)
+    boxed(&format!("Install {app}'s packages"), lines, "c or n, or j k + Enter · Esc / i close", cells, rows, inner)
 }
 
 /// y: what to copy from the focused app's output, each with how much there is of it now.
@@ -283,7 +302,7 @@ pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             let key = pad(&format!(" {key}"), 5);
             let label = pad(label, 22);
             if i == index {
-                return aim(selected(&format!("{key}{label}{size}"), INNER), Target::Item(i));
+                return aim(selected_moving(ui, &format!("{key}{label}{size}"), INNER), Target::Item(i));
             }
             let color = if lines.is_empty() { C::DarkGray } else { C::White };
             aim(vec![seg(key, C::Cyan), seg(label, color), seg(size, C::DarkGray)], Target::Item(i))

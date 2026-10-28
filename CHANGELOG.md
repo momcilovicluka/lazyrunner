@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.21.0] - 2026-10-28
+
+### Changed
+- Long rows aren't cut off any more: the `,` and `x` menus, the command palette, the About box and the install box grow to fit their longest row (up to the terminal's width), and a selected row that still doesn't fit scrolls sideways, resting at both ends, to show the rest - cut with … with reduced motion (#41, thanks @ognjen004028)
+
 ## [1.20.0] - 2026-10-28
 
 ### Changed

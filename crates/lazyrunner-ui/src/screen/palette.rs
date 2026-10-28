@@ -65,7 +65,8 @@ fn draw(
     cells: usize,
     rows: usize,
 ) -> Vec<Vec<Seg>> {
-    let inner = cells.saturating_sub(8).clamp(20, INNER);
+    let widest = actions::palette(ui, controller, "").iter().map(natural_width).max().unwrap_or(0);
+    let inner = super::overlays::fit_inner(cells, INNER, widest);
     let count = if found.len() == 1 { "1 command".to_string() } else { format!("{} commands", found.len()) };
     let mut prompt = vec![seg("› ", C::Cyan), seg(query, C::White), seg(ui.cursor(), C::Cyan)];
     let gap = inner.saturating_sub(width(&prompt) + count.width());
@@ -98,7 +99,7 @@ fn draw(
     if found.is_empty() {
         lines.push(vec![seg("  no matching command", C::DarkGray)]);
     }
-    boxed("Commands", lines, FOOTER, cells, rows, INNER)
+    boxed("Commands", lines, FOOTER, cells, rows, inner)
 }
 
 fn group_icon(group: &str) -> Icon {
@@ -120,6 +121,12 @@ fn header(ui: &Ui, group: &str, inner: usize) -> Vec<Seg> {
 
 /// An action: its icon (the focused app's on what acts on it), its label with the typed letters lit, its hint when
 /// there's room, and its keys as keycaps on the right - all on the bar's colours when it's the chosen one.
+/// A command's row with nothing cut: its icon, label, hint and keycap.
+fn natural_width(action: &Action) -> usize {
+    let hint = if action.hint.is_empty() { 0 } else { 2 + action.hint.width() };
+    ICON_CELLS + action.label.width() + hint + 2 + width(&keycaps(&action.key, C::White, C::DarkGray))
+}
+
 fn item(
     ui: &Ui,
     controller: &Controller,
@@ -148,30 +155,35 @@ fn item(
     let caps_cells = width(&caps);
     let mut segs = vec![paint(format!(" {icon}  "), if on_bar { C::FocusText } else { C::Cyan })];
     let room = inner.saturating_sub(ICON_CELLS + caps_cells + 2);
-    let label: Vec<char> = action.label.chars().collect();
-    let shown = label.len().min(room);
-    let lit = actions::fuzzy_positions(query, &action.label);
-    let mut at = 0;
-    while at < shown {
-        let matched = lit.contains(&at);
-        let end = (at..shown).find(|i| lit.contains(i) != matched).unwrap_or(shown);
-        let color = match (matched, on_bar) {
-            (true, false) => C::Yellow,
-            _ => fg,
-        };
-        let mut run = paint(label[at..end].iter().collect(), color);
-        run.underline = matched;
-        segs.push(run);
-        at = end;
-    }
-    let hint_room = room.saturating_sub(shown + 2);
-    if !action.hint.is_empty() && hint_room >= MIN_HINT {
-        let hint: String = if action.hint.chars().count() > hint_room {
-            format!("{}…", action.hint.chars().take(hint_room - 1).collect::<String>())
-        } else {
-            action.hint.clone()
-        };
-        segs.push(paint(format!("  {hint}"), if on_bar { C::FocusText } else { C::DarkGray }));
+    let full = if action.hint.is_empty() { action.label.clone() } else { format!("{}  {}", action.label, action.hint) };
+    if on_bar && full.width() > room {
+        segs.push(paint(ui.scrolling(&full, room), fg));
+    } else {
+        let label: Vec<char> = action.label.chars().collect();
+        let shown = label.len().min(room);
+        let lit = actions::fuzzy_positions(query, &action.label);
+        let mut at = 0;
+        while at < shown {
+            let matched = lit.contains(&at);
+            let end = (at..shown).find(|i| lit.contains(i) != matched).unwrap_or(shown);
+            let color = match (matched, on_bar) {
+                (true, false) => C::Yellow,
+                _ => fg,
+            };
+            let mut run = paint(label[at..end].iter().collect(), color);
+            run.underline = matched;
+            segs.push(run);
+            at = end;
+        }
+        let hint_room = room.saturating_sub(shown + 2);
+        if !action.hint.is_empty() && hint_room >= MIN_HINT {
+            let hint: String = if action.hint.chars().count() > hint_room {
+                format!("{}…", action.hint.chars().take(hint_room - 1).collect::<String>())
+            } else {
+                action.hint.clone()
+            };
+            segs.push(paint(format!("  {hint}"), if on_bar { C::FocusText } else { C::DarkGray }));
+        }
     }
     let filled = width(&segs);
     segs.push(paint(" ".repeat(inner.saturating_sub(filled + caps_cells + 1)), fg));
