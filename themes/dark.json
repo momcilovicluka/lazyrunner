@@ -1,6 +1,6 @@
 {
-  "name": "One Dark",
-  "description": "One Dark-like: softer, true colour",
+  "name": "Dark",
+  "description": "One Dark's colours, softer, without recolouring the terminal background; true colour",
   "colors": {
     "Black": "#282c34", "DarkRed": "#be5046", "DarkGreen": "#7a9f60", "DarkYellow": "#d19a66",
     "DarkBlue": "#4078c0", "DarkMagenta": "#a05ab8", "DarkCyan": "#3e8f99", "Gray": "#abb2bf",

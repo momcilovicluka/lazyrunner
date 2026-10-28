@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.18.1] - 2026-10-28
+
+### Fixed
+- `Tab` in the theme picker undoes itself: on this project's own theme it gives the project back the shared one. The log says where a project's own theme is kept - your `lazyrunner.config.json`, not the project's `.lazyrunner.json` (#43, thanks @ognjen004028)
+- The theme picker listed One Dark twice: the built-in `dark` theme (One Dark's colours, the terminal background left as it is) is now called Dark. Two themes with the same name - one of your own beside a built-in one - show their ids
+
 ## [1.18.0] - 2026-10-28
 
 ### Changed

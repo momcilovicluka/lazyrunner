@@ -9,6 +9,7 @@ expression: screen.frame()
              ┃             │             │             │                 ┃ ▸  Ayu Mirage            ■■■■■■
              ┃             │             │             │                 ┃    Catppuccin Latte      ■■■■■■
              ┃             │             │             │                 ┃    Catppuccin Mocha      ■■■■■■
+             ┃             │             │             │                 ┃    Dark                  ■■■■■■
              ┃             │             │             │                 ┃    Dracula               ■■■■■■
              ┃             │             │             │                 ┃    Evangelion            ■■■■■■
              ┃             │             │             │                 ┃    Everforest            ■■■■■■
@@ -19,7 +20,6 @@ expression: screen.frame()
              ┃             │             │             │                 ┃    High Contrast         ■■■■■■
              ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
              ┃             │             │             │                 ┃    Light                 ■■■■■■
-             ┃             │             │             │                 ┃    Monokai Pro           ■■■■■■
              ┃             │             │             │                 ┃────────────────────────────────────
              ┃             │             │             │                 ┃ Ayu's medium-dark blue-grey; also
              ┃             │             │             │                 ┃ recolours the terminal background

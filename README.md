@@ -527,7 +527,7 @@ question marks instead of icons mean the font isn't one: set one, or `, i` for p
 `t` opens the theme picker: a narrow panel on the right, so the rest of the screen shows each theme as you move through
 the list (`↑` `↓`, `PgUp` `PgDn`), the terminal's background included. Typing filters by name, `Enter` keeps the
 selected theme for every project (saved), `Tab` for this project alone - handy to tell two projects' windows apart (`◆`
-marks it; `Enter` later gives the project back the shared one) - and `Esc` puts back the one you had. Built in:
+marks it; `Tab` on it again, or `Enter` on another, gives the project back the shared one) - and `Esc` puts back the one you had. Built in:
 `default` (your terminal's own palette), `dark`, `light`, `high-contrast`; the editors' favourites `one-dark`,
 `github-dark`, `github-light`, `dracula`, `monokai-pro`, `nord`, `gruvbox`, `kanagawa`, `rose-pine`, `everforest`,
 `ayu-mirage`, `night-owl`, `shades-of-purple`, `catppuccin-mocha`, `catppuccin-latte`, `tokyo-night`, `solarized-dark`
