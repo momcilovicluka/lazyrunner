@@ -52,7 +52,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     *index = (*index).min(all.len().saturating_sub(1));
     let selected = all.get(*index).cloned();
     let count = selected.as_ref().map_or(0, |context| context.items.len());
-    let moved = |at: usize, by: isize, count: usize| at.saturating_add_signed(by).min(count.saturating_sub(1));
+    let moved = super::keys::wrapped;
     let step = match name {
         "j" | "DownArrow" => Some(1),
         "k" | "UpArrow" => Some(-1),

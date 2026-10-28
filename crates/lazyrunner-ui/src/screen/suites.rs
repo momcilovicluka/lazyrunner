@@ -177,11 +177,11 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     match name {
         "Escape" | "q" | "T" => ui.overlay = None,
         "j" | "DownArrow" => {
-            *index = (at + 1).min(rows.len().saturating_sub(1));
+            *index = super::keys::wrapped(at, 1, rows.len());
             *scroll = 0;
         }
         "k" | "UpArrow" => {
-            *index = at.saturating_sub(1);
+            *index = super::keys::wrapped(at, -1, rows.len());
             *scroll = 0;
         }
         "l" | "RightArrow" | "Tab" => match selected.first().and_then(|key| controller.suite(key)) {
@@ -233,8 +233,8 @@ fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     *at = (*at).min(last);
     match name {
         "h" | "LeftArrow" | "Escape" | "Tab" => *picking = None,
-        "j" | "DownArrow" => *at = (*at + 1).min(last),
-        "k" | "UpArrow" => *at = at.saturating_sub(1),
+        "j" | "DownArrow" => *at = super::keys::wrapped(*at, 1, names.len()),
+        "k" | "UpArrow" => *at = super::keys::wrapped(*at, -1, names.len()),
         "Ctrl+D" | "PageDown" => *at = (*at + PAGE).min(last),
         "Ctrl+U" | "PageUp" => *at = at.saturating_sub(PAGE),
         "g" | "Home" | "<" => *at = 0,

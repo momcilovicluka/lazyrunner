@@ -177,11 +177,11 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
             return;
         }
         "j" | "DownArrow" | "Ctrl+N" => {
-            *index = (*index + 1).min(last);
+            *index = keys::wrapped(*index, 1, all.len());
             return;
         }
         "k" | "UpArrow" | "Ctrl+P" => {
-            *index = index.saturating_sub(1);
+            *index = keys::wrapped(*index, -1, all.len());
             return;
         }
         "<" | "Home" => {

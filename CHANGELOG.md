@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.19.0] - 2026-10-28
+
+### Changed
+- Menus and lists wrap around: `↑` (or `k`) on the first item goes to the last, `↓` (or `j`) on the last to the first - the `,` and `x` menus, the palette, the About box, the theme, database and branch pickers, the tests, migrations and requests views. A page (`PgUp` / `PgDn`), `Home` and `End` still stop at the ends; the logs and the changelog scroll as before (#44, thanks @ognjen004028)
+
 ## [1.18.1] - 2026-10-28
 
 ### Fixed
