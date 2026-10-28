@@ -1,7 +1,8 @@
 //! `t`: the theme picker. A narrow panel on the right, so the rest of the screen shows the theme on the real columns.
 //! Moving through the list applies each theme at once (a preview, terminal background included; nothing is saved);
-//! typing filters by name (by description only when no name matches); Enter keeps and saves the selected theme, Esc
-//! puts back the one the picker opened with. Themes are read again every time it opens.
+//! typing filters by name (by description only when no name matches); Enter keeps and saves the selected theme for
+//! every project, Tab for this project alone; Esc puts back the one the picker opened with. Themes are read again
+//! every time it opens.
 
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
@@ -28,7 +29,8 @@ pub fn open(ui: &mut Ui, controller: &mut Controller) {
     }
     ui.themes = themes;
     let index = ui.themes.iter().position(|theme| theme.id == ui.theme.id).unwrap_or(0);
-    ui.overlay = Some(Overlay::Themes { query: String::new(), index, original: ui.theme.id.clone() });
+    let own = controller.own_setting("theme").and_then(|id| id.as_str().map(str::to_string));
+    ui.overlay = Some(Overlay::Themes { query: String::new(), index, original: ui.theme.id.clone(), own });
 }
 
 /// The themes the picker lists (indexes into `themes`): all of them, or the fuzzy matches for `query` - by name and
@@ -54,7 +56,7 @@ pub fn matches(themes: &[Theme], query: &str) -> Vec<usize> {
 
 /// A key while the picker is open.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
-    let Some(Overlay::Themes { query, index, original }) = &mut ui.overlay else { return };
+    let Some(Overlay::Themes { query, index, original, .. }) = &mut ui.overlay else { return };
     match name {
         "Escape" => {
             let original = original.clone();
@@ -62,12 +64,12 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             ui.set_theme(&original);
             return;
         }
-        "Enter" => {
+        "Enter" | "Tab" => {
             let picked = matches(&ui.themes, query).get(*index).map(|&at| ui.themes[at].id.clone());
             let original = original.clone();
             ui.overlay = None;
             match picked {
-                Some(id) => save(ui, controller, &id),
+                Some(id) => save(ui, controller, &id, name == "Tab"),
                 None => ui.set_theme(&original),
             }
             return;
@@ -97,19 +99,28 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
     }
 }
 
-/// Enter: the theme is kept, saved, and named in the log.
-fn save(ui: &mut Ui, controller: &mut Controller, id: &str) {
-    controller.set_setting("theme", json!(id));
+/// Enter: the theme is kept for every project (this one's own theme, if it had one, goes); Tab: for this project
+/// alone. Saved, and named in the log.
+fn save(ui: &mut Ui, controller: &mut Controller, id: &str, own: bool) {
+    if own {
+        controller.set_own_setting("theme", Some(json!(id)));
+    } else {
+        controller.set_setting("theme", json!(id));
+        if controller.own_setting("theme").is_some() {
+            controller.set_own_setting("theme", None);
+        }
+    }
     ui.set_theme(id);
     let description =
         if ui.theme.description.is_empty() { String::new() } else { format!(" - {}", ui.theme.description) };
     let no_color = if theme::no_color() { " (NO_COLOR is set, so colours stay off)" } else { "" };
-    controller.add_log(format!("Theme: {}{description}{no_color} (saved)", ui.theme.name), Hue::Cyan);
+    let saved = if own { format!("saved for {}", controller.project.name) } else { "saved".to_string() };
+    controller.add_log(format!("Theme: {}{description}{no_color} ({saved})", ui.theme.name), Hue::Cyan);
 }
 
 /// The panel: the themes found, each with a swatch of its own colours; the selected one's description below.
 pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let Some(Overlay::Themes { query, index, .. }) = &ui.overlay else { return Vec::new() };
+    let Some(Overlay::Themes { query, index, own, .. }) = &ui.overlay else { return Vec::new() };
     let found = matches(&ui.themes, query);
     let index = (*index).min(found.len().saturating_sub(1));
     let mut lines = vec![
@@ -126,13 +137,21 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
             footer.push(vec![seg(format!(" {line}"), C::DarkGray)]);
         }
     }
-    footer.push(vec![seg(" ↑↓ preview · Enter keep · Esc undo", C::DarkGray)]);
+    if own.is_some() {
+        footer.push(vec![seg(" ◆ this project's own theme", C::DarkGray)]);
+    }
+    footer.push(vec![seg(" ↑↓ preview · Esc undo", C::DarkGray)]);
+    footer.push(vec![seg(" Enter keep · Tab this project", C::DarkGray)]);
     let visible = rows.saturating_sub(lines.len() + footer.len()).max(1);
     let first = index.saturating_sub(visible / 2).min(found.len().saturating_sub(visible));
     let name_cells = cells.saturating_sub(15).max(8);
     for (at, &theme_at) in found.iter().enumerate().skip(first).take(visible) {
         let theme = &ui.themes[theme_at];
-        let mark = if theme.id == saved { '•' } else { ' ' };
+        let mark = match own {
+            Some(own) if *own == theme.id => '◆',
+            _ if theme.id == saved => '•',
+            _ => ' ',
+        };
         let name = fit_name(&theme.name, name_cells);
         let mut row = if at == index {
             vec![on(format!(" ▸{mark} {name} "), C::FocusText, C::FocusBack)]

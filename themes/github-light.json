@@ -1,0 +1,12 @@
+{
+  "name": "GitHub Light",
+  "description": "GitHub's own light theme; recolours the terminal background, so it works in a dark terminal too",
+  "colors": {
+    "Black": "#ffffff", "DarkRed": "#a40e26", "DarkGreen": "#116329", "DarkYellow": "#bc4c00",
+    "DarkBlue": "#0550ae", "DarkMagenta": "#6639ba", "DarkCyan": "#1b7c83", "Gray": "#424a53",
+    "DarkGray": "#6e7781", "Red": "#cf222e", "Green": "#1a7f37", "Yellow": "#9a6700",
+    "Blue": "#0969da", "Magenta": "#8250df", "Cyan": "#3192aa", "White": "#1f2328"
+  },
+  "focus": { "background": "#0969da", "text": "#ffffff", "border": "#0969da" },
+  "terminal": { "background": "#ffffff", "foreground": "#1f2328" }
+}

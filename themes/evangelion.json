@@ -1,0 +1,12 @@
+{
+  "name": "Evangelion",
+  "description": "Unit-01: purple armour, NERV green and LCL orange (xero's evangelion.nvim); also recolours the terminal background",
+  "colors": {
+    "Black": "#000000", "DarkRed": "#bf2d2d", "DarkGreen": "#8bd450", "DarkYellow": "#d99145",
+    "DarkBlue": "#9dafd1", "DarkMagenta": "#875faf", "DarkCyan": "#a4d2ec", "Gray": "#d4d4d4",
+    "DarkGray": "#666666", "Red": "#db6088", "Green": "#87ff5f", "Yellow": "#e6bb85",
+    "Blue": "#a4d2ec", "Magenta": "#b968fc", "Cyan": "#a4d2ec", "White": "#e1d6f8"
+  },
+  "focus": { "background": "#875faf", "text": "#87ff5f", "border": "#87ff5f" },
+  "terminal": { "background": "#201430", "foreground": "#d4d4d4" }
+}

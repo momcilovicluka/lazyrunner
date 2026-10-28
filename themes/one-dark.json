@@ -1,0 +1,12 @@
+{
+  "name": "One Dark",
+  "description": "Atom's One Dark, as One Dark Pro has it; also recolours the terminal background",
+  "colors": {
+    "Black": "#21252b", "DarkRed": "#be5046", "DarkGreen": "#8cc265", "DarkYellow": "#d19a66",
+    "DarkBlue": "#528bff", "DarkMagenta": "#c162de", "DarkCyan": "#42b3c2", "Gray": "#abb2bf",
+    "DarkGray": "#5c6370", "Red": "#e06c75", "Green": "#98c379", "Yellow": "#e5c07b",
+    "Blue": "#61afef", "Magenta": "#c678dd", "Cyan": "#56b6c2", "White": "#e6e6e6"
+  },
+  "focus": { "background": "#61afef", "text": "#282c34", "border": "#528bff" },
+  "terminal": { "background": "#282c34", "foreground": "#abb2bf" }
+}

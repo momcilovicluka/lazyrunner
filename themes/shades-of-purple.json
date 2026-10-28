@@ -1,0 +1,12 @@
+{
+  "name": "Shades of Purple",
+  "description": "Bold purples with yellow and orange; also recolours the terminal background",
+  "colors": {
+    "Black": "#1e1e3f", "DarkRed": "#ec3a37", "DarkGreen": "#3ad900", "DarkYellow": "#ff9d00",
+    "DarkBlue": "#8a6cff", "DarkMagenta": "#ff2c70", "DarkCyan": "#9effff", "Gray": "#a599e9",
+    "DarkGray": "#b362ff", "Red": "#ff628c", "Green": "#a5ff90", "Yellow": "#fad000",
+    "Blue": "#886bfe", "Magenta": "#fb94ff", "Cyan": "#80fcff", "White": "#ffffff"
+  },
+  "focus": { "background": "#fad000", "text": "#1e1e3f", "border": "#ff9d00" },
+  "terminal": { "background": "#2d2b55", "foreground": "#ffffff" }
+}

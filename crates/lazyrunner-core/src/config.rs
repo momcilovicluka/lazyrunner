@@ -1,5 +1,6 @@
 //! The settings for this machine: the defaults, then the settings file. Its top level is for everything; the
 //! settings that belong to a project ([`PROJECT_KEYS`]) live in that project's section, `"projects": { "<id>": {} }`.
+//! A project's section may also set one of the others for itself (its own `"theme"`), which wins over the top level's.
 
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -142,28 +143,9 @@ impl ConfigFile {
     /// Saves one setting (a project's in its section, the rest at the top) and returns the settings as `load` reads
     /// them.
     pub fn set(&self, project: Option<&str>, name: &str, value: Value) -> Result<Value> {
-        // A file that's there but can't be read stays as it is: better no change than losing the rest.
-        let mut saved = match json::read_for_update(&self.path) {
-            Ok(Some(Value::Object(saved))) => saved,
-            Ok(None) => Map::new(),
-            Ok(Some(_)) => return Err(anyhow!("lazyrunner: {} must hold one JSON object", self.path.display())),
-            Err(error) => {
-                return Err(anyhow!(
-                    "lazyrunner: can't read {} ({error}), so it was left as it is",
-                    self.path.display()
-                ));
-            }
-        };
+        let mut saved = self.saved()?;
         match project {
-            Some(id) if PROJECT_KEYS.contains(&name) => {
-                let mut section = project_section(&saved, Some(id));
-                section.insert(name.to_string(), value);
-                let projects = saved.entry("projects").or_insert_with(|| json!({}));
-                if !projects.is_object() {
-                    *projects = json!({});
-                }
-                projects[id] = Value::Object(section);
-            }
+            Some(id) if PROJECT_KEYS.contains(&name) => set_in_section(&mut saved, id, name, Some(value)),
             _ => {
                 saved.insert(name.to_string(), value);
             }
@@ -171,6 +153,52 @@ impl ConfigFile {
         write(&self.path, &Value::Object(saved))?;
         Ok(self.load(project))
     }
+
+    /// Saves a setting for `project` alone, in its section, where it wins over the top level's; `None` takes it out
+    /// again, so the top level's counts. Returns the settings as `load` reads them.
+    pub fn set_own(&self, project: &str, name: &str, value: Option<Value>) -> Result<Value> {
+        let mut saved = self.saved()?;
+        set_in_section(&mut saved, project, name, value);
+        write(&self.path, &Value::Object(saved))?;
+        Ok(self.load(Some(project)))
+    }
+
+    /// `project`'s own value of a setting, when its section has one.
+    pub fn own(&self, project: &str, name: &str) -> Option<Value> {
+        let Some(Value::Object(saved)) = json::read(&self.path) else { return None };
+        project_section(&saved, Some(project)).remove(name)
+    }
+
+    /// The saved settings, to change one. A file that's there but can't be read stays as it is: better no change than
+    /// losing the rest.
+    fn saved(&self) -> Result<Map<String, Value>> {
+        match json::read_for_update(&self.path) {
+            Ok(Some(Value::Object(saved))) => Ok(saved),
+            Ok(None) => Ok(Map::new()),
+            Ok(Some(_)) => Err(anyhow!("lazyrunner: {} must hold one JSON object", self.path.display())),
+            Err(error) => {
+                Err(anyhow!("lazyrunner: can't read {} ({error}), so it was left as it is", self.path.display()))
+            }
+        }
+    }
+}
+
+/// Sets (or, with `None`, takes out) a setting in a project's section.
+fn set_in_section(saved: &mut Map<String, Value>, project: &str, name: &str, value: Option<Value>) {
+    let mut section = project_section(saved, Some(project));
+    match value {
+        Some(value) => {
+            section.insert(name.to_string(), value);
+        }
+        None => {
+            section.remove(name);
+        }
+    }
+    let projects = saved.entry("projects").or_insert_with(|| json!({}));
+    if !projects.is_object() {
+        *projects = json!({});
+    }
+    projects[project] = Value::Object(section);
 }
 
 /// A project's section of the saved settings (empty when it has none yet, or before a project is chosen).
@@ -254,11 +282,34 @@ mod tests {
     }
 
     #[test]
+    fn a_project_can_have_its_own_theme_and_give_it_back() {
+        let config = file("own-theme");
+        config.set(Some("sample"), "theme", json!("nord")).unwrap();
+        let loaded = config.set_own("sample", "theme", Some(json!("dracula"))).unwrap();
+        assert_eq!(loaded["theme"], "dracula", "its own wins");
+        assert_eq!(config.load(Some("other"))["theme"], "nord", "the others keep the one every project uses");
+        assert_eq!(config.own("sample", "theme"), Some(json!("dracula")));
+        let saved = json::read(&config.path).unwrap();
+        assert_eq!(
+            (saved["theme"].clone(), saved["projects"]["sample"]["theme"].clone()),
+            (json!("nord"), json!("dracula"))
+        );
+
+        config.set(Some("sample"), "columnWidths", json!({ "shop": 60 })).unwrap();
+        let loaded = config.set_own("sample", "theme", None).unwrap();
+        assert_eq!(loaded["theme"], "nord", "back to every project's");
+        assert_eq!(config.own("sample", "theme"), None);
+        assert_eq!(config.load(Some("sample"))["columnWidths"]["shop"], 60, "the rest of its section stays");
+        let _ = std::fs::remove_dir_all(config.path.parent().unwrap());
+    }
+
+    #[test]
     fn a_file_that_cant_be_read_is_never_replaced() {
         let config = file("broken");
         std::fs::create_dir_all(config.path.parent().unwrap()).unwrap();
         std::fs::write(&config.path, "{ \"theme\": \"dark\", broken").unwrap();
         assert!(config.set(None, "theme", json!("light")).is_err());
+        assert!(config.set_own("sample", "theme", Some(json!("light"))).is_err());
         assert_eq!(std::fs::read_to_string(&config.path).unwrap(), "{ \"theme\": \"dark\", broken", "left as it was");
         let _ = std::fs::remove_dir_all(config.path.parent().unwrap());
     }

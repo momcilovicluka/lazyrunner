@@ -1,0 +1,12 @@
+{
+  "name": "Night Owl",
+  "description": "For the night owls: deep blue, made for late hours; also recolours the terminal background",
+  "colors": {
+    "Black": "#011627", "DarkRed": "#ef5350", "DarkGreen": "#22da6e", "DarkYellow": "#f78c6c",
+    "DarkBlue": "#82aaff", "DarkMagenta": "#c792ea", "DarkCyan": "#21c7a8", "Gray": "#d6deeb",
+    "DarkGray": "#637777", "Red": "#ef5350", "Green": "#addb67", "Yellow": "#ffeb95",
+    "Blue": "#82aaff", "Magenta": "#c792ea", "Cyan": "#7fdbca", "White": "#ffffff"
+  },
+  "focus": { "background": "#7e57c2", "text": "#ffffff", "border": "#82aaff" },
+  "terminal": { "background": "#011627", "foreground": "#d6deeb" }
+}

@@ -2,29 +2,29 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders  ┳ ■ Billing  :┬ ■ Shop  :473┬ ■ Docs   ○ s┬ ■ Console  :4730┃ Themes   10 of 10
+ ▸ ◆ Orders  ┳ ■ Billing  :┬ ■ Shop  :473┬ ■ Docs   ○ s┬ ■ Console  :4730┃ Themes   26 of 26
              ┃             │   dev server│   watch buil│   live · dev    ┃ › ▏
              ┃             │             │             │                 ┃────────────────────────────────────
              ┃             │             │             │                 ┃  • Default               ■■■■■■
-             ┃             │             │             │                 ┃ ▸  Catppuccin Mocha      ■■■■■■
+             ┃             │             │             │                 ┃ ▸  Ayu Mirage            ■■■■■■
+             ┃             │             │             │                 ┃    Catppuccin Latte      ■■■■■■
+             ┃             │             │             │                 ┃    Catppuccin Mocha      ■■■■■■
              ┃             │             │             │                 ┃    Dracula               ■■■■■■
+             ┃             │             │             │                 ┃    Evangelion            ■■■■■■
+             ┃             │             │             │                 ┃    Everforest            ■■■■■■
+             ┃             │             │             │                 ┃    GitHub Dark           ■■■■■■
+             ┃             │             │             │                 ┃    GitHub Light          ■■■■■■
              ┃             │             │             │                 ┃    Gruvbox               ■■■■■■
+             ┃             │             │             │                 ┃    Hatsune Miku          ■■■■■■
              ┃             │             │             │                 ┃    High Contrast         ■■■■■■
+             ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
              ┃             │             │             │                 ┃    Light                 ■■■■■■
-             ┃             │             │             │                 ┃    Nord                  ■■■■■■
-             ┃             │             │             │                 ┃    One Dark              ■■■■■■
-             ┃             │             │             │                 ┃    Solarized Light       ■■■■■■
-             ┃             │             │             │                 ┃    Tokyo Night           ■■■■■■
-             ┃             │             │             │                 ┃
-             ┃             │             │             │                 ┃
-             ┃             │             │             │                 ┃
-             ┃             │             │             │                 ┃
-             ┃             │             │             │                 ┃
-             ┃             │             │             │                 ┃
+             ┃             │             │             │                 ┃    Monokai Pro           ■■■■■■
              ┃             │             │             │                 ┃────────────────────────────────────
-             ┃             │             │             │                 ┃ Soothing pastels; also recolours
-             ┃             │             │             │                 ┃ the terminal background
-             ┃             │             │             │                 ┃ ↑↓ preview · Enter keep · Esc undo
-──────────────────────────────────────────────────────────────────────────────────────────── Catppuccin Mocha
+             ┃             │             │             │                 ┃ Ayu's medium-dark blue-grey; also
+             ┃             │             │             │                 ┃ recolours the terminal background
+             ┃             │             │             │                 ┃ ↑↓ preview · Esc undo
+             ┃             │             │             │                 ┃ Enter keep · Tab this project
+────────────────────────────────────────────────────────────────────────────────────────────────── Ayu Mirage
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

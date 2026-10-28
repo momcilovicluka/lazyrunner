@@ -447,6 +447,29 @@ async fn the_theme_picker_previews_without_saving_and_enter_keeps_one() {
 }
 
 #[tokio::test]
+async fn tab_keeps_a_theme_for_this_project_alone_and_enter_gives_it_back() {
+    let mut screen = screen("themes-own", json!({ "theme": "nord" }));
+    let settings = lazyrunner_core::config::ConfigFile::new(screen.temp.join("config.json"));
+    screen.press("t d r a c Tab");
+    assert!(screen.ui.overlay.is_none());
+    assert_eq!(screen.ui.theme.id, "dracula");
+    assert_eq!(saved_theme(&screen).as_deref(), Some("dracula"), "this project uses its own");
+    assert_eq!(screen.controller.own_setting("theme"), Some(json!("dracula")));
+    assert_eq!(settings.load(Some("another-project"))["theme"], "nord", "every other project keeps theirs");
+    let name = screen.controller.project.name.clone();
+    assert!(screen.last_log().ends_with(&format!("(saved for {name})")), "{}", screen.last_log());
+
+    screen.press("t");
+    let Some(Overlay::Themes { own, .. }) = &screen.ui.overlay else { panic!("the picker is open") };
+    assert_eq!(own.as_deref(), Some("dracula"));
+    assert!(screen.frame().contains("◆ this project's own theme"), "{}", screen.frame());
+    screen.press("g r u v Enter");
+    assert_eq!(screen.ui.theme.id, "gruvbox");
+    assert_eq!(screen.controller.own_setting("theme"), None, "Enter keeps it for every project, this one too");
+    assert_eq!(settings.load(Some("another-project"))["theme"], "gruvbox");
+}
+
+#[tokio::test]
 async fn esc_puts_back_the_theme_the_picker_opened_with() {
     let mut screen = screen("themes-undo", json!({ "theme": "nord" }));
     screen.press("t Down Down Esc");

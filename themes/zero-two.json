@@ -1,0 +1,12 @@
+{
+  "name": "Zero Two",
+  "description": "Darling in the Franxx: pink and jade on near-black (the Doki Theme's Obsidian); also recolours the terminal background",
+  "colors": {
+    "Black": "#0e0509", "DarkRed": "#ff0000", "DarkGreen": "#1ecd86", "DarkYellow": "#ffd448",
+    "DarkBlue": "#2faaf6", "DarkMagenta": "#efa2da", "DarkCyan": "#39e6a6", "Gray": "#bbbbbb",
+    "DarkGray": "#57745d", "Red": "#ff0000", "Green": "#26ee65", "Yellow": "#ffd448",
+    "Blue": "#82b1ee", "Magenta": "#fdb8eb", "Cyan": "#39e6a6", "White": "#fbfbfb"
+  },
+  "focus": { "background": "#1ecd86", "text": "#17070e", "border": "#fdb8eb" },
+  "terminal": { "background": "#17070e", "foreground": "#bbbbbb" }
+}

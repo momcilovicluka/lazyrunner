@@ -1,0 +1,12 @@
+{
+  "name": "Rem",
+  "description": "Re:Zero's Rem: soft blues with pink and lilac (the Doki Theme); also recolours the terminal background",
+  "colors": {
+    "Black": "#25262b", "DarkRed": "#ff6b81", "DarkGreen": "#85ffef", "DarkYellow": "#fbff90",
+    "DarkBlue": "#578cda", "DarkMagenta": "#9d8df6", "DarkCyan": "#6ec8f8", "Gray": "#bbbbbb",
+    "DarkGray": "#5c6d80", "Red": "#ff6b81", "Green": "#85ffef", "Yellow": "#fbff90",
+    "Blue": "#6893f3", "Magenta": "#f0a1ff", "Cyan": "#6ec8f8", "White": "#fbfbfb"
+  },
+  "focus": { "background": "#578cda", "text": "#25262b", "border": "#6ec8f8" },
+  "terminal": { "background": "#2c2d34", "foreground": "#bbbbbb" }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Rosé Pine",
+  "description": "Soho vibes: muted rose, gold and foam; also recolours the terminal background",
+  "colors": {
+    "Black": "#191724", "DarkRed": "#eb6f92", "DarkGreen": "#9ccfd8", "DarkYellow": "#f6c177",
+    "DarkBlue": "#31748f", "DarkMagenta": "#c4a7e7", "DarkCyan": "#ebbcba", "Gray": "#e0def4",
+    "DarkGray": "#6e6a86", "Red": "#eb6f92", "Green": "#9ccfd8", "Yellow": "#f6c177",
+    "Blue": "#9ccfd8", "Magenta": "#c4a7e7", "Cyan": "#ebbcba", "White": "#ffffff"
+  },
+  "focus": { "background": "#c4a7e7", "text": "#191724", "border": "#ebbcba" },
+  "terminal": { "background": "#191724", "foreground": "#e0def4" }
+}

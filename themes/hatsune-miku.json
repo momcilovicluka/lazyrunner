@@ -1,0 +1,12 @@
+{
+  "name": "Hatsune Miku",
+  "description": "Teal twin tails with a pink accent (the Doki Theme); also recolours the terminal background",
+  "colors": {
+    "Black": "#2c3333", "DarkRed": "#ff6b81", "DarkGreen": "#b5f6ba", "DarkYellow": "#f6e9cb",
+    "DarkBlue": "#95c8fa", "DarkMagenta": "#ff9cea", "DarkCyan": "#53b0b4", "Gray": "#bbbbbb",
+    "DarkGray": "#67807b", "Red": "#ff6b81", "Green": "#b5f6ba", "Yellow": "#f6e9cb",
+    "Blue": "#7bb9fd", "Magenta": "#ff9cea", "Cyan": "#7bf8e1", "White": "#fbfbfb"
+  },
+  "focus": { "background": "#53b0b4", "text": "#2c3333", "border": "#7bf8e1" },
+  "terminal": { "background": "#2f3635", "foreground": "#bbbbbb" }
+}

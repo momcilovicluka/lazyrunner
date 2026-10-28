@@ -653,6 +653,19 @@ impl Controller {
         }
     }
 
+    /// Saves a setting for this project alone (its own theme); `None` goes back to the one every project uses.
+    pub fn set_own_setting(&mut self, name: &str, value: Option<Value>) {
+        match self.config_file.set_own(&self.project.id, name, value) {
+            Ok(config) => self.config = config,
+            Err(error) => self.add_log(format!("✗ {error}"), Hue::Red),
+        }
+    }
+
+    /// This project's own value of a setting, when it has one.
+    pub fn own_setting(&self, name: &str) -> Option<Value> {
+        self.config_file.own(&self.project.id, name)
+    }
+
     /// Reads the settings file again (Ctrl+R): a hand edit counts from now on.
     pub fn reload_settings(&mut self) {
         self.config = self.config_file.load(Some(&self.project.id));
