@@ -20,6 +20,8 @@ const MIN_CHECK: Duration = Duration::from_millis(80);
 const BACKGROUND_GRACE: Duration = Duration::from_secs(2);
 /// How long the checklist stays up when everything is fine.
 const ALL_GOOD_HOLD: f64 = 0.5;
+/// A hold this short closes too soon for a draining bar to mean anything.
+const BAR_MIN_HOLD: Duration = Duration::from_secs(5);
 
 pub struct Item {
     pub name: String,
@@ -29,7 +31,12 @@ pub struct Item {
 
 enum Phase {
     Checking,
-    Holding { until: Instant, problems: usize },
+    /// Done: it closes at `until`, or waits for a key without one.
+    Holding {
+        from: Instant,
+        until: Option<Instant>,
+        problems: usize,
+    },
 }
 
 pub struct Checklist {
@@ -41,6 +48,8 @@ pub struct Checklist {
     pub manual: bool,
     /// Any key: continue now.
     pub skip: bool,
+    /// r was pressed: from then on it waits for a key while there is something to retry.
+    retried: bool,
     /// Start everything once it is done (auto-start, `lazyrunner start`).
     pub start_after: bool,
     /// The lazyrunner version this checklist installed (it reopens on it).
@@ -87,6 +96,7 @@ impl Checklist {
             news: changelog::format(whats_new),
             manual,
             skip: false,
+            retried: false,
             start_after,
             updated_to: None,
             installed_before: update::installed(),
@@ -138,6 +148,7 @@ impl Checklist {
         }
         self.results = results;
         self.phase = Phase::Checking;
+        self.retried = true;
         self.others_done_at = None;
         self.footer = "checking again…".into();
         true
@@ -151,6 +162,17 @@ impl Checklist {
             [one] => format!("r retries {}", one.name),
             many => format!("r retries those {}", many.len()),
         }
+    }
+
+    /// How much of a timed hold is left (1 to 0), for the bar that drains along the box; none while it waits for a
+    /// key, or for a hold too short to show one.
+    pub fn draining(&self, now: Instant) -> Option<f64> {
+        let Phase::Holding { from, until: Some(until), .. } = self.phase else { return None };
+        let total = until.saturating_duration_since(from);
+        if total < BAR_MIN_HOLD || self.skip {
+            return None;
+        }
+        Some(until.saturating_duration_since(now).as_secs_f64() / total.as_secs_f64())
     }
 
     /// The background checks the startup didn't wait for: still running, or finished while it closed.
@@ -262,22 +284,29 @@ impl Checklist {
             } else {
                 ALL_GOOD_HOLD
             };
-            self.phase = Phase::Holding { until: now + Duration::from_secs_f64(hold), problems: problems.len() };
+            let until = Some(now + Duration::from_secs_f64(hold));
+            self.phase = Phase::Holding { from: now, until, problems: problems.len() };
+            // Opened by hand, or after r: what can be retried stays up until a key, never closing under the next r.
+            if (self.manual || self.retried) && self.can_retry() {
+                self.phase = Phase::Holding { from: now, until: None, problems: problems.len() };
+            }
         }
-        let Phase::Holding { until, problems } = self.phase else { return false };
-        if self.skip || now >= until {
+        let Phase::Holding { until, problems, .. } = self.phase else { return false };
+        if self.skip || until.is_some_and(|until| now >= until) {
             return true;
         }
-        let left = until.saturating_duration_since(now).as_secs_f64().ceil() as u64;
+        let left = until.map_or(String::new(), |until| {
+            format!(" ({} s)", until.saturating_duration_since(now).as_secs_f64().ceil() as u64)
+        });
         let retry = if self.can_retry() { format!(" · {}", self.retry_hint()) } else { String::new() };
         self.footer = if let Some(version) = self.updated_to.as_ref().filter(|_| !self.manual) {
             format!("v{version} installed - reopening lazyrunner…")
         } else if self.manual {
-            format!("any key closes{retry}")
+            format!("any key closes{left}{retry}")
         } else if !self.news.is_empty() {
-            format!("what's new above (, then c shows the whole changelog) - any key continues ({left} s){retry}")
+            format!("what's new above (, then c shows the whole changelog) - any key continues{left}{retry}")
         } else if problems > 0 {
-            format!("{problems} to look at (also in the log below) - any key continues ({left} s){retry}")
+            format!("{problems} to look at (also in the log below) - any key continues{left}{retry}")
         } else {
             "all good - starting…".into()
         };
@@ -365,6 +394,7 @@ impl Checklist {
             news,
             manual: false,
             skip: false,
+            retried: false,
             start_after: false,
             updated_to: None,
             installed_before: None,
@@ -480,8 +510,52 @@ mod tests {
         }
         list.update(Instant::now(), &mut controller);
         assert_eq!(list.items[1].status, Status::Ok, "git is there: {}", list.items[1].detail);
-        assert_eq!(list.footer, "any key closes", "nothing left to retry");
+        assert_eq!(list.footer, "any key closes (60 s)", "nothing left to retry: it closes by itself again");
         assert!(!list.retry(&mut controller));
+    }
+
+    #[test]
+    fn opened_by_hand_it_waits_for_a_key_while_something_can_be_retried() {
+        let (_temp, mut controller) = crate::screen::tests::controller("checklist-waits");
+        let update = Item { name: "lazyrunner".into(), status: Status::Warn, detail: "GitHub didn't answer".into() };
+        let mut list = Checklist::fixed(vec![update, item(Status::Ok)], Vec::new(), "checking…");
+        list.manual = true;
+        let now = Instant::now();
+        assert!(!list.update(now, &mut controller));
+        assert!(!list.update(now + Duration::from_secs(600), &mut controller), "it never closes by itself");
+        assert_eq!(list.footer, "any key closes · r retries lazyrunner");
+        assert_eq!(list.draining(now), None, "so nothing drains");
+    }
+
+    #[test]
+    fn at_startup_it_moves_on_by_itself_until_r_is_pressed() {
+        let (_temp, mut controller) = crate::screen::tests::controller("checklist-retried");
+        let mut list = Checklist::fixed(vec![item_named("Ports", Status::Warn)], Vec::new(), "checking…");
+        let now = Instant::now();
+        assert!(!list.update(now, &mut controller));
+        assert_eq!(list.footer, "1 to look at (also in the log below) - any key continues (8 s) · r retries Ports");
+        assert_eq!(list.draining(now), Some(1.0));
+        assert_eq!(list.draining(now + Duration::from_secs(2)), Some(0.75), "the bar drains with the time left");
+        assert!(list.update(now + Duration::from_secs(8), &mut controller), "then the apps start");
+
+        let mut list = Checklist::fixed(vec![item_named("Ports", Status::Warn)], Vec::new(), "checking…");
+        list.update(now, &mut controller);
+        let (sender, results) = channel();
+        list.retry(&mut controller);
+        list.results = results;
+        sender.send((0, Message::Done((Status::Warn, "47211 is in use".into())))).unwrap();
+        assert!(!list.update(now, &mut controller));
+        assert!(!list.update(now + Duration::from_secs(600), &mut controller), "after r it waits for a key");
+        assert_eq!(list.footer, "1 to look at (also in the log below) - any key continues · r retries Ports");
+    }
+
+    #[test]
+    fn a_short_hold_has_no_bar() {
+        let (_temp, mut controller) = crate::screen::tests::controller("checklist-short");
+        let mut list = Checklist::fixed(vec![item(Status::Ok)], Vec::new(), "checking…");
+        let now = Instant::now();
+        assert!(!list.update(now, &mut controller), "all good, a moment");
+        assert_eq!(list.draining(now), None);
     }
 
     #[test]

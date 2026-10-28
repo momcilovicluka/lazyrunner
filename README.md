@@ -327,6 +327,8 @@ apps' ports are free, whether the active database's server answers, each npm app
 the update check: once everything else is done it gets 2 s more, then goes on in the background (an update it installs
 is switched to when nothing is in the way). Problems also go to the panel log. Once every check is done, `r` runs the
 ones that failed or warned again - a failed update, a port that was busy - without closing it; any other key closes it.
+At startup it moves on by itself after a few seconds, the time left draining along its bottom edge. Opened by hand
+(`,` then `r`), or once you've pressed `r`, it stays up while there is something to retry, until a key closes it.
 Turn it off with `,` then `w`.
 
 ## Database picker (`d`)

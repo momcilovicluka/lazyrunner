@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.16.1] - 2026-10-28
+
+### Fixed
+- The startup checklist no longer closes under you while `r` can retry something: opened by hand (`,` then `r`), or once `r` was pressed, it waits for a key. When it does move on by itself, the time left drains along its bottom edge (#25, thanks @ognjen004028)
+
 ## [1.16.0] - 2026-10-27
 
 ### Changed
