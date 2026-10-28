@@ -431,6 +431,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             match name {
                 "Escape" | "q" => ui.overlay = None,
                 _ if name == close => ui.overlay = None,
+                "S" if controller.building.is_some() => controller.cancel_start(),
                 "j" | "DownArrow" | "Ctrl+N" => *index = (*index + 1).min(items.len().saturating_sub(1)),
                 "<" | "Home" => *index = 0,
                 ">" | "End" => *index = items.len().saturating_sub(1),

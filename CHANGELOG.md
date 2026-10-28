@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.17.1] - 2026-10-28
+
+### Changed
+- `S` cancels a running build from inside the `,` and `x` menus too, and the menu stays open: an action a build blocks (`,` then `r`, the startup checklist) runs right after, without closing the menu and opening it again (#8, thanks @ognjen004028)
+
 ## [1.17.0] - 2026-10-28
 
 ### Added

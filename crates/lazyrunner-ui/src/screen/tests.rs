@@ -1690,6 +1690,44 @@ async fn r_in_the_checklist_retries_what_failed_and_another_key_still_closes_it(
 }
 
 #[tokio::test]
+async fn s_cancels_a_build_from_inside_the_settings_menu_which_stays_open() {
+    use lazyrunner_core::run::Tag;
+    use lazyrunner_core::run::child::{Child, Spec};
+    use lazyrunner_core::run::controller::ToolJob;
+    let mut screen = screen("menu-cancel-build", json!({}));
+    let (program, flag, wait) =
+        if cfg!(windows) { ("cmd", "/C", "ping -n 30 127.0.0.1 > nul") } else { ("sh", "-c", "sleep 30") };
+    let spec = Spec {
+        program: program.into(),
+        args: vec![flag.into(), wait.into()],
+        dir: std::env::temp_dir(),
+        env: Vec::new(),
+    };
+    let key = screen.controller.apps[0].key.clone();
+    let (events, _keep) = tokio::sync::mpsc::unbounded_channel();
+    let child = Child::spawn(&spec, Tag::Build { key: key.clone(), job: 1 }, events, None).unwrap();
+    screen.controller.building = Some(ToolJob {
+        key,
+        id: 1,
+        child,
+        started: screen.ui.now,
+        lines: Vec::new(),
+        done: 0,
+        total: 0,
+        warnings: 0,
+        start_after: false,
+        what: "dotnet build",
+    });
+    screen.press(", r");
+    assert!(screen.last_log().starts_with("Building - press S to cancel it first"), "{}", screen.last_log());
+    screen.press("S");
+    assert!(screen.controller.building.is_none(), "S cancels the build");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { .. })), "and the menu stays open");
+    screen.press("r");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Checklist(_))), "so r runs the checklist right away");
+}
+
+#[tokio::test]
 async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     let mut screen = screen("checklist-bar", json!({}));
     let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };
