@@ -1,0 +1,12 @@
+{
+  "name": "Ayu Mirage",
+  "description": "Ayu's medium-dark blue-grey; also recolours the terminal background",
+  "colors": {
+    "Black": "#171b24", "DarkRed": "#f27983", "DarkGreen": "#87d96c", "DarkYellow": "#ffad66",
+    "DarkBlue": "#80bfff", "DarkMagenta": "#dfbfff", "DarkCyan": "#5ccfe6", "Gray": "#cccac2",
+    "DarkGray": "#707a8c", "Red": "#f28779", "Green": "#d5ff80", "Yellow": "#ffd173",
+    "Blue": "#73d0ff", "Magenta": "#dfbfff", "Cyan": "#95e6cb", "White": "#ffffff"
+  },
+  "focus": { "background": "#ffcc66", "text": "#1f2430", "border": "#ffcc66" },
+  "terminal": { "background": "#1f2430", "foreground": "#cccac2" }
+}

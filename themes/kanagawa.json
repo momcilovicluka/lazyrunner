@@ -1,0 +1,12 @@
+{
+  "name": "Kanagawa",
+  "description": "Ink and muted colours after Hokusai's Great Wave (Wave); also recolours the terminal background",
+  "colors": {
+    "Black": "#16161d", "DarkRed": "#c34043", "DarkGreen": "#76946a", "DarkYellow": "#dca561",
+    "DarkBlue": "#7e9cd8", "DarkMagenta": "#957fb8", "DarkCyan": "#6a9589", "Gray": "#c8c093",
+    "DarkGray": "#727169", "Red": "#ff5d62", "Green": "#98bb6c", "Yellow": "#e6c384",
+    "Blue": "#7fb4ca", "Magenta": "#d27e99", "Cyan": "#7aa89f", "White": "#dcd7ba"
+  },
+  "focus": { "background": "#7e9cd8", "text": "#1f1f28", "border": "#957fb8" },
+  "terminal": { "background": "#1f1f28", "foreground": "#dcd7ba" }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Everforest",
+  "description": "Green, warm and soft on the eyes (dark, medium); also recolours the terminal background",
+  "colors": {
+    "Black": "#232a2e", "DarkRed": "#e67e80", "DarkGreen": "#a7c080", "DarkYellow": "#e69875",
+    "DarkBlue": "#7fbbb3", "DarkMagenta": "#d699b6", "DarkCyan": "#83c092", "Gray": "#d3c6aa",
+    "DarkGray": "#859289", "Red": "#e67e80", "Green": "#a7c080", "Yellow": "#dbbc7f",
+    "Blue": "#7fbbb3", "Magenta": "#d699b6", "Cyan": "#83c092", "White": "#fdf6e3"
+  },
+  "focus": { "background": "#a7c080", "text": "#2d353b", "border": "#a7c080" },
+  "terminal": { "background": "#2d353b", "foreground": "#d3c6aa" }
+}

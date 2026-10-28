@@ -1,0 +1,12 @@
+{
+  "name": "Monokai Pro",
+  "description": "Monokai, refined: warm grey with bright accents; also recolours the terminal background",
+  "colors": {
+    "Black": "#19181a", "DarkRed": "#ff6188", "DarkGreen": "#a9dc76", "DarkYellow": "#fc9867",
+    "DarkBlue": "#78dce8", "DarkMagenta": "#ab9df2", "DarkCyan": "#78dce8", "Gray": "#c1c0c0",
+    "DarkGray": "#727072", "Red": "#ff6188", "Green": "#a9dc76", "Yellow": "#ffd866",
+    "Blue": "#78dce8", "Magenta": "#ab9df2", "Cyan": "#78dce8", "White": "#fcfcfa"
+  },
+  "focus": { "background": "#ffd866", "text": "#2d2a2e", "border": "#fc9867" },
+  "terminal": { "background": "#2d2a2e", "foreground": "#fcfcfa" }
+}

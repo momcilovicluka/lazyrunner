@@ -523,13 +523,17 @@ question marks instead of icons mean the font isn't one: set one, or `, i` for p
 
 ## Themes
 
-`t` opens the theme picker: a narrow panel on the right, so the rest of the screen shows each theme as you move
-through the list (`↑` `↓`, `PgUp` `PgDn`), the terminal's background included. Typing filters by name, `Enter` keeps
-the selected theme (saved), `Esc` puts back the one you had. Built in: `default` (your terminal's own palette),
-`dark`, `light`, `high-contrast`, `dracula`, `nord`, `gruvbox`, `catppuccin-mocha`, `tokyo-night` and
-`solarized-light`; some also recolour the terminal background while lazyrunner runs. Your own: copy one from
-[themes/](themes/) to `themes/<id>.json` in the settings folder and change it; the picker reads the themes again each
-time it opens, so it shows up straight away. [themes/README.md](themes/README.md) describes every field.
+`t` opens the theme picker: a narrow panel on the right, so the rest of the screen shows each theme as you move through
+the list (`↑` `↓`, `PgUp` `PgDn`), the terminal's background included. Typing filters by name, `Enter` keeps the
+selected theme for every project (saved), `Tab` for this project alone - handy to tell two projects' windows apart (`◆`
+marks it; `Enter` later gives the project back the shared one) - and `Esc` puts back the one you had. Built in:
+`default` (your terminal's own palette), `dark`, `light`, `high-contrast`; the editors' favourites `one-dark`,
+`github-dark`, `github-light`, `dracula`, `monokai-pro`, `nord`, `gruvbox`, `kanagawa`, `rose-pine`, `everforest`,
+`ayu-mirage`, `night-owl`, `shades-of-purple`, `catppuccin-mocha`, `catppuccin-latte`, `tokyo-night`, `solarized-dark`
+and `solarized-light`; and for anime fans `evangelion` (Unit-01), `zero-two`, `rem` and `hatsune-miku`. Most also
+recolour the terminal background while lazyrunner runs. Your own: copy one from [themes/](themes/) to `themes/<id>.json`
+in the settings folder and change it; the picker reads the themes again each time it opens, so it shows up straight
+away. [themes/README.md](themes/README.md) describes every field.
 `NO_COLOR` turns colour off.
 
 ## Configuration
@@ -571,6 +575,7 @@ time it opens, so it shows up straight away. [themes/README.md](themes/README.md
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
+| `projects.<id>.theme` | | This project's own theme, instead of `theme` (`t`, then `Tab`) |
 | `projects.<id>.columnWidths` | equal | Relative width per app key, or height when stacked (`>` / `<` / `=`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |
 | `projects.<id>.apps.<key>.includeInAll` | | `false` keeps that app running on Stop all / Restart all |

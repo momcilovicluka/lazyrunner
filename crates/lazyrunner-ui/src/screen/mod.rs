@@ -105,11 +105,12 @@ pub enum Overlay {
         scroll: usize,
         picking: Option<usize>,
     },
-    /// `t`: the theme picker; `original` is the theme Esc puts back.
+    /// `t`: the theme picker; `original` is the theme Esc puts back, `own` this project's own theme, if it has one.
     Themes {
         query: String,
         index: usize,
         original: String,
+        own: Option<String>,
     },
     /// `, A`: the About box; the selected link.
     About {

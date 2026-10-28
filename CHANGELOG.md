@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.17.0] - 2026-10-28
+
+### Added
+- A project can have its own theme: in the theme picker (`t`) `Tab` keeps the selected theme for this project alone (`Enter` still keeps it for every project, and gives this one back the shared theme). It's `"theme"` in the project's section of `lazyrunner.config.json` (#26, thanks @ognjen004028)
+- Twelve more themes, the favourites of VS Code and Neovim: One Dark, GitHub Dark and Light, Monokai Pro, Kanagawa, Rosé Pine, Everforest, Ayu Mirage, Night Owl, Shades of Purple, Catppuccin Latte and Solarized Dark
+- And four anime ones: Evangelion (Unit-01's purple and green), Zero Two, Rem and Hatsune Miku
+
 ## [1.16.1] - 2026-10-28
 
 ### Fixed

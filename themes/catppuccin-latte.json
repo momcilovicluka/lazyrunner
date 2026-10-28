@@ -1,0 +1,12 @@
+{
+  "name": "Catppuccin Latte",
+  "description": "Catppuccin's light flavour; recolours the terminal background, so it works in a dark terminal too",
+  "colors": {
+    "Black": "#eff1f5", "DarkRed": "#d20f39", "DarkGreen": "#3a9027", "DarkYellow": "#d55409",
+    "DarkBlue": "#1e66f5", "DarkMagenta": "#8839ef", "DarkCyan": "#179299", "Gray": "#5c5f77",
+    "DarkGray": "#8c8fa1", "Red": "#d20f39", "Green": "#3a9027", "Yellow": "#ae6f17",
+    "Blue": "#1e66f5", "Magenta": "#bb5ea2", "Cyan": "#0387bc", "White": "#4c4f69"
+  },
+  "focus": { "background": "#8839ef", "text": "#eff1f5", "border": "#8839ef" },
+  "terminal": { "background": "#eff1f5", "foreground": "#4c4f69" }
+}

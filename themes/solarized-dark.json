@@ -1,0 +1,12 @@
+{
+  "name": "Solarized Dark",
+  "description": "Solarized on deep blue-green; also recolours the terminal background",
+  "colors": {
+    "Black": "#002b36", "DarkRed": "#dc322f", "DarkGreen": "#859900", "DarkYellow": "#cb4b16",
+    "DarkBlue": "#268bd2", "DarkMagenta": "#6c71c4", "DarkCyan": "#2aa198", "Gray": "#839496",
+    "DarkGray": "#586e75", "Red": "#dc322f", "Green": "#859900", "Yellow": "#b58900",
+    "Blue": "#268bd2", "Magenta": "#d33682", "Cyan": "#2aa198", "White": "#eee8d5"
+  },
+  "focus": { "background": "#268bd2", "text": "#fdf6e3", "border": "#268bd2" },
+  "terminal": { "background": "#002b36", "foreground": "#839496" }
+}

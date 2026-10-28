@@ -53,17 +53,33 @@ pub const PALETTE: [(&str, C); 16] = [
 ];
 
 /// The bundled themes.
-const BUNDLED: [(&str, &str); 10] = [
+const BUNDLED: [(&str, &str); 26] = [
     ("default", include_str!("../../../../themes/default.json")),
+    ("ayu-mirage", include_str!("../../../../themes/ayu-mirage.json")),
+    ("catppuccin-latte", include_str!("../../../../themes/catppuccin-latte.json")),
     ("catppuccin-mocha", include_str!("../../../../themes/catppuccin-mocha.json")),
     ("dark", include_str!("../../../../themes/dark.json")),
     ("dracula", include_str!("../../../../themes/dracula.json")),
+    ("evangelion", include_str!("../../../../themes/evangelion.json")),
+    ("everforest", include_str!("../../../../themes/everforest.json")),
+    ("github-dark", include_str!("../../../../themes/github-dark.json")),
+    ("github-light", include_str!("../../../../themes/github-light.json")),
     ("gruvbox", include_str!("../../../../themes/gruvbox.json")),
+    ("hatsune-miku", include_str!("../../../../themes/hatsune-miku.json")),
     ("high-contrast", include_str!("../../../../themes/high-contrast.json")),
+    ("kanagawa", include_str!("../../../../themes/kanagawa.json")),
     ("light", include_str!("../../../../themes/light.json")),
+    ("monokai-pro", include_str!("../../../../themes/monokai-pro.json")),
+    ("night-owl", include_str!("../../../../themes/night-owl.json")),
     ("nord", include_str!("../../../../themes/nord.json")),
+    ("one-dark", include_str!("../../../../themes/one-dark.json")),
+    ("rem", include_str!("../../../../themes/rem.json")),
+    ("rose-pine", include_str!("../../../../themes/rose-pine.json")),
+    ("shades-of-purple", include_str!("../../../../themes/shades-of-purple.json")),
+    ("solarized-dark", include_str!("../../../../themes/solarized-dark.json")),
     ("solarized-light", include_str!("../../../../themes/solarized-light.json")),
     ("tokyo-night", include_str!("../../../../themes/tokyo-night.json")),
+    ("zero-two", include_str!("../../../../themes/zero-two.json")),
 ];
 
 /// A resolved theme: an SGR code per colour name, for text and for backgrounds.
