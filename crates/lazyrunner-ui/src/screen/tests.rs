@@ -2066,6 +2066,30 @@ async fn m_marks_lines_brackets_jump_between_them_and_the_marks_box_lists_them()
 }
 
 #[tokio::test]
+async fn r_in_the_checklist_never_reaches_the_app_behind_it() {
+    let mut screen = screen("checklist-r-again", json!({}));
+    let failed = Item { name: "git".into(), status: Status::Fail, detail: "not found on PATH".into() };
+    let mut list = Checklist::fixed(vec![failed], Vec::new(), "checking…");
+    list.manual = true;
+    list.update(screen.ui.now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    screen.press("r r r");
+    let Some(Overlay::Checklist(list)) = &screen.ui.overlay else { panic!("the checklist stays open") };
+    assert!(list.is_checking() && !list.skip, "r again while it retries: nothing");
+    assert!(screen.ui.replay.is_none(), "no r goes on to the columns (it would restart the focused app)");
+
+    let fine = Item { name: "git".into(), status: Status::Ok, detail: "2.50".into() };
+    let mut list = Checklist::fixed(vec![fine], Vec::new(), "checking…");
+    list.manual = true;
+    list.update(screen.ui.now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    screen.press("r");
+    let Some(Overlay::Checklist(list)) = &screen.ui.overlay else { panic!("the checklist is still there") };
+    assert!(list.skip, "nothing to retry: r closes it");
+    assert!(screen.ui.replay.is_none(), "and isn't run on the columns");
+}
+
+#[tokio::test]
 async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     let mut screen = screen("checklist-bar", json!({}));
     let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };

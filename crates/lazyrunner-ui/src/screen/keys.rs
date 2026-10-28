@@ -79,7 +79,12 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         return;
     }
     if let Some(Overlay::Checklist(list)) = &mut ui.overlay {
-        if name == "r" && list.retry(controller) {
+        if name == "r" {
+            // r is the checklist's own: it retries what failed, does nothing while checks run, else only closes it -
+            // it never reaches the columns (pressed again during a retry it used to restart the focused app).
+            if !list.retry(controller) && !list.is_checking() {
+                list.skip = true;
+            }
             return;
         }
         // Skips what's still running; the loop closes the checklist and runs the key right away.
