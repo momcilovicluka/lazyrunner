@@ -317,6 +317,46 @@ async fn search_finds_and_steps_through_matches() {
 }
 
 #[tokio::test]
+async fn search_filters_to_its_matches_and_takes_regex_and_case() {
+    let mut screen = screen("search-filter", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    for line in [
+        "start",
+        "Timeout calling payments",
+        "after one",
+        "filler two",
+        "filler three",
+        "before two",
+        "timeout again",
+        "end",
+    ] {
+        screen.controller.states[0].add_line(line, Hue::Gray, at);
+    }
+    screen.press("z / t i m e o u t");
+    assert!(screen.frame().contains("2 matches"), "{}", screen.frame());
+    screen.press("Alt+c");
+    assert!(screen.frame().contains("1 match "), "case counts: {}", screen.frame());
+    screen.press("Alt+c Tab Enter");
+    let frame = screen.frame();
+    assert!(frame.contains("after one") && frame.contains("before two") && !frame.contains("filler two"), "{frame}");
+    assert!(frame.contains("⌕ /timeout and a line either side · 2 lines hidden - Esc shows all"), "{frame}");
+    let search = screen.ui.search.clone().unwrap();
+    assert_eq!((search.position, search.total), (1, 2));
+    screen.press("n");
+    assert_eq!(screen.ui.search.as_ref().map(|search| search.position), Some(2), "n steps to the older one");
+
+    screen.press("/");
+    let again = screen.ui.search.clone().unwrap();
+    assert!(again.typing && again.filter && again.query == "timeout", "/ brings the search back");
+    screen.press("Esc / t i m e . * a g Alt+r");
+    assert!(screen.frame().contains("1 match "), "a regex: {}", screen.frame());
+    screen.press("(");
+    assert!(screen.frame().contains("not a regex"), "{}", screen.frame());
+    screen.press("Esc");
+    assert!(screen.ui.search.is_none());
+}
+
+#[tokio::test]
 async fn database_picker() {
     let mut screen = screen("snap-picker", json!({}));
     let path = screen.temp.join("secrets.json");

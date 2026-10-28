@@ -195,7 +195,7 @@ fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direc
         None => {}
     }
     if let Some(Target::Output(index) | Target::Title(index) | Target::Link { column: index, .. }) = target {
-        keys::scroll_column(controller, index, WHEEL_LINES * direction);
+        keys::scroll_column(controller, index, WHEEL_LINES * direction, ui.search.as_ref());
     }
 }
 

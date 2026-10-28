@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 
 use super::actions::{self, Action, Run};
 use super::checklist::Checklist;
-use super::columns::{self, chunk, contains_ignore_case};
+use super::columns::{self, chunk};
 use super::motion::Spot;
 use super::overlays::menu_items;
 use super::{Exit, Overlay, Picker, Search, Ui};
@@ -206,26 +206,39 @@ fn move_focus(ui: &mut Ui, controller: &Controller, step: isize) {
 }
 
 fn scroll(ui: &Ui, controller: &mut Controller, lines: isize) {
-    scroll_column(controller, ui.focus, lines);
+    scroll_column(controller, ui.focus, lines, ui.search.as_ref());
 }
 
-/// Scrolls a column `lines` back (negative: towards the newest).
-pub fn scroll_column(controller: &mut Controller, index: usize, lines: isize) {
+/// Scrolls a column `lines` back (negative: towards the newest), through the lines it shows.
+pub fn scroll_column(controller: &mut Controller, index: usize, lines: isize, search: Option<&Search>) {
+    let Some(shown) = controller.states.get(index).map(|state| columns::shown_lines(state, search).len()) else {
+        return;
+    };
     if let Some(state) = controller.states.get_mut(index) {
-        let shown = state.output.newest_first(0).filter(|line| state.filter.admits(line)).count();
-        let max = shown.saturating_sub(1);
-        state.scroll = state.scroll.saturating_add_signed(lines).min(max);
+        state.scroll = state.scroll.saturating_add_signed(lines).min(shown.saturating_sub(1));
     }
 }
 
 // ---------------------------------------------------------------- search (/ then n older, N newer)
 
+/// Typing a search: the query; Tab filters the column to the matches, Alt+r makes it a regex, Alt+c minds case.
 fn search_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
     let Some(search) = ui.search.as_mut() else { return };
+    let alt = key.modifiers == KeyModifiers::ALT;
     match name {
         "Escape" => ui.search = None,
         "Backspace" => {
             search.query.pop();
+            search.refresh();
+        }
+        "Tab" => search.filter = !search.filter,
+        "r" | "R" if alt => {
+            search.regex = !search.regex;
+            search.refresh();
+        }
+        "c" | "C" if alt => {
+            search.case = !search.case;
+            search.refresh();
         }
         "Enter" => {
             search.typing = false;
@@ -238,13 +251,15 @@ fn search_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEve
         _ => {
             if let Some(c) = typed(key) {
                 search.query.push(c);
+                search.refresh();
             }
         }
     }
 }
 
 /// Steps to the next match above (older) or below (newer) the current one (the first time, from the bottom of
-/// what the column shows), wrapping around at the ends, and scrolls it into the middle of the column.
+/// what the column shows), wrapping around at the ends, and scrolls it into the middle of the column. Only the lines
+/// the column shows count (its level filter, a search that filters).
 fn find_match(ui: &mut Ui, controller: &mut Controller, older: bool) {
     let focus_key = controller.apps.get(ui.focus).map(|app| app.key.clone()).unwrap_or_default();
     let (body_rows, cells) = (ui.body_rows, ui.focus_cells);
@@ -256,54 +271,53 @@ fn find_match(ui: &mut Ui, controller: &mut Controller, older: bool) {
         search.key = focus_key;
         search.index = None;
     }
-    let Some(state) = controller.states.get_mut(ui.focus) else { return };
-    let lines: Vec<&str> =
-        state.output.newest_first(0).map(|line| line.text.as_str()).collect::<Vec<_>>().into_iter().rev().collect();
-    let count = lines.len() as isize;
-    if count == 0 {
+    let Some(state) = controller.states.get(ui.focus) else { return };
+    let shown = columns::shown_lines(state, Some(search));
+    let hits: Vec<usize> = shown
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| !item.context && search.matches(&item.line.text))
+        .map(|(at, _)| at)
+        .collect();
+    let (Some(&first), Some(&last)) = (hits.first(), hits.last()) else {
         search.note = "no match".into();
         search.total = 0;
         return;
-    }
-    let start = match search.index {
-        Some(index) if (index as isize) < count => index as isize,
-        _ if older => count - state.scroll as isize,
-        _ => -1,
     };
-    let step = if older { -1 } else { 1 };
+    let current = search.index.and_then(|index| shown.iter().position(|item| item.position == index));
+    let start = current.map_or(if older { shown.len() as isize - state.scroll as isize } else { -1 }, |at| at as isize);
+    let next = if older {
+        hits.iter().rev().find(|&&at| (at as isize) < start)
+    } else {
+        hits.iter().find(|&&at| at as isize > start)
+    };
     search.note.clear();
-    let mut found = None;
-    for n in 1..=count {
-        let i = (start + step * n).rem_euclid(count);
-        if contains_ignore_case(lines[i as usize], &search.query) {
-            if (step < 0 && i > start) || (step > 0 && i < start) {
-                search.note = "wrapped".into();
-            }
-            found = Some(i as usize);
-            break;
+    let found = match next {
+        Some(&at) => at,
+        None => {
+            search.note = "wrapped".into();
+            if older { last } else { first }
         }
-    }
-    let Some(found) = found else {
-        search.note = "no match".into();
-        search.total = 0;
-        return;
     };
-    search.index = Some(found);
-    search.total = lines.iter().filter(|line| contains_ignore_case(line, &search.query)).count();
-    search.position = lines[found..].iter().filter(|line| contains_ignore_case(line, &search.query)).count(); // 1 = newest
+    search.index = Some(shown[found].position);
+    search.total = hits.len();
+    search.position = hits.iter().filter(|&&at| at >= found).count(); // 1 = newest
     // The match in the middle of the column, counting the rows its newer lines wrap to.
     let mut rows_below = 0;
-    let mut scroll = lines.len() - 1 - found;
-    for line in lines[found + 1..].iter().rev() {
-        let rows = chunk(line, cells).len();
+    let mut scroll = shown.len() - 1 - found;
+    for item in shown[found + 1..].iter().rev() {
+        let rows = chunk(&item.line.text, cells).len();
         if rows_below + rows > body_rows / 2 {
             break;
         }
         rows_below += rows;
         scroll -= 1;
     }
-    state.scroll = scroll;
-    ui.motion.flash(Spot::Match { app: ui.focus, line: found }, ui.now);
+    let line = shown[found].position;
+    if let Some(state) = controller.states.get_mut(ui.focus) {
+        state.scroll = scroll;
+    }
+    ui.motion.flash(Spot::Match { app: ui.focus, line }, ui.now);
 }
 
 // ---------------------------------------------------------------- overlays
@@ -574,7 +588,14 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Migrations => super::migrations::open(ui, controller),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
-        Run::Search => ui.search = Some(Search { typing: true, key, ..Search::default() }),
+        Run::Search => {
+            // / again on the same column brings its last search back, switches and all.
+            let last = ui.search.take().filter(|search| search.key == key);
+            ui.search = Some(match last {
+                Some(search) => Search { typing: true, index: None, ..search },
+                None => Search { typing: true, key, ..Search::default() },
+            });
+        }
         Run::Zoom => ui.zoom = !ui.zoom,
         Run::LevelFilter => {
             let Some(state) = controller.states.get(ui.focus) else { return };

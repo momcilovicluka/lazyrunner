@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.24.0] - 2026-10-28
+
+### Added
+- Search filters, and takes a regex: while typing, `Tab` shows only the matching lines (a dimmed line either side as context; the column's top row says what it hides), `Alt+r` takes the query as a regular expression (one that doesn't compile is searched as plain text, and the prompt says why), `Alt+c` minds case. The prompt counts the matches as you type, and `/` again brings the column's last search back (#29)
+
+### Fixed
+- `n` / `N` step only through the lines a column shows, so with a level filter (`f`) they no longer jump to a hidden line
+
 ## [1.23.0] - 2026-10-28
 
 ### Added

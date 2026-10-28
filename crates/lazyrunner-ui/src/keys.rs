@@ -11,6 +11,10 @@ fn parse_one(token: &str) -> Result<KeyEvent, String> {
         let key = parse_one(rest)?;
         return Ok(KeyEvent::new(key.code, key.modifiers | KeyModifiers::CONTROL));
     }
+    if let Some(rest) = token.strip_prefix("Alt+") {
+        let key = parse_one(rest)?;
+        return Ok(KeyEvent::new(key.code, key.modifiers | KeyModifiers::ALT));
+    }
     let mut chars = token.chars();
     if let (Some(c), None) = (chars.next(), chars.next()) {
         let modifiers = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
