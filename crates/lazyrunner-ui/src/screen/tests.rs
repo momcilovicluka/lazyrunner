@@ -457,16 +457,43 @@ async fn tab_keeps_a_theme_for_this_project_alone_and_enter_gives_it_back() {
     assert_eq!(screen.controller.own_setting("theme"), Some(json!("dracula")));
     assert_eq!(settings.load(Some("another-project"))["theme"], "nord", "every other project keeps theirs");
     let name = screen.controller.project.name.clone();
-    assert!(screen.last_log().ends_with(&format!("(saved for {name})")), "{}", screen.last_log());
+    assert!(screen.last_log().contains(&format!("(saved for {name} in config.json")), "{}", screen.last_log());
 
     screen.press("t");
     let Some(Overlay::Themes { own, .. }) = &screen.ui.overlay else { panic!("the picker is open") };
     assert_eq!(own.as_deref(), Some("dracula"));
-    assert!(screen.frame().contains("◆ this project's own theme"), "{}", screen.frame());
+    assert!(screen.frame().contains("◆ project's own · Tab undoes"), "{}", screen.frame());
     screen.press("g r u v Enter");
     assert_eq!(screen.ui.theme.id, "gruvbox");
     assert_eq!(screen.controller.own_setting("theme"), None, "Enter keeps it for every project, this one too");
     assert_eq!(settings.load(Some("another-project"))["theme"], "gruvbox");
+}
+
+#[tokio::test]
+async fn tab_on_the_projects_own_theme_undoes_it() {
+    let mut screen = screen("themes-own-undo", json!({ "theme": "nord" }));
+    screen.press("t d r a c Tab");
+    assert!(screen.last_log().contains("in config.json, Tab on it again undoes it"), "{}", screen.last_log());
+    screen.press("t Tab");
+    assert!(screen.ui.overlay.is_none());
+    assert_eq!(screen.controller.own_setting("theme"), None, "Tab on its own theme takes it out");
+    assert_eq!(screen.ui.theme.id, "nord", "back to every project's");
+    assert!(screen.last_log().contains("own theme undone in config.json"), "{}", screen.last_log());
+}
+
+#[tokio::test]
+async fn themes_with_the_same_name_show_their_ids() {
+    let mut screen = screen("themes-twins", json!({}));
+    let mine = screen.temp.join("my-themes");
+    std::fs::create_dir_all(&mine).unwrap();
+    std::fs::write(mine.join("onedark.json"), r#"{ "name": "One Dark", "extends": "one-dark" }"#).unwrap();
+    screen.ui.user_themes = Some(mine);
+    screen.press("t o n e d");
+    let frame = screen.frame();
+    assert!(frame.contains("One Dark · one-dark") && frame.contains("One Dark · onedark"), "{frame}");
+    screen.press("Esc t n o r d");
+    let frame = screen.frame();
+    assert!(frame.contains("Nord ") && !frame.contains("Nord ·"), "a name of its own stays as it is: {frame}");
 }
 
 #[tokio::test]
