@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.25.1] - 2026-10-28
+
+### Fixed
+- `r` in the startup checklist stays the checklist's: pressed again while a retry runs it does nothing, and with nothing to retry it only closes the checklist - it no longer goes on to restart the focused app (#46)
+
 ## [1.25.0] - 2026-10-28
 
 ### Added

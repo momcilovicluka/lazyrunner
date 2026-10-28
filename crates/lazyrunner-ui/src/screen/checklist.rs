@@ -110,6 +110,11 @@ impl Checklist {
         }
     }
 
+    /// Whether checks are running: at first, or again after r.
+    pub fn is_checking(&self) -> bool {
+        matches!(self.phase, Phase::Checking)
+    }
+
     /// r: every check is done, none goes on in the background, some failed or warned, and nothing is about to reopen
     /// lazyrunner on a new version.
     pub fn can_retry(&self) -> bool {
