@@ -250,7 +250,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         let icon = icons::icon(nerd, link.icon);
         let label = pad(link.label, LABEL_CELLS);
         let line = if at == index {
-            vec![on(ui.scrolling(&format!(" ▸ {}  {icon}  {label}{}", link.key, link.hint), inner), C::Black, C::Cyan)]
+            let row = ui.scrolling_parts(&[&format!(" ▸ {}  {icon}  ", link.key), &label, link.hint], inner);
+            vec![on(row, C::Black, C::Cyan)]
         } else {
             vec![
                 seg(format!("   {}  ", link.key), C::Cyan),

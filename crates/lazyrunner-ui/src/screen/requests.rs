@@ -446,7 +446,7 @@ fn copy_menu(ui: &Ui, at: usize, title: &str, cells: usize, rows: usize) -> Vec<
         .map(|(choice, (_, key, label, _))| {
             let key = pad(&format!(" {key}"), 5);
             if choice == at {
-                vec![on(ui.scrolling(&format!("{key}{label}"), INNER), C::Black, C::Cyan)]
+                vec![on(ui.scrolling_parts(&[&key, label], INNER), C::Black, C::Cyan)]
             } else {
                 vec![seg(key, C::Cyan), seg(*label, C::White)]
             }

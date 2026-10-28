@@ -97,9 +97,9 @@ fn selected(text: &str, inner: usize) -> Vec<Seg> {
     vec![on(pad(text, inner), C::Black, C::Cyan)]
 }
 
-/// A selected item that scrolls sideways when it doesn't fit (`Ui::scrolling`).
-fn selected_moving(ui: &Ui, text: &str, inner: usize) -> Vec<Seg> {
-    vec![on(ui.scrolling(text, inner), C::Black, C::Cyan)]
+/// A selected item in parts (key, label, hint): when it doesn't fit, only its tail scrolls (`Ui::scrolling_parts`).
+fn selected_parts(ui: &Ui, parts: &[&str], inner: usize) -> Vec<Seg> {
+    vec![on(ui.scrolling_parts(parts, inner), C::Black, C::Cyan)]
 }
 
 /// A box's inner width: room for its widest row, at least `usual` (so boxes keep their size), never more than the
@@ -218,7 +218,8 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
                 return aim(vec![on(line, C::Black, C::Green)], Target::Item(i));
             }
             if i == index {
-                return aim(selected_moving(ui, &format!("{key}{}{hint}", item.label), inner), Target::Item(i));
+                let label = if item.hint.is_empty() { item.label.clone() } else { format!("{}  ", item.label) };
+                return aim(selected_parts(ui, &[&key, &label, &item.hint], inner), Target::Item(i));
             }
             let label_color = if item.label.starts_with("[x]") { C::Green } else { C::White };
             aim(vec![seg(key, C::Cyan), seg(item.label.clone(), label_color), seg(hint, C::DarkGray)], Target::Item(i))
@@ -256,7 +257,7 @@ pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
         .map(|(i, (key, command, hint))| {
             let key = pad(&format!(" {key}"), 5);
             if i == index {
-                return aim(selected_moving(ui, &format!("{key}{command}  {hint}"), inner), Target::Item(i));
+                return aim(selected_parts(ui, &[&key, &format!("{command}  "), hint], inner), Target::Item(i));
             }
             aim(
                 vec![seg(key, C::Cyan), seg(*command, C::White), seg(format!("  {hint}"), C::DarkGray)],
@@ -302,7 +303,7 @@ pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             let key = pad(&format!(" {key}"), 5);
             let label = pad(label, 22);
             if i == index {
-                return aim(selected_moving(ui, &format!("{key}{label}{size}"), INNER), Target::Item(i));
+                return aim(selected_parts(ui, &[&key, &label, &size], INNER), Target::Item(i));
             }
             let color = if lines.is_empty() { C::DarkGray } else { C::White };
             aim(vec![seg(key, C::Cyan), seg(label, color), seg(size, C::DarkGray)], Target::Item(i))

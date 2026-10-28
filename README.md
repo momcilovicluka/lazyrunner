@@ -288,8 +288,9 @@ flash, the column that gets the focus pulses, a box opens from its middle, a set
 light up in their column, the line the search jumps to flashes, and column widths and scrolling glide. Long work moves
 for as long as it lasts: builds, starts, npm, tests and migrations have a spinner and a bar against the usual time,
 and with `restartOnCodeChange` a saved change counts down to the rebuild. None of it holds you up - a key acts at once,
-also during the startup checklist or the reload show, which it ends. Boxes grow to fit their longest row, and a
-selected row still too long for the terminal scrolls sideways to show the rest. `, f` (reduced motion) turns it all
+also during the startup checklist or the reload show, which it ends. Boxes grow to fit their longest row, and when
+a selected row is still too long for the terminal its hint scrolls sideways to show the rest, its key and label staying
+put. `, f` (reduced motion) turns it all
 off.
 
 ### During a build

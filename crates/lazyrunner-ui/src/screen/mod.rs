@@ -46,6 +46,8 @@ use unicode_width::UnicodeWidthStr;
 const MIN_SIZE: (u16, u16) = (60, 15);
 /// The theme picker's panel: a third of the width, within these.
 const THEME_PANEL: (usize, usize) = (30, 40);
+/// The least room a selected row's scrolling tail gets; with less, more of the row scrolls.
+const MIN_SCROLLING_TAIL: usize = 12;
 /// The PowerShell version redrew every 100 ms; its frame-counted animations (spinners, glints, blinking cursors)
 /// keep that pace here at any frame rate.
 const ANIMATION_TICK: Duration = Duration::from_millis(100);
@@ -368,6 +370,25 @@ impl Ui {
             }
         };
         seg::marquee(text, cells, self.now.saturating_duration_since(since).as_secs_f64())
+    }
+
+    /// A selected row given in parts (its key, label, hint...) in exactly `cells`: when it doesn't fit, only its tail
+    /// scrolls sideways - the hint, in the room the key and label leave, or all after the key when the label doesn't fit
+    /// either - so what names the row stays where it is.
+    pub fn scrolling_parts(&self, parts: &[&str], cells: usize) -> String {
+        let parts: Vec<&str> = parts.iter().copied().filter(|part| !part.is_empty()).collect();
+        let whole = parts.concat();
+        if whole.width() <= cells {
+            return seg::pad(&whole, cells);
+        }
+        for keep in (1..parts.len()).rev() {
+            let fixed = parts[..keep].concat();
+            let room = cells.saturating_sub(fixed.width());
+            if room >= MIN_SCROLLING_TAIL {
+                return format!("{fixed}{}", self.scrolling(&parts[keep..].concat(), room));
+            }
+        }
+        self.scrolling(&whole, cells)
     }
 
     /// The text cursor of a prompt, blinking.
