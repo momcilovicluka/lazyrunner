@@ -28,6 +28,6 @@ rted.                ┃): something is off  │                     │        
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all     :  commands   x  menu   ?  keys   ,  settings
- /error▏   search Orders · Enter finds · Esc cancels
+ /error▏   Orders · 1 match · Tab filter · Alt+r regex · Alt+c case · Enter finds · Esc cancels
  12:00:00 Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

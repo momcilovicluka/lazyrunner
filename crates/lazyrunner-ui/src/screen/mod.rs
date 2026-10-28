@@ -63,6 +63,48 @@ pub struct Search {
     pub note: String,
     pub position: usize,
     pub total: usize,
+    /// Tab while typing: the column shows only the matching lines, a line either side as context.
+    pub filter: bool,
+    /// Alt+r: the query is a regular expression; Alt+c: its case counts.
+    pub regex: bool,
+    pub case: bool,
+    /// The regular expression, compiled; why it didn't (then it searches as plain text).
+    pattern: Option<regex::Regex>,
+    pub invalid: Option<String>,
+}
+
+impl Search {
+    /// Whether `text` matches: the regular expression (Alt+r), else the query as typed; any case unless Alt+c.
+    pub fn matches(&self, text: &str) -> bool {
+        if self.query.is_empty() {
+            return false;
+        }
+        if let Some(pattern) = &self.pattern {
+            return pattern.is_match(text);
+        }
+        if self.case { text.contains(&self.query) } else { columns::contains_ignore_case(text, &self.query) }
+    }
+
+    /// Compiles the query again once it or a switch changed.
+    pub fn refresh(&mut self) {
+        (self.pattern, self.invalid) = (None, None);
+        if !self.regex || self.query.is_empty() {
+            return;
+        }
+        match regex::RegexBuilder::new(&self.query).case_insensitive(!self.case).build() {
+            Ok(pattern) => self.pattern = Some(pattern),
+            Err(error) => {
+                let why = error.to_string().lines().last().unwrap_or_default().trim().to_string();
+                self.invalid = Some(why.trim_start_matches("error: ").to_string());
+            }
+        }
+    }
+
+    /// The switches that are on, as the panel says them: "filtered · regex · case".
+    pub fn switches(&self) -> String {
+        let on = [(self.filter, "filtered"), (self.regex, "regex"), (self.case, "case")];
+        on.iter().filter(|(on, _)| *on).map(|(_, name)| *name).collect::<Vec<_>>().join(" · ")
+    }
 }
 
 pub enum Overlay {

@@ -517,10 +517,11 @@ fn body(
     let state = &controller.states[index];
     let search = ui.search.as_ref().filter(|search| !search.query.is_empty() && search.key == state.key);
     let total = state.output.len();
-    // A filtered column (f) says on its top row what it hides, and shows only the lines it lets through.
-    let filtered = state.filter != LevelFilter::All;
-    let shown =
-        if filtered { state.output.newest_first(0).filter(|line| state.filter.admits(line)).count() } else { total };
+    let list = shown_lines(state, search);
+    let searching = search.is_some_and(|search| search.filter);
+    // A filtered column (f, or a search that filters) says on its top row what it hides.
+    let filtered = state.filter != LevelFilter::All || searching;
+    let shown = list.len();
     let rows = if filtered { rows.saturating_sub(1) } else { rows };
     // More lines than rows: the last cell is a scrollbar.
     let scrollable = shown > rows && rows > 0 && column > 1;
@@ -528,13 +529,12 @@ fn body(
     let scroll = scroll.min(shown.saturating_sub(1));
     let copied = ui.motion.copied(index, ui.now);
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
-    let lines = state.output.newest_first(0).enumerate().filter(|(_, line)| state.filter.admits(line)).skip(scroll);
-    for (back, line) in lines {
+    for item in list.iter().rev().skip(scroll) {
         if result.len() >= rows {
             break;
         }
-        let position = total - 1 - back; // 0 = the oldest line kept
-        let mut color = line_color(line);
+        let (position, line) = (item.position, item.line); // position: 0 = the oldest line kept
+        let mut color = if item.context { C::DarkGray } else { line_color(line) };
         let mut back = None;
         let age = ui.now.saturating_duration_since(line.born);
         if ui.reduced_motion {
@@ -545,7 +545,7 @@ fn body(
             color = bright(color);
         }
         if let Some(search) = search
-            && contains_ignore_case(&line.text, &search.query)
+            && search.matches(&line.text)
         {
             if search.index == Some(position) {
                 let jumped =
@@ -598,10 +598,57 @@ fn body(
     if filtered {
         let hidden = total - shown;
         let lines = if hidden == 1 { "line" } else { "lines" };
-        let note = format!(" ⧩ {} · {hidden} {lines} hidden - f shows all", state.filter.label());
+        let level = state.filter != LevelFilter::All;
+        let mut what = Vec::new();
+        if level {
+            what.push(format!("⧩ {}", state.filter.label()));
+        }
+        if let Some(search) = search.filter(|_| searching) {
+            what.push(format!("⌕ /{} and a line either side", search.query));
+        }
+        let undo = match (level, searching) {
+            (true, true) => "f, Esc show all",
+            (false, true) => "Esc shows all",
+            _ => "f shows all",
+        };
+        let note = format!(" {} · {hidden} {lines} hidden - {undo}", what.join(" · "));
         result.insert(0, fit(vec![seg(note, C::DarkCyan)], column));
     }
     result
+}
+
+/// A line a column shows: where it is among the lines kept (0 = the oldest), and whether it's only there as context
+/// around a match (a search that filters).
+pub struct Shown<'a> {
+    pub position: usize,
+    pub line: &'a OutputLine,
+    pub context: bool,
+}
+
+/// The lines a column shows, oldest first: those its level filter (f) lets through, and while its search filters
+/// (Tab), only the matches among them, with a line either side.
+pub fn shown_lines<'a>(state: &'a AppState, search: Option<&super::Search>) -> Vec<Shown<'a>> {
+    let total = state.output.len();
+    let mut kept: Vec<(usize, &OutputLine)> = state
+        .output
+        .newest_first(0)
+        .enumerate()
+        .filter(|(_, line)| state.filter.admits(line))
+        .map(|(back, line)| (total - 1 - back, line))
+        .collect();
+    kept.reverse();
+    let filtering = search.filter(|search| search.filter && !search.query.is_empty() && search.key == state.key);
+    let Some(search) = filtering else {
+        return kept.into_iter().map(|(position, line)| Shown { position, line, context: false }).collect();
+    };
+    let hits: Vec<bool> = kept.iter().map(|(_, line)| search.matches(&line.text)).collect();
+    kept.into_iter()
+        .enumerate()
+        .filter_map(|(at, (position, line))| {
+            let near = (at > 0 && hits[at - 1]) || hits.get(at + 1).copied().unwrap_or(false);
+            (hits[at] || near).then_some(Shown { position, line, context: !hits[at] })
+        })
+        .collect()
 }
 
 /// A piece of a line (its bytes `start..` in the line) in segments: its links underlined and clickable.

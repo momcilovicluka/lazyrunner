@@ -5,7 +5,7 @@
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::Status as AppStatus;
 
-use super::columns::hue_color;
+use super::columns::{self, hue_color};
 use super::icons::{self, Icon};
 use super::motion::Spot;
 use super::mouse::Target;
@@ -163,19 +163,34 @@ fn notice(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     if let Some(search) = &ui.search {
         if search.typing {
             let name = controller.app(&search.key).map_or("", |app| app.name.as_str());
-            return vec![
-                seg(" /", C::Cyan),
-                seg(search.query.clone(), C::White),
-                seg(ui.cursor(), C::Cyan),
-                seg(format!("   search {name} · Enter finds · Esc cancels"), C::DarkGray),
-            ];
+            let count = controller.state(&search.key).map_or(0, |state| {
+                columns::shown_lines(state, None).iter().filter(|item| search.matches(&item.line.text)).count()
+            });
+            let matches = if count == 1 { "match" } else { "matches" };
+            let switch = |on: bool, text: &str| seg(text.to_string(), if on { C::Cyan } else { C::DarkGray });
+            let mut segs = vec![seg(" /", C::Cyan), seg(search.query.clone(), C::White), seg(ui.cursor(), C::Cyan)];
+            if let Some(why) = &search.invalid {
+                segs.push(seg(format!("   ! not a regex, so as plain text ({why})"), C::Yellow));
+            }
+            segs.extend([
+                seg(format!("   {name} · {count} {matches} · "), C::DarkGray),
+                switch(search.filter, "Tab filter"),
+                seg(" · ", C::DarkGray),
+                switch(search.regex, "Alt+r regex"),
+                seg(" · ", C::DarkGray),
+                switch(search.case, "Alt+c case"),
+                seg(" · Enter finds · Esc cancels", C::DarkGray),
+            ]);
+            return segs;
         }
         let no_match = search.note == "no match";
+        let switches = search.switches();
+        let switches = if switches.is_empty() { switches } else { format!(" · {switches}") };
         let place = if no_match {
-            "no match".to_string()
+            format!("no match{switches}")
         } else {
             let note = if search.note.is_empty() { String::new() } else { format!(" · {}", search.note) };
-            format!("match {} of {} (1 = newest){note}", search.position, search.total)
+            format!("match {} of {} (1 = newest){note}{switches}", search.position, search.total)
         };
         return vec![
             seg(format!(" /{}", search.query), C::Cyan),
