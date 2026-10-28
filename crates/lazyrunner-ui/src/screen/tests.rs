@@ -2032,6 +2032,40 @@ async fn f_filters_the_focused_column_by_level_and_says_what_it_hides() {
 }
 
 #[tokio::test]
+async fn m_marks_lines_brackets_jump_between_them_and_the_marks_box_lists_them() {
+    let mut screen = screen("marks", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    for n in 1..=60 {
+        screen.controller.states[0].add_line(&format!("line {n}"), Hue::Gray, at);
+    }
+    screen.press("z m");
+    assert_eq!(screen.controller.states[0].marks, [60], "following: the newest line");
+    assert!(screen.last_log().starts_with("Marked Orders: line 60"), "{}", screen.last_log());
+    screen.controller.states[0].scroll = 30;
+    screen.press("m");
+    assert_eq!(screen.controller.states[0].marks, [30, 60], "scrolled back: the line at the bottom");
+    assert!(screen.frame().contains("▌line 30"), "{}", screen.frame());
+    screen.press("]");
+    assert!(screen.frame().contains("▌line 60"), "] to the newer mark: {}", screen.frame());
+    screen.press("[");
+    assert!(screen.frame().contains("▌line 30"), "[ back to the older one: {}", screen.frame());
+
+    screen.press("'");
+    let frame = screen.frame();
+    assert!(frame.contains("Marks") && frame.contains("line 30") && frame.contains("line 60"), "{frame}");
+    screen.press("d");
+    assert_eq!(screen.controller.states[0].marks, [60], "d unmarks");
+    screen.press("Esc");
+    screen.controller.states[0].scroll = 30;
+    screen.press("m m");
+    assert_eq!(screen.controller.states[0].marks, [60], "m again unmarks");
+    screen.controller.states[0].reset_for_start();
+    assert!(screen.controller.states[0].marks.is_empty(), "a new run, its output over again");
+    screen.press("'");
+    assert!(screen.last_log().starts_with("No marks yet"), "{}", screen.last_log());
+}
+
+#[tokio::test]
 async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     let mut screen = screen("checklist-bar", json!({}));
     let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };

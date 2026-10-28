@@ -343,17 +343,23 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         entries.push(vec![seg(group, C::Cyan)]);
         for action in all.iter().filter(|action| action.group == group) {
             let key = action.key.as_str();
-            // A focused-app key and its uppercase twin for every app share a line (u U); other keys stand alone (d D).
+            // A focused-app key and its uppercase twin for every app, in the same group, share a line (u U); other
+            // keys stand alone (d D, m M).
             let is_upper = key.len() == 1 && key.chars().all(|c| c.is_ascii_uppercase());
-            if is_upper && all.iter().any(|other| other.focused && other.key == key.to_lowercase()) {
+            let twinned = |other: &Action| other.group == action.group;
+            if is_upper && all.iter().any(|other| twinned(other) && other.focused && other.key == key.to_lowercase()) {
                 continue;
             }
             if key == "-" {
                 continue;
             }
-            let twin = all
-                .iter()
-                .find(|other| action.focused && other.key != key && other.key == key.to_uppercase() && key.len() == 1);
+            let twin = all.iter().find(|other| {
+                twinned(other)
+                    && action.focused
+                    && other.key != key
+                    && other.key == key.to_uppercase()
+                    && key.len() == 1
+            });
             if let Some(twin) = twin {
                 entries.push(entry(
                     &format!("{key} {}", twin.key),
