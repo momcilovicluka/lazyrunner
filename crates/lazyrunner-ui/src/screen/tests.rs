@@ -1863,6 +1863,28 @@ async fn the_menus_wrap_around_at_their_ends() {
 }
 
 #[tokio::test]
+async fn a_long_row_widens_its_box_and_a_selected_one_still_too_long_scrolls() {
+    let mut screen = screen("menus-long", json!({}));
+    let label = "L opens the git tool beside lazyrunner (Windows Terminal)";
+    screen.press(",");
+    assert!(screen.frame().contains(label), "the box makes room for it: {}", screen.frame());
+    let at =
+        super::overlays::menu_items(&screen.ui, &screen.controller).iter().position(|item| item.key == "g").unwrap();
+    if let Some(Overlay::Settings { index }) = &mut screen.ui.overlay {
+        *index = at;
+    }
+    let narrow = screen.render(64, 32);
+    assert!(narrow.contains("L opens the git tool") && !narrow.contains("(Windows Terminal)"), "{narrow}");
+    assert!(screen.ui.is_animating(&screen.controller), "it scrolls, so frames keep coming");
+    screen.ui.now += Duration::from_secs(3);
+    let later = screen.render(64, 32);
+    assert!(later.contains("(Windows Terminal)"), "then it shows its end: {later}");
+    screen.press("k");
+    screen.frame();
+    assert!(screen.ui.marquee.borrow().is_none(), "a row that fits doesn't scroll");
+}
+
+#[tokio::test]
 async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     let mut screen = screen("checklist-bar", json!({}));
     let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };

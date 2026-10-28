@@ -7,19 +7,19 @@ expression: screen.frame()
 
 
 
-                     ┌─ Orders ─────────────────────────────────────────────────────────┐
-                     │  Space  Start / stop the focused app  whichever it is not        │
-                     │  u      Start the focused app  builds it first if it changed     │
-                     │  s      Stop the focused app  or cancel its build / npm ci       │
-                     │  r      Restart the focused app  rebuild if it changed           │
-                     │  b      Build the focused app  full build, then it stays stopped │
-                     │  w      Open the focused app in the browser  Swagger for an API  │
-                     │  o      Open the focused app's log file  its full output         │
-                     │  y      Copy (yank)  the last error, every error or warning, th… │
-                     │  /      Search the focused app's output  n older match, N newer  │
-                     │  z      Zoom the focused column                                  │
-                     │ press a key, or j k + Enter · Esc / x close                      │
-                     └──────────────────────────────────────────────────────────────────┘
+        ┌─ Orders ──────────────────────────────────────────────────────────────────────────────────┐
+        │  Space  Start / stop the focused app  whichever it is not                                 │
+        │  u      Start the focused app  builds it first if it changed                              │
+        │  s      Stop the focused app  or cancel its build / npm ci                                │
+        │  r      Restart the focused app  rebuild if it changed                                    │
+        │  b      Build the focused app  full build, then it stays stopped                          │
+        │  w      Open the focused app in the browser  Swagger for an API                           │
+        │  o      Open the focused app's log file  its full output                                  │
+        │  y      Copy (yank)  the last error, every error or warning, the search match, the output │
+        │  /      Search the focused app's output  n older match, N newer                           │
+        │  z      Zoom the focused column                                                           │
+        │ press a key, or j k + Enter · Esc / x close                                               │
+        └───────────────────────────────────────────────────────────────────────────────────────────┘
 
 
 

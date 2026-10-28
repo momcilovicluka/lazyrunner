@@ -223,7 +223,12 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         _ => 0,
     };
     let (nerd, animated, tick, seconds) = (ui.nerd, !ui.reduced_motion, ui.tick(), ui.seconds());
-    let inner = cells.saturating_sub(8).clamp(20, INNER);
+    let widest = all
+        .iter()
+        .map(|link| 8 + icons::icon(nerd, link.icon).width() + LABEL_CELLS + link.hint.width())
+        .max()
+        .unwrap_or(0);
+    let inner = super::overlays::fit_inner(cells, INNER, widest);
     let mut lines = vec![
         version_line(controller, nerd),
         vec![seg("  Runs a project's .NET and npm apps side by side.", C::Gray)],
@@ -245,7 +250,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         let icon = icons::icon(nerd, link.icon);
         let label = pad(link.label, LABEL_CELLS);
         let line = if at == index {
-            vec![on(pad(&format!(" ▸ {}  {icon}  {label}{}", link.key, link.hint), inner), C::Black, C::Cyan)]
+            vec![on(ui.scrolling(&format!(" ▸ {}  {icon}  {label}{}", link.key, link.hint), inner), C::Black, C::Cyan)]
         } else {
             vec![
                 seg(format!("   {}  ", link.key), C::Cyan),
@@ -273,7 +278,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     }
     let sparkle = if animated { SPARKLES[(tick / 3) as usize % SPARKLES.len()] } else { SPARKLES[0] };
     let footer = "a letter, or j k + Enter · Esc closes";
-    boxed(&format!("{sparkle} About lazyrunner"), lines, footer, cells, rows, INNER)
+    boxed(&format!("{sparkle} About lazyrunner"), lines, footer, cells, rows, inner)
 }
 
 /// The logo, centred, in rainbow colours flowing across it, a rainbow rule flowing the other way under it. Still:

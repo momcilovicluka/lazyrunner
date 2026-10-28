@@ -27,6 +27,7 @@ mod tests;
 pub mod theme;
 pub mod theme_picker;
 
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -40,6 +41,7 @@ use ratatui::style::Style;
 
 use seg::{Seg, seg as s};
 use theme::{C, Theme};
+use unicode_width::UnicodeWidthStr;
 
 const MIN_SIZE: (u16, u16) = (60, 15);
 /// The theme picker's panel: a third of the width, within these.
@@ -228,6 +230,10 @@ pub struct Ui {
     pub theme_changed: Instant,
     /// A theme was just kept: it ripples out over the screen.
     pub theme_ripple: Option<theme_picker::Ripple>,
+    /// The selected row scrolling sideways because it doesn't fit its box, and since when (a new one starts over).
+    pub marquee: RefCell<Option<(String, Instant)>>,
+    /// Whether a row scrolled in the frame being drawn (when none did, `marquee` is let go).
+    marquee_seen: Cell<bool>,
     pub user_themes: Option<PathBuf>,
     pub exit: Option<Exit>,
     /// An installed lazyrunner version to switch to once nothing is in the way (the apps are handed over to it).
@@ -282,6 +288,8 @@ impl Ui {
             theme: themes[0].clone(),
             theme_changed: now,
             theme_ripple: None,
+            marquee: RefCell::new(None),
+            marquee_seen: Cell::new(false),
             themes,
             user_themes,
             exit: None,
@@ -338,6 +346,27 @@ impl Ui {
         shown
     }
 
+    /// A selected row's `text` in exactly `cells`: when it doesn't fit, it scrolls sideways to show the rest (cut with
+    /// … with reduced motion).
+    pub fn scrolling(&self, text: &str, cells: usize) -> String {
+        if text.width() <= cells {
+            return seg::pad(text, cells);
+        }
+        if self.reduced_motion {
+            return seg::ellipsis(text, cells);
+        }
+        self.marquee_seen.set(true);
+        let mut marquee = self.marquee.borrow_mut();
+        let since = match marquee.as_ref() {
+            Some((shown, at)) if shown == text => *at,
+            _ => {
+                *marquee = Some((text.to_string(), self.now));
+                self.now
+            }
+        };
+        seg::marquee(text, cells, self.now.saturating_duration_since(since).as_secs_f64())
+    }
+
     /// The text cursor of a prompt, blinking.
     pub fn cursor(&self) -> &'static str {
         if self.reduced_motion || self.tick() % 10 < 5 { "▏" } else { " " }
@@ -345,7 +374,11 @@ impl Ui {
 
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
-        if self.reload.is_some() || self.theme_ripple.is_some() || self.motion.active(self.now) {
+        if self.reload.is_some()
+            || self.theme_ripple.is_some()
+            || self.marquee.borrow().is_some()
+            || self.motion.active(self.now)
+        {
             return true;
         }
         if self.reduced_motion {
@@ -384,6 +417,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.reduced_motion = controller.setting(Toggle::ReducedMotion);
     ui.nerd = controller.setting(Toggle::NerdIcons);
     ui.motion.reduced = ui.reduced_motion;
+    ui.marquee_seen.set(false);
     let typing = ui.search.as_ref().is_some_and(|search| search.typing);
     if ui.overlay.is_none() && ui.picker.is_none() && !typing {
         ui.overlay = ui.behind.take(); // what was opened from a view closed: the view again
@@ -432,6 +466,9 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     let touch = seg::Touch { hover: ui.hover, pressed: ui.motion.pressed(ui.now) };
     for (y, row) in rows.iter().enumerate().take(height) {
         seg::draw(buf, area.x, area.y + y as u16, area.width, row, &ui.theme, &mut ui.hits, touch);
+    }
+    if !ui.marquee_seen.get() {
+        ui.marquee.replace(None);
     }
     theme_picker::paint_ripple(buf, area, ui);
     reload::paint(buf, area, ui);

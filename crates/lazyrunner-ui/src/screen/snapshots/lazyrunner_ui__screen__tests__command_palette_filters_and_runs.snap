@@ -3,26 +3,26 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
 
-           ┌─ Commands ───────────────────────────────────────────────────────────────────────────┐
-           │ › rest▏                                                                  41 commands │
-           │ ──────────────────────────────────────────────────────────────────────────────────── │
-           │  ◆  Restart Orders  rebuild if it changed                                        r   │
-           │  ▸  Restart all  rebuild if anything changed                                     R   │
-           │  ≡  [ ] Auto-restart on branch change                                        ,   a   │
-           │  ≡  [x] Stop/Restart all include the frontend                                ,   s   │
-           │  ≡  [ ] Restart the APIs when code changes                                   ,   e   │
-           │  ✱  Requests: what the .NET apps served  newest or slowest, per endpoint; filt…  H   │
-           │  ≡  Run the startup checklist now (and check for an update)                  ,   r   │
-           │  ?  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklis…  ,   │
-           │  ✱  Tests: run the project's test suites  dotnet test, jest, vitest - several …  T   │
-           │  ≡  [x] Startup checklist when lazyrunner opens                              ,   w   │
-           │  ◆  Open Orders in the browser  Swagger for an API                               w   │
-           │  ≡  [ ] L opens the git tool beside lazyrunner (Windows Terminal)            ,   g   │
-           │  ◆  Search Orders' output  n older match, N newer                                /   │
-           │  ≡  [ ] Nerd Font icons (the terminal's font a Nerd Font Mono)               ,   i   │
-           │  ≡  About lazyrunner: version, contributors, links                           ,   A   │
-           │ type to search · ↑↓ choose · Enter run · Esc close                                   │
-           └──────────────────────────────────────────────────────────────────────────────────────┘
+  ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ › rest▏                                                                                    41 commands │
+  │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
+  │  ◆  Restart Orders  rebuild if it changed                                                          r   │
+  │  ▸  Restart all  rebuild if anything changed                                                       R   │
+  │  ≡  [ ] Auto-restart on branch change                                                          ,   a   │
+  │  ≡  [x] Stop/Restart all include the frontend                                                  ,   s   │
+  │  ≡  [ ] Restart the APIs when code changes                                                     ,   e   │
+  │  ✱  Requests: what the .NET apps served  newest or slowest, per endpoint; filter, copy, open       H   │
+  │  ≡  Run the startup checklist now (and check for an update)                                    ,   r   │
+  │  ?  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklist…                   ,   │
+  │  ✱  Tests: run the project's test suites  dotnet test, jest, vitest - several at once in the bac…  T   │
+  │  ≡  [x] Startup checklist when lazyrunner opens                                                ,   w   │
+  │  ◆  Open Orders in the browser  Swagger for an API                                                 w   │
+  │  ≡  [ ] L opens the git tool beside lazyrunner (Windows Terminal)                              ,   g   │
+  │  ◆  Search Orders' output  n older match, N newer                                                  /   │
+  │  ≡  [ ] Nerd Font icons (the terminal's font a Nerd Font Mono)                                 ,   i   │
+  │  ≡  About lazyrunner: version, contributors, links                                             ,   A   │
+  │ type to search · ↑↓ choose · Enter run · Esc close                                                     │
+  └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────

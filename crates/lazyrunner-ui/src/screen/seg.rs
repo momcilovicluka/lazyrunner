@@ -174,9 +174,57 @@ pub fn text_of(value: &Value) -> String {
     }
 }
 
+/// How fast a selected row too long for its box scrolls sideways, and how long it rests at either end.
+const MARQUEE_CELLS_PER_SECOND: f64 = 10.0;
+const MARQUEE_REST: f64 = 1.2;
+
+/// `text` in exactly `cells`: as it is when it fits; otherwise `seconds` into scrolling sideways through it - resting
+/// at its start, moving along to its end, resting there, then from the start again.
+pub fn marquee(text: &str, cells: usize, seconds: f64) -> String {
+    let overflow = text.width().saturating_sub(cells);
+    if overflow == 0 {
+        return pad(text, cells);
+    }
+    let travel = overflow as f64 / MARQUEE_CELLS_PER_SECOND;
+    let at = seconds % (2.0 * MARQUEE_REST + travel);
+    let offset = (((at - MARQUEE_REST).max(0.0) * MARQUEE_CELLS_PER_SECOND) as usize).min(overflow);
+    let mut skipped = 0;
+    let rest: String = text
+        .graphemes(true)
+        .skip_while(|grapheme| {
+            let skip = skipped < offset;
+            if skip {
+                skipped += grapheme.width();
+            }
+            skip
+        })
+        .collect();
+    pad(&rest, cells)
+}
+
+/// `text` in exactly `cells`, cut with … when it doesn't fit.
+pub fn ellipsis(text: &str, cells: usize) -> String {
+    if text.width() <= cells {
+        return pad(text, cells);
+    }
+    format!("{}…", take_cells(text, cells.saturating_sub(1)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_row_too_long_scrolls_sideways_resting_at_both_ends() {
+        let text = "abcdefghij";
+        assert_eq!(marquee("short", 8, 5.0), "short   ", "a row that fits stays put");
+        assert_eq!(marquee(text, 6, 0.0), "abcdef", "resting at its start");
+        assert_eq!(marquee(text, 6, MARQUEE_REST + 0.25), "cdefgh", "moving along");
+        assert_eq!(marquee(text, 6, MARQUEE_REST + 1.0), "efghij", "resting at its end");
+        assert_eq!(marquee(text, 6, 2.0 * MARQUEE_REST + 0.5), "abcdef", "from the start again");
+        assert_eq!(ellipsis(text, 6), "abcde…");
+        assert_eq!(ellipsis("abc", 6), "abc   ");
+    }
 
     #[test]
     fn rows_are_cut_with_an_ellipsis() {
