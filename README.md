@@ -231,6 +231,7 @@ at once while the palette wipes away.
 | `gg` / `G` (`Home` / `End`) | Oldest output / follow new output again |
 | `/`, `n` / `N`, `Esc` | Search the focused column (matches highlighted), older / newer match, clear |
 | `z` | Zoom: only the focused column |
+| `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
 | `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
 | `<` / `>` | The first / last: the oldest output and following new output again in a column, the first and last item in a list or box (as in lazygit) |
 | `\|` | Layout: auto (stacked below 120 cells) → columns side by side → stacked top to bottom (saved) |

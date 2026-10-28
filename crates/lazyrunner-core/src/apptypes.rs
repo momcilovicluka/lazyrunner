@@ -79,6 +79,11 @@ fn has_app(apps: &[App], key: &str) -> bool {
     apps.iter().any(|app| app.key.eq_ignore_ascii_case(key))
 }
 
+/// The column's level filter (`f`): `"apps": { "<key>": { "filter": "errors" } }`; all lines without one.
+pub fn level_filter(config: &Value, key: &str) -> crate::output::LevelFilter {
+    crate::output::LevelFilter::from_key(app_setting(config, key, "filter").as_str().unwrap_or_default())
+}
+
 /// Whether the app runs on this machine: `"apps": { "<key>": { "enabled": false } }` turns one off, and
 /// `"frontend": false` every frontend.
 pub fn is_enabled(config: &Value, app: &App) -> bool {

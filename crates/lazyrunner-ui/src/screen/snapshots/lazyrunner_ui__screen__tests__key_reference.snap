@@ -10,23 +10,23 @@ expression: screen.frame()
   │ Run                                                         View                                       │
   │   Space       Start / stop the focused app                    /           Search the focused app's ou… │
   │   u U         Start · focused / all                           z           Zoom the focused column      │
-  │   s S         Stop · focused / all                            + -         Widen / narrow the focused … │
-  │   r R         Restart · focused / all                         =           Equal column widths          │
-  │   b B         Build · focused / all                           |           Layout: columns → next       │
-  │   q           Quit                                            Ctrl+L      Clear output                 │
-  │ Tools                                                         Ctrl+R      Reload window                │
-  │   d           Switch database                                 t           Theme picker (Default)       │
-  │   i           Install packages: npm ci or npm install       Help                                       │
-  │   i c         npm ci                                          ,           Settings (on/off toggles, r… │
-  │   i n         npm install                                     ?           Key reference                │
-  │   w W         Open in the browser · focused / all             :           Command palette              │
-  │   o           Open the focused app's log file               Navigate                                   │
-  │   y           Copy (yank)                                     h l Tab     focus another column         │
-  │   D           Durations                                       1-5         jump to a column             │
-  │   H           Requests: what the .NET apps served             j k ↑ ↓     scroll a line                │
-  │   M           Migrations: what's applied to the database      ^u ^d ^b ^f half page / page (PgUp PgDn) │
-  │   T           Tests: run the project's test suites            gg G < >    oldest / follow new output   │
-  │   L           lazygit: git without leaving lazyrunner         n N Esc     search: older / newer / cle… │
-  │   x           Menu for the focused app                                                                 │
+  │   s S         Stop · focused / all                            f           Filter the focused column b… │
+  │   r R         Restart · focused / all                         + -         Widen / narrow the focused … │
+  │   b B         Build · focused / all                           =           Equal column widths          │
+  │   q           Quit                                            |           Layout: columns → next       │
+  │ Tools                                                         Ctrl+L      Clear output                 │
+  │   d           Switch database                                 Ctrl+R      Reload window                │
+  │   i           Install packages: npm ci or npm install         t           Theme picker (Default)       │
+  │   i c         npm ci                                        Help                                       │
+  │   i n         npm install                                     ,           Settings (on/off toggles, r… │
+  │   w W         Open in the browser · focused / all             ?           Key reference                │
+  │   o           Open the focused app's log file                 :           Command palette              │
+  │   y           Copy (yank)                                   Navigate                                   │
+  │   D           Durations                                       h l Tab     focus another column         │
+  │   H           Requests: what the .NET apps served             1-5         jump to a column             │
+  │   M           Migrations: what's applied to the database      j k ↑ ↓     scroll a line                │
+  │   T           Tests: run the project's test suites            ^u ^d ^b ^f half page / page (PgUp PgDn) │
+  │   L           lazygit: git without leaving lazyrunner         gg G < >    oldest / follow new output   │
+  │   x           Menu for the focused app                        n N Esc     search: older / newer / cle… │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

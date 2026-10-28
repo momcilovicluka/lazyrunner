@@ -212,7 +212,8 @@ fn scroll(ui: &Ui, controller: &mut Controller, lines: isize) {
 /// Scrolls a column `lines` back (negative: towards the newest).
 pub fn scroll_column(controller: &mut Controller, index: usize, lines: isize) {
     if let Some(state) = controller.states.get_mut(index) {
-        let max = state.output.len().saturating_sub(1);
+        let shown = state.output.newest_first(0).filter(|line| state.filter.admits(line)).count();
+        let max = shown.saturating_sub(1);
         state.scroll = state.scroll.saturating_add_signed(lines).min(max);
     }
 }
@@ -575,6 +576,13 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => ui.search = Some(Search { typing: true, key, ..Search::default() }),
         Run::Zoom => ui.zoom = !ui.zoom,
+        Run::LevelFilter => {
+            let Some(state) = controller.states.get(ui.focus) else { return };
+            let (key, filter) = (state.key.clone(), state.filter.next());
+            controller.set_level_filter(&key, filter);
+            let name = controller.apps.get(ui.focus).map_or(key, |app| app.name.clone());
+            controller.add_log(format!("{name}: {} (f: {})", filter.label(), filter.next().label()), Hue::Cyan);
+        }
         Run::Widen => resize(controller, &key, 5.0),
         Run::Narrow => resize(controller, &key, -5.0),
         Run::EqualWidths => {

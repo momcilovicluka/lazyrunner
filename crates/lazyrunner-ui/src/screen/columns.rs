@@ -5,7 +5,7 @@ use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
 use lazyrunner_core::links;
-use lazyrunner_core::output::{Hue, Level, OutputLine};
+use lazyrunner_core::output::{Hue, Level, LevelFilter, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
 use lazyrunner_core::run::format_duration;
@@ -442,6 +442,9 @@ fn info(controller: &Controller, index: usize, cells: usize, nerd: bool) -> Vec<
     if state.warnings > 0 {
         segs.push(seg(format!("  △ {}", state.warnings), C::Yellow));
     }
+    if state.filter != LevelFilter::All {
+        segs.push(seg(format!("  ⧩ {}", state.filter.label()), C::Cyan));
+    }
     if let Some(mode) = controller.mode(&state.key) {
         segs.push(seg(format!("  {} · {}", mode.label, mode.script), C::DarkGray));
     }
@@ -514,17 +517,23 @@ fn body(
     let state = &controller.states[index];
     let search = ui.search.as_ref().filter(|search| !search.query.is_empty() && search.key == state.key);
     let total = state.output.len();
+    // A filtered column (f) says on its top row what it hides, and shows only the lines it lets through.
+    let filtered = state.filter != LevelFilter::All;
+    let shown =
+        if filtered { state.output.newest_first(0).filter(|line| state.filter.admits(line)).count() } else { total };
+    let rows = if filtered { rows.saturating_sub(1) } else { rows };
     // More lines than rows: the last cell is a scrollbar.
-    let scrollable = total > rows && rows > 0 && column > 1;
+    let scrollable = shown > rows && rows > 0 && column > 1;
     let cells = if scrollable { column - 1 } else { column };
-    let scroll = scroll.min(total.saturating_sub(1));
+    let scroll = scroll.min(shown.saturating_sub(1));
     let copied = ui.motion.copied(index, ui.now);
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
-    for (offset, line) in state.output.newest_first(scroll).enumerate() {
+    let lines = state.output.newest_first(0).enumerate().filter(|(_, line)| state.filter.admits(line)).skip(scroll);
+    for (back, line) in lines {
         if result.len() >= rows {
             break;
         }
-        let position = total - 1 - scroll - offset; // 0 = the oldest line kept
+        let position = total - 1 - back; // 0 = the oldest line kept
         let mut color = line_color(line);
         let mut back = None;
         let age = ui.now.saturating_duration_since(line.born);
@@ -584,7 +593,13 @@ fn body(
     }
     result.reverse();
     if scrollable {
-        add_scrollbar(&mut result, total, scroll);
+        add_scrollbar(&mut result, shown, scroll);
+    }
+    if filtered {
+        let hidden = total - shown;
+        let lines = if hidden == 1 { "line" } else { "lines" };
+        let note = format!(" ⧩ {} · {hidden} {lines} hidden - f shows all", state.filter.label());
+        result.insert(0, fit(vec![seg(note, C::DarkCyan)], column));
     }
     result
 }
