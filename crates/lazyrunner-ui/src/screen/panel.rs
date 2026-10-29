@@ -66,6 +66,13 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(seg("   ", C::Gray));
         segs.push(seg(text, color).at(Target::Tests)); // a click opens T
     }
+    for chip in super::seen::chips(ui, controller) {
+        let target = Target::News(chip.view);
+        let popping = ui.motion.lit(&Spot::Hint(format!("new {}", chip.key)), ui.now).is_some();
+        segs.push(seg("   ", C::Gray));
+        segs.push(on(format!(" {} ", chip.key), C::Black, if popping { C::White } else { chip.color }).at(target));
+        segs.push(seg(format!(" {}", chip.label), chip.color).at(target));
+    }
     segs.extend([
         seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta),
         seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),

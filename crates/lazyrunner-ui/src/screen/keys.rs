@@ -613,9 +613,9 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenLog => open_log(ui, controller),
         Run::Copy => ui.overlay = Some(Overlay::Copy { index: 0 }),
         Run::Durations => super::durations::open(ui, controller),
-        Run::Tests => super::suites::open(ui, controller),
-        Run::Requests => super::requests::open(ui),
-        Run::Migrations => super::migrations::open(ui, controller),
+        Run::Tests => super::seen::open(ui, controller, super::jumps::View::Tests),
+        Run::Requests => super::seen::open(ui, controller, super::jumps::View::Requests),
+        Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => {

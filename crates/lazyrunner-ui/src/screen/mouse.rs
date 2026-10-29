@@ -37,6 +37,8 @@ pub enum Target {
     Test(usize),
     /// The tests' summary on the panel's status line: a click opens the tests view.
     Tests,
+    /// A view's chip of news on the panel's status line: a click opens the view on the first new thing.
+    News(super::jumps::View),
     /// A migration of the context selected in the migrations view, by its place in that list (newest first).
     Migration(usize),
 }
@@ -161,6 +163,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         }
         Some(Target::Output(index)) => ui.focus = index,
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
+        Some(Target::News(view)) => super::seen::open(ui, controller, view),
         Some(Target::Link { column, link }) => {
             ui.focus = column;
             open_link(ui, controller, link, Some(column), modified);
