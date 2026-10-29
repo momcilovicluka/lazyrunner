@@ -132,6 +132,8 @@ pub enum Overlay {
     /// `'`: every column's marks; the selected one.
     Marks {
         index: usize,
+        /// The note being written for the selected mark (`a`).
+        note: Option<String>,
     },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {

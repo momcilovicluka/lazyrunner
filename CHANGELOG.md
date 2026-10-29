@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.30.0] - 2026-10-29
+
+### Added
+- Notes on marks: `a` in the marks box (`'`) writes one for the selected mark, shown in the box and in the log when `[` / `]` jump to it; `y` there copies every mark, oldest first, as a timeline (time, app, note, line) for a ticket or a chat. The box lists the marks oldest first across the apps; notes go with their marks (#58)
+
 ## [1.29.0] - 2026-10-29
 
 ### Added

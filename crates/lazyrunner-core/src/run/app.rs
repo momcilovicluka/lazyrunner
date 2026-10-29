@@ -63,6 +63,8 @@ pub struct AppState {
     pub filter: LevelFilter,
     /// The lines marked (`m`), by number, oldest first; they go when the app starts again.
     pub marks: Vec<u64>,
+    /// The marks' notes, by line number; they go with their marks.
+    pub notes: std::collections::BTreeMap<u64, String>,
     pub errors: u64,
     pub warnings: u64,
     pub requests: u64,
@@ -103,6 +105,7 @@ impl AppState {
             scroll: 0,
             filter: LevelFilter::All,
             marks: Vec::new(),
+            notes: std::collections::BTreeMap::new(),
             errors: 0,
             warnings: 0,
             requests: 0,
@@ -271,6 +274,7 @@ impl AppState {
     pub fn reset_for_start(&mut self) {
         self.generation += 1;
         self.marks.clear();
+        self.notes.clear();
         self.errors = 0;
         self.warnings = 0;
         self.requests = 0;
