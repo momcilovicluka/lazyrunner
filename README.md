@@ -229,6 +229,7 @@ at once while the palette wipes away.
 | `j` / `k`, `↓` `↑` | Scroll the focused column one line |
 | `Ctrl+d` / `Ctrl+u`, `Ctrl+f` / `Ctrl+b`, `PgDn` `PgUp` | Scroll half a page / a page |
 | `gg` / `G` (`Home` / `End`) | Oldest output / follow new output again |
+| `Ctrl+O` or `Alt+←` / `Alt+→` | Jump back to where you were before a jump, / forward again - as an editor's jump list. A view opened (`H` `T` `M`), `gg` / `G`, a search match, a mark or a scroll of more than half a page is a jump; the place you land on flashes, and the header shows `↶ 3/12` while there's somewhere to go back to (at most 50 places; one whose line is gone is skipped) |
 | `/`, `n` / `N`, `Esc` | Search the focused column (matches highlighted), older / newer match, clear. While typing: `Tab` shows only the matching lines (a line either side), `Alt+r` takes it as a regex, `Alt+c` minds case; the prompt counts the matches. `/` again brings the column's last search back |
 | `z` | Zoom: only the focused column |
 | `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`; marks and their notes go when the app starts again |

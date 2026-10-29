@@ -79,6 +79,8 @@ pub enum Icon {
     Git,
     Plug,
     Folder,
+    /// The jump list in the panel.
+    Back,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -198,6 +200,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Plug, true) => "\u{f1e6}", // plug
         (Icon::Folder, false) => "/",
         (Icon::Folder, true) => "\u{f07b}", // folder
+        (Icon::Back, false) => "↶",
+        (Icon::Back, true) => "\u{f0e2}", // undo
     }
 }
 
@@ -306,6 +310,7 @@ mod tests {
             Icon::Git,
             Icon::Plug,
             Icon::Folder,
+            Icon::Back,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");

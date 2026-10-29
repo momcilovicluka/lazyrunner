@@ -26,5 +26,5 @@ expression: screen.frame()
 
  GET /api/orders/43   200 · 10 ms · 512 bytes · application/json · Orders · 09:41:07
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
- lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ lazyrunner   ○ stopped   ↶ 1/1   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

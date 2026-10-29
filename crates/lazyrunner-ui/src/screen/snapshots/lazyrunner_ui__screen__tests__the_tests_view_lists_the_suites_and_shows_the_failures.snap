@@ -26,5 +26,5 @@ expression: screen.frame()
                                             │
                                             │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
- lazyrunner   ○ stopped   ⚗ ✓2 ✗1   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ lazyrunner   ○ stopped   ↶ 1/1   ⚗ ✓2 ✗1   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

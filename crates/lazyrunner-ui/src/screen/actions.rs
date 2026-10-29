@@ -37,6 +37,8 @@ pub enum Run {
     Menu,
     Search,
     Zoom,
+    JumpBack,
+    JumpForward,
     LevelFilter,
     Mark,
     PrevMark,
@@ -204,6 +206,8 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
         action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
         action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),
+        action("View", "Ctrl+O", "Jump back", "to where you were before a jump - Alt+← too", Run::JumpBack).safe(),
+        action("View", "Alt+→", "Jump forward", "after jumping back", Run::JumpForward).safe(),
         action(
             "View",
             "f",

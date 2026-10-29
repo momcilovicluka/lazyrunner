@@ -98,10 +98,11 @@
 <rect x="14.0" y="624.0" width="100.8" height="18" fill="#94e2d5"/>
 <text x="14.0" y="637.7" fill="#11111b" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> lazyrunner </text>
 <text x="114.8" y="637.7" fill="#a6e3a1" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● all up (5)</text>
-<text x="232.4" y="637.7" fill="#f5c2e7" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ⎇ feature/checkout-v2</text>
-<text x="434.0" y="637.7" fill="#6c7086" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   DB </text>
-<text x="484.4" y="637.7" fill="#f9e2af" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopLocal @ localhost</text>
-<text x="660.8" y="637.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   /work/shop</text>
+<text x="232.4" y="637.7" fill="#89dceb" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ↶ 1/1</text>
+<text x="299.6" y="637.7" fill="#f5c2e7" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ⎇ feature/checkout-v2</text>
+<text x="501.2" y="637.7" fill="#6c7086" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   DB </text>
+<text x="551.6" y="637.7" fill="#f9e2af" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ShopLocal @ localhost</text>
+<text x="728.0" y="637.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   /work/shop</text>
 <rect x="22.4" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
 <rect x="131.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
 <rect x="215.6" y="642.0" width="25.2" height="18" fill="#cdd6f4"/>
