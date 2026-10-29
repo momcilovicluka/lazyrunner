@@ -412,8 +412,9 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
-            "UpArrow" | "Ctrl+P" => *index = wrapped(*index, -1, palette_len),
-            "DownArrow" | "Ctrl+N" => *index = wrapped(*index, 1, palette_len),
+            _ if list_step(name, key).is_some() => {
+                *index = wrapped(*index, list_step(name, key).unwrap_or_default(), palette_len);
+            }
             "Backspace" => {
                 query.pop();
                 *index = 0;
@@ -464,6 +465,19 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             }
         }
         None => {}
+    }
+}
+
+/// In a list you type into (the palette, the theme picker), the keys that move instead of typing: ↑ ↓, Ctrl+P / Ctrl+N,
+/// and vim's j / k with Alt - or Ctrl, where the terminal sends Ctrl+J as itself and not as Enter.
+pub fn list_step(name: &str, key: &KeyEvent) -> Option<isize> {
+    let alt = key.modifiers == KeyModifiers::ALT;
+    match name {
+        "UpArrow" | "Ctrl+P" | "Ctrl+K" => Some(-1),
+        "DownArrow" | "Ctrl+N" | "Ctrl+J" => Some(1),
+        "k" if alt => Some(-1),
+        "j" if alt => Some(1),
+        _ => None,
     }
 }
 

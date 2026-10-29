@@ -240,7 +240,7 @@ at once while the palette wipes away.
 | `Ctrl+R` | **Reload window**, like VS Code's: reads the settings and themes again, sets the terminal up again (screen, mouse, tab, colours) and repaints - with a little CRT show (none with reduced motion). The apps keep running. Handy after editing a setting or a theme by hand, or when the terminal got garbled |
 | `t` | Theme picker: preview each theme live, `Enter` keeps one (saved), `Esc` undoes; see [Themes](#themes) |
 | `?` | Key reference |
-| `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting |
+| `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting; `↑` `↓` (or `Alt+j` / `Alt+k`) choose |
 
 **Settings (`,` then a letter)**, saved in `lazyrunner.config.json` (the letter highlights the setting it flips):
 
@@ -534,7 +534,7 @@ question marks instead of icons mean the font isn't one: set one, or `, i` for p
 ## Themes
 
 `t` opens the theme picker: a narrow panel on the right, so the rest of the screen shows each theme as you move through
-the list (`↑` `↓`, `PgUp` `PgDn`), the terminal's background included. Typing filters by name, `Enter` keeps the
+the list (`↑` `↓` or `Alt+j` `Alt+k`, `PgUp` `PgDn`), the terminal's background included. Typing filters by name, `Enter` keeps the
 selected theme for every project (saved), `Tab` for this project alone - handy to tell two projects' windows apart (`◆`
 marks it; `Tab` on it again, or `Enter` on another, gives the project back the shared one) - and `Esc` puts back the one you had. Built in:
 `default` (your terminal's own palette), `dark`, `light`, `high-contrast`; the editors' favourites `one-dark`,

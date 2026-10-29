@@ -133,8 +133,10 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             ripple(ui, from);
             return;
         }
-        "UpArrow" | "Ctrl+P" => *index = keys::wrapped(*index, -1, matches(&ui.themes, query).len()),
-        "DownArrow" | "Ctrl+N" => *index = keys::wrapped(*index, 1, matches(&ui.themes, query).len()),
+        _ if keys::list_step(name, key).is_some() => {
+            let by = keys::list_step(name, key).unwrap_or_default();
+            *index = keys::wrapped(*index, by, matches(&ui.themes, query).len());
+        }
         "PageUp" => *index = index.saturating_sub(PAGE),
         "PageDown" => *index += PAGE,
         "Home" => *index = 0,
@@ -281,7 +283,7 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     if own.is_some() {
         footer.push(vec![seg(" ◆ project's own · Tab undoes", C::DarkGray)]);
     }
-    footer.push(vec![seg(" ↑↓ preview · Esc undo", C::DarkGray)]);
+    footer.push(vec![seg(" ↑↓ Alt+jk preview · Esc undo", C::DarkGray)]);
     footer.push(vec![seg(" Enter keep · Tab this project", C::DarkGray)]);
     enum Entry {
         Heading(&'static str),

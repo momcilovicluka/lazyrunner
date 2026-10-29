@@ -2090,6 +2090,28 @@ async fn r_in_the_checklist_never_reaches_the_app_behind_it() {
 }
 
 #[tokio::test]
+async fn alt_j_and_k_move_in_the_palette_and_the_theme_picker_while_plain_j_and_k_type() {
+    let mut screen = screen("palette-alt-jk", json!({}));
+    let palette = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Palette { index, query }) => (*index, query.clone()),
+        _ => panic!("the palette is open"),
+    };
+    screen.press(": z o o m Alt+j");
+    assert_eq!(palette(&screen), (1, "zoom".to_string()), "Alt+j moves down, and isn't typed");
+    screen.press("Alt+k Alt+k");
+    let count = super::actions::palette(&screen.ui, &screen.controller, "zoom").len();
+    assert_eq!(palette(&screen).0, count - 1, "Alt+k moves up, wrapping around");
+    screen.press("Ctrl+j");
+    assert_eq!(palette(&screen).0, 0, "Ctrl+J too, where the terminal sends it");
+    screen.press("j");
+    assert_eq!(palette(&screen).1, "zoomj", "a plain j types");
+
+    screen.press("Esc t Alt+j");
+    let Some(Overlay::Themes { index, query, .. }) = &screen.ui.overlay else { panic!("the theme picker is open") };
+    assert_eq!((*index, query.as_str()), (1, ""), "the theme picker moves the same way");
+}
+
+#[tokio::test]
 async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     let mut screen = screen("checklist-bar", json!({}));
     let warned = Item { name: "Ports".into(), status: Status::Warn, detail: "47211 is in use".into() };
