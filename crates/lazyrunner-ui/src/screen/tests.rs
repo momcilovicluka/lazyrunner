@@ -2262,6 +2262,35 @@ async fn ctrl_o_jumps_back_to_where_you_were_and_alt_right_forward_again() {
 }
 
 #[tokio::test]
+async fn a_bug_report_zips_versions_settings_the_profile_logs_and_the_screen_with_secrets_masked() {
+    use std::io::Read as _;
+    let mut screen = screen("bug-report", json!({ "githubToken": "gh-s3cret" }));
+    let at = screen.ui.now - Duration::from_secs(5);
+    screen.controller.states[0].add_line("Connecting: Server=sql;Database=Shop;Password=hunter2;", Hue::Gray, at);
+    screen.press(", b");
+    let said = screen.ui.replays.pop().expect("writing in the background").recv_timeout(Duration::from_secs(60));
+    let (hue, line) = said.expect("it finishes");
+    assert_eq!(hue, Hue::Green, "{line}");
+    let path = line.trim_start_matches("Bug report: ").split(" - ").next().unwrap_or_default().to_string();
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(&path).expect("the zip")).expect("a zip");
+    let mut read = |name: &str| {
+        let mut text = String::new();
+        zip.by_name(name).unwrap_or_else(|_| panic!("{name} in it")).read_to_string(&mut text).expect("text");
+        text
+    };
+    assert!(read("about.txt").contains(&format!("lazyrunner {}", lazyrunner_core::changelog::VERSION)));
+    let settings = read("settings.json");
+    assert!(settings.contains("\"githubToken\": \"***\"") && !settings.contains("gh-s3cret"), "{settings}");
+    let orders = read("output/orders.log");
+    assert!(orders.contains("Password=***;") && !orders.contains("hunter2"), "{orders}");
+    assert!(
+        read("screen.svg").starts_with("<svg")
+            && !read("profile.json").is_empty()
+            && !read("lazyrunner.log").is_empty()
+    );
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();

@@ -83,6 +83,24 @@ fn version_of(tool: &str) -> Option<String> {
     tool_version(&tools::find_on_path(tool)?, &["--version"])
 }
 
+fn npm_version() -> Option<String> {
+    let (program, prefix) = tools::npm_launcher().ok()?;
+    let mut args: Vec<String> = prefix.iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
+    args.push("--version".into());
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    tool_version(&program, &args)
+}
+
+/// The tools' versions - git, the .NET SDK, Node.js, npm - for a bug report; `None`: not found.
+pub fn tool_versions() -> Vec<(&'static str, Option<String>)> {
+    vec![
+        ("git", version_of("git").map(|version| version.trim_start_matches("git version ").to_string())),
+        (".NET SDK", version_of("dotnet")),
+        ("Node.js", version_of("node")),
+        ("npm", npm_version()),
+    ]
+}
+
 /// The checks for this project, ready to run.
 pub fn checks(controller: &Controller) -> Vec<Check> {
     let mut checks = Vec::new();
@@ -115,13 +133,7 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
     if controller.apps.iter().any(|app| app.traits().installs) {
         checks.push(check("Node.js / npm", || {
             let Some(node) = version_of("node") else { return (Status::Fail, "node not found on PATH".into()) };
-            let npm = tools::npm_launcher().ok().and_then(|(program, prefix)| {
-                let mut args: Vec<String> = prefix.iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
-                args.push("--version".into());
-                let args: Vec<&str> = args.iter().map(String::as_str).collect();
-                tool_version(&program, &args)
-            });
-            (Status::Ok, format!("node {node} · npm {}", npm.unwrap_or_else(|| "?".into())))
+            (Status::Ok, format!("node {node} · npm {}", npm_version().unwrap_or_else(|| "?".into())))
         }));
     }
     checks.push(ports_check(controller));

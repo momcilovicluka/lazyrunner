@@ -4,6 +4,7 @@
 
 pub mod about;
 pub mod actions;
+pub mod bundle;
 pub mod checklist;
 pub mod columns;
 pub mod copy;

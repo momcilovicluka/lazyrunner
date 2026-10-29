@@ -40,6 +40,7 @@ pub enum Run {
     JumpBack,
     JumpForward,
     Follow,
+    BugReport,
     LevelFilter,
     Mark,
     PrevMark,
@@ -328,6 +329,7 @@ pub fn settings(controller: &Controller) -> Vec<Action> {
         action("Settings", "r", "Run the startup checklist now (and check for an update)", "", Run::Checklist),
         action("Settings", "c", "What's new: the lazyrunner changelog", "", Run::Changelog).safe(),
         action("Settings", "A", "About lazyrunner: version, contributors, links", "", Run::About).safe(),
+        action("Settings", "b", "Bug report: a zip to attach to an issue", "", Run::BugReport).safe(),
     ]);
     let changed = if controller.profile_changed { " (this branch changed it)" } else { "" };
     list.push(action("Settings", "p", &format!("Reload the project profile{changed}"), "", Run::ReloadProfile));

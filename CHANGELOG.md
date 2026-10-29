@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.35.0] - 2026-10-29
+
+### Added
+- A bug report (`,` then `b`, or the palette): a zip with lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's recent output and lazyrunner's log, and the screen as a picture - ready to attach to an issue (#22)
+
 ## [1.34.0] - 2026-10-29
 
 ### Added

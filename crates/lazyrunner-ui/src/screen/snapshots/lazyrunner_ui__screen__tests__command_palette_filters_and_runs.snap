@@ -4,7 +4,7 @@ expression: screen.frame()
 ---
 
   ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ › rest▏                                                                                    45 commands │
+  │ › rest▏                                                                                    46 commands │
   │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  ◆  Restart Orders  rebuild if it changed                                                          r   │
   │  ▸  Restart all  rebuild if anything changed                                                       R   │
