@@ -1,6 +1,7 @@
 //! lazyrunner, the Rust version: `lazyrunner [start]` runs the project here, `stop` / `restart` tell an open one,
 //! `update` / `version` keep it current, and `profile check|init` look after project profiles.
 
+mod hook_cli;
 mod mcp;
 mod profile_cli;
 mod start;
@@ -76,6 +77,17 @@ enum Command {
         #[arg(long)]
         save: bool,
     },
+    /// Your hooks ("hooks" in the settings): test runs the ones that wait for an event, as if it happened.
+    Hook {
+        /// test
+        action: String,
+        /// app.up, app.crashed, build.passed, build.failed, tests.green, tests.red, migrations.applied or
+        /// update.installed.
+        event: String,
+        /// The app's key, for an app.* or build.* event.
+        #[arg(long)]
+        app: Option<String>,
+    },
     /// Sends a control request to a running lazyrunner and prints the answer (the tests use it).
     #[command(hide = true)]
     Ctl { name: String, request: String },
@@ -110,6 +122,7 @@ fn run_cli() -> Result<()> {
             Ok(())
         }
         Some(Command::Mcp { ipc }) => mcp::run(ipc),
+        Some(Command::Hook { action, event, app }) => hook_cli::run(&action, &event, app.as_deref()),
         Some(Command::Start) => start::start(true),
         None => start::start(false),
         Some(Command::Update) => update_cli::update(),

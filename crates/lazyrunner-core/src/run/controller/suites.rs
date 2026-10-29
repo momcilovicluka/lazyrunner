@@ -512,11 +512,13 @@ impl Controller {
         let totals = self.totals(|suite| ran.contains(&suite.key));
         if totals.failed == 0 && totals.errors == 0 {
             self.add_log(format!("Tests done in {took}: all {} passed", totals.passed), Hue::Green);
+            self.happened("tests.green", None, format!("all {} passed", totals.passed));
             return;
         }
         let didnt = if totals.errors > 0 { format!(", {} suites didn't run", totals.errors) } else { String::new() };
         let counts = format!("{} failed, {} passed", totals.failed, totals.passed);
         self.add_log(format!("Tests done in {took}: {counts}{didnt} - T shows them"), Hue::Red);
+        self.happened("tests.red", None, format!("{counts}{didnt}"));
         self.notifications.push(("Tests failed".into(), counts));
     }
 

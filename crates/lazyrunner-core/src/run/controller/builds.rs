@@ -223,6 +223,7 @@ impl Controller {
             self.last_build_failed = true;
             self.notifications
                 .push((format!("{} build failed", app.name), format!("{} errors - see lazyrunner", errors.len())));
+            self.happened("build.failed", Some(key), format!("{} build failed: {} errors", app.name, errors.len()));
             self.add_log(
                 format!("✗ {} build failed after {whole}s ({} errors) - o opens the full log", app.name, errors.len()),
                 Hue::Red,
@@ -242,6 +243,7 @@ impl Controller {
         let summary = format!("built in {whole}s ({} projects{warnings}){note}", job.done);
         self.pane(key, &format!("✓ {summary}"), Hue::Green);
         self.add_log(format!("✓ {} {summary}", app.name), Hue::Green);
+        self.happened("build.passed", Some(key), format!("{} {summary}", app.name));
         self.build_queue.retain(|queued| queued != key);
         self.built.push(key.to_string());
         self.next_build();

@@ -5,6 +5,7 @@
 
 mod builds;
 mod handover;
+mod hooks;
 mod migrations;
 mod npm_ci;
 mod start;
@@ -132,6 +133,10 @@ pub struct Controller {
     pub failed_build_errors: HashMap<String, Vec<String>>,
     /// Desktop notifications to show (title, message); the UI takes them and shows them when the setting is on.
     pub notifications: Vec<(String, String)>,
+    /// The `"hooks"` setting whose problems were said last.
+    hooks_said: Value,
+    /// The update the hooks ran for.
+    hooked_update: Option<String>,
     git_dir: Option<PathBuf>,
     pending_branch: Option<(String, Instant)>,
     config_file: ConfigFile,
@@ -263,6 +268,8 @@ impl Controller {
             last_build_failed: false,
             failed_build_errors: HashMap::new(),
             notifications: Vec::new(),
+            hooks_said: Value::Null,
+            hooked_update: None,
             git_dir: None,
             pending_branch: None,
             config_file,
@@ -488,6 +495,7 @@ impl Controller {
             Event::Metrics(samples) => self.metrics(samples),
             Event::FileChanged(path) => self.code.changed(path, now),
             Event::Suites(found) => self.suites_found(found),
+            Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),
         }
     }
 
