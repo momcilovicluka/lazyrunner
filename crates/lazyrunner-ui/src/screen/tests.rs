@@ -2079,7 +2079,32 @@ async fn m_marks_lines_brackets_jump_between_them_and_the_marks_box_lists_them()
     screen.controller.states[0].reset_for_start();
     assert!(screen.controller.states[0].marks.is_empty(), "a new run, its output over again");
     screen.press("'");
-    assert!(screen.last_log().starts_with("No marks yet"), "{}", screen.last_log());
+    let empty = screen.frame();
+    assert!(empty.contains("No marks yet.") && empty.contains("m marks the line"), "{empty}");
+    screen.press("Esc");
+    assert!(screen.ui.overlay.is_none());
+}
+
+#[tokio::test]
+async fn an_empty_column_says_what_fills_it() {
+    let mut screen = screen("empty-hints", json!({}));
+    let frame = screen.frame();
+    assert!(
+        frame.contains("u starts it") && frame.contains("b builds it") && frame.contains("U starts all"),
+        "{frame}"
+    );
+    screen.press("3");
+    let npm = screen.frame();
+    assert!(npm.contains("u starts it") && !npm.contains("b builds it"), "Shop's: npm builds as it starts: {npm}");
+    assert_eq!(npm.matches("u starts it").count(), 1, "the keys act on the focused app only");
+
+    screen.press("1");
+    let at = screen.ui.now - Duration::from_secs(5);
+    screen.controller.states[0].add_line("Now listening on: http://localhost:47201", Hue::Gray, at);
+    assert!(!screen.frame().contains("u starts it"), "a column with output shows it");
+    screen.press("f");
+    let errors = screen.frame();
+    assert!(errors.contains("No errors") && errors.contains("f shows all"), "{errors}");
 }
 
 #[tokio::test]

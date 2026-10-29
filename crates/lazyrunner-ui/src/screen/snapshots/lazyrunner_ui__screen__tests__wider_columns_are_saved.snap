@@ -13,9 +13,9 @@ expression: screen.frame()
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
-                            ┃                   │                   │                   │
-                            ┃                   │                   │                   │
-                            ┃                   │                   │                   │
+        u starts it         ┃                   │                   │                   │
+        b builds it         ┃                   │                   │                   │
+        U starts all        ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │

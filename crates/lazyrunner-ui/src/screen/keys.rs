@@ -611,7 +611,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Mark => super::marks::toggle(ui, controller),
         Run::PrevMark => super::marks::jump(ui, controller, true),
         Run::NextMark => super::marks::jump(ui, controller, false),
-        Run::Marks => super::marks::open(ui, controller),
+        Run::Marks => super::marks::open(ui),
         Run::LevelFilter => {
             let Some(state) = controller.states.get(ui.focus) else { return };
             let (key, filter) = (state.key.clone(), state.filter.next());
