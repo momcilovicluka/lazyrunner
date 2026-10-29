@@ -21,14 +21,14 @@ expression: screen.frame()
   │   o           Open the focused app's log file               Help                                       │
   │   y           Copy (yank)                                     ,           Settings (on/off toggles, r… │
   │   D           Durations                                       ?           Key reference                │
-  │   H           Requests: what the .NET apps served             :           Command palette              │
-  │   M           Migrations: what's applied to the database    Navigate                                   │
-  │   T           Tests: run the project's test suites            h l Tab     focus another column         │
-  │   L           lazygit: git without leaving lazyrunner         1-5         jump to a column             │
-  │   x           Menu for the focused app                        j k ↑ ↓     scroll a line                │
-  │   F           Follow the agent                                ^u ^d ^b ^f half page / page (PgUp PgDn) │
-  │ View                                                          gg G < >    oldest / follow new output   │
-  │   /           Search the focused app's output                 n N Esc     search: older / newer / cle… │
-  │   z           Zoom the focused column                                                                  │
+  │   H           Requests: what the .NET apps served             , A z       Diagnostics zip to attach    │
+  │   M           Migrations: what's applied to the database      :           Command palette              │
+  │   T           Tests: run the project's test suites          Navigate                                   │
+  │   L           lazygit: git without leaving lazyrunner         h l Tab     focus another column         │
+  │   x           Menu for the focused app                        1-5         jump to a column             │
+  │   F           Follow the agent                                j k ↑ ↓     scroll a line                │
+  │ View                                                          ^u ^d ^b ^f half page / page (PgUp PgDn) │
+  │   /           Search the focused app's output                 gg G < >    oldest / follow new output   │
+  │   z           Zoom the focused column                         n N Esc     search: older / newer / cle… │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

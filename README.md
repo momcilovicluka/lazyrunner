@@ -233,7 +233,7 @@ at once while the palette wipes away.
 | `/`, `n` / `N`, `Esc` | Search the focused column (matches highlighted), older / newer match, clear. While typing: `Tab` shows only the matching lines (a line either side), `Alt+r` takes it as a regex, `Alt+c` minds case; the prompt counts the matches. `/` again brings the column's last search back |
 | `z` | Zoom: only the focused column |
 | `H` `T` `M` chips | What's new since a view was last open, in the panel's header: `H 3 new errors` (requests that failed since), `T 2 suites done · 1 red`, `M 1 pending` (a migration that appeared). The view's key or a click on the chip opens it on the first new thing; having it open clears the chip |
-| `,` then `b` | **Bug report**: a zip to attach to an issue - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`bug-reports`); the log says where. Look over its logs before you share it |
+| `,` `A` then `z` | **Diagnostics zip**, in the About box under Report a bug: what to attach to a bug report - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`diagnostics`); the log says where. Look over its logs before you share it |
 | `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`; marks and their notes go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
 | `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
@@ -269,7 +269,8 @@ at once while the palette wipes away.
 
 **About lazyrunner** (`,` then `A`, or `:` about): the version and when it was released, who makes lazyrunner, and
 its links - a letter (or `j` `k` and Enter, or a double click) opens the README, the changelog, the releases, the
-license, a bug report with the version and OS already filled in, a feature request or the source, or checks for an
+license, a bug report with the version and OS already filled in, the diagnostics zip to attach to it (`z`), a
+feature request or the source, or checks for an
 update right there (`u`: what the check is doing, then how it ended, under its link; an update it finds is installed,
 as the startup checklist does). Its logo shimmers in rainbow colours over a flowing rule (still with reduced motion), with Nerd Font icons
 when they're on.

@@ -1,6 +1,6 @@
 //! The About box (`,` then `A`, or `:` about): lazyrunner's version, who makes it - from the repo, by way of
-//! contributors.json - and where to go next: the README, the changelog, the releases, the license, a bug report or an
-//! idea, the source, an update check (run right there, its outcome under its link), everyone who contributed. Its logo
+//! contributors.json - and where to go next: the README, the changelog, the releases, the license, a bug report and the
+//! diagnostics zip to attach to it, an idea, the source, an update check (run right there, its outcome under its link), everyone who contributed. Its logo
 //! shimmers in rainbow colours over a flowing rule, the title sparkles and the heart beats (all still with reduced
 //! motion).
 
@@ -83,6 +83,13 @@ fn links() -> Vec<Link> {
         link("e", Icon::Releases, "Releases", "every version, on GitHub", page("/releases")),
         link("l", Icon::License, "License", "source-available; free to use, at work too", page("/blob/main/LICENSE")),
         link("b", Icon::Bug, "Report a bug", "the bug form, this version filled in", page(&bug)),
+        link(
+            "z",
+            Icon::Zip,
+            "Diagnostics zip",
+            "versions, logs and the screen, to attach",
+            Does::Run(Run::Diagnostics),
+        ),
         link(
             "f",
             Icon::Idea,

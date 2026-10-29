@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.35.1] - 2026-10-29
+
+### Changed
+- The bug report zip is now the diagnostics zip, and moved from the settings to the About box, under Report a bug (`,` `A` then `z`, or the palette), so the two bug reports aren't mistaken for each other. It goes into the state folder's `diagnostics` (#68)
+
 ## [1.35.0] - 2026-10-29
 
 ### Added
