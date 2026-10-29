@@ -6,6 +6,7 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::{Controller, format_duration};
 
 use super::columns;
+use super::icons::{self, Icon};
 use super::motion::Spot;
 use super::overlays::boxed;
 use super::seg::{Seg, on, pad, seg};
@@ -188,5 +189,12 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             }
         })
         .collect();
-    boxed("Marks", lines, "j k + Enter jumps · d unmarks · Esc closes", cells, rows, inner)
+    boxed(
+        &icons::titled(ui.nerd, Icon::Bookmark, "Marks"),
+        lines,
+        "j k + Enter jumps · d unmarks · Esc closes",
+        cells,
+        rows,
+        inner,
+    )
 }

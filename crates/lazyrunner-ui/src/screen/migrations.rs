@@ -430,5 +430,5 @@ pub fn confirm_rows(ui: &Ui, width: usize, rows: usize) -> Vec<Vec<Seg>> {
         .iter()
         .map(|line| vec![seg(line.clone(), if line.contains("Down() runs") { C::Yellow } else { C::White })])
         .collect();
-    boxed("Confirm", lines, "y / Enter: yes · n / Esc: no", width, rows, 90)
+    boxed(&icons::titled(ui.nerd, Icon::Help, "Confirm"), lines, "y / Enter: yes · n / Esc: no", width, rows, 90)
 }

@@ -864,6 +864,23 @@ async fn nerd_icons_are_on_by_default_and_swap_the_symbols_and_the_apps_icons() 
 }
 
 #[tokio::test]
+async fn nerd_icons_mark_the_states_the_chips_and_the_boxes() {
+    let mut screen = screen("nerd-chrome", json!({ "nerdIcons": true }));
+    let frame = screen.frame();
+    assert!(frame.contains("\u{f04d} stopped"), "an app stopped, and all of them: {frame}");
+    screen.press(":");
+    assert!(screen.frame().contains("\u{f120} Commands"), "{}", screen.frame());
+    screen.press("Esc ,");
+    assert!(screen.frame().contains("\u{f013} Settings (saved)"), "{}", screen.frame());
+    screen.press("Esc t");
+    let themes = screen.frame();
+    assert!(themes.contains("\u{f1fc} Themes") && themes.contains("\u{f186} Dark"), "{themes}");
+    screen.press("Esc , i Esc");
+    let plain = screen.frame();
+    assert!(plain.contains("○ stopped") && !plain.contains('\u{f04d}'), "{plain}");
+}
+
+#[tokio::test]
 async fn an_apps_nerd_icon_from_its_profile_wins_over_its_kinds() {
     let mut screen = screen("nerd-own", json!({ "nerdIcons": true }));
     let mut apps = screen.controller.apps.clone();

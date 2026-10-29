@@ -103,7 +103,7 @@ fn draw(
     if found.is_empty() {
         lines.push(vec![seg("  no matching command", C::DarkGray)]);
     }
-    boxed("Commands", lines, FOOTER, cells, rows, inner)
+    boxed(&icons::titled(ui.nerd, Icon::Terminal, "Commands"), lines, FOOTER, cells, rows, inner)
 }
 
 /// The commands run from the palette lately, newest first (their keys).

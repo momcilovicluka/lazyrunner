@@ -158,7 +158,7 @@ pub fn picker(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
             seg(cursor, C::Cyan),
         ]);
         return boxed(
-            &format!("Database · {key}"),
+            &icons::titled(ui.nerd, Icon::Database, &format!("Database · {key}")),
             lines,
             "type the database name · Enter adds it (inactive) · Esc cancels",
             cells,
@@ -176,7 +176,14 @@ pub fn picker(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     } else {
         format!("j k choose · Enter switch + restart the APIs · n new · y copy row · / filter · Esc close{more}")
     };
-    boxed(&format!("Database · {key}{group_info}"), lines, &footer, cells, rows, 96)
+    boxed(
+        &icons::titled(ui.nerd, Icon::Database, &format!("Database · {key}{group_info}")),
+        lines,
+        &footer,
+        cells,
+        rows,
+        96,
+    )
 }
 
 /// The items of the x menu or the , settings.
@@ -229,7 +236,14 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         let name = controller.apps.get(ui.focus).map_or(String::new(), |app| app.name.clone());
         boxed(&name, lines, "press a key, or j k + Enter · Esc / x close", cells, rows, inner)
     } else {
-        boxed("Settings (saved)", lines, "press a letter to toggle, or j k + Enter · Esc / , close", cells, rows, inner)
+        boxed(
+            &icons::titled(ui.nerd, Icon::Settings, "Settings (saved)"),
+            lines,
+            "press a letter to toggle, or j k + Enter · Esc / , close",
+            cells,
+            rows,
+            inner,
+        )
     }
 }
 
@@ -270,7 +284,14 @@ pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
         .npm_ci_key(focused)
         .and_then(|key| controller.app(&key))
         .map_or(String::new(), |app| app.name.clone());
-    boxed(&format!("Install {app}'s packages"), lines, "c or n, or j k + Enter · Esc / i close", cells, rows, inner)
+    boxed(
+        &icons::titled(ui.nerd, Icon::Package, &format!("Install {app}'s packages")),
+        lines,
+        "c or n, or j k + Enter · Esc / i close",
+        cells,
+        rows,
+        inner,
+    )
 }
 
 /// y: what to copy from the focused app's output, each with how much there is of it now.
@@ -311,7 +332,7 @@ pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         .collect();
     let app = controller.apps.get(ui.focus).map_or(String::new(), |app| app.name.clone());
     boxed(
-        &format!("Copy from {app}"),
+        &icons::titled(ui.nerd, Icon::Clipboard, &format!("Copy from {app}")),
         lines,
         "press a key (y y: the last error), or j k + Enter · Esc close",
         cells,
@@ -404,7 +425,14 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         .collect();
     let inner = widths.iter().sum::<usize>().saturating_sub(4);
     let footer = "any key closes · : searches every command · lowercase = focused app, uppercase = all";
-    boxed(&format!("Keys · lazyrunner v{VERSION}"), lines, footer, cells, rows, inner)
+    boxed(
+        &icons::titled(ui.nerd, Icon::Keyboard, &format!("Keys · lazyrunner v{VERSION}")),
+        lines,
+        footer,
+        cells,
+        rows,
+        inner,
+    )
 }
 
 fn icon(status: Status, tick: u64, animated: bool, nerd: bool) -> String {
@@ -421,6 +449,15 @@ fn icon(status: Status, tick: u64, animated: bool, nerd: bool) -> String {
         Status::Warn => icons::icon(nerd, Icon::Warn).into(),
         Status::Fail => icons::icon(nerd, Icon::Fail).into(),
         Status::Skip => icons::icon(nerd, Icon::Skip).into(),
+    }
+}
+
+/// A check's name in its column, after its icon with Nerd Font icons.
+fn check_name(nerd: bool, name: &str) -> String {
+    match icons::check(name).filter(|_| nerd) {
+        Some(icon) => format!("{} {name:<17}", icons::icon(true, icon)),
+        None if nerd => format!("  {name:<17}"),
+        None => format!("{name:<19}"),
     }
 }
 
@@ -455,7 +492,7 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
             let detail_color = if item.status == Status::Ok { C::Gray } else { status_color(item.status) };
             vec![
                 seg(format!(" {} ", icon(item.status, tick, animated, ui.nerd)), status_color(item.status)),
-                seg(format!("{:<19}", item.name), C::White),
+                seg(check_name(ui.nerd, &item.name), C::White),
                 seg(item.detail.clone(), detail_color),
             ]
         })
@@ -529,5 +566,12 @@ pub fn changelog(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     } else {
         String::new()
     };
-    boxed(&format!("lazyrunner v{VERSION} · changelog"), shown, &format!("{more}Esc closes"), cells, rows, 90)
+    boxed(
+        &icons::titled(ui.nerd, Icon::Changelog, &format!("lazyrunner v{VERSION} · changelog")),
+        shown,
+        &format!("{more}Esc closes"),
+        cells,
+        rows,
+        90,
+    )
 }

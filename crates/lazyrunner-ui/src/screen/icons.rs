@@ -44,6 +44,41 @@ pub enum Icon {
     View,
     Help,
     Settings,
+    /// An app up, or all of them.
+    Up,
+    /// Built, watching for changes (no port to ask).
+    Watching,
+    Stopped,
+    /// An app that exited or couldn't start.
+    Exited,
+    /// A column's warnings count.
+    Warnings,
+    /// A column's level filter.
+    Filter,
+    Search,
+    /// A duration's trend.
+    Slower,
+    Faster,
+    /// The boxes' titles, and what they hold.
+    Terminal,
+    Bookmark,
+    Keyboard,
+    Package,
+    Clipboard,
+    Copy,
+    Hourglass,
+    Brush,
+    /// A project's own theme.
+    Pin,
+    Sun,
+    Moon,
+    Globe,
+    JavaScript,
+    Link,
+    /// The startup checklist's checks.
+    Git,
+    Plug,
+    Folder,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -111,6 +146,79 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Help, true) => "\u{f059}", // question
         (Icon::Settings, false) => "≡",
         (Icon::Settings, true) => "\u{f013}", // cog
+        (Icon::Up, false) => "●",
+        (Icon::Up, true) => "\u{f04b}", // play
+        (Icon::Watching, false) => "●",
+        (Icon::Watching, true) => "\u{f06e}", // eye
+        (Icon::Stopped, false) => "○",
+        (Icon::Stopped, true) => "\u{f04d}", // stop
+        (Icon::Exited, false) => "✗",
+        (Icon::Exited, true) => "\u{f057}", // times circle
+        (Icon::Warnings, false) => "△",
+        (Icon::Warnings, true) => "\u{f071}", // warning
+        (Icon::Filter, false) => "⧩",
+        (Icon::Filter, true) => "\u{f0b0}", // filter
+        (Icon::Search, false) => "⌕",
+        (Icon::Search, true) => "\u{f002}", // search
+        (Icon::Slower, false) => "▲",
+        (Icon::Slower, true) => "\u{f062}", // arrow up
+        (Icon::Faster, false) => "▼",
+        (Icon::Faster, true) => "\u{f063}", // arrow down
+        (Icon::Terminal, false) => "$",
+        (Icon::Terminal, true) => "\u{f120}", // terminal
+        (Icon::Bookmark, false) => "▌",
+        (Icon::Bookmark, true) => "\u{f02e}", // bookmark
+        (Icon::Keyboard, false) => "?",
+        (Icon::Keyboard, true) => "\u{f11c}", // keyboard
+        (Icon::Package, false) => "▣",
+        (Icon::Package, true) => "\u{f1b2}", // cube
+        (Icon::Clipboard, false) => "⧉",
+        (Icon::Clipboard, true) => "\u{f0ea}", // clipboard
+        (Icon::Copy, false) => "⧉",
+        (Icon::Copy, true) => "\u{f0c5}", // copy
+        (Icon::Hourglass, false) => "⧗",
+        (Icon::Hourglass, true) => "\u{f252}", // hourglass
+        (Icon::Brush, false) => "◐",
+        (Icon::Brush, true) => "\u{f1fc}", // paint brush
+        (Icon::Pin, false) => "◆",
+        (Icon::Pin, true) => "\u{f08d}", // thumb tack
+        (Icon::Sun, false) => "○",
+        (Icon::Sun, true) => "\u{f185}", // sun
+        (Icon::Moon, false) => "●",
+        (Icon::Moon, true) => "\u{f186}", // moon
+        (Icon::Globe, false) => "@",
+        (Icon::Globe, true) => "\u{f0ac}", // globe
+        (Icon::JavaScript, false) => "J",
+        (Icon::JavaScript, true) => "\u{e74e}", // JavaScript
+        (Icon::Link, false) => "~",
+        (Icon::Link, true) => "\u{f0c1}", // link
+        (Icon::Git, false) => "±",
+        (Icon::Git, true) => "\u{e702}", // git
+        (Icon::Plug, false) => "#",
+        (Icon::Plug, true) => "\u{f1e6}", // plug
+        (Icon::Folder, false) => "/",
+        (Icon::Folder, true) => "\u{f07b}", // folder
+    }
+}
+
+/// A box's title, after its icon with Nerd Font icons; plain, as it is.
+pub fn titled(nerd: bool, icon: Icon, title: &str) -> String {
+    if nerd { format!("{} {title}", self::icon(true, icon)) } else { title.to_string() }
+}
+
+/// A startup check's icon, by its name.
+pub fn check(name: &str) -> Option<Icon> {
+    match name {
+        "lazyrunner" => Some(Icon::Rust),
+        "git" => Some(Icon::Git),
+        ".NET SDK" => Some(Icon::Dotnet),
+        "Node.js / npm" => Some(Icon::Npm),
+        "Branch" => Some(Icon::Branch),
+        "Ports" => Some(Icon::Plug),
+        "Database" => Some(Icon::Database),
+        "Project" => Some(Icon::Folder),
+        _ if name.ends_with(" packages") => Some(Icon::Package),
+        _ => None,
     }
 }
 
@@ -172,6 +280,32 @@ mod tests {
             Icon::View,
             Icon::Help,
             Icon::Settings,
+            Icon::Up,
+            Icon::Watching,
+            Icon::Stopped,
+            Icon::Exited,
+            Icon::Warnings,
+            Icon::Filter,
+            Icon::Search,
+            Icon::Slower,
+            Icon::Faster,
+            Icon::Terminal,
+            Icon::Bookmark,
+            Icon::Keyboard,
+            Icon::Package,
+            Icon::Clipboard,
+            Icon::Copy,
+            Icon::Hourglass,
+            Icon::Brush,
+            Icon::Pin,
+            Icon::Sun,
+            Icon::Moon,
+            Icon::Globe,
+            Icon::JavaScript,
+            Icon::Link,
+            Icon::Git,
+            Icon::Plug,
+            Icon::Folder,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");

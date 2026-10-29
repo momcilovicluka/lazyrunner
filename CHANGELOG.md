@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.28.0] - 2026-10-29
+
+### Added
+- More Nerd Font icons: a column's state (up, watching, stopped, exited) and its warnings, level filter and search chips; the header's "all up" and "stopped"; an icon in every box's title; one for each startup check; sun and moon on the theme picker's groups and a pin on the project's own theme; one for each way to copy a request; the durations' trend arrows. Plain symbols (`, i`) and the terminal tab's title stay as they were
+
 ## [1.27.0] - 2026-10-29
 
 ### Added

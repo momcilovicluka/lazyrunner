@@ -51,7 +51,7 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         }
         None => {
             let summary = status::summary(controller);
-            seg(format!("  {}", summary.text), summary.color)
+            seg(format!("  {}", summary.line(ui.nerd)), summary.color)
         }
     };
     let mut segs = vec![on(" lazyrunner ", C::Black, chip), summary];

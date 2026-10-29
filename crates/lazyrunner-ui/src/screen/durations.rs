@@ -8,6 +8,7 @@ use lazyrunner_core::run::history::{Item, trend};
 use unicode_width::UnicodeWidthStr;
 
 use super::columns::SPARKS;
+use super::icons::{self, Icon};
 use super::overlays::boxed;
 use super::seg::{Seg, pad, seg, take_cells};
 use super::theme::C;
@@ -43,7 +44,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     for (kind, items) in controller.durations.grouped() {
         let header = format!("{} {}  {:>7}  {:>7}", pad(kind.title(), label + 2), pad(&runs, bars), "last", "usual");
         lines.push(vec![seg(header, C::Cyan)]);
-        lines.extend(items.into_iter().map(|item| line(item, label, bars, count)));
+        lines.extend(items.into_iter().map(|item| line(item, label, bars, count, ui.nerd)));
     }
     let visible = rows.saturating_sub(4).max(1);
     *top = (*top).min(lines.len().saturating_sub(visible));
@@ -54,11 +55,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         String::new()
     };
     let footer = format!("Esc closes{more} · usual = median of the earlier successful runs · red = failed");
-    boxed("Durations", shown, &footer, cells, rows, MAX_INNER)
+    boxed(&icons::titled(ui.nerd, Icon::Hourglass, "Durations"), shown, &footer, cells, rows, MAX_INNER)
 }
 
 /// An item's row: its name, a bar per run, the last run, the usual, the trend and (with room) how many runs there are.
-fn line(item: &Item, label: usize, bars: usize, count: bool) -> Vec<Seg> {
+fn line(item: &Item, label: usize, bars: usize, count: bool, nerd: bool) -> Vec<Seg> {
     let Some(trend) = trend(&item.runs) else { return Vec::new() };
     let name = if item.label.width() > label {
         format!("{}…", take_cells(&item.label, label.saturating_sub(1)))
@@ -73,8 +74,10 @@ fn line(item: &Item, label: usize, bars: usize, count: bool) -> Vec<Seg> {
     let percent = |change: f64| (change * 100.0).round().min(9999.0);
     let (text, color) = match (trend.change, trend.notable()) {
         (None, _) => (String::new(), C::DarkGray),
-        (Some(_), Some(change)) if change > 0.0 => (format!("▲ +{}%", percent(change)), C::Red),
-        (Some(_), Some(change)) => (format!("▼ {}%", percent(change)), C::Green),
+        (Some(_), Some(change)) if change > 0.0 => {
+            (format!("{} +{}%", icons::icon(nerd, Icon::Slower), percent(change)), C::Red)
+        }
+        (Some(_), Some(change)) => (format!("{} {}%", icons::icon(nerd, Icon::Faster), percent(change)), C::Green),
         (Some(_), None) => ("≈".to_string(), C::DarkGray),
     };
     segs.push(seg(format!("  {}", pad(&text, 8)), color));

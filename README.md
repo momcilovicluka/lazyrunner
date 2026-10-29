@@ -522,7 +522,10 @@ lazyrunner draws Nerd Font icons in its chrome (`nerdIcons`, on by default; `, i
 shows the .NET logo, or for an npm app its framework's - Angular, React or Vue, by its package.json - else Node.js's;
 the status line a git branch and a database; the tests, requests and migrations views a flask, an exchange and a
 database, and check, cross, warning, minus and clock marks for passed, failed, errors, skipped and queued (the startup
-checklist's marks too). An app's `"icon"` is the one it has without them; `"nerdIcon"` in its profile gives it one with
+checklist's marks too, and an icon for each check). A column says up, watching, stopped or exited with play, eye, stop
+and a crossed circle, its warnings, level filter and search with a warning, a funnel and a magnifier; every box has
+an icon in its title, the theme picker a sun and a moon on its groups and a pin on the project's own theme, and the
+requests view's copy menu a terminal, a globe, JavaScript's logo or a link on each way to copy. An app's `"icon"` is the one it has without them; `"nerdIcon"` in its profile gives it one with
 them, as PowerShell's lazybms had - `"\uf0ac"` a globe, `"\uf085"` cogs, any icon on
 [the Nerd Fonts cheat sheet](https://www.nerdfonts.com/cheat-sheet). Text written into the columns and the log stays as
 it is.
