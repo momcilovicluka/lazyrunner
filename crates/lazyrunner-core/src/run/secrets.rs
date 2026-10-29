@@ -30,12 +30,55 @@ pub fn secrets_path(root: &Path, apps: &[App]) -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("LAZYRUNNER_SECRETS_PATH").filter(|path| !path.is_empty()) {
         return Some(PathBuf::from(path));
     }
-    apps.iter().filter(|app| app.traits().uses_secrets).find_map(|app| {
-        let AppKind::Dotnet { project, .. } = &app.kind else { return None };
-        let text = json::read_text(&root.join(project)).ok()?;
-        let id = SECRETS_ID.captures(&text)?[1].to_string();
-        Some(user_secrets_dir()?.join(id).join("secrets.json"))
-    })
+    apps.iter().filter(|app| app.traits().uses_secrets).find_map(|app| own_secrets(root, app))
+}
+
+/// The secrets.json one .NET app reads: `LAZYRUNNER_SECRETS_PATH`, else its own UserSecretsId's.
+pub fn app_secrets_path(root: &Path, app: &App) -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("LAZYRUNNER_SECRETS_PATH").filter(|path| !path.is_empty()) {
+        return Some(PathBuf::from(path));
+    }
+    own_secrets(root, app)
+}
+
+fn own_secrets(root: &Path, app: &App) -> Option<PathBuf> {
+    let AppKind::Dotnet { project, .. } = &app.kind else { return None };
+    let text = json::read_text(&root.join(project)).ok()?;
+    let id = SECRETS_ID.captures(&text)?[1].to_string();
+    Some(user_secrets_dir()?.join(id).join("secrets.json"))
+}
+
+/// Every setting in secrets.json as .NET reads it - `Section:Key` - with its value; the commented-out ones left out.
+pub fn flatten(text: &str) -> Vec<(String, String)> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&strip_jsonc(text)) else { return Vec::new() };
+    let mut found = Vec::new();
+    flatten_into(&value, "", &mut found);
+    found
+}
+
+fn flatten_into(value: &serde_json::Value, at: &str, found: &mut Vec<(String, String)>) {
+    let key = |name: &str| if at.is_empty() { name.to_string() } else { format!("{at}:{name}") };
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (name, value) in fields {
+                flatten_into(value, &key(name), found);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (index, value) in items.iter().enumerate() {
+                flatten_into(value, &key(&index.to_string()), found);
+            }
+        }
+        serde_json::Value::String(text) => found.push((at.to_string(), text.clone())),
+        other => found.push((at.to_string(), other.to_string())),
+    }
+}
+
+/// A SQL connection string as the database picker shows it, "database @ server" - never its password.
+pub fn connection_label(value: &str) -> Option<String> {
+    let server = SERVER.captures(value)?[1].trim().to_string();
+    let database = DATABASE.captures(value)?[1].trim().to_string();
+    Some(format!("{database} @ {server}"))
 }
 
 /// Where `dotnet user-secrets` keeps them on this OS.
@@ -255,6 +298,15 @@ mod tests {
     use crate::testing::{TempDir, write as write_file};
 
     const SECRETS: &str = "{\r\n  //\"DefaultConnection\": \"Server=dev-sql;Database=Shop;User Id=x;Password=secret\",\r\n  \"DefaultConnection\": \"Server=localhost;Database=ShopLocal;Trusted_Connection=True\",\r\n  \"Storage\": \"UseDevelopmentStorage=true\",\r\n  \"Other\": \"Data Source=reports;Initial Catalog=Reports\"\r\n}\r\n";
+
+    #[test]
+    fn every_setting_reads_as_dotnet_names_it_and_a_connection_string_by_its_database() {
+        let text = "{\n  // \"Old\": \"x\",\n  \"ConnectionStrings\": { \"Default\": \"Server=sql;Database=Shop;Password=p\" },\n  \"Seq\": { \"ApiKey\": \"k\", \"Ports\": [1, 2] }\n}";
+        let keys: Vec<String> = flatten(text).into_iter().map(|(key, _)| key).collect();
+        assert_eq!(keys, ["ConnectionStrings:Default", "Seq:ApiKey", "Seq:Ports:0", "Seq:Ports:1"]);
+        assert_eq!(connection_label("Server=sql;Database=Shop;Password=p").as_deref(), Some("Shop @ sql"));
+        assert_eq!(connection_label("UseDevelopmentStorage=true"), None);
+    }
 
     #[test]
     fn reads_the_sql_connection_strings_without_their_passwords() {

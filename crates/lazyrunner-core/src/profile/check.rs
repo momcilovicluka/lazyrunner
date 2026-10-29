@@ -36,10 +36,11 @@ pub const FIELDS: Fields = Fields {
         "launchProfile",
         "swagger",
         "args",
+        "env",
         "tests",
         "migrations",
     ],
-    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "tests"],
+    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "env", "tests"],
     variant: &["label", "when", "script", "port", "servedBy", "ready"],
     when: &["packageScript"],
     ready: &["file"],
@@ -168,6 +169,11 @@ fn check_app<'a>(app: &'a Value, index: usize, keys: &mut HashMap<String, &'a Va
         if !icon.is_null() && icon.as_str().is_none_or(|icon| icon.encode_utf16().count() != 1) {
             problems.push(format!("{at}.{name} must be one character (it fills one cell of the title bar)"));
         }
+    }
+    let env = field(app, "env");
+    if !env.is_null() && !env.as_object().is_some_and(|vars| vars.values().all(Value::is_string)) {
+        problems
+            .push(format!("{at}.env must name text values, e.g. {{ \"ASPNETCORE_ENVIRONMENT\": \"Development\" }}"));
     }
     let kind = field(app, "type").as_str().map(str::to_lowercase);
     match kind.as_deref() {

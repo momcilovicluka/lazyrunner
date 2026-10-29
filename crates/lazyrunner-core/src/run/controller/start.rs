@@ -221,6 +221,12 @@ impl Controller {
         }
     }
 
+    /// What app `key` is started with now: its command line, folder and variables.
+    pub fn server_command(&self, key: &str) -> anyhow::Result<super::super::tools::ServerCommand> {
+        let app = self.app(key).ok_or_else(|| anyhow::anyhow!("no app '{key}'"))?;
+        self.commands.server(&self.root, app, &self.apps)
+    }
+
     /// Starts one app's server.
     pub(super) fn start_app(&mut self, key: &str) {
         let Some(index) = self.index(key) else { return };

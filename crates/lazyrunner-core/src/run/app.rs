@@ -342,6 +342,7 @@ mod tests {
             kind,
             tests: Vec::new(),
             migrations: None,
+            env: Vec::new(),
         }
     }
 

@@ -111,7 +111,7 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
                     program: find_on_path("dotnet").unwrap_or_else(|| "dotnet".into()),
                     args,
                     dir,
-                    env: Vec::new(),
+                    env: env(app),
                 },
                 label: format!(
                     "dotnet run --launch-profile {launch_profile}{}",
@@ -131,12 +131,17 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
             let (program, mut args) = npm_launcher()?;
             args.extend(["run".into(), mode.script.clone().into(), "--verbose".into()]);
             Ok(ServerCommand {
-                spec: Spec { program, args, dir: folder, env: Vec::new() },
+                spec: Spec { program, args, dir: folder, env: env(app) },
                 label: format!("npm run {} --verbose ({})", mode.script, mode.label),
                 script: Some(mode.script),
             })
         }
     }
+}
+
+/// The variables the profile gives the app (`"env"`).
+fn env(app: &App) -> Vec<(OsString, OsString)> {
+    app.env.iter().map(|(name, value)| (name.into(), value.into())).collect()
 }
 
 /// `dotnet build` for an app that builds.
@@ -382,6 +387,7 @@ mod tests {
             nerd_icon: None,
             tests: Vec::new(),
             migrations: None,
+            env: Vec::new(),
             kind: AppKind::Dotnet {
                 project: crate::profile::native("services/Orders/Orders.csproj"),
                 launch_profile: "Orders".into(),
@@ -404,5 +410,8 @@ mod tests {
         let command = server_command(root, &app, &[]).unwrap();
         assert_eq!(command.spec.args.last(), Some(&OsString::from("--Seq:ApiKey=")), "after lazyrunner's own");
         assert_eq!(command.label, "dotnet run --launch-profile Orders -- --Seq:ApiKey=");
+        app.env = vec![("ASPNETCORE_ENVIRONMENT".into(), "Local".into())];
+        let command = server_command(root, &app, &[]).unwrap();
+        assert_eq!(command.spec.env, [(OsString::from("ASPNETCORE_ENVIRONMENT"), OsString::from("Local"))]);
     }
 }
