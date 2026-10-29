@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.31.0] - 2026-10-29
+
+### Added
+- A jump list: `Ctrl+O` or `Alt+←` goes back to where you were before a jump, `Alt+→` forward again. A view opened (`H` `T` `M`), `gg` / `G`, a search match, a mark or a scroll of more than half a page is a jump; where you land flashes, and the header shows `↶ 3/12` while there's somewhere to go back to. Also in the palette (#48)
+
 ## [1.30.0] - 2026-10-29
 
 ### Added

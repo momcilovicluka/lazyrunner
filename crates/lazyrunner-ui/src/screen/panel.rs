@@ -55,6 +55,9 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         }
     };
     let mut segs = vec![on(" lazyrunner ", C::Black, chip), summary];
+    if let Some((at, of)) = ui.jumps.count() {
+        segs.push(seg(format!("   {} {at}/{of}", icons::icon(ui.nerd, Icon::Back)), C::DarkCyan));
+    }
     if let Some((text, color)) = super::suites::badge(ui, controller) {
         segs.push(seg("   ", C::Gray));
         segs.push(seg(text, color).at(Target::Tests)); // a click opens T

@@ -2113,6 +2113,40 @@ async fn a_mark_takes_a_note_and_y_copies_the_marks_as_a_timeline() {
 }
 
 #[tokio::test]
+async fn ctrl_o_jumps_back_to_where_you_were_and_alt_right_forward_again() {
+    let mut screen = screen("jumps", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    for n in 1..=200 {
+        screen.controller.states[0].add_line(&format!("line {n}"), Hue::Gray, at);
+    }
+    screen.frame();
+    screen.press("k k");
+    assert_eq!(screen.ui.jumps.count(), None, "a line or two isn't a jump");
+    screen.press("g g");
+    let oldest = screen.controller.states[0].scroll;
+    assert!(oldest > 2 && screen.ui.jumps.count() == Some((1, 1)), "gg is: {:?}", screen.ui.jumps.count());
+    assert!(screen.frame().contains("↶ 1/1"), "{}", screen.frame());
+
+    screen.press("Ctrl+o");
+    assert_eq!(screen.controller.states[0].scroll, 2, "back where gg left");
+    screen.press("Alt+Right");
+    assert_eq!(screen.controller.states[0].scroll, oldest, "and forward again");
+
+    screen.press("H");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Requests(_))));
+    screen.press("Alt+Left");
+    assert!(screen.ui.overlay.is_none() && screen.controller.states[0].scroll == oldest, "the view was a jump");
+    screen.press("Alt+Right");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Requests(_))), "forward opens it again");
+
+    screen.press("Esc G Ctrl+o");
+    screen.controller.states[0].output = lazyrunner_core::output::Output::new(10);
+    screen.press("Ctrl+o");
+    assert!(screen.last_log().starts_with("Nowhere to jump back to"), "{}", screen.last_log());
+    assert!(screen.controller.log.iter().any(|entry| entry.text.starts_with("Skipped a place")), "the gone one");
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();

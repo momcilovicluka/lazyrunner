@@ -69,6 +69,12 @@ pub(super) fn typed(key: &KeyEvent) -> Option<char> {
 
 /// Handles one key.
 pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
+    let before = super::jumps::before(ui, controller);
+    press_key(ui, controller, key);
+    super::jumps::noticed(ui, controller, before);
+}
+
+fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     let name = key_name(&key);
     if name == "Ctrl+C" {
         ui.exit = Some(Exit::Quit);
@@ -92,6 +98,12 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         if !matches!(name.as_str(), "Escape" | "Enter" | "Space") {
             ui.replay = Some(key);
         }
+        return;
+    }
+    if let Some(back) = super::jumps::travel_key(&name, &key)
+        && super::jumps::can_travel(ui)
+    {
+        super::jumps::travel(ui, controller, back);
         return;
     }
     if ui.overlay.is_some() {
@@ -608,6 +620,8 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             });
         }
         Run::Zoom => ui.zoom = !ui.zoom,
+        Run::JumpBack => super::jumps::travel(ui, controller, true),
+        Run::JumpForward => super::jumps::travel(ui, controller, false),
         Run::Mark => super::marks::toggle(ui, controller),
         Run::PrevMark => super::marks::jump(ui, controller, true),
         Run::NextMark => super::marks::jump(ui, controller, false),
