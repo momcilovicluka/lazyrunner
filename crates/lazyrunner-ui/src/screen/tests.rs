@@ -2375,6 +2375,31 @@ async fn a_spinner_of_your_own_spins_where_lazyrunners_would() {
 }
 
 #[tokio::test]
+async fn the_rail_maps_where_the_errors_are_and_a_click_jumps_there() {
+    let mut screen = screen("rail", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    let state = &mut screen.controller.states[0];
+    state.output = lazyrunner_core::output::Output::new(1000);
+    for n in 0..400 {
+        let (text, hue) = if n == 10 { ("fail: boom".to_string(), Hue::Red) } else { (format!("line {n}"), Hue::Gray) };
+        state.add_line(&text, hue, at);
+    }
+    let frame = screen.frame();
+    assert!(!frame.contains("fail: boom") && frame.contains("█"), "{frame}");
+    let top = screen
+        .ui
+        .hits
+        .iter()
+        .filter(|hit| matches!(hit.target, Target::Rail { column: 0, .. }))
+        .min_by_key(|hit| hit.y)
+        .map(|hit| (hit.x, hit.y))
+        .expect("a rail");
+    screen.click_at(top.0, top.1);
+    assert!(screen.controller.states[0].scroll > 300, "{}", screen.controller.states[0].scroll);
+    assert!(screen.frame().contains("fail: boom"), "{}", screen.frame());
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();

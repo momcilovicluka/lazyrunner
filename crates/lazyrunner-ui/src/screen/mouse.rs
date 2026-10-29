@@ -41,6 +41,8 @@ pub enum Target {
     News(super::jumps::View),
     /// A migration of the context selected in the migrations view, by its place in that list (newest first).
     Migration(usize),
+    /// A row of a column's rail: the column, and where a click scrolls it to (lines back from the newest).
+    Rail { column: usize, scroll: usize },
     /// A diagnostics zip's path in the log (in `Ui::links`): a click shows it in its folder.
     Reveal(usize),
 }
@@ -164,6 +166,12 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
             }
         }
         Some(Target::Output(index)) => ui.focus = index,
+        Some(Target::Rail { column, scroll }) => {
+            ui.focus = column;
+            if let Some(state) = controller.states.get_mut(column) {
+                state.scroll = scroll;
+            }
+        }
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
         Some(Target::Reveal(link)) => {
@@ -216,7 +224,13 @@ fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direc
         None if ui.picker.is_some() => return press(ui, controller, arrow),
         None => {}
     }
-    if let Some(Target::Output(index) | Target::Title(index) | Target::Link { column: index, .. }) = target {
+    if let Some(
+        Target::Output(index)
+        | Target::Title(index)
+        | Target::Link { column: index, .. }
+        | Target::Rail { column: index, .. },
+    ) = target
+    {
         keys::scroll_column(controller, index, WHEEL_LINES * direction, ui.search.as_ref());
     }
 }

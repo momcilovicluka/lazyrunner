@@ -558,9 +558,9 @@ fn body(
     let filtered = state.filter != LevelFilter::All || searching;
     let shown = list.len();
     let rows = if filtered { rows.saturating_sub(1) } else { rows };
-    // More lines than rows: the last cell is a scrollbar.
-    let scrollable = shown > rows && rows > 0 && column > 1;
-    let cells = if scrollable { column - 1 } else { column };
+    // More lines than rows: the last cells are the rail, a map of them.
+    let rail = if shown > rows && rows > 0 && column > 1 { super::rail::width(column) } else { 0 };
+    let cells = column - rail;
     let scroll = scroll.min(shown.saturating_sub(1));
     let copied = ui.motion.copied(index, ui.now);
     let looked = ui.motion.looked(index, ui.now);
@@ -650,8 +650,8 @@ fn body(
         result.push(vec![seg(" ".repeat(cells), C::Gray)]);
     }
     result.reverse();
-    if scrollable {
-        add_scrollbar(&mut result, shown, scroll);
+    if rail > 0 {
+        super::rail::add(ui, state, index, &list, search, &mut result, scroll, rail);
     }
     if filtered {
         let hidden = total - shown;
@@ -758,20 +758,6 @@ pub(super) fn linked(
         segs.push(seg(rest, color));
     }
     segs
-}
-
-/// The scrollbar: where the lines on screen are among all the column keeps (by lines, not wrapped rows); bright
-/// while scrolled back.
-fn add_scrollbar(rows: &mut [Vec<Seg>], total: usize, scroll: usize) {
-    let height = rows.len();
-    let thumb = (height * height / total).clamp(1, height);
-    let newest_shown = total.saturating_sub(scroll).max(1); // the lines up to this one end at the bottom row
-    let bottom = (newest_shown * height).div_ceil(total).clamp(thumb, height); // at the top it keeps its size
-    let top = bottom.saturating_sub(thumb);
-    let color = if scroll > 0 { C::Cyan } else { C::DarkGray };
-    for (at, row) in rows.iter_mut().enumerate() {
-        row.push(if (top..bottom).contains(&at) { seg("▐", color) } else { seg(" ", C::Gray) });
-    }
 }
 
 /// Cuts text into pieces of `cells` cells.

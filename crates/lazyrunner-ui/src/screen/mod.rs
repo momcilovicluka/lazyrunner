@@ -22,6 +22,7 @@ pub mod mouse;
 pub mod overlays;
 pub mod palette;
 pub mod panel;
+pub mod rail;
 pub mod reload;
 pub mod requests;
 pub mod seen;
@@ -261,6 +262,8 @@ pub struct Ui {
     pub held: held::Held,
     /// What spins while something runs: `"spinner"` in the settings, or lazyrunner's own.
     pub spinner: spinner::Spinner,
+    /// Each column's rail map, drawn again only when its lines change.
+    pub rails: rail::Maps,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Requests sent again (p in the requests view): how each went, once it has.
@@ -350,6 +353,7 @@ impl Ui {
             user_key_at: None,
             held: held::Held::default(),
             spinner: spinner::Spinner::default(),
+            rails: rail::Maps::default(),
             seen: seen::Seen::default(),
             replays: Vec::new(),
             git_tool_wanted: false,
