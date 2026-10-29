@@ -58,23 +58,24 @@ pub fn open(ui: &mut Ui, controller: &mut Controller) {
     ui.overlay = Some(Overlay::Themes { query: String::new(), index, original: ui.theme.id.clone(), own });
 }
 
-/// The themes the picker lists (indexes into `themes`): Default first, then the dark themes, then the light ones -
-/// all of them, or the fuzzy matches for `query` in that order.
+/// The themes the picker lists (indexes into `themes`): Default first, then the dark themes, the light ones and your
+/// own - all of them, or the fuzzy matches for `query` in that order.
 pub fn matches(themes: &[Theme], query: &str) -> Vec<usize> {
     let mut found = found(themes, query);
     found.sort_by_key(|&at| group(&themes[at])); // stable: each group keeps its order
     found
 }
 
-/// Where a theme is listed: Default (your terminal's own colours), the dark themes, the light themes.
-fn group(theme: &Theme) -> u8 {
+/// The groups after Default, in the order listed, with their headings: the built-in themes, then yours.
+const GROUPS: [(Icon, &str); 4] =
+    [(Icon::Moon, "Dark"), (Icon::Sun, "Light"), (Icon::Moon, "Custom dark"), (Icon::Sun, "Custom light")];
+
+/// Where a theme is listed: Default (your terminal's own colours), then one of `GROUPS`.
+fn group(theme: &Theme) -> usize {
     if theme.id == "default" {
-        0
-    } else if theme.light {
-        2
-    } else {
-        1
+        return 0;
     }
+    1 + usize::from(theme.light) + 2 * usize::from(theme.custom)
 }
 
 /// While the picker is open: whether the terminal's background should stay as it is a moment longer. A light theme
@@ -288,7 +289,7 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     footer.push(vec![seg(" ↑↓ Alt+jk preview · Esc undo", C::DarkGray)]);
     footer.push(vec![seg(" Enter keep · Tab this project", C::DarkGray)]);
     enum Entry {
-        Heading(&'static str),
+        Heading(usize),
         Theme(usize, usize),
     }
     let mut entries = Vec::new();
@@ -296,7 +297,7 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     for (at, &theme_at) in found.iter().enumerate() {
         let theme = &ui.themes[theme_at];
         if group(theme) != 0 && last_group != Some(group(theme)) {
-            entries.push(Entry::Heading(if theme.light { "Light" } else { "Dark" }));
+            entries.push(Entry::Heading(group(theme)));
         }
         last_group = Some(group(theme));
         entries.push(Entry::Theme(at, theme_at));
@@ -307,8 +308,8 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let name_cells = cells.saturating_sub(15).max(8);
     for entry in entries.iter().skip(first).take(visible) {
         let (at, theme_at) = match entry {
-            Entry::Heading(label) => {
-                let icon = if *label == "Light" { Icon::Sun } else { Icon::Moon };
+            Entry::Heading(group) => {
+                let (icon, label) = GROUPS[group - 1];
                 lines.push(heading(&icons::titled(ui.nerd, icon, label), cells));
                 continue;
             }

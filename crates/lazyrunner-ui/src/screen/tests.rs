@@ -573,6 +573,26 @@ async fn the_picker_groups_dark_and_light_themes_and_a_light_one_waits_to_light_
 }
 
 #[tokio::test]
+async fn your_own_themes_are_listed_apart_dark_then_light() {
+    let mut screen = screen("themes-custom", json!({}));
+    let mine = screen.temp.join("my-themes");
+    std::fs::create_dir_all(&mine).unwrap();
+    std::fs::write(mine.join("paper.json"), r#"{ "name": "Paper", "extends": "github-light" }"#).unwrap();
+    std::fs::write(mine.join("midnight.json"), r#"{ "name": "Midnight", "extends": "nord" }"#).unwrap();
+    screen.ui.user_themes = Some(mine);
+    screen.press("t");
+    let themes = &screen.ui.themes;
+    let ids: Vec<&str> = super::theme_picker::matches(themes, "").iter().map(|&at| themes[at].id.as_str()).collect();
+    assert_eq!(ids[ids.len() - 2..], ["midnight", "paper"], "{ids:?}");
+    assert!(themes.iter().filter(|theme| theme.custom).count() == 2);
+
+    screen.press("Up");
+    assert_eq!(screen.ui.theme.id, "paper");
+    let frame = screen.frame();
+    assert!(frame.contains(" Custom dark ─") && frame.contains(" Custom light ─"), "{frame}");
+}
+
+#[tokio::test]
 async fn keeping_a_theme_ripples_out_from_where_it_was_picked() {
     use super::theme_picker::{RIPPLE, Ripple, paint_ripple};
     use ratatui::buffer::Buffer;
