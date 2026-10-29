@@ -78,6 +78,9 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, event: MouseEvent) -> bo
     if !controller.setting(Toggle::Mouse) {
         return false; // turned off (, m): what was on its way still arrives
     }
+    if ui.follow.on {
+        return false;
+    }
     let (x, y) = (event.column, event.row);
     let target = target_at(ui, x, y);
     ui.pending_g = None;

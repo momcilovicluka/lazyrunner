@@ -44,7 +44,7 @@ pub fn open(ui: &mut Ui, controller: &mut Controller) {
 }
 
 /// The selection when the view opens: the first suite (once there is a list).
-const FIRST_SUITE: usize = usize::MAX;
+pub(super) const FIRST_SUITE: usize = usize::MAX;
 
 /// A row of the list: a side (Backend, Frontend), one of its apps (or the suites of no app), or a suite (by its
 /// place among the suites).

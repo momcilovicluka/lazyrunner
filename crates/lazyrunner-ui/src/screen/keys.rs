@@ -80,6 +80,12 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         ui.exit = Some(Exit::Quit);
         return;
     }
+    if ui.follow.on {
+        if name == "F" {
+            super::follow::toggle(ui, controller);
+        }
+        return;
+    }
     // A key ends the reload show at once, and does what it does (Esc only ends it).
     if ui.reload.take().is_some() && name == "Escape" {
         return;
@@ -622,6 +628,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Zoom => ui.zoom = !ui.zoom,
         Run::JumpBack => super::jumps::travel(ui, controller, true),
         Run::JumpForward => super::jumps::travel(ui, controller, false),
+        Run::Follow => super::follow::toggle(ui, controller),
         Run::Mark => super::marks::toggle(ui, controller),
         Run::PrevMark => super::marks::jump(ui, controller, true),
         Run::NextMark => super::marks::jump(ui, controller, false),

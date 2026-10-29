@@ -16,6 +16,7 @@ expression: screen.frame()
                   │  i      [ ] Nerd Font icons (the terminal's font a Nerd Font Mono)    │
                   │  o      [ ] Check the migrations against the database when M opens    │
                   │  l      [x] Links open on Alt+click (off: on a click)                 │
+                  │  F      [ ] Follow an agent when it calls (F: your keys back)         │
                   │  r      Run the startup checklist now (and check for an update)       │
                   │  c      What's new: the lazyrunner changelog                          │
                   │  A      About lazyrunner: version, contributors, links                │
@@ -23,7 +24,6 @@ expression: screen.frame()
                   │  P      Open the project profile in your editor  sample.json          │
                   │ press a letter to toggle, or j k + Enter · Esc / , close              │
                   └───────────────────────────────────────────────────────────────────────┘
-
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample

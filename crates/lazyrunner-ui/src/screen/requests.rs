@@ -575,13 +575,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     match view.tab {
         Tab::Requests if side => {
             view.index = view.index.min(list.len().saturating_sub(1));
-            let left = request_rows(view, controller, &list, list_width, height + 1);
+            let left = request_rows(view, controller, &list, list_width, height + 1, ui.motion.looked_requests(ui.now));
             let right = request_details(controller, list.get(view.index).copied(), panel.0, panel.1);
             out.extend(beside(left, right, list_width, panel));
         }
         Tab::Requests => {
             view.index = view.index.min(list.len().saturating_sub(1));
-            out.extend(request_rows(view, controller, &list, width, height));
+            out.extend(request_rows(view, controller, &list, width, height, ui.motion.looked_requests(ui.now)));
             out.resize(rows.saturating_sub(1), Vec::new());
             out.push(vec![seg(detail(controller, list.get(view.index).copied()), C::White)]);
         }
@@ -942,7 +942,15 @@ fn hint(view: &View, controller: &Controller, width: usize) -> Vec<Seg> {
     fit(vec![seg(text, C::DarkGray)], width)
 }
 
-fn request_rows(view: &View, controller: &Controller, list: &[&Request], width: usize, height: usize) -> Vec<Vec<Seg>> {
+/// The requests list; those an agent just read (`looked`) outlined.
+fn request_rows(
+    view: &View,
+    controller: &Controller,
+    list: &[&Request],
+    width: usize,
+    height: usize,
+    looked: Option<&std::collections::HashSet<u64>>,
+) -> Vec<Vec<Seg>> {
     let path_cells = width.saturating_sub(REQUEST_FIXED).max(10);
     let title = format!(" {:<8}  {:<8}  {:<6} {:>6} {:>7}  {}", "TIME", "APP", "METHOD", "STATUS", "MS", "PATH");
     let mut out = vec![vec![seg(title, C::DarkCyan)]];
@@ -965,9 +973,11 @@ fn request_rows(view: &View, controller: &Controller, list: &[&Request], width: 
         let tag = if n_plus_one { "  N+1" } else { "" };
         let path = cut(&request.path, path_cells.saturating_sub(tag.len()));
         let (method, status, took) = (&request.method, request.status, ms(request.ms));
+        let text = format!(" {time:<8}  {app}  {method:<6} {status:>6} {took:>7}  {path}{tag}");
         let row = if index == view.index {
-            let text = format!(" {time:<8}  {app}  {method:<6} {status:>6} {took:>7}  {path}{tag}");
             vec![on(pad(&text, width), C::FocusText, C::FocusBack)]
+        } else if looked.is_some_and(|read| read.contains(&request.seq)) {
+            vec![on(pad(&text, width), C::Black, C::Magenta)]
         } else {
             vec![
                 seg(format!(" {time:<8}  {app}  {method:<6}"), C::DarkGray),

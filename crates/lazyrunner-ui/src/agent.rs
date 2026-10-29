@@ -66,6 +66,10 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
     };
+    if let Ok(result) = &answer {
+        let op = request["op"].as_str().unwrap_or_default();
+        crate::screen::follow::agent_call(ui, controller, op, args, result, &client);
+    }
     match answer {
         Ok(result) => json!({ "ok": true, "result": result }),
         Err((code, why)) => refusal(code, &why),

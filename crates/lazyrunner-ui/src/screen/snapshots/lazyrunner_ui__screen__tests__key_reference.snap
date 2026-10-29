@@ -26,8 +26,9 @@ expression: screen.frame()
   │   T           Tests: run the project's test suites            h l Tab     focus another column         │
   │   L           lazygit: git without leaving lazyrunner         1-5         jump to a column             │
   │   x           Menu for the focused app                        j k ↑ ↓     scroll a line                │
-  │ View                                                          ^u ^d ^b ^f half page / page (PgUp PgDn) │
-  │   /           Search the focused app's output                 gg G < >    oldest / follow new output   │
-  │   z           Zoom the focused column                         n N Esc     search: older / newer / cle… │
+  │   F           Follow the agent                                ^u ^d ^b ^f half page / page (PgUp PgDn) │
+  │ View                                                          gg G < >    oldest / follow new output   │
+  │   /           Search the focused app's output                 n N Esc     search: older / newer / cle… │
+  │   z           Zoom the focused column                                                                  │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

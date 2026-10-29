@@ -8,6 +8,7 @@ pub mod checklist;
 pub mod columns;
 pub mod copy;
 pub mod durations;
+pub mod follow;
 pub mod icons;
 pub mod jumps;
 pub mod keys;
@@ -248,6 +249,8 @@ pub struct Ui {
     pub recent_commands: Vec<String>,
     /// Where you were before each jump (Ctrl+O back, Alt+→ forward).
     pub jumps: jumps::Jumps,
+    /// Follow mode (F): the screen follows an agent, your keys rest.
+    pub follow: follow::Follow,
     /// Requests sent again (p in the requests view): how each went, once it has.
     pub replays: Vec<std::sync::mpsc::Receiver<(lazyrunner_core::output::Hue, String)>>,
     /// `L` was pressed: the loop opens the git tool.
@@ -329,6 +332,7 @@ impl Ui {
             update_check: None,
             recent_commands: Vec::new(),
             jumps: jumps::Jumps::default(),
+            follow: follow::Follow::default(),
             replays: Vec::new(),
             git_tool_wanted: false,
             mark_at: None,

@@ -563,6 +563,7 @@ fn body(
     let cells = if scrollable { column - 1 } else { column };
     let scroll = scroll.min(shown.saturating_sub(1));
     let copied = ui.motion.copied(index, ui.now);
+    let looked = ui.motion.looked(index, ui.now);
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
     for item in list.iter().rev().skip(scroll) {
         if result.len() >= rows {
@@ -589,6 +590,9 @@ fn body(
             } else {
                 (color, back) = (C::Black, Some(C::Yellow));
             }
+        }
+        if looked.is_some_and(|lines| lines.contains(&line.text)) {
+            (color, back) = (C::Black, Some(C::Magenta)); // an agent read it (follow mode)
         }
         if copied.is_some_and(|lines| lines.contains(&line.text)) {
             (color, back) = (C::Black, Some(C::Cyan)); // just copied
