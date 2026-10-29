@@ -437,22 +437,33 @@ pub fn poll_replays(ui: &mut Ui, controller: &mut Controller) {
     });
 }
 
+fn copy_icon(kind: CopyAs) -> Icon {
+    match kind {
+        CopyAs::Row => Icon::Copy,
+        CopyAs::Curl | CopyAs::PowerShell | CopyAs::CurlExe => Icon::Terminal,
+        CopyAs::Http => Icon::Globe,
+        CopyAs::Fetch => Icon::JavaScript,
+        CopyAs::Url => Icon::Link,
+    }
+}
+
 /// y on a request: what to copy it as, in a box over the list.
 fn copy_menu(ui: &Ui, at: usize, title: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     const INNER: usize = 50;
     let lines = COPY_AS
         .iter()
         .enumerate()
-        .map(|(choice, (_, key, label, _))| {
+        .map(|(choice, (kind, key, label, _))| {
             let key = pad(&format!(" {key}"), 5);
+            let label = icons::titled(ui.nerd, copy_icon(*kind), label);
             if choice == at {
-                vec![on(ui.scrolling_parts(&[&key, label], INNER), C::Black, C::Cyan)]
+                vec![on(ui.scrolling_parts(&[&key, &label], INNER), C::Black, C::Cyan)]
             } else {
-                vec![seg(key, C::Cyan), seg(*label, C::White)]
+                vec![seg(key, C::Cyan), seg(label, C::White)]
             }
         })
         .collect();
-    let title = format!("Copy {title} as");
+    let title = icons::titled(ui.nerd, Icon::Clipboard, &format!("Copy {title} as"));
     super::overlays::boxed(&title, lines, "a key, or j k + Enter · Esc close", cells, rows, INNER)
 }
 

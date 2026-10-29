@@ -15,6 +15,7 @@ use ratatui::style::{Modifier, Style};
 use serde_json::json;
 
 use super::actions::fuzzy_score;
+use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, seg, styled};
 use super::theme::{self, C, Theme};
@@ -268,7 +269,7 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let index = (*index).min(found.len().saturating_sub(1));
     let mut lines = vec![
         vec![
-            on(" Themes ", C::FocusText, C::FocusBack),
+            on(format!(" {} ", icons::titled(ui.nerd, Icon::Brush, "Themes")), C::FocusText, C::FocusBack),
             seg(format!("  {} of {}", found.len(), ui.themes.len()), C::DarkGray),
         ],
         vec![seg(" › ", C::Cyan), seg(query.clone(), C::White), seg(ui.cursor(), C::Cyan)],
@@ -280,8 +281,9 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
             footer.push(vec![seg(format!(" {line}"), C::DarkGray)]);
         }
     }
+    let pin = icons::icon(ui.nerd, Icon::Pin);
     if own.is_some() {
-        footer.push(vec![seg(" ◆ project's own · Tab undoes", C::DarkGray)]);
+        footer.push(vec![seg(format!(" {pin} project's own · Tab undoes"), C::DarkGray)]);
     }
     footer.push(vec![seg(" ↑↓ Alt+jk preview · Esc undo", C::DarkGray)]);
     footer.push(vec![seg(" Enter keep · Tab this project", C::DarkGray)]);
@@ -306,16 +308,17 @@ pub fn rows(ui: &Ui, saved: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     for entry in entries.iter().skip(first).take(visible) {
         let (at, theme_at) = match entry {
             Entry::Heading(label) => {
-                lines.push(heading(label, cells));
+                let icon = if *label == "Light" { Icon::Sun } else { Icon::Moon };
+                lines.push(heading(&icons::titled(ui.nerd, icon, label), cells));
                 continue;
             }
             Entry::Theme(at, theme_at) => (*at, *theme_at),
         };
         let theme = &ui.themes[theme_at];
         let mark = match own {
-            Some(own) if *own == theme.id => '◆',
-            _ if theme.id == saved => '•',
-            _ => ' ',
+            Some(own) if *own == theme.id => pin,
+            _ if theme.id == saved => "•",
+            _ => " ",
         };
         let twin = ui.themes.iter().filter(|other| other.name == theme.name).count() > 1;
         let name = if twin { format!("{} · {}", theme.name, theme.id) } else { theme.name.clone() };

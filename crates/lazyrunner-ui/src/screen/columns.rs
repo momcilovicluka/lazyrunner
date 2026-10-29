@@ -342,9 +342,10 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
         Status::Running if state.is_up() => {
             let up = format!("  up in {}", format_duration(state.up_after.unwrap_or_default()));
             if controller.port(&key).is_none() {
-                return vec![seg("● built, watching", C::Green), seg(up, C::DarkGray)];
+                let watching = icons::icon(ui.nerd, Icon::Watching);
+                return vec![seg(format!("{watching} built, watching"), C::Green), seg(up, C::DarkGray)];
             }
-            let mut segs = vec![seg("● ", C::Green)];
+            let mut segs = vec![seg(format!("{} ", icons::icon(ui.nerd, Icon::Up)), C::Green)];
             segs.push(match controller.last_probe(&key) {
                 None => seg("checking…", C::DarkGray),
                 Some(probe) if !probe.ok => seg("not responding", C::Red),
@@ -373,10 +374,11 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
             vec![seg(format!("{dot} {verb} {bar}{}{eta}", format_duration(elapsed)), C::Yellow)]
         }
         Status::Exited(code) => {
-            vec![seg(format!("✗ exited (code {})", code.map_or("?".into(), |c| c.to_string())), C::Red)]
+            let exited = icons::icon(ui.nerd, Icon::Exited);
+            vec![seg(format!("{exited} exited (code {})", code.map_or("?".into(), |c| c.to_string())), C::Red)]
         }
-        Status::Error(error) => vec![seg(format!("✗ {error}"), C::Red)],
-        Status::Stopped => vec![seg("○ stopped", C::DarkGray)],
+        Status::Error(error) => vec![seg(format!("{} {error}", icons::icon(ui.nerd, Icon::Exited)), C::Red)],
+        Status::Stopped => vec![seg(format!("{} stopped", icons::icon(ui.nerd, Icon::Stopped)), C::DarkGray)],
     }
 }
 
@@ -440,10 +442,10 @@ fn info(controller: &Controller, index: usize, cells: usize, nerd: bool) -> Vec<
         segs.push(seg(format!("  {} {}", icons::icon(nerd, Icon::Fail), state.errors), C::Red));
     }
     if state.warnings > 0 {
-        segs.push(seg(format!("  △ {}", state.warnings), C::Yellow));
+        segs.push(seg(format!("  {} {}", icons::icon(nerd, Icon::Warnings), state.warnings), C::Yellow));
     }
     if state.filter != LevelFilter::All {
-        segs.push(seg(format!("  ⧩ {}", state.filter.label()), C::Cyan));
+        segs.push(seg(format!("  {} {}", icons::icon(nerd, Icon::Filter), state.filter.label()), C::Cyan));
     }
     if let Some(mode) = controller.mode(&state.key) {
         segs.push(seg(format!("  {} · {}", mode.label, mode.script), C::DarkGray));
@@ -606,10 +608,10 @@ fn body(
         let level = state.filter != LevelFilter::All;
         let mut what = Vec::new();
         if level {
-            what.push(format!("⧩ {}", state.filter.label()));
+            what.push(format!("{} {}", icons::icon(ui.nerd, Icon::Filter), state.filter.label()));
         }
         if let Some(search) = search.filter(|_| searching) {
-            what.push(format!("⌕ /{} and a line either side", search.query));
+            what.push(format!("{} /{} and a line either side", icons::icon(ui.nerd, Icon::Search), search.query));
         }
         let undo = match (level, searching) {
             (true, true) => "f, Esc show all",

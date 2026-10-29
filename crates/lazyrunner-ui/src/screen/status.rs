@@ -5,6 +5,7 @@
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::Status;
 
+use super::icons::{self, Icon};
 use super::theme::C;
 
 const SLOW_RESPONSE_MS: u64 = 1000;
@@ -12,6 +13,8 @@ const SLOW_RESPONSE_MS: u64 = 1000;
 /// The summary: what the header and the tab say, its colour, and the progress state for the tab.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
+    /// Before the text: all up, or stopped.
+    pub mark: Option<Icon>,
     pub text: String,
     pub color: C,
     /// OSC 9;4 state;progress: "1;100" green, "2;100" red, "4;100" yellow, "0;0" none.
@@ -45,20 +48,31 @@ pub fn summary(controller: &Controller) -> Summary {
     if let Some(job) = &controller.npm_ci {
         tools.push(format!("{}…", job.what));
     }
-    let (progress, text, color) = if !tools.is_empty() {
-        ("4;100", tools.join(" + "), C::Yellow)
+    let (progress, mark, text, color) = if !tools.is_empty() {
+        ("4;100", None, tools.join(" + "), C::Yellow)
     } else if failed {
-        ("2;100", "something failed - see the log".into(), C::Red)
+        ("2;100", None, "something failed - see the log".into(), C::Red)
     } else if !running.is_empty() && up < running.len() {
-        ("4;100", format!("starting ({up}/{} up)…", running.len()), C::Yellow)
+        ("4;100", None, format!("starting ({up}/{} up)…", running.len()), C::Yellow)
     } else if slow > 0 {
-        ("4;100", "up, but slow / not responding".into(), C::Yellow)
+        ("4;100", None, "up, but slow / not responding".into(), C::Yellow)
     } else if !running.is_empty() {
-        ("1;100", format!("● all up ({up})"), C::Green)
+        ("1;100", Some(Icon::Up), format!("all up ({up})"), C::Green)
     } else {
-        ("0;0", "○ stopped".into(), C::DarkGray)
+        ("0;0", Some(Icon::Stopped), "stopped".into(), C::DarkGray)
     };
-    Summary { text, color, progress }
+    Summary { mark, text, color, progress }
+}
+
+impl Summary {
+    /// The text after its mark: the Nerd Font's in the header, the plain one in the tab's title (not in the
+    /// terminal's font).
+    pub fn line(&self, nerd: bool) -> String {
+        match self.mark {
+            Some(mark) => format!("{} {}", icons::icon(nerd, mark), self.text),
+            None => self.text.clone(),
+        }
+    }
 }
 
 /// The escape sequences for the tab: its progress and its title ("lazyrunner · ShopLocal · ● all up (5)").
@@ -67,7 +81,7 @@ pub fn tab_sequence(controller: &Controller, summary: &Summary) -> String {
         .db_label
         .as_ref()
         .map_or(String::new(), |label| format!("{} · ", label.split(" @ ").next().unwrap_or(label)));
-    format!("\x1b]9;4;{}\x1b\\\x1b]0;lazyrunner · {database}{}\x07", summary.progress, summary.text)
+    format!("\x1b]9;4;{}\x1b\\\x1b]0;lazyrunner · {database}{}\x07", summary.progress, summary.line(false))
 }
 
 /// Puts the tab back as it was: no progress.
