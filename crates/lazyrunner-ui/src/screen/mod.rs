@@ -22,6 +22,7 @@ pub mod palette;
 pub mod panel;
 pub mod reload;
 pub mod requests;
+pub mod seen;
 pub mod seg;
 pub mod status;
 pub mod suites;
@@ -253,6 +254,8 @@ pub struct Ui {
     pub follow: follow::Follow,
     /// When the user last pressed a key: an agent's press_keys waits while they type in a prompt.
     pub user_key_at: Option<std::time::Instant>,
+    /// What each view had when it was last open: the panel's chips say what's new since.
+    pub seen: seen::Seen,
     /// Requests sent again (p in the requests view): how each went, once it has.
     pub replays: Vec<std::sync::mpsc::Receiver<(lazyrunner_core::output::Hue, String)>>,
     /// `L` was pressed: the loop opens the git tool.
@@ -336,6 +339,7 @@ impl Ui {
             jumps: jumps::Jumps::default(),
             follow: follow::Follow::default(),
             user_key_at: None,
+            seen: seen::Seen::default(),
             replays: Vec::new(),
             git_tool_wanted: false,
             mark_at: None,
@@ -509,6 +513,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.nerd = controller.setting(Toggle::NerdIcons);
     ui.motion.reduced = ui.reduced_motion;
     ui.marquee_seen.set(false);
+    seen::update(ui, controller);
     let typing = ui.search.as_ref().is_some_and(|search| search.typing);
     if ui.overlay.is_none() && ui.picker.is_none() && !typing {
         ui.overlay = ui.behind.take(); // what was opened from a view closed: the view again

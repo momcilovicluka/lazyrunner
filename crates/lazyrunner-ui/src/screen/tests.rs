@@ -1231,6 +1231,41 @@ fn with_suites(screen: &mut Screen) {
 }
 
 #[tokio::test]
+async fn chips_say_whats_new_since_a_view_was_open_and_open_it_on_the_first_new_thing() {
+    use lazyrunner_core::run::suites::Status as SuiteStatus;
+    let mut screen = screen("seen", json!({}));
+    with_suites(&mut screen);
+    screen.frame();
+    with_requests(&mut screen);
+    let frame = screen.frame();
+    assert!(frame.contains(" H ") && frame.contains("1 new error"), "{frame}");
+    let suites = screen.controller.suites.as_mut().expect("the sample's suites");
+    let billing = suites.iter_mut().find(|suite| suite.key == "dotnet:billing").expect("Billing.Tests");
+    (billing.status, billing.last_run) = (SuiteStatus::Failed, Some(chrono::Local::now()));
+    assert!(screen.frame().contains("1 suite done · 1 red"), "{}", screen.frame());
+
+    screen.press("H");
+    let failed =
+        screen.controller.requests.items.iter().find(|request| request.status == 500).map(|request| request.seq);
+    assert!(
+        matches!(&screen.ui.overlay, Some(Overlay::Requests(view)) if Some(view.selected) == failed && !view.follow)
+    );
+    screen.frame();
+    screen.press("Esc");
+    assert!(!screen.frame().contains("new error"), "having it open cleared the chip");
+
+    screen.click(Target::News(super::jumps::View::Tests));
+    let all = screen.controller.suites.as_deref().unwrap_or_default();
+    let at = all.iter().position(|suite| suite.key == "dotnet:billing");
+    let row = super::suites::list_rows(&screen.controller)
+        .iter()
+        .position(|row| matches!(row, super::suites::Row::Suite(suite) if Some(*suite) == at));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index, .. }) if Some(index) == row), "on Billing.Tests");
+    screen.frame();
+    assert!(!screen.frame().contains("suite done"), "{}", screen.frame());
+}
+
+#[tokio::test]
 async fn the_tests_view_lists_the_suites_and_shows_the_failures() {
     let mut screen = screen("snap-tests", json!({}));
     with_suites(&mut screen);

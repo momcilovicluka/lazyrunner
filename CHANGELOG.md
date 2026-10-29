@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.34.0] - 2026-10-29
+
+### Added
+- "New since you looked" chips in the panel's header: `H 3 new errors`, `T 2 suites done · 1 red`, `M 1 pending` - what happened in the requests, tests and migrations views since each was last open. The view's key or a click on the chip opens it on the first new thing; having it open clears the chip. A chip pops in once, then stays still (#49)
+
 ## [1.33.0] - 2026-10-29
 
 ### Added
