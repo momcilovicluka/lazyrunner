@@ -54,6 +54,15 @@ pub fn key_name(key: &KeyEvent) -> String {
     }
 }
 
+/// The user is in a prompt: the palette, a search, a filter, a note, the theme picker's search.
+pub fn prompt(ui: &Ui) -> bool {
+    ui.search.as_ref().is_some_and(|search| search.typing)
+        || ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
+        || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
+        || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
+        || matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.typing)
+}
+
 pub(super) fn typed(key: &KeyEvent) -> Option<char> {
     match key.code {
         // AltGr arrives as Ctrl+Alt on Windows: @ [ ] { } \ | on many layouts.

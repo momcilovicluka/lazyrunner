@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.35.2] - 2026-10-29
+
+### Fixed
+- A held key acted over and over - a held `f` in the settings flicked reduced motion on and off. It acts once now; moving and scrolling (`j` `k`, the arrows, `PgUp` `PgDn`…) still repeat, and so does typing in a prompt (#67)
+
 ## [1.35.1] - 2026-10-29
 
 ### Changed

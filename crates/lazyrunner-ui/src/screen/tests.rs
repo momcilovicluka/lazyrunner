@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use lazyrunner_core::changelog::Line;
 use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::Hue;
@@ -142,6 +142,16 @@ impl Screen {
         for key in crate::keys::parse(spec).unwrap() {
             keys::press(&mut self.ui, &mut self.controller, key);
         }
+    }
+
+    /// A key event as the terminal sends it; false: the loop drops it.
+    fn event(&mut self, c: char, kind: KeyEventKind) -> bool {
+        let key = KeyEvent::new_with_kind(KeyCode::Char(c), KeyModifiers::NONE, kind);
+        let dropped = super::held::dropped(&mut self.ui, &key);
+        if !dropped {
+            keys::press(&mut self.ui, &mut self.controller, key);
+        }
+        !dropped
     }
 
     fn last_log(&self) -> String {
@@ -2288,6 +2298,28 @@ async fn the_diagnostics_zip_holds_versions_settings_the_profile_logs_and_the_sc
             && !read("profile.json").is_empty()
             && !read("lazyrunner.log").is_empty()
     );
+}
+
+#[tokio::test]
+async fn a_held_key_acts_once_but_moving_and_typing_repeat() {
+    use KeyEventKind::{Press, Release};
+    let mut screen = screen("held", json!({}));
+    let reduced = screen.controller.setting(Toggle::ReducedMotion);
+    assert!(screen.event(',', Press) && !screen.event(',', Release));
+    assert!(screen.event('f', Press));
+    assert!(!screen.event('f', Press) && !screen.event('f', Press), "its repeats");
+    assert_ne!(screen.controller.setting(Toggle::ReducedMotion), reduced, "toggled once");
+    screen.event('f', Release);
+    assert!(screen.event('f', Press), "pressed again");
+    assert_eq!(screen.controller.setting(Toggle::ReducedMotion), reduced);
+    screen.event('f', Release);
+
+    screen.press("Esc");
+    assert!(screen.event('j', Press) && screen.event('j', Press), "scrolling repeats");
+    assert!(screen.event('l', Press) && screen.event('l', Press), "so does moving between columns");
+    screen.press("/");
+    assert!(screen.event('e', Press) && screen.event('e', Press) && screen.event('e', Press), "typing");
+    assert_eq!(screen.ui.search.as_ref().map(|search| search.query.as_str()), Some("eee"));
 }
 
 #[tokio::test]
