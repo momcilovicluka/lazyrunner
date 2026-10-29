@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.26.0] - 2026-10-29
+
+### Added
+- `Alt+j` / `Alt+k` move the selection in the command palette and the theme picker, where a plain `j` or `k` types; `Ctrl+J` / `Ctrl+K` too, in terminals that send them as such (#47)
+
 ## [1.25.1] - 2026-10-28
 
 ### Fixed

@@ -23,7 +23,7 @@ expression: screen.frame()
              ┃             │             │             │                 ┃────────────────────────────────────
              ┃             │             │             │                 ┃ Ayu's medium-dark blue-grey; also
              ┃             │             │             │                 ┃ recolours the terminal background
-             ┃             │             │             │                 ┃ ↑↓ preview · Esc undo
+             ┃             │             │             │                 ┃ ↑↓ Alt+jk preview · Esc undo
              ┃             │             │             │                 ┃ Enter keep · Tab this project
 ────────────────────────────────────────────────────────────────────────────────────────────────── Ayu Mirage
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample

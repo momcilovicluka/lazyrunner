@@ -16,7 +16,7 @@ use super::theme::C;
 use super::{Overlay, Ui};
 
 const INNER: usize = 84;
-const FOOTER: &str = "type to search · ↑↓ choose · Enter run · Esc close";
+const FOOTER: &str = "type to search · ↑↓ or Alt+j k choose · Enter run · Esc close";
 /// A row's icon and the space after it.
 const ICON_CELLS: usize = 4;
 /// The least room a hint gets beside its label before it's left out.
