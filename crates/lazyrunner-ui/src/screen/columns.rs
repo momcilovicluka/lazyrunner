@@ -636,11 +636,13 @@ fn body(
         let hint = empty_hint(controller, index, ui.focus == index, search.filter(|_| searching));
         let blank = || vec![seg(" ".repeat(cells), C::Gray)];
         let top = rows.saturating_sub(hint.len()) / 2;
+        // The lines start together, the block centred by its widest.
+        let widest = hint.iter().map(|text| text.width()).max().unwrap_or(0);
+        let left = " ".repeat(cells.saturating_sub(widest) / 2);
         let mut block: Vec<Vec<Seg>> = (0..top).map(|_| blank()).collect();
-        block.extend(hint.iter().take(rows - top).map(|text| {
-            let left = " ".repeat(cells.saturating_sub(text.width()) / 2);
-            fit(vec![seg(format!("{left}{text}"), C::DarkGray)], cells)
-        }));
+        block.extend(
+            hint.iter().take(rows - top).map(|text| fit(vec![seg(format!("{left}{text}"), C::DarkGray)], cells)),
+        );
         block.resize_with(rows, blank);
         result = block.into_iter().rev().collect();
     }

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.32.1] - 2026-10-29
+
+### Fixed
+- An empty column's hints (`u starts it`, `b builds it`, `U starts all`) start in one column, the block centred, instead of each line centred on its own
+
 ## [1.32.0] - 2026-10-29
 
 ### Added
