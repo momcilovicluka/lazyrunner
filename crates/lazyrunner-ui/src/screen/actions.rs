@@ -39,6 +39,7 @@ pub enum Run {
     Zoom,
     JumpBack,
     JumpForward,
+    Follow,
     LevelFilter,
     Mark,
     PrevMark,
@@ -204,6 +205,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         )
         .safe(),
         action("Tools", "x", "Menu for the focused app", "", Run::Menu).safe(),
+        action(
+            "Tools",
+            "F",
+            "Follow the agent",
+            "the screen shows what it reads over MCP; F again: your keys back",
+            Run::Follow,
+        )
+        .safe(),
         action("View", "/", "Search the focused app's output", "n older match, N newer", Run::Search).safe().focused(),
         action("View", "z", "Zoom the focused column", "", Run::Zoom).safe().focused(),
         action("View", "Ctrl+O", "Jump back", "to where you were before a jump - Alt+← too", Run::JumpBack).safe(),
@@ -272,7 +281,7 @@ pub(crate) struct MenuToggle {
     pub label: &'static str,
 }
 
-const MENU_TOGGLES: [MenuToggle; 12] = [
+const MENU_TOGGLES: [MenuToggle; 13] = [
     MenuToggle { letter: "a", toggle: Toggle::AutoRestartOnBranchChange, label: "Auto-restart on branch change" },
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
     MenuToggle { letter: "s", toggle: Toggle::StopFrontendOnStop, label: "Stop/Restart all include the frontend" },
@@ -297,6 +306,7 @@ const MENU_TOGGLES: [MenuToggle; 12] = [
         label: "Check the migrations against the database when M opens",
     },
     MenuToggle { letter: "l", toggle: Toggle::LinksOnAltClick, label: "Links open on Alt+click (off: on a click)" },
+    MenuToggle { letter: "F", toggle: Toggle::FollowAgent, label: "Follow an agent when it calls (F: your keys back)" },
 ];
 
 /// The , menu's toggles that apply here (whether Stop/Restart all include the frontend only with one).

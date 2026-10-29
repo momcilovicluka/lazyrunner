@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.32.0] - 2026-10-29
+
+### Added
+- Follow mode (`F`): the screen follows an agent working over MCP - the column whose output it reads, scrolled to the lines it read; the requests view with its filters; the tests view on its suite; the migrations view - and outlines what it read for a few seconds. Your keys rest meanwhile (all but `F` and `Ctrl+C`), the header says whom you follow and the keys row tells its last calls. `F` again gives you the keys back and the screen as it was; where the agent took you stays in the jump list. `followAgent` (`, F`) starts it when an agent calls (#63)
+
 ## [1.31.0] - 2026-10-29
 
 ### Added

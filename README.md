@@ -496,6 +496,13 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results; run all, a suite, its failed tests or one test |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 
+**Follow mode** (`F`) lets you watch it work: the screen goes where the agent looks - the column whose output it reads,
+scrolled to the lines it read; the requests view with its filters; the tests view on its suite; the migrations view -
+and outlines what it read for a few seconds. Your keys rest meanwhile (all but `F`, and `Ctrl+C`; the mouse too), the
+header says whom you follow, and the keys row tells its last calls in words. `F` again gives you the keys back and puts
+the screen back as it was; the places the agent took you stay in the jump list (`Ctrl+O`). With `followAgent` (`, F`)
+an agent's call starts following - not again while that agent works, once you've taken the keys back.
+
 It asks from anywhere, but acts only in the checkout lazyrunner runs (or a folder in it): an agent working in another
 worktree is told to have you open lazyrunner there. Its actions follow the keys' rules while an app builds. Applying
 or rolling back migrations, switching the database and killing what holds a port stay yours. When lazyrunner isn't
@@ -587,6 +594,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `nerdIcons` | `true` | Nerd Font icons in the chrome; for a terminal whose font is a Nerd Font (a "Mono" one) |
 | `checkMigrationsOnOpen` | `false` | `M` checks every DbContext against the database when it opens, and again after a database or branch switch |
 | `linksOnAltClick` | `true` | Links in the output open on Alt+click (Ctrl+click too, where the terminal allows); off, on a plain click |
+| `followAgent` | `false` | An agent's call over MCP starts follow mode (`F`): the screen shows what it reads, your keys rest until `F` |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |

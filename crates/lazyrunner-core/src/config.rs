@@ -36,10 +36,11 @@ pub enum Toggle {
     NerdIcons,
     CheckMigrationsOnOpen,
     LinksOnAltClick,
+    FollowAgent,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 14] = [
+    pub const ALL: [Toggle; 15] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -54,6 +55,7 @@ impl Toggle {
         Toggle::NerdIcons,
         Toggle::CheckMigrationsOnOpen,
         Toggle::LinksOnAltClick,
+        Toggle::FollowAgent,
     ];
 
     /// Its name in the settings file.
@@ -73,6 +75,7 @@ impl Toggle {
             Toggle::NerdIcons => "nerdIcons",
             Toggle::CheckMigrationsOnOpen => "checkMigrationsOnOpen",
             Toggle::LinksOnAltClick => "linksOnAltClick",
+            Toggle::FollowAgent => "followAgent",
         }
     }
 
@@ -84,6 +87,7 @@ impl Toggle {
                 | Toggle::ReducedMotion
                 | Toggle::GitBeside
                 | Toggle::CheckMigrationsOnOpen
+                | Toggle::FollowAgent
         )
     }
 

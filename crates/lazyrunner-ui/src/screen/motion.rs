@@ -14,6 +14,8 @@ use super::mouse::Target;
 pub const FLASH: Duration = Duration::from_millis(220);
 /// Copied lines stay lit a little longer: they show what was taken.
 pub const COPY_FLASH: Duration = Duration::from_millis(450);
+/// What an agent read stays outlined long enough to follow (follow mode).
+pub const LOOK: Duration = Duration::from_secs(4);
 /// A box opening from its middle.
 pub const REVEAL: Duration = Duration::from_millis(120);
 /// Column widths and scrolling moving to where they're going.
@@ -45,6 +47,10 @@ pub enum Spot {
     Setting(Toggle),
     /// Lines of an app's output (by their text) that were just copied.
     Copied { app: usize, lines: HashSet<String> },
+    /// Lines of an app's output (by their text) an agent just read.
+    Looked { app: usize, lines: HashSet<String> },
+    /// Requests (by number) an agent just read.
+    LookedRequests(HashSet<u64>),
     /// The search match just jumped to (the line's index, 0 = the oldest kept).
     Match { app: usize, line: usize },
     /// What was clicked.
@@ -53,7 +59,11 @@ pub enum Spot {
 
 impl Spot {
     fn lasts(&self) -> Duration {
-        if matches!(self, Spot::Copied { .. }) { COPY_FLASH } else { FLASH }
+        match self {
+            Spot::Copied { .. } => COPY_FLASH,
+            Spot::Looked { .. } | Spot::LookedRequests(_) => LOOK,
+            _ => FLASH,
+        }
     }
 }
 
@@ -143,6 +153,28 @@ impl Motion {
     pub fn copied(&self, app: usize, now: Instant) -> Option<&HashSet<String>> {
         self.flashes.iter().find_map(|(spot, at)| match spot {
             Spot::Copied { app: of, lines } if *of == app && progress(*at, now, COPY_FLASH) < 1.0 => Some(lines),
+            _ => None,
+        })
+    }
+
+    /// Outlines what an agent read - with reduced motion too: it shows where the agent looks, it isn't a flourish.
+    pub fn look(&mut self, spot: Spot, now: Instant) {
+        self.flashes.retain(|(other, _)| std::mem::discriminant(other) != std::mem::discriminant(&spot));
+        self.flashes.push((spot, now));
+    }
+
+    /// The lines of `app` an agent read, while they're outlined.
+    pub fn looked(&self, app: usize, now: Instant) -> Option<&HashSet<String>> {
+        self.flashes.iter().find_map(|(spot, at)| match spot {
+            Spot::Looked { app: of, lines } if *of == app && progress(*at, now, LOOK) < 1.0 => Some(lines),
+            _ => None,
+        })
+    }
+
+    /// The requests an agent read, while they're outlined.
+    pub fn looked_requests(&self, now: Instant) -> Option<&HashSet<u64>> {
+        self.flashes.iter().find_map(|(spot, at)| match spot {
+            Spot::LookedRequests(read) if progress(*at, now, LOOK) < 1.0 => Some(read),
             _ => None,
         })
     }

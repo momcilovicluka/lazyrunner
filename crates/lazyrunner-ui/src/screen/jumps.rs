@@ -93,7 +93,7 @@ fn view(overlay: Option<&Overlay>) -> Option<View> {
     }
 }
 
-fn here(ui: &Ui, controller: &Controller) -> Place {
+pub(super) fn here(ui: &Ui, controller: &Controller) -> Place {
     let app = ui.focus;
     let line = controller.states.get(app).filter(|state| state.scroll > 0).and_then(|state| {
         let shown = columns::shown_lines(state, ui.search.as_ref());
@@ -173,7 +173,7 @@ pub fn travel(ui: &mut Ui, controller: &mut Controller, back: bool) {
 }
 
 /// Goes to a place: its column with its line at the bottom again (flashed), its view; false when the line is gone.
-fn go(ui: &mut Ui, controller: &mut Controller, place: &Place) -> bool {
+pub(super) fn go(ui: &mut Ui, controller: &mut Controller, place: &Place) -> bool {
     let Some(state) = controller.states.get(place.app) else { return false };
     let (scroll, position) = match place.line {
         None => (0, None),

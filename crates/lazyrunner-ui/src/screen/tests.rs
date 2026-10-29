@@ -1697,6 +1697,49 @@ fn agent(screen: &mut Screen, op: &str, args: Value, repo: Option<&std::path::Pa
 }
 
 #[tokio::test]
+async fn follow_mode_shows_what_the_agent_reads_while_your_keys_rest() {
+    let mut screen = screen("follow", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    let shop = &mut screen.controller.states[2];
+    (1..=60).for_each(|n| shop.add_line(&format!("line {n}"), Hue::Gray, at));
+    shop.add_line("payment timed out", Hue::Red, at);
+    (61..=90).for_each(|n| shop.add_line(&format!("line {n}"), Hue::Gray, at));
+    screen.frame();
+    screen.press("F");
+    assert!(screen.ui.follow.on);
+    agent(&mut screen, "logs", json!({ "app": "Shop", "grep": "timed out" }), None);
+    assert_eq!((screen.ui.focus, screen.controller.states[2].scroll), (2, 30), "Shop, the line read at the bottom");
+    assert!(screen.ui.motion.looked(2, screen.ui.now).is_some_and(|lines| lines.contains("payment timed out")));
+    let frame = screen.frame();
+    assert!(frame.contains("following claude-code"), "{frame}");
+    assert!(frame.contains("read Shop's output matching \"timed out\""), "{frame}");
+
+    screen.press("1 q");
+    assert!(screen.ui.focus == 2 && screen.ui.exit.is_none(), "your keys rest");
+    agent(&mut screen, "requests", json!({ "errors_only": true }), None);
+    assert!(matches!(&screen.ui.overlay, Some(Overlay::Requests(view)) if view.errors_only), "its filters");
+
+    screen.press("F");
+    assert!(!screen.ui.follow.on && screen.ui.overlay.is_none());
+    assert_eq!((screen.ui.focus, screen.controller.states[2].scroll), (0, 0), "the screen back as it was");
+    screen.press("Ctrl+o");
+    assert_eq!(screen.ui.focus, 2, "the jump list has where the agent took you");
+}
+
+#[tokio::test]
+async fn follow_agent_follows_an_agents_call_until_you_take_the_keys_back_while_it_works() {
+    let mut screen = screen("follow-auto", json!({ "followAgent": true }));
+    agent(&mut screen, "status", json!({}), None);
+    assert!(screen.ui.follow.on);
+    screen.press("F");
+    agent(&mut screen, "status", json!({}), None);
+    assert!(!screen.ui.follow.on, "not again while it works");
+    screen.ui.now += Duration::from_secs(180);
+    agent(&mut screen, "status", json!({}), None);
+    assert!(screen.ui.follow.on, "its next task, a quiet while later");
+}
+
+#[tokio::test]
 async fn an_agent_reads_the_requests_their_endpoints_and_one_request_in_full() {
     let mut screen = screen("agent-requests", json!({}));
     let empty = agent(&mut screen, "requests", json!({}), None);

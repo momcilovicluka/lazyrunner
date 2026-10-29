@@ -23,7 +23,7 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
     let tag = if ui.theme.id != "default" || no_color() { format!(" {} ", ui.theme.name) } else { String::new() };
     rows.push(vec![seg("─".repeat(cells.saturating_sub(tag.chars().count())), C::DarkGray), seg(tag, C::DarkGray)]);
     rows.push(header(ui, controller));
-    rows.push(hints(ui, controller, cells));
+    rows.push(if ui.follow.on { super::follow::ticker(ui, cells) } else { hints(ui, controller, cells) });
     rows.push(notice(ui, controller));
     let count = controller.config["panelLogLines"]
         .as_u64()
@@ -55,6 +55,10 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         }
     };
     let mut segs = vec![on(" lazyrunner ", C::Black, chip), summary];
+    if ui.follow.on {
+        let who = if ui.follow.client.is_empty() { "the agent" } else { ui.follow.client.as_str() };
+        segs.push(seg(format!("   {} following {who}", icons::icon(ui.nerd, Icon::Watching)), C::Magenta));
+    }
     if let Some((at, of)) = ui.jumps.count() {
         segs.push(seg(format!("   {} {at}/{of}", icons::icon(ui.nerd, Icon::Back)), C::DarkCyan));
     }

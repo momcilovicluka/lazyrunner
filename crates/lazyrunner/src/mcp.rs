@@ -333,7 +333,13 @@ impl<C: Channel> Server<C> {
                 &["id"],
                 true,
             ),
-            tool("get_screen", "lazyrunner's screen as the user sees it now, as text.", json!({}), &[], true),
+            tool(
+                "get_screen",
+                "lazyrunner's screen as the user sees it now, as text. In follow mode (F) it shows what you read last.",
+                json!({}),
+                &[],
+                true,
+            ),
             tool(
                 "start_apps",
                 "Starts an app or every app (builds the .NET ones first when their code changed). Then wait for ready.",
