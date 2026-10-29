@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.40.0] - 2026-10-29
+
+### Added
+- Hooks: your own commands, run when something happens - `"hooks": [{ "on": "tests.red", "run": "..." }]` in `lazyrunner.config.json`. The events: an app up or crashed, a build passed or failed, tests green or red, migrations applied, an update installed (`"app"` narrows one to an app). A hook runs in the background with what happened in `LAZYRUNNER_*` variables; one that fails or runs past 60 s says so in the log. `lazyrunner hook test <event>` tries them (#57)
+
 ## [1.39.0] - 2026-10-29
 
 ### Added
@@ -11,27 +16,27 @@ it updates itself; `,` then `c` shows the whole file. How to release a version: 
 ## [1.38.0] - 2026-10-29
 
 ### Added
-- A spinner of your own, as lazygit's: `"spinner": { "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` in `lazyrunner.config.json`, for every project or in a project's section for that one. It spins wherever lazyrunner's would; one that can't be used says why in the log, and lazyrunner's own spins (#64)
+- A spinner of your own, as lazygit's: `"spinner": { "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` in `lazyrunner.config.json`, for every project or in a project's section for that one. It spins wherever lazyrunner's would; one that can't be used says why in the log, and lazyrunner's own spins (#64, thanks @ognjen004028)
 
 ## [1.37.0] - 2026-10-29
 
 ### Added
-- Your own themes (`themes/` in the settings folder) are listed apart in the theme picker, after the built-in ones: Custom dark, then Custom light. A theme of yours with a built-in one's id is listed as yours (#65)
+- Your own themes (`themes/` in the settings folder) are listed apart in the theme picker, after the built-in ones: Custom dark, then Custom light. A theme of yours with a built-in one's id is listed as yours (#65, thanks @ognjen004028)
 
 ## [1.36.0] - 2026-10-29
 
 ### Added
-- The diagnostics zip's path in the log is a link: Alt+click on it (a click, with `, l` off) shows the zip in its folder - selected in Explorer (#66)
+- The diagnostics zip's path in the log is a link: Alt+click on it (a click, with `, l` off) shows the zip in its folder - selected in Explorer (#66, thanks @ognjen004028)
 
 ## [1.35.2] - 2026-10-29
 
 ### Fixed
-- A held key acted over and over - a held `f` in the settings flicked reduced motion on and off. It acts once now; moving and scrolling (`j` `k`, the arrows, `PgUp` `PgDn`…) still repeat, and so does typing in a prompt (#67)
+- A held key acted over and over - a held `f` in the settings flicked reduced motion on and off. It acts once now; moving and scrolling (`j` `k`, the arrows, `PgUp` `PgDn`…) still repeat, and so does typing in a prompt (#67, thanks @ognjen004028)
 
 ## [1.35.1] - 2026-10-29
 
 ### Changed
-- The bug report zip is now the diagnostics zip, and moved from the settings to the About box, under Report a bug (`,` `A` then `z`, or the palette), so the two bug reports aren't mistaken for each other. It goes into the state folder's `diagnostics` (#68)
+- The bug report zip is now the diagnostics zip, and moved from the settings to the About box, under Report a bug (`,` `A` then `z`, or the palette), so the two bug reports aren't mistaken for each other. It goes into the state folder's `diagnostics` (#68, thanks @ognjen004028)
 
 ## [1.35.0] - 2026-10-29
 
@@ -224,7 +229,7 @@ it updates itself; `,` then `c` shows the whole file. How to release a version: 
 ## [1.10.2] - 2026-10-26
 
 ### Fixed
-- `L` with `"gitBeside"` on opens the git tool beside lazyrunner once: more presses while its pane starts are ignored, and while it runs in the project - its folder or its repo's top one, beside lazyrunner or in another window - the log says so instead of opening another (#13, thanks @ognjen004028)
+- `L` with `"gitBeside"` on opens the git tool beside lazyrunner once: more presses while its pane starts are ignored, and while it runs in the project - its folder or its repo's top one, beside lazyrunner or in another window - the log says so instead of opening another (#13, #14, thanks @ognjen004028)
 
 ## [1.10.1] - 2026-10-26
 
@@ -240,7 +245,7 @@ it updates itself; `,` then `c` shows the whole file. How to release a version: 
 ## [1.9.1] - 2026-10-26
 
 ### Fixed
-- A link's letter in the About box highlights that link before opening it, like the `,` and `x` menus, so `Enter` and `j` / `k` go on from it (#7, thanks @ognjen004028)
+- A link's letter in the About box highlights that link before opening it, like the `,` and `x` menus, so `Enter` and `j` / `k` go on from it (#7, #12, thanks @ognjen004028)
 
 ## [1.9.0] - 2026-10-26
 
@@ -268,10 +273,10 @@ it updates itself; `,` then `c` shows the whole file. How to release a version: 
 ## [1.6.1] - 2026-10-23
 
 ### Fixed
-- The About box's "Report a bug" and "Suggest a feature" open the repository's bug and feature forms (the bug form's version and operating system filled in), not a blank issue (#5)
+- The About box's "Report a bug" and "Suggest a feature" open the repository's bug and feature forms (the bug form's version and operating system filled in), not a blank issue (#5, thanks @ognjen004028)
 
 ### Changed
-- A letter in the , menu (and the x menu) highlights the item it runs, so a toggled setting is the one in view (#4)
+- A letter in the , menu (and the x menu) highlights the item it runs, so a toggled setting is the one in view (#4, thanks @ognjen004028)
 - The About box thanks the people whose bug reports and ideas shaped lazyrunner
 
 ## [1.6.0] - 2026-10-23

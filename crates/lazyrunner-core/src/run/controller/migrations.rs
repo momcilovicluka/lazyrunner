@@ -333,6 +333,7 @@ impl Controller {
                 let name = self.context(&key).map(|context| context.name.clone()).unwrap_or_default();
                 if code == Some(0) {
                     self.add_log(format!("✓ {name} on {db}: {what}"), Hue::Green);
+                    self.happened("migrations.applied", None, format!("{name} on {db}: {what}"));
                 } else {
                     let failure = migrations::failure(&job.lines, code);
                     if let Some(context) = self.context_mut(&key) {

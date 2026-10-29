@@ -10,6 +10,7 @@ pub mod child;
 pub mod command;
 pub mod controller;
 pub mod history;
+pub mod hooks;
 pub mod migrations;
 pub mod net;
 pub mod requests;
@@ -77,6 +78,12 @@ pub enum Event {
     FileChanged(PathBuf),
     /// The test suites found (T), with their last results.
     Suites(Vec<suites::Suite>),
+    /// A hook that didn't go well: its event, its command, and what went wrong.
+    HookFailed {
+        event: String,
+        run: String,
+        problem: String,
+    },
 }
 
 /// "4s", "1m05s", as the panel says durations.

@@ -612,6 +612,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
+| `hooks` | | Your own commands, run when something happens - see Hooks below |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.theme` | | This project's own theme, instead of `theme` (`t`, then `Tab`) |
 | `projects.<id>.spinner` | | This project's own spinner, instead of `spinner` |
@@ -620,6 +621,24 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `projects.<id>.apps.<key>.includeInAll` | | `false` keeps that app running on Stop all / Restart all |
 | `projects.<id>.frontend` | `true` | `false` leaves out every npm app |
 | `projects.<id>.stopFrontendOnStop` | `true` | Stop/Restart all include the npm apps (`,` then `s`) |
+
+**Hooks** run your own commands when something happens. They live in your settings, never in a project's profile,
+as a hook runs a command on your machine:
+
+```json
+"hooks": [
+  { "on": "tests.red", "run": "pwsh -File C:\\scripts\\notify.ps1" },
+  { "on": "app.crashed", "app": "orders", "run": "msg * Orders crashed" }
+]
+```
+
+The events: `app.up`, `app.crashed`, `build.passed`, `build.failed`, `tests.green`, `tests.red`,
+`migrations.applied` and `update.installed`; `"app"` narrows an app or build event to one app. A hook runs in the
+background through the shell (`cmd` on Windows, `sh` elsewhere), in the project's folder, with what happened in
+`LAZYRUNNER_EVENT`, `LAZYRUNNER_PROJECT`, `LAZYRUNNER_APP` and `LAZYRUNNER_DETAILS`. One that fails, or still runs
+after 60 s (then it's stopped), says so in the log: `▸ hook tests.red (notify.ps1): exit 1`. A project's section
+can have its own `hooks`, for that project. `lazyrunner hook test tests.red` runs the hooks for an event now, to
+try them.
 
 **Where things live:**
 

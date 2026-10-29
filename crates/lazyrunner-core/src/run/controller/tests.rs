@@ -34,6 +34,21 @@ fn last_log(controller: &Controller) -> String {
 }
 
 #[tokio::test]
+async fn a_hook_runs_when_its_event_happens_and_says_when_it_fails() {
+    let temp = TempDir::new("hooks");
+    let hooks = json!([{ "on": "tests.red", "run": "exit 4" }, { "on": "tests.blue", "run": "x" }]);
+    let (mut controller, mut rx) = controller(&temp, json!({ "hooks": hooks }));
+    controller.happened("tests.red", None, "1 failed".into());
+    assert!(last_log(&controller).starts_with("▸ hook 2: \"on\""), "{}", last_log(&controller));
+    let logged = controller.log.len();
+    controller.happened("tests.green", None, "all passed".into());
+    assert_eq!(controller.log.len(), logged, "a problem is said once");
+    let event = tokio::time::timeout(std::time::Duration::from_secs(30), rx.recv()).await.unwrap().unwrap();
+    controller.handle(event);
+    assert_eq!(last_log(&controller), "▸ hook tests.red (exit 4): exit 4");
+}
+
+#[tokio::test]
 async fn stopping_nothing_says_so_and_stop_all_names_what_it_keeps() {
     let temp = TempDir::new("controller-stop");
     let (mut controller, _rx) = controller(&temp, json!({}));
