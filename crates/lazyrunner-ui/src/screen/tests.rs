@@ -2204,6 +2204,20 @@ async fn the_palette_groups_its_keycaps_until_something_is_typed() {
 }
 
 #[tokio::test]
+async fn the_palette_lists_what_you_ran_lately_first_and_remembers_it() {
+    let mut screen = screen("palette-recent", json!({}));
+    screen.press(": z o o m Enter");
+    screen.press(": t h e m e Enter Esc :");
+    let found = super::actions::palette(&screen.ui, &screen.controller, "");
+    let first: Vec<(&str, bool)> = found.iter().take(2).map(|action| (action.key.as_str(), action.recent)).collect();
+    assert_eq!(first, [("t", true), ("z", true)], "newest first");
+    assert!(found.iter().skip(2).any(|action| action.key == "z" && !action.recent), "and still in its own group");
+    let frame = screen.frame();
+    assert!(frame.contains(" Recent ─"), "{frame}");
+    assert_eq!(super::palette::recent(&screen.controller), ["t", "z"], "kept in the project's state");
+}
+
+#[tokio::test]
 async fn enter_runs_at_once_while_the_palette_wipes_away() {
     let mut screen = screen("palette-enter", json!({}));
     screen.ui.motion.enabled = true;

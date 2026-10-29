@@ -346,6 +346,11 @@ impl Controller {
         &self.paths
     }
 
+    /// This project's own state folder (its histories, results, what the palette ran lately).
+    pub fn state_folder(&self) -> &std::path::Path {
+        &self.state_dir
+    }
+
     pub fn index(&self, key: &str) -> Option<usize> {
         self.apps.iter().position(|app| app.key == key)
     }

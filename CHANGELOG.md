@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.27.0] - 2026-10-29
+
+### Added
+- The command palette remembers what you ran: with nothing typed, the last five come first under Recent, and of two equally good matches the one run lately wins. Kept per project (#59)
+
 ## [1.26.0] - 2026-10-29
 
 ### Added

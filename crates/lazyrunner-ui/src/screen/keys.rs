@@ -423,6 +423,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 let (query, index) = (query.clone(), *index);
                 let found = actions::palette(ui, controller, &query);
                 if let Some(action) = found.get(index).cloned() {
+                    super::palette::remember(ui, controller, &action.key);
                     ui.motion.close_palette(&query, index, ui.now);
                     run_from_overlay(ui, controller, &action, false);
                 } else {
@@ -637,7 +638,10 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Theme => super::theme_picker::open(ui, controller),
         Run::Settings => ui.overlay = Some(Overlay::Settings { index: 0 }),
         Run::Help => ui.overlay = Some(Overlay::Help),
-        Run::Palette => ui.overlay = Some(Overlay::Palette { query: String::new(), index: 0 }),
+        Run::Palette => {
+            ui.recent_commands = super::palette::recent(controller);
+            ui.overlay = Some(Overlay::Palette { query: String::new(), index: 0 });
+        }
         Run::Setting { toggle, label } => {
             let on = !controller.setting(*toggle);
             execute(controller, Command::SetToggle { toggle: *toggle, on });

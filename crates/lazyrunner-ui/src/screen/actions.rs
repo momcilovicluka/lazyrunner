@@ -74,6 +74,8 @@ pub struct Action {
     pub run: Run,
     pub safe: bool,
     pub focused: bool,
+    /// Shown again under Recent, first in the palette.
+    pub recent: bool,
 }
 
 fn action(group: &'static str, key: &str, label: &str, hint: &str, run: Run) -> Action {
@@ -86,6 +88,7 @@ fn action(group: &'static str, key: &str, label: &str, hint: &str, run: Run) -> 
         run,
         safe: false,
         focused: false,
+        recent: false,
     }
 }
 
@@ -389,7 +392,13 @@ pub fn palette(ui: &Ui, controller: &Controller, query: &str) -> Vec<Action> {
         setting
     }));
     if query.trim().is_empty() {
-        return all;
+        let recent: Vec<Action> = ui
+            .recent_commands
+            .iter()
+            .filter_map(|key| all.iter().find(|action| action.key == *key))
+            .map(|action| Action { recent: true, ..action.clone() })
+            .collect();
+        return recent.into_iter().chain(all).collect();
     }
     let mut scored: Vec<(u32, Action)> = all
         .into_iter()
@@ -403,7 +412,9 @@ pub fn palette(ui: &Ui, controller: &Controller, query: &str) -> Vec<Action> {
             (score > 0).then_some((score, action))
         })
         .collect();
-    scored.sort_by_key(|(score, _)| std::cmp::Reverse(*score)); // stable: ties keep the list's order
+    let lately = |action: &Action| ui.recent_commands.iter().position(|key| *key == action.key).unwrap_or(usize::MAX);
+    // stable: ties go to what ran lately, then keep the list's order
+    scored.sort_by_key(|(score, action)| (std::cmp::Reverse(*score), lately(action)));
     scored.into_iter().map(|(_, action)| action).collect()
 }
 

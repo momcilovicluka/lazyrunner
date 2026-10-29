@@ -241,6 +241,8 @@ pub struct Ui {
     pub contributors: lazyrunner_core::contributors::Contributors,
     /// The update check `u` in the About box runs.
     pub update_check: Option<about::UpdateCheck>,
+    /// The commands run from the palette lately, newest first (their keys), read when it opens.
+    pub recent_commands: Vec<String>,
     /// Requests sent again (p in the requests view): how each went, once it has.
     pub replays: Vec<std::sync::mpsc::Receiver<(lazyrunner_core::output::Hue, String)>>,
     /// `L` was pressed: the loop opens the git tool.
@@ -320,6 +322,7 @@ impl Ui {
             picker: None,
             contributors: lazyrunner_core::contributors::built_in(),
             update_check: None,
+            recent_commands: Vec::new(),
             replays: Vec::new(),
             git_tool_wanted: false,
             mark_at: None,
