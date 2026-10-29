@@ -3,7 +3,7 @@
 //! file of the same id in your themes folder replaces one, and new files add themes. `NO_COLOR` turns colour off
 //! (backgrounds become reverse video).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use ratatui::style::{Color, Modifier, Style};
@@ -94,6 +94,8 @@ pub struct Theme {
     pub terminal: Option<(Option<String>, Option<String>)>,
     /// Made for a light background: the picker lists it with the light themes.
     pub light: bool,
+    /// Yours, from the settings folder's themes: the picker lists it apart from the built-in ones.
+    pub custom: bool,
 }
 
 impl Theme {
@@ -305,6 +307,7 @@ fn resolve(id: &str, files: &HashMap<String, Value>, chain: &[String]) -> Result
         bg,
         terminal,
         light,
+        custom: false,
     })
 }
 
@@ -318,6 +321,7 @@ fn is_light(hex: &str) -> bool {
 pub fn load(user_dir: Option<&Path>) -> (Vec<Theme>, Vec<String>) {
     let mut warnings = Vec::new();
     let mut files: HashMap<String, Value> = HashMap::new();
+    let mut own: HashSet<String> = HashSet::new();
     for (id, text) in BUNDLED {
         if let Ok(data) = serde_json::from_str(text) {
             files.insert(id.to_string(), data);
@@ -341,6 +345,7 @@ pub fn load(user_dir: Option<&Path>) -> (Vec<Theme>, Vec<String>) {
             .and_then(|text| serde_json::from_str::<Value>(&text).map_err(|e| e.to_string()))
         {
             Ok(data) if data.is_object() => {
+                own.insert(id.clone());
                 files.insert(id, data);
             }
             Ok(_) => warnings.push(format!("Theme {file} skipped: the file must hold one JSON object")),
@@ -352,7 +357,7 @@ pub fn load(user_dir: Option<&Path>) -> (Vec<Theme>, Vec<String>) {
     ids.sort();
     for id in ids {
         match resolve(id, &files, &[]) {
-            Ok(theme) => themes.push(theme),
+            Ok(theme) => themes.push(Theme { custom: own.contains(id), ..theme }),
             Err(error) => warnings.push(format!("Theme {id}.json skipped: {error}")),
         }
     }

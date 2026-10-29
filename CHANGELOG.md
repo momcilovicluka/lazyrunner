@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.37.0] - 2026-10-29
+
+### Added
+- Your own themes (`themes/` in the settings folder) are listed apart in the theme picker, after the built-in ones: Custom dark, then Custom light. A theme of yours with a built-in one's id is listed as yours (#65)
+
 ## [1.36.0] - 2026-10-29
 
 ### Added

@@ -566,7 +566,8 @@ and `solarized-light`; and for anime fans `evangelion` (Unit-01), `zero-two`, `r
 recolour the terminal background while lazyrunner runs. Your own: copy one from [themes/](themes/) to `themes/<id>.json`
 in the settings folder and change it; the picker reads the themes again each time it opens, so it shows up straight
 away. [themes/README.md](themes/README.md) describes every field.
-The picker lists the dark themes, then the light ones under their own heading; a light theme recolours the terminal's
+The picker lists the dark themes, then the light ones under their own heading, then yours (Custom dark, Custom
+light); a light theme recolours the terminal's
 background only once you stay on it, so passing by never flashes the whole terminal white. A theme you keep ripples
 out from where you picked it, a ring of its own colours with sparkles on it (not with reduced motion). `NO_COLOR` turns colour off.
 
