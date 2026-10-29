@@ -1,7 +1,7 @@
 //! App types: the one place that knows what a dotnet or an npm app is. Everything else asks about a trait
 //! (`app.traits().builds`) or calls a function here, so a new type is a new entry plus its commands.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -199,6 +199,16 @@ fn launch_settings_path(project: &str) -> String {
     join(&join(&dir, "Properties"), "launchSettings.json")
 }
 
+/// A .NET app's launch profile: its launchSettings.json, its name there, and what it sets.
+pub fn launch_profile(root: &Path, app: &App) -> Option<(PathBuf, String, Value)> {
+    let AppKind::Dotnet { project, launch_profile, .. } = &app.kind else { return None };
+    let file = root.join(launch_settings_path(project));
+    let settings = json::read(&file)?;
+    let profiles = field(&settings, "profiles").as_object()?;
+    let (name, profile) = profiles.iter().find(|(name, _)| name.eq_ignore_ascii_case(launch_profile))?;
+    Some((file, name.clone(), profile.clone()))
+}
+
 /// The port an app listens on in this checkout.
 pub fn port(root: &Path, app: &App, active: &[App]) -> Option<u16> {
     match &app.kind {
@@ -357,6 +367,7 @@ mod tests {
             kind: AppKind::Npm { dir: dir.into(), variants: Vec::new() },
             tests: Vec::new(),
             migrations: None,
+            env: Vec::new(),
         };
         let write = |dir: &str, package: &str| {
             std::fs::create_dir_all(temp.join(dir)).unwrap();

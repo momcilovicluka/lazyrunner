@@ -219,6 +219,10 @@ fn to_app(app: &Value) -> App {
         AppKind::Npm { dir: native(&text(field(app, "dir"))), variants }
     };
     let tests = list(field(app, "tests")).into_iter().map(text).collect();
+    let env = field(app, "env")
+        .as_object()
+        .map(|vars| vars.iter().filter_map(|(name, value)| Some((name.clone(), value.as_str()?.to_string()))).collect())
+        .unwrap_or_default();
     let setup = field(app, "migrations");
     let migrations = setup.is_object().then(|| Migrations {
         project: truthy(field(setup, "project")).then(|| native(&text(field(setup, "project")))),
@@ -232,6 +236,7 @@ fn to_app(app: &Value) -> App {
         kind,
         tests,
         migrations,
+        env,
     }
 }
 

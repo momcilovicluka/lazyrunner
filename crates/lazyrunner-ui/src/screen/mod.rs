@@ -27,6 +27,7 @@ pub mod reload;
 pub mod requests;
 pub mod seen;
 pub mod seg;
+pub mod sheet;
 pub mod spinner;
 pub mod status;
 pub mod suites;
@@ -142,6 +143,12 @@ pub enum Overlay {
         /// The note being written for the selected mark (`a`).
         note: Option<String>,
     },
+    /// `x` then `e`: what an app is started with; the selected secret, and when Space showed it.
+    Sheet {
+        app: usize,
+        index: usize,
+        shown: Option<Instant>,
+    },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {
         index: usize,
@@ -189,6 +196,7 @@ impl Overlay {
             Self::Changelog { .. } => "changelog",
             Self::Durations { .. } => "durations",
             Self::Marks { .. } => "marks",
+            Self::Sheet { .. } => "sheet",
             Self::Tests { .. } => "tests",
             Self::Requests(_) => "requests",
             Self::Install { .. } => "install",
@@ -489,6 +497,7 @@ impl Ui {
             || self.theme_ripple.is_some()
             || self.marquee.borrow().is_some()
             || self.motion.active(self.now)
+            || sheet::showing(self)
         {
             return true;
         }
@@ -614,6 +623,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
         Some(Overlay::Marks { .. }) => return marks::rows(ui, controller, width, rows),
+        Some(Overlay::Sheet { .. }) => return sheet::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
         Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),

@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.41.0] - 2026-10-29
+
+### Added
+- The start sheet (`e`, in the `x` menu and the palette): what the focused app is started with - the command line and its folder, the launch profile (its URL and variables) or npm script, the profile's `args` and `env`, and the user secrets with their values masked (`Space` shows one for 5 s; a connection string reads `database @ server`). A part that changed since the app started says so, and `r` restarts it; `y` copies the sheet, secrets masked
+- `"env"` in a profile's app: environment variables the app gets on top of lazyrunner's own (#55)
+
 ## [1.40.0] - 2026-10-29
 
 ### Added

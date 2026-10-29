@@ -3,32 +3,32 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
 
-
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
-  │ Run                                                           Ctrl+O      Jump back                    │
-  │   Space       Start / stop the focused app                    Alt+→       Jump forward                 │
-  │   u U         Start · focused / all                           f           Filter the focused column b… │
-  │   s S         Stop · focused / all                            m           Mark a line                  │
-  │   r R         Restart · focused / all                         [           Older mark                   │
-  │   b B         Build · focused / all                           ]           Newer mark                   │
-  │   q           Quit                                            '           Marks: every column's, to j… │
-  │ Tools                                                         + -         Widen / narrow the focused … │
-  │   d           Switch database                                 =           Equal column widths          │
-  │   i           Install packages: npm ci or npm install         |           Layout: columns → next       │
-  │   i c         npm ci                                          Ctrl+L      Clear output                 │
-  │   i n         npm install                                     Ctrl+R      Reload window                │
-  │   w W         Open in the browser · focused / all             t           Theme picker (Default)       │
-  │   o           Open the focused app's log file               Help                                       │
-  │   y           Copy (yank)                                     ,           Settings (on/off toggles, r… │
-  │   D           Durations                                       ?           Key reference                │
-  │   H           Requests: what the .NET apps served             , A z       Diagnostics zip to attach    │
-  │   M           Migrations: what's applied to the database      :           Command palette              │
-  │   T           Tests: run the project's test suites          Navigate                                   │
-  │   L           lazygit: git without leaving lazyrunner         h l Tab     focus another column         │
-  │   x           Menu for the focused app                        1-5         jump to a column             │
-  │   F           Follow the agent                                j k ↑ ↓     scroll a line                │
-  │ View                                                          ^u ^d ^b ^f half page / page (PgUp PgDn) │
-  │   /           Search the focused app's output                 gg G < >    oldest / follow new output   │
-  │   z           Zoom the focused column                         n N Esc     search: older / newer / cle… │
+  │ Run                                                                  Ctrl+O      Jump back             │
+  │   Space       Start / stop the focused app                           Alt+→       Jump forward          │
+  │   u U         Start · focused / all                                  f           Filter the focused c… │
+  │   s S         Stop · focused / all                                   m           Mark a line           │
+  │   r R         Restart · focused / all                                [           Older mark            │
+  │   b B         Build · focused / all                                  ]           Newer mark            │
+  │   q           Quit                                                   '           Marks: every column'… │
+  │ Tools                                                                + -         Widen / narrow the f… │
+  │   d           Switch database                                        =           Equal column widths   │
+  │   i           Install packages: npm ci or npm install                |           Layout: columns → ne… │
+  │   i c         npm ci                                                 Ctrl+L      Clear output          │
+  │   i n         npm install                                            Ctrl+R      Reload window         │
+  │   w W         Open in the browser · focused / all                    t           Theme picker (Defaul… │
+  │   o           Open the focused app's log file                      Help                                │
+  │   e           Start sheet: what the focused app is started with      ,           Settings (on/off tog… │
+  │   y           Copy (yank)                                            ?           Key reference         │
+  │   D           Durations                                              , A z       Diagnostics zip to a… │
+  │   H           Requests: what the .NET apps served                    :           Command palette       │
+  │   M           Migrations: what's applied to the database           Navigate                            │
+  │   T           Tests: run the project's test suites                   h l Tab     focus another column  │
+  │   L           lazygit: git without leaving lazyrunner                1-5         jump to a column      │
+  │   x           Menu for the focused app                               j k ↑ ↓     scroll a line         │
+  │   F           Follow the agent                                       ^u ^d ^b ^f half page / page (Pg… │
+  │ View                                                                 gg G < >    oldest / follow new … │
+  │   /           Search the focused app's output                        n N Esc     search: older / newe… │
+  │   z           Zoom the focused column                                                                  │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

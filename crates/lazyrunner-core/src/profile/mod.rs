@@ -95,6 +95,8 @@ pub struct App {
     pub tests: Vec<String>,
     /// A .NET app's EF Core migrations (`"migrations"`), for the migrations view (M).
     pub migrations: Option<Migrations>,
+    /// Variables the app gets on top of lazyrunner's own (`"env"`).
+    pub env: Vec<(String, String)>,
 }
 
 /// Where a .NET app's EF Core migrations are: the project with them (the app's own when `None`) and its DbContexts

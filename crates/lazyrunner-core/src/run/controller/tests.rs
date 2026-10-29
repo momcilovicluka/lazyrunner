@@ -43,8 +43,14 @@ async fn a_hook_runs_when_its_event_happens_and_says_when_it_fails() {
     let logged = controller.log.len();
     controller.happened("tests.green", None, "all passed".into());
     assert_eq!(controller.log.len(), logged, "a problem is said once");
-    let event = tokio::time::timeout(std::time::Duration::from_secs(30), rx.recv()).await.unwrap().unwrap();
-    controller.handle(event);
+    let failed = async {
+        loop {
+            if let Some(event @ crate::run::Event::HookFailed { .. }) = rx.recv().await {
+                return event;
+            }
+        }
+    };
+    controller.handle(tokio::time::timeout(std::time::Duration::from_secs(30), failed).await.unwrap());
     assert_eq!(last_log(&controller), "▸ hook tests.red (exit 4): exit 4");
 }
 

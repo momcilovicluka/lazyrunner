@@ -2400,6 +2400,21 @@ async fn the_rail_maps_where_the_errors_are_and_a_click_jumps_there() {
 }
 
 #[tokio::test]
+async fn the_start_sheet_shows_what_an_app_is_started_with_and_copies_it() {
+    let mut screen = screen("sheet", json!({}));
+    screen.press("x e");
+    let frame = screen.frame();
+    assert!(frame.contains("Start sheet · Orders"), "{frame}");
+    assert!(frame.contains("Command line") && frame.contains("--launch-profile"), "{frame}");
+    assert!(frame.contains("Launch profile") && frame.contains("Profile"), "{frame}");
+    screen.press("y");
+    let copied = copied();
+    assert!(copied.last().is_some_and(|text| text.starts_with("Command line")), "{copied:?}");
+    screen.press("Esc");
+    assert!(screen.ui.overlay.is_none());
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();

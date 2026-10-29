@@ -747,6 +747,7 @@ mod tests {
             nerd_icon: None,
             tests: Vec::new(),
             migrations: None,
+            env: Vec::new(),
             kind: AppKind::Npm { dir: dir.into(), variants: Vec::new() },
         };
         let api = App {
@@ -756,6 +757,7 @@ mod tests {
             nerd_icon: None,
             tests: Vec::new(),
             migrations: None,
+            env: Vec::new(),
             kind: AppKind::Dotnet {
                 project: "services/Shop/Shop.csproj".into(),
                 launch_profile: "Api".into(),
