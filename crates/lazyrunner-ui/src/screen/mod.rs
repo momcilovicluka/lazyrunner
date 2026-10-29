@@ -251,6 +251,8 @@ pub struct Ui {
     pub jumps: jumps::Jumps,
     /// Follow mode (F): the screen follows an agent, your keys rest.
     pub follow: follow::Follow,
+    /// When the user last pressed a key: an agent's press_keys waits while they type in a prompt.
+    pub user_key_at: Option<std::time::Instant>,
     /// Requests sent again (p in the requests view): how each went, once it has.
     pub replays: Vec<std::sync::mpsc::Receiver<(lazyrunner_core::output::Hue, String)>>,
     /// `L` was pressed: the loop opens the git tool.
@@ -333,6 +335,7 @@ impl Ui {
             recent_commands: Vec::new(),
             jumps: jumps::Jumps::default(),
             follow: follow::Follow::default(),
+            user_key_at: None,
             replays: Vec::new(),
             git_tool_wanted: false,
             mark_at: None,

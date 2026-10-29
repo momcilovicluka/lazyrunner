@@ -495,6 +495,14 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
 | `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results; run all, a suite, its failed tests or one test |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
+| `list_actions` | Everything lazyrunner can do: every action as the palette lists it (its key, whether it runs while an app builds, whether it needs `confirm`) and every setting with its state |
+| `run_action` | Any action by its key, on an app, as your key would |
+| `press_keys` | Keys as the key reference names them (`"g g"`, `"Ctrl+o"`, `"Esc"`), for what no tool covers; answers with the screen after. It waits while you type in a prompt |
+| `switch_database`, `install_packages`, `apply_migrations`, `kill_port_holder`, `set_setting` | The database by name, `npm ci` / `npm install`, a DbContext's pending migrations or one to move to, what holds a needed port, a setting |
+
+What can't be undone or takes something away from you - quitting, killing a port's holder, reverting a migration,
+switching the database, clearing the output, reopening lazyrunner, the git tool over the screen - needs
+`"confirm": true`, and the agent is told to ask you first.
 
 **Follow mode** (`F`) lets you watch it work: the screen goes where the agent looks - the column whose output it reads,
 scrolled to the lines it read; the requests view with its filters; the tests view on its suite; the migrations view -

@@ -148,7 +148,7 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             result["doing"].as_str().map(str::to_string)
         }
         "status" => Some("looked at the status".to_string()),
-        _ => None,
+        _ => result["doing"].as_str().map(str::to_string),
     }
 }
 
