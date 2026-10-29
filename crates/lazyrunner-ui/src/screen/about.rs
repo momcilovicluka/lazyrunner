@@ -230,6 +230,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         _ => 0,
     };
     let (nerd, animated, tick, seconds) = (ui.nerd, !ui.reduced_motion, ui.tick(), ui.seconds());
+    let spin = animated.then(|| spinner(ui).to_string());
     let widest = all
         .iter()
         .map(|link| 8 + icons::icon(nerd, link.icon).width() + LABEL_CELLS + link.hint.width())
@@ -271,7 +272,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         if link.does == Does::CheckUpdate
             && let Some(check) = &ui.update_check
         {
-            lines.push(update_line(check, animated, tick));
+            lines.push(update_line(check, spin.as_deref()));
         }
     }
     lines.push(Vec::new());
@@ -337,10 +338,9 @@ fn version_line(controller: &Controller, nerd: bool) -> Vec<Seg> {
 }
 
 /// Under the update link: a spinner and what the check is doing, then how it ended.
-fn update_line(check: &UpdateCheck, animated: bool, tick: u64) -> Vec<Seg> {
+fn update_line(check: &UpdateCheck, spin: Option<&str>) -> Vec<Seg> {
     let (mark, color) = match check.status {
-        None if animated => (spinner(tick).to_string(), C::Yellow),
-        None => ("…".to_string(), C::Yellow),
+        None => (spin.unwrap_or("…").to_string(), C::Yellow),
         Some(update::Status::Ok) => ("✓".to_string(), C::Green),
         Some(update::Status::Warn) => ("!".to_string(), C::Yellow),
         Some(update::Status::Skip) => ("-".to_string(), C::DarkGray),
