@@ -344,7 +344,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             "Escape" | "q" | "c" => ui.overlay = None,
             _ => scroll_box(top, name),
         },
-        Some(Overlay::Marks { .. }) => super::marks::key(ui, controller, name),
+        Some(Overlay::Marks { .. }) => super::marks::key(ui, controller, name, key),
         Some(Overlay::Durations { top }) => match name {
             "Escape" | "q" | "D" => ui.overlay = None,
             _ => scroll_box(top, name),

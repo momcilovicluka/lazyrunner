@@ -2086,6 +2086,33 @@ async fn m_marks_lines_brackets_jump_between_them_and_the_marks_box_lists_them()
 }
 
 #[tokio::test]
+async fn a_mark_takes_a_note_and_y_copies_the_marks_as_a_timeline() {
+    let mut screen = screen("mark-notes", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    screen.controller.states[1].add_line("Retrying the payment", Hue::Gray, at + Duration::from_secs(1));
+    screen.controller.states[0].add_line("Request timed out", Hue::Gray, at);
+    screen.press("2 m 1 m '");
+    screen.press("a q u i t Backspace Backspace Backspace Backspace t i m e o u t Space f i r s t");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Marks { .. })), "q types while a note is written");
+    assert!(screen.frame().contains("note: timeout first"), "{}", screen.frame());
+    screen.press("Enter");
+    let notes: Vec<&String> = screen.controller.states[0].notes.values().collect();
+    assert_eq!(notes, ["timeout first"], "the oldest mark first: Orders'");
+    assert!(screen.frame().contains("timeout first · Request timed out"), "{}", screen.frame());
+
+    screen.press("y");
+    let timeline = copied().pop().unwrap_or_default();
+    let lines: Vec<&str> = timeline.lines().collect();
+    assert_eq!(lines.len(), 2, "{timeline}");
+    assert!(lines[0].ends_with("  Orders  timeout first - Request timed out"), "{timeline}");
+    assert!(lines[1].ends_with("  Billing  Retrying the payment"), "{timeline}");
+    assert!(screen.last_log().starts_with("Copied 2 marks as a timeline"), "{}", screen.last_log());
+
+    screen.press("a Esc d");
+    assert!(screen.controller.states[0].marks.is_empty() && screen.controller.states[0].notes.is_empty());
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();
