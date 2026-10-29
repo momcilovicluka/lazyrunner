@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use lazyrunner_core::changelog::VERSION;
+use lazyrunner_core::links;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::{Controller, checks};
 use ratatui::Terminal;
@@ -20,6 +21,9 @@ use super::Ui;
 use crate::svg;
 
 const FOLDER: &str = "diagnostics";
+/// The log's line for a zip written: these around its path.
+pub const WRITTEN: &str = "Diagnostics zip: ";
+pub const SHARE: &str = " - look over its logs before you share it";
 /// An app's output lines in the report, the newest.
 const OUTPUT_LINES: usize = 1000;
 const MASK: &str = "***";
@@ -134,13 +138,30 @@ pub fn write(ui: &mut Ui, controller: &mut Controller) {
             .collect();
         files.insert(0, ("about.txt".into(), format!("{about}\n\ntools:\n{}\n", tools.join("\n")).into_bytes()));
         let said = match zip(&path, &files) {
-            Ok(()) => {
-                (Hue::Green, format!("Diagnostics zip: {} - look over its logs before you share it", path.display()))
-            }
+            Ok(()) => (Hue::Green, format!("{WRITTEN}{}{SHARE}", path.display())),
             Err(error) => (Hue::Red, format!("✗ Couldn't write the diagnostics zip: {error}")),
         };
         let _ = send.send(said);
     });
+}
+
+/// The zip a line of the log says was written.
+pub fn written(text: &str) -> Option<&str> {
+    text.strip_prefix(WRITTEN)?.strip_suffix(SHARE)
+}
+
+/// A click on the zip's path in the log (`link` in `Ui::links`): the zip in the file manager.
+pub fn reveal(ui: &Ui, controller: &mut Controller, link: usize) {
+    let Some(links::Target::File { path, .. }) = ui.links.get(link) else { return };
+    let zip = std::path::PathBuf::from(path);
+    let name = zip.file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
+    if !zip.exists() {
+        controller.add_log(format!("{name} isn't there any more"), Hue::Yellow);
+    } else if (ui.revealer)(&zip) {
+        controller.add_log(format!("Showing {name} in its folder"), Hue::DarkGray);
+    } else {
+        controller.add_log(format!("✗ Couldn't show {name} in its folder"), Hue::Red);
+    }
 }
 
 fn zip(path: &Path, files: &[(String, Vec<u8>)]) -> std::io::Result<()> {

@@ -75,6 +75,25 @@ pub fn open_file(ui: &Ui, controller: &mut Controller, file: &Path, line: Option
     }
 }
 
+/// A file in the file manager: Explorer with it selected, Finder too; elsewhere its folder. False when that
+/// doesn't start.
+#[cfg(windows)]
+pub fn reveal(file: &Path) -> bool {
+    use std::os::windows::process::CommandExt;
+    let select = format!("/select,\"{}\"", file.display());
+    Command::new("explorer.exe").raw_arg(select).stdout(Stdio::null()).stderr(Stdio::null()).spawn().is_ok()
+}
+
+#[cfg(target_os = "macos")]
+pub fn reveal(file: &Path) -> bool {
+    launch(Path::new("open"), &["-R".into(), file.display().to_string()])
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+pub fn reveal(file: &Path) -> bool {
+    file.parent().is_some_and(|folder| launch(Path::new("xdg-open"), &[folder.display().to_string()]))
+}
+
 /// Starts a program without waiting for it (the editor); false when it doesn't start.
 pub fn launch(program: &Path, args: &[String]) -> bool {
     Command::new(program).args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().is_ok()

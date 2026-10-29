@@ -152,7 +152,7 @@ pub fn draw(
                 style = style.add_modifier(Modifier::REVERSED);
             } else if touch.hover == Some(target) {
                 style = style.add_modifier(Modifier::BOLD);
-                if matches!(target, Target::Link { .. } | Target::Tests) {
+                if matches!(target, Target::Link { .. } | Target::Tests | Target::Reveal(_)) {
                     style = style.add_modifier(Modifier::UNDERLINED);
                 }
             }

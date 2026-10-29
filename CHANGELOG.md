@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.36.0] - 2026-10-29
+
+### Added
+- The diagnostics zip's path in the log is a link: Alt+click on it (a click, with `, l` off) shows the zip in its folder - selected in Explorer (#66)
+
 ## [1.35.2] - 2026-10-29
 
 ### Fixed

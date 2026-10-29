@@ -64,6 +64,11 @@ fn opened(target: &str) -> bool {
     true
 }
 
+fn revealed(file: &std::path::Path) -> bool {
+    OPENED.with(|opened| opened.borrow_mut().push(format!("reveal {}", file.display())));
+    true
+}
+
 fn launched(program: &std::path::Path, args: &[String]) -> bool {
     let program = program.file_stem().unwrap_or_default().to_string_lossy().into_owned();
     OPENED.with(|opened| opened.borrow_mut().push(format!("{program} {}", args.join(" "))));
@@ -110,6 +115,7 @@ fn screen(label: &str, config: Value) -> Screen {
     let (mut ui, _) = Ui::new(&controller, None, started);
     ui.opener = opened;
     ui.launcher = launched;
+    ui.revealer = revealed;
     ui.clipboard = record;
     ui.now = started + Duration::from_secs(10);
     // The frames are taken at one frozen instant: a box would never have opened. The motion tests turn it on.
@@ -2298,6 +2304,16 @@ async fn the_diagnostics_zip_holds_versions_settings_the_profile_logs_and_the_sc
             && !read("profile.json").is_empty()
             && !read("lazyrunner.log").is_empty()
     );
+
+    screen.controller.add_log(line.clone(), hue);
+    screen.frame();
+    let hit = screen.ui.hits.iter().find(|hit| matches!(hit.target, Target::Reveal(_))).expect("the path, a link");
+    let (x, y) = (hit.x, hit.y);
+    screen.click_at(x, y);
+    assert!(OPENED.with(|opened| opened.borrow().is_empty()), "a plain click opens nothing by default");
+    screen.alt_click_at(x, y);
+    assert_eq!(OPENED.with(|opened| opened.borrow().clone()), [format!("reveal {path}")]);
+    assert!(screen.last_log().starts_with("Showing lazyrunner-diagnostics-"), "{}", screen.last_log());
 }
 
 #[tokio::test]

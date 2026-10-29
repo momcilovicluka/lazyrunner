@@ -41,6 +41,8 @@ pub enum Target {
     News(super::jumps::View),
     /// A migration of the context selected in the migrations view, by its place in that list (newest first).
     Migration(usize),
+    /// A diagnostics zip's path in the log (in `Ui::links`): a click shows it in its folder.
+    Reveal(usize),
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -164,6 +166,11 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::Output(index)) => ui.focus = index,
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
+        Some(Target::Reveal(link)) => {
+            if link_click(ui, controller, modified) {
+                super::bundle::reveal(ui, controller, link);
+            }
+        }
         Some(Target::Link { column, link }) => {
             ui.focus = column;
             open_link(ui, controller, link, Some(column), modified);
@@ -175,11 +182,20 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
 /// A link opens on Alt+click (`linksOnAltClick`, the default; Ctrl+click too, where the terminal doesn't take it for
 /// its own links - Windows Terminal does, on URLs) or on any click; a plain click on one says so, once.
 fn open_link(ui: &mut Ui, controller: &mut Controller, link: usize, app: Option<usize>, modified: bool) {
-    if modified || !controller.setting(Toggle::LinksOnAltClick) {
+    if link_click(ui, controller, modified) {
         super::links::open(ui, controller, link, app);
-    } else if !std::mem::replace(&mut ui.link_hint_shown, true) {
+    }
+}
+
+/// Whether a click opens a link; a plain one that doesn't says so, once.
+fn link_click(ui: &mut Ui, controller: &mut Controller, modified: bool) -> bool {
+    if modified || !controller.setting(Toggle::LinksOnAltClick) {
+        return true;
+    }
+    if !std::mem::replace(&mut ui.link_hint_shown, true) {
         controller.add_log("Alt+click opens a link (, then l: a click does)", Hue::DarkGray);
     }
+    false
 }
 
 /// The wheel: a box of text or a list moves as its arrow keys move it; elsewhere the column under the pointer
