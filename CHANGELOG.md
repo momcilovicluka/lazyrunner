@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.29.0] - 2026-10-29
+
+### Added
+- Empty places say what fills them: a stopped app's empty column its keys (`u` starts it, `b` builds it, `U` starts all), a column whose filter or search hides every line what hides them and how to show them again, and the marks box (`'`) opens with no marks to say how to make one (#60)
+
 ## [1.28.0] - 2026-10-29
 
 ### Added

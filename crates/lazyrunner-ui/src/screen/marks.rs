@@ -100,11 +100,7 @@ fn all(controller: &Controller) -> Vec<(usize, u64)> {
 }
 
 /// ': the marks box (none yet: says how to make one).
-pub fn open(ui: &mut Ui, controller: &mut Controller) {
-    if all(controller).is_empty() {
-        controller.add_log("No marks yet - m marks the line at the bottom of the focused column.", Hue::DarkGray);
-        return;
-    }
+pub fn open(ui: &mut Ui) {
     ui.overlay = Some(Overlay::Marks { index: 0 });
 }
 
@@ -164,7 +160,7 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         _ => 0,
     };
     let inner = cells.saturating_sub(8).clamp(20, INNER);
-    let lines = marks
+    let mut lines: Vec<Vec<Seg>> = marks
         .iter()
         .enumerate()
         .map(|(at, &(app, number))| {
@@ -189,10 +185,22 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             }
         })
         .collect();
+    if marks.is_empty() {
+        lines = [
+            "",
+            "No marks yet.",
+            "m marks the line at the bottom of the focused column; ] and [ jump between",
+            "the marks, and they're listed here.",
+            "",
+        ]
+        .iter()
+        .map(|text| vec![seg(format!(" {text}"), C::DarkGray)])
+        .collect();
+    }
     boxed(
         &icons::titled(ui.nerd, Icon::Bookmark, "Marks"),
         lines,
-        "j k + Enter jumps · d unmarks · Esc closes",
+        if marks.is_empty() { "Esc closes" } else { "j k + Enter jumps · d unmarks · Esc closes" },
         cells,
         rows,
         inner,

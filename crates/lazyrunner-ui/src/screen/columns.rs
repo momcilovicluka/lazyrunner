@@ -503,6 +503,39 @@ fn bright(color: C) -> C {
     }
 }
 
+/// What an empty column says, centred: a stopped app's keys (in the focused column, where they act), or what hides
+/// every line and how to show them again.
+fn empty_hint(controller: &Controller, index: usize, focused: bool, search: Option<&super::Search>) -> Vec<String> {
+    let state = &controller.states[index];
+    if state.output.is_empty() {
+        if !focused || !matches!(state.status, Status::Stopped) {
+            return Vec::new();
+        }
+        let mut hint = vec!["u starts it".to_string()];
+        if controller.apps[index].traits().builds {
+            hint.push("b builds it".into());
+        }
+        if controller.apps.len() > 1 {
+            hint.push("U starts all".into());
+        }
+        return hint;
+    }
+    let noun = match state.filter {
+        LevelFilter::All => "",
+        LevelFilter::Errors => "errors",
+        LevelFilter::Warnings => "warnings or errors",
+        LevelFilter::Info => "info, warnings or errors",
+    };
+    match (noun.is_empty(), search) {
+        (false, Some(search)) => {
+            vec![format!("No {noun}"), format!("match /{}", search.query), "f, Esc show all".into()]
+        }
+        (false, None) => vec![format!("No {noun}"), "f shows all".into()],
+        (true, Some(search)) => vec!["Nothing matches".into(), format!("/{}", search.query), "Esc shows all".into()],
+        (true, None) => Vec::new(),
+    }
+}
+
 /// Output rows, newest at the bottom, wrapped to the width. New lines fade in; search matches are highlighted
 /// (the current one in the focus colours, the others yellow).
 #[allow(clippy::too_many_arguments)]
@@ -594,6 +627,18 @@ fn body(
             }
             result.push(fit(segs, cells));
         }
+    }
+    if shown == 0 {
+        let hint = empty_hint(controller, index, ui.focus == index, search.filter(|_| searching));
+        let blank = || vec![seg(" ".repeat(cells), C::Gray)];
+        let top = rows.saturating_sub(hint.len()) / 2;
+        let mut block: Vec<Vec<Seg>> = (0..top).map(|_| blank()).collect();
+        block.extend(hint.iter().take(rows - top).map(|text| {
+            let left = " ".repeat(cells.saturating_sub(text.width()) / 2);
+            fit(vec![seg(format!("{left}{text}"), C::DarkGray)], cells)
+        }));
+        block.resize_with(rows, blank);
+        result = block.into_iter().rev().collect();
     }
     while result.len() < rows {
         result.push(vec![seg(" ".repeat(cells), C::Gray)]);
