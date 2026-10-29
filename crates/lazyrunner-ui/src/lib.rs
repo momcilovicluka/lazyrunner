@@ -7,5 +7,6 @@ pub mod keys;
 pub mod panics;
 pub mod project_run;
 pub mod screen;
+pub mod svg;
 pub mod terminal;
 pub mod theme;
