@@ -17,6 +17,8 @@ use serde_json::{Value, json};
 use crate::screen::Ui;
 use crate::screen::copy::{self, Pick};
 
+mod drive;
+
 /// The agent protocol this lazyrunner speaks; `lazyrunner mcp` sends it with every request.
 pub const PROTOCOL: u64 = 1;
 const LOG_LINES: usize = 100;
@@ -61,7 +63,10 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "migrations" => Ok(migrations(controller)),
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
-        op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations") => {
+        "actions" => Ok(drive::actions(ui, controller)),
+        op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
+        | "run_action" | "press_keys" | "switch_database" | "install_packages" | "apply_migrations"
+        | "kill_port_holder" | "set_setting") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
@@ -494,6 +499,13 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
             controller.stop_tests(false);
             "stop the tests".into()
         }
+        "run_action" => drive::run_action(ui, controller, args)?,
+        "press_keys" => drive::press_keys(ui, controller, args)?,
+        "switch_database" => drive::switch_database(controller, args)?,
+        "install_packages" => drive::install_packages(controller, args)?,
+        "apply_migrations" => drive::apply_migrations(controller, args)?,
+        "kill_port_holder" => drive::kill_port_holder(controller, args)?,
+        "set_setting" => drive::set_setting(controller, args)?,
         _ => check_migrations(controller, args)?,
     };
     // Said once it's done: a refused action leaves no line.

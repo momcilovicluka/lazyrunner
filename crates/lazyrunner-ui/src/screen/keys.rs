@@ -69,6 +69,7 @@ pub(super) fn typed(key: &KeyEvent) -> Option<char> {
 
 /// Handles one key.
 pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
+    ui.user_key_at = Some(ui.now);
     let before = super::jumps::before(ui, controller);
     press_key(ui, controller, key);
     super::jumps::noticed(ui, controller, before);

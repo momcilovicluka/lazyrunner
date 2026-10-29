@@ -21,6 +21,8 @@ use tokio::task::{AbortHandle, JoinSet};
 
 use crate::profile_cli::install_dir;
 
+mod tools;
+
 /// The MCP versions this server speaks, newest first; a client asking for another gets the newest.
 const MCP_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 /// How long lazyrunner has to answer one request (its UI paused by a selection in its window doesn't answer).
@@ -46,7 +48,9 @@ a failed build or a crash, get_errors has the error with its stack. For a slow o
 (errors_only, sort slowest, endpoints) and get_request show what the app logged and queried while serving it. Tell \
 the user before stopping or restarting apps \
 they may be using. With restartOnCodeChange on (get_status settings), your own edits rebuild the running APIs by \
-themselves a moment after the last save: wait for build_done instead of calling build.";
+themselves a moment after the last save: wait for build_done instead of calling build. list_actions names \
+everything else lazyrunner can do: run_action runs one by its key, press_keys presses keys for what no tool covers - \
+ask the user before anything that needs confirm.";
 
 /// How the server reaches the open lazyrunner (the tests use a fake).
 pub trait Channel: Send + Sync + 'static {
@@ -161,15 +165,6 @@ fn tool_result(text: String, failed: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": text }], "isError": failed })
 }
 
-fn tool(name: &str, description: &str, properties: Value, required: &[&str], read_only: bool) -> Value {
-    json!({
-        "name": name,
-        "description": description,
-        "inputSchema": { "type": "object", "properties": properties, "required": required, "additionalProperties": false },
-        "annotations": { "readOnlyHint": read_only, "destructiveHint": false, "openWorldHint": false },
-    })
-}
-
 /// Why lazyrunner couldn't be asked: not open, not answering, run as Administrator while this isn't (Windows keeps
 /// a program that isn't elevated from driving one that is), or the channel failing (it may be closing).
 fn unreachable(error: &io::Error) -> String {
@@ -262,163 +257,7 @@ impl<C: Channel> Server<C> {
             Err(_) => Vec::new(),
         };
         let apps = if keys.is_empty() { String::new() } else { format!(": {}", keys.join(", ")) };
-        let app = json!({ "type": "string", "description": format!("An app's key (get_status lists them{apps})") });
-        let some_apps = json!({
-            "app": { "type": "string", "description": format!("An app's key (get_status lists them{apps}), or \"all\" (the default)") },
-        });
-        vec![
-            tool(
-                "get_status",
-                "What lazyrunner runs now: each app's state, port, url and error count; what's busy (a build, a \
-                 rebuild after code changes, the apps getting ready, npm, tests, migrations); the test totals; the \
-                 settings; what the user is looking at; lazyrunner's newest log lines. Call it first in every turn.",
-                json!({}),
-                &[],
-                true,
-            ),
-            tool(
-                "get_logs",
-                "An app's output, each line numbered: the newest `limit` (100, at most 500) after `since` (pass the \
-                 last answer's `next` to get only what's new; `truncated` says older matching lines didn't fit), \
-                 those containing `grep` (ignoring case), or only the error lines.",
-                json!({
-                    "app": app,
-                    "since": { "type": "integer", "minimum": 0 },
-                    "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
-                    "grep": { "type": "string" },
-                    "errors_only": { "type": "boolean" },
-                }),
-                &["app"],
-                true,
-            ),
-            tool(
-                "get_errors",
-                "An app's last error with its stack trace (after a failed build: the build's errors with their full \
-                 paths), or every error, warning, or both, in order.",
-                json!({ "app": app, "what": { "type": "string", "enum": ["last", "errors", "warnings", "both"] } }),
-                &["app"],
-                true,
-            ),
-            tool(
-                "get_requests",
-                "The HTTP requests the .NET apps served (lazyrunner's requests view, from ASP.NET's request log): \
-                 id, method, path, endpoint, status and milliseconds, newest first or slowest first (sort), after \
-                 `since` (pass the last answer's `next` for only the new ones), of one app, errors only (status 400 \
-                 and up), with `path` in them, or of one `endpoint` as the endpoints list names it (and `method`); \
-                 `limit` (50, at most 500). With endpoints: true, summed up per \
-                 endpoint instead - count, errors, avg, p50, p95, max. `n_plus_one` marks a request that ran one \
-                 query over and over (and n_plus_one_requests an endpoint's); get_request has one in full.",
-                json!({
-                    "app": app,
-                    "since": { "type": "integer", "minimum": 0 },
-                    "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
-                    "errors_only": { "type": "boolean" },
-                    "path": { "type": "string" },
-                    "endpoint": { "type": "string", "description": "As endpoints: true names it, e.g. /api/orders/{id}" },
-                    "method": { "type": "string" },
-                    "sort": { "type": "string", "enum": ["newest", "slowest"] },
-                    "endpoints": { "type": "boolean" },
-                }),
-                &[],
-                true,
-            ),
-            tool(
-                "get_request",
-                "One request in full, by its id from get_requests: what it sent and returned, its endpoint's times \
-                 to compare with (p50, p95, slower_than_p95), the log lines its app wrote while it ran \
-                 (possibly_mixed: other requests ran meanwhile, so some lines may be theirs), and its EF Core \
-                 database commands: how many, their total and the slowest, and `repeated` - the query it ran over \
-                 and over (10 times or more), an N+1.",
-                json!({ "id": { "type": "integer", "minimum": 1 } }),
-                &["id"],
-                true,
-            ),
-            tool(
-                "get_screen",
-                "lazyrunner's screen as the user sees it now, as text. In follow mode (F) it shows what you read last.",
-                json!({}),
-                &[],
-                true,
-            ),
-            tool(
-                "start_apps",
-                "Starts an app or every app (builds the .NET ones first when their code changed). Then wait for ready.",
-                some_apps.clone(),
-                &[],
-                false,
-            ),
-            tool("stop_apps", "Stops an app or every app.", some_apps.clone(), &[], false),
-            tool(
-                "restart_apps",
-                "Restarts an app or every app (rebuilding what changed). Then wait for ready.",
-                some_apps.clone(),
-                &[],
-                false,
-            ),
-            tool(
-                "build",
-                "Builds an app or every .NET app without starting it (a running one stops first). Then wait for \
-                 build_done and read get_errors when it failed.",
-                some_apps,
-                &[],
-                false,
-            ),
-            tool(
-                "wait",
-                "Waits until something is done, then says how it went: ready (no build or rebuild, no npm install, \
-                 every started app answers), build_done (the builds that ran while waiting), tests_done or \
-                 migrations_checked. At most timeout_sec (120, at most 600); call it again when it timed out.",
-                json!({
-                    "for": { "type": "string", "enum": WAITS },
-                    "timeout_sec": { "type": "integer", "minimum": 1, "maximum": WAIT_MAX_SECS },
-                }),
-                &["for"],
-                true,
-            ),
-            tool(
-                "list_tests",
-                "The test suites (.NET test projects, npm and Nx test targets) with their last results.",
-                json!({}),
-                &[],
-                true,
-            ),
-            tool(
-                "get_test_results",
-                "A suite's last results: its failed tests with their messages and stacks, and its last output lines.",
-                json!({ "suite": { "type": "string", "description": "A suite's key or name (list_tests)" } }),
-                &["suite"],
-                true,
-            ),
-            tool(
-                "run_tests",
-                "Runs every suite, one suite, its failed tests only, or one test of a suite. Then wait for \
-                 tests_done.",
-                json!({
-                    "suite": { "type": "string", "description": "A suite's key or name (list_tests); every suite without it" },
-                    "failed_only": { "type": "boolean" },
-                    "test": { "type": "string", "description": "One test's full name; needs its suite" },
-                }),
-                &[],
-                false,
-            ),
-            tool("stop_tests", "Stops the tests that run or wait.", json!({}), &[], false),
-            tool(
-                "get_migrations",
-                "The EF Core DbContexts and their migrations as last checked against the database the apps use: \
-                 when, applied, pending. It doesn't check them (check_migrations does).",
-                json!({}),
-                &[],
-                true,
-            ),
-            tool(
-                "check_migrations",
-                "Checks one DbContext against the database (`context`), or finds them again and checks them all. \
-                 Then wait for migrations_checked.",
-                json!({ "context": { "type": "string", "description": "A context's key or name (get_migrations)" } }),
-                &[],
-                false,
-            ),
-        ]
+        tools::list(&apps)
     }
 
     /// A tool's result; none for a tool this server doesn't have.
@@ -444,6 +283,10 @@ impl<C: Channel> Server<C> {
             "stop_tests" => self.agent("stop_tests", json!({})).await,
             "get_migrations" => self.agent("migrations", json!({})).await,
             "check_migrations" => self.agent("check_migrations", args).await,
+            "list_actions" => self.agent("actions", json!({})).await,
+            "press_keys" => self.pressed(args).await,
+            name @ ("run_action" | "switch_database" | "install_packages" | "apply_migrations" | "kill_port_holder"
+            | "set_setting") => self.agent(name, args).await,
             _ => return None,
         };
         Some(match outcome {
@@ -451,6 +294,15 @@ impl<C: Channel> Server<C> {
             Ok(value) => tool_result(serde_json::to_string_pretty(&value).unwrap_or_default(), false),
             Err(why) => tool_result(why, true),
         })
+    }
+
+    /// press_keys, and the screen the keys left.
+    async fn pressed(&self, args: Value) -> Result<Value, String> {
+        let mut answer = self.agent("press_keys", args).await?;
+        if let Ok(Value::String(frame)) = self.screen().await {
+            answer["screen"] = json!(frame);
+        }
+        Ok(answer)
     }
 
     /// The frame the open lazyrunner draws next.
@@ -736,7 +588,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 17));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 25));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);

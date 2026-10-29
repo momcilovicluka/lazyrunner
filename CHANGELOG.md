@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.33.0] - 2026-10-29
+
+### Added
+- MCP for everything the keys do: `list_actions` names every action and setting, `run_action` runs any action by its key, `press_keys` presses keys for what no tool covers (answering with the screen; it waits while you type in a prompt), and `switch_database`, `install_packages`, `apply_migrations`, `kill_port_holder`, `set_setting` do those by name. What can't be undone or takes something from you needs `"confirm": true` (#62)
+
 ## [1.32.1] - 2026-10-29
 
 ### Fixed

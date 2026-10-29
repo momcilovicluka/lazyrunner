@@ -1740,6 +1740,43 @@ async fn follow_agent_follows_an_agents_call_until_you_take_the_keys_back_while_
 }
 
 #[tokio::test]
+async fn an_agent_lists_every_action_runs_one_by_its_key_and_presses_keys() {
+    let mut screen = screen("agent-drive", json!({}));
+    let listed = agent(&mut screen, "actions", json!({}), None);
+    let actions = listed["result"]["actions"].as_array().cloned().unwrap_or_default();
+    let action = |key: &str| actions.iter().find(|action| action["key"] == key).cloned().unwrap_or_default();
+    assert_eq!(action("D")["label"], "Durations", "{listed}");
+    assert_eq!(action("q")["needs_confirm"], true);
+    let settings = listed["result"]["settings"].as_array().cloned().unwrap_or_default();
+    assert!(settings.iter().any(|setting| setting["setting"] == "followAgent" && setting["on"] == false));
+
+    let zoom = agent(&mut screen, "run_action", json!({ "key": "z", "app": "Billing" }), None);
+    assert_eq!(zoom["ok"], true, "{zoom}");
+    assert!(screen.ui.zoom && screen.ui.focus == 1);
+    assert!(screen.last_log().contains("Zoom Billing"), "{}", screen.last_log());
+    let quit = agent(&mut screen, "run_action", json!({ "key": "q" }), None);
+    assert!(quit["code"] == "needs_confirm" && screen.ui.exit.is_none(), "{quit}");
+
+    let pressed = agent(&mut screen, "press_keys", json!({ "keys": "z :" }), None);
+    assert_eq!(pressed["ok"], true, "{pressed}");
+    assert!(!screen.ui.zoom && matches!(screen.ui.overlay, Some(Overlay::Palette { .. })));
+    assert_eq!(agent(&mut screen, "press_keys", json!({ "keys": "Esc" }), None)["ok"], true, "its own palette");
+    screen.press(":");
+    let typing = agent(&mut screen, "press_keys", json!({ "keys": "Esc" }), None);
+    assert_eq!(typing["code"], "user_typing", "the user's palette: {typing}");
+    screen.press("Esc");
+    assert_eq!(agent(&mut screen, "press_keys", json!({ "keys": "q" }), None)["code"], "needs_confirm");
+
+    let set = agent(&mut screen, "set_setting", json!({ "setting": "followAgent", "on": true }), None);
+    assert_eq!(set["ok"], true, "{set}");
+    assert!(screen.controller.setting(Toggle::FollowAgent));
+    let install = agent(&mut screen, "install_packages", json!({ "app": "Orders" }), None);
+    assert_eq!(install["ok"], false, "Orders is .NET: {install}");
+    let kill = agent(&mut screen, "kill_port_holder", json!({}), None);
+    assert_eq!(kill["code"], "nothing_to_do");
+}
+
+#[tokio::test]
 async fn an_agent_reads_the_requests_their_endpoints_and_one_request_in_full() {
     let mut screen = screen("agent-requests", json!({}));
     let empty = agent(&mut screen, "requests", json!({}), None);
