@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 
 use super::{CLIENT_CHARS, NO_MIGRATIONS, Refusal, app_index, clean};
 use crate::screen::actions::{self, Action, Run};
-use crate::screen::{Overlay, Ui, keys};
+use crate::screen::{Ui, keys};
 
 /// The user pressed a key this lately in a prompt: they're typing in it, so press_keys waits.
 const TYPING: Duration = Duration::from_secs(10);
@@ -100,14 +100,9 @@ pub fn run_action(ui: &mut Ui, controller: &mut Controller, args: &Value) -> Res
     Ok(format!("{} ({key})", action.label))
 }
 
-/// The user is typing in a prompt: the palette, a search, a filter, a note, the theme picker's search.
+/// The user is typing in a prompt.
 fn typing(ui: &Ui) -> bool {
-    let prompt = ui.search.as_ref().is_some_and(|search| search.typing)
-        || ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
-        || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
-        || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
-        || matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.typing);
-    prompt && ui.user_key_at.is_some_and(|at| ui.now.saturating_duration_since(at) < TYPING)
+    keys::prompt(ui) && ui.user_key_at.is_some_and(|at| ui.now.saturating_duration_since(at) < TYPING)
 }
 
 /// Presses keys as the user would - in follow mode too - for what no tool covers.

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use crossterm::event::{Event, EventStream, KeyEventKind};
+use crossterm::event::{Event, EventStream};
 use futures_util::{Stream, StreamExt};
 use lazyrunner_core::changelog;
 use lazyrunner_core::config::Toggle;
@@ -147,7 +147,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         tokio::select! {
             biased;
             event = terminal_events.next() => match event {
-                Some(Ok(Event::Key(key))) if key.kind != KeyEventKind::Release => {
+                Some(Ok(Event::Key(key))) if !screen::held::dropped(&mut ui, &key) => {
                     ui.now = Instant::now();
                     screen::keys::press(&mut ui, &mut controller, key);
                     if ui.replay.is_some() {

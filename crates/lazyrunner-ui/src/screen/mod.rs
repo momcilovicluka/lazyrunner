@@ -10,6 +10,7 @@ pub mod columns;
 pub mod copy;
 pub mod durations;
 pub mod follow;
+pub mod held;
 pub mod icons;
 pub mod jumps;
 pub mod keys;
@@ -255,6 +256,8 @@ pub struct Ui {
     pub follow: follow::Follow,
     /// When the user last pressed a key: an agent's press_keys waits while they type in a prompt.
     pub user_key_at: Option<std::time::Instant>,
+    /// The key held down: its repeats act only when they move.
+    pub held: held::Held,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Requests sent again (p in the requests view): how each went, once it has.
@@ -340,6 +343,7 @@ impl Ui {
             jumps: jumps::Jumps::default(),
             follow: follow::Follow::default(),
             user_key_at: None,
+            held: held::Held::default(),
             seen: seen::Seen::default(),
             replays: Vec::new(),
             git_tool_wanted: false,
