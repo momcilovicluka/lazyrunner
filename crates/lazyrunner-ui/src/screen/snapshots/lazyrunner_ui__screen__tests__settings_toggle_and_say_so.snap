@@ -2,6 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
+
                   ┌─ Settings (saved) ────────────────────────────────────────────────────┐
                   │  a      [ ] Auto-restart on branch change                             │
                   │  u      [x] Auto-start when lazyrunner opens                          │
@@ -19,7 +20,6 @@ expression: screen.frame()
                   │  r      Run the startup checklist now (and check for an update)       │
                   │  c      What's new: the lazyrunner changelog                          │
                   │  A      About lazyrunner: version, contributors, links                │
-                  │  b      Bug report: a zip to attach to an issue                       │
                   │  p      Reload the project profile                                    │
                   │  P      Open the project profile in your editor  sample.json          │
                   │ press a letter to toggle, or j k + Enter · Esc / , close              │

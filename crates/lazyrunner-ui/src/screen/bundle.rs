@@ -1,4 +1,4 @@
-//! `, b`: a bug report as a zip, ready to attach to an issue - lazyrunner's and the tools' versions, the apps and
+//! `, A z`: the diagnostics zip, ready to attach to a bug report - lazyrunner's and the tools' versions, the apps and
 //! their states, the settings and the project profile with their secrets masked, each app's recent output and
 //! lazyrunner's log (passwords in connection strings, a URL's user:password and bearer tokens masked), and the screen
 //! as a picture in the theme's colours. Written in the background (the tools take a moment to say their versions)
@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 use super::Ui;
 use crate::svg;
 
-const FOLDER: &str = "bug-reports";
+const FOLDER: &str = "diagnostics";
 /// An app's output lines in the report, the newest.
 const OUTPUT_LINES: usize = 1000;
 const MASK: &str = "***";
@@ -123,10 +123,10 @@ pub fn write(ui: &mut Ui, controller: &mut Controller) {
     files.push(("lazyrunner.log".into(), (log.join("\n") + "\n").into_bytes()));
     let about = about(ui, controller, size);
     let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-    let path = controller.state_folder().join(FOLDER).join(format!("lazyrunner-bug-report-{stamp}.zip"));
+    let path = controller.state_folder().join(FOLDER).join(format!("lazyrunner-diagnostics-{stamp}.zip"));
     let (send, receive) = std::sync::mpsc::channel();
     ui.replays.push(receive);
-    controller.add_log("Writing a bug report…", Hue::DarkGray);
+    controller.add_log("Writing the diagnostics zip…", Hue::DarkGray);
     std::thread::spawn(move || {
         let tools: Vec<String> = checks::tool_versions()
             .into_iter()
@@ -134,8 +134,10 @@ pub fn write(ui: &mut Ui, controller: &mut Controller) {
             .collect();
         files.insert(0, ("about.txt".into(), format!("{about}\n\ntools:\n{}\n", tools.join("\n")).into_bytes()));
         let said = match zip(&path, &files) {
-            Ok(()) => (Hue::Green, format!("Bug report: {} - look over its logs before you share it", path.display())),
-            Err(error) => (Hue::Red, format!("✗ Couldn't write the bug report: {error}")),
+            Ok(()) => {
+                (Hue::Green, format!("Diagnostics zip: {} - look over its logs before you share it", path.display()))
+            }
+            Err(error) => (Hue::Red, format!("✗ Couldn't write the diagnostics zip: {error}")),
         };
         let _ = send.send(said);
     });

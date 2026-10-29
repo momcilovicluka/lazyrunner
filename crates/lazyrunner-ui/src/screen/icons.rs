@@ -81,6 +81,7 @@ pub enum Icon {
     Folder,
     /// The jump list in the panel.
     Back,
+    Zip,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -202,6 +203,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Folder, true) => "\u{f07b}", // folder
         (Icon::Back, false) => "↶",
         (Icon::Back, true) => "\u{f0e2}", // undo
+        (Icon::Zip, false) => "▤",
+        (Icon::Zip, true) => "\u{f1c6}", // file archive
     }
 }
 
@@ -311,6 +314,7 @@ mod tests {
             Icon::Plug,
             Icon::Folder,
             Icon::Back,
+            Icon::Zip,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");
