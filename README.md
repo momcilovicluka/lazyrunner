@@ -240,7 +240,7 @@ at once while the palette wipes away.
 | `Ctrl+R` | **Reload window**, like VS Code's: reads the settings and themes again, sets the terminal up again (screen, mouse, tab, colours) and repaints - with a little CRT show (none with reduced motion). The apps keep running. Handy after editing a setting or a theme by hand, or when the terminal got garbled |
 | `t` | Theme picker: preview each theme live, `Enter` keeps one (saved), `Esc` undoes; see [Themes](#themes) |
 | `?` | Key reference |
-| `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting; `↑` `↓` (or `Alt+j` / `Alt+k`) choose |
+| `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting; `↑` `↓` (or `Alt+j` / `Alt+k`) choose. With nothing typed, the five you ran last come first (Recent) |
 
 **Settings (`,` then a letter)**, saved in `lazyrunner.config.json` (the letter highlights the setting it flips):
 

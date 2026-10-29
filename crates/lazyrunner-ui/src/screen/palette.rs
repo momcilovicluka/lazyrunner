@@ -4,6 +4,7 @@
 //! palette shows its keycap pressed for a frame and wipes away (screen::motion).
 
 use lazyrunner_core::run::Controller;
+use serde_json::json;
 use unicode_width::UnicodeWidthStr;
 
 use super::actions::{self, Action};
@@ -16,6 +17,9 @@ use super::theme::C;
 use super::{Overlay, Ui};
 
 const INNER: usize = 84;
+/// How many commands the palette remembers, and the file in the project's state folder it keeps them in.
+const RECENT: usize = 5;
+const RECENT_FILE: &str = "palette-recent.json";
 const FOOTER: &str = "type to search · ↑↓ or Alt+j k choose · Enter run · Esc close";
 /// A row's icon and the space after it.
 const ICON_CELLS: usize = 4;
@@ -75,7 +79,7 @@ fn draw(
     let grouped = query.trim().is_empty();
     let mut list = Vec::new();
     for (at, action) in found.iter().enumerate() {
-        if grouped && (at == 0 || found[at - 1].group != action.group) {
+        if grouped && (at == 0 || group_of(&found[at - 1]) != group_of(action)) {
             list.push(Row::Header(at));
         }
         list.push(Row::Item(at));
@@ -89,7 +93,7 @@ fn draw(
     }
     for row in list.iter().skip(first).take(room) {
         lines.push(match *row {
-            Row::Header(at) => header(ui, found[at].group, inner),
+            Row::Header(at) => header(ui, group_of(&found[at]), inner),
             Row::Item(at) => {
                 let line = item(ui, controller, &found[at], query, at == bar, pressed == Some(at), inner);
                 aim(line, Target::Item(at))
@@ -102,8 +106,32 @@ fn draw(
     boxed("Commands", lines, FOOTER, cells, rows, inner)
 }
 
+/// The commands run from the palette lately, newest first (their keys).
+pub fn recent(controller: &Controller) -> Vec<String> {
+    lazyrunner_core::json::read(&controller.state_folder().join(RECENT_FILE))
+        .and_then(|keys| keys.as_array().cloned())
+        .map(|keys| keys.iter().filter_map(|key| key.as_str().map(str::to_string)).collect())
+        .unwrap_or_default()
+}
+
+/// A command run from the palette goes first among the recent ones; the oldest past `RECENT` drops off.
+pub fn remember(ui: &mut Ui, controller: &Controller, key: &str) {
+    let mut keys = recent(controller);
+    keys.retain(|known| known != key);
+    keys.insert(0, key.to_string());
+    keys.truncate(RECENT);
+    let _ = lazyrunner_core::config::write(&controller.state_folder().join(RECENT_FILE), &json!(keys));
+    ui.recent_commands = keys;
+}
+
+/// The header a command shows under: Recent, or its own group.
+fn group_of(action: &Action) -> &'static str {
+    if action.recent { "Recent" } else { action.group }
+}
+
 fn group_icon(group: &str) -> Icon {
     match group {
+        "Recent" => Icon::Changelog,
         "Run" => Icon::Run,
         "Tools" => Icon::Tools,
         "View" => Icon::View,
@@ -119,14 +147,14 @@ fn header(ui: &Ui, group: &str, inner: usize) -> Vec<Seg> {
     vec![seg(title, C::DarkCyan), seg(rule, C::DarkGray)]
 }
 
-/// An action: its icon (the focused app's on what acts on it), its label with the typed letters lit, its hint when
-/// there's room, and its keys as keycaps on the right - all on the bar's colours when it's the chosen one.
 /// A command's row with nothing cut: its icon, label, hint and keycap.
 fn natural_width(action: &Action) -> usize {
     let hint = if action.hint.is_empty() { 0 } else { 2 + action.hint.width() };
     ICON_CELLS + action.label.width() + hint + 2 + width(&keycaps(&action.key, C::White, C::DarkGray))
 }
 
+/// An action: its icon (the focused app's on what acts on it), its label with the typed letters lit, its hint when
+/// there's room, and its keys as keycaps on the right - all on the bar's colours when it's the chosen one.
 fn item(
     ui: &Ui,
     controller: &Controller,
