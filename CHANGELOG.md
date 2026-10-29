@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.39.0] - 2026-10-29
+
+### Added
+- A rail in place of the scrollbar: a map of all a column's lines - errors red, warnings yellow, search matches cyan, marks magenta, the rest dim ticks - with a bracket on the lines on screen (`▼` while it follows new output). A click on it jumps there. A narrow column gets the map alone (#31)
+
 ## [1.38.0] - 2026-10-29
 
 ### Added
