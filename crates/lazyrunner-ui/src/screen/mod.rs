@@ -275,6 +275,8 @@ pub struct Ui {
     pub links: Vec<lazyrunner_core::links::Target>,
     /// Starts a program without waiting (the editor for a link); tests swap it for one that only records.
     pub launcher: fn(&std::path::Path, &[String]) -> bool,
+    /// Shows a file in the file manager (a diagnostics zip); tests swap it for one that only records.
+    pub revealer: fn(&std::path::Path) -> bool,
     pub last_click: Option<(Instant, u16, u16)>,
     /// A plain click on a link that needs Alt said so (once).
     pub link_hint_shown: bool,
@@ -353,6 +355,7 @@ impl Ui {
             hits: Vec::new(),
             links: Vec::new(),
             launcher: links::launch,
+            revealer: links::reveal,
             last_click: None,
             link_hint_shown: false,
             hover: None,

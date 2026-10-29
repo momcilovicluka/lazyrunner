@@ -2,6 +2,7 @@
 //! summary, branch, database and folder), the keys that matter now as keycaps, a notice line, and the log. The
 //! settings live in the , menu.
 
+use lazyrunner_core::links;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::Status as AppStatus;
 
@@ -11,14 +12,14 @@ use super::motion::Spot;
 use super::mouse::Target;
 use super::seg::{Seg, on, seg, width};
 use super::theme::{C, no_color};
-use super::{Ui, status};
+use super::{Ui, bundle, status};
 
 const SPARKLE: [char; 2] = ['✦', '✧'];
 const DEFAULT_LOG_LINES: usize = 5;
 /// "panelLogLines" beyond this is a typo, not a wish.
 const MAX_LOG_LINES: usize = 50;
 
-pub fn rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
+pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
     let mut rows = Vec::new();
     let tag = if ui.theme.id != "default" || no_color() { format!(" {} ", ui.theme.name) } else { String::new() };
     rows.push(vec![seg("─".repeat(cells.saturating_sub(tag.chars().count())), C::DarkGray), seg(tag, C::DarkGray)]);
@@ -30,7 +31,18 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>> {
         .map_or(DEFAULT_LOG_LINES, |n| usize::try_from(n).unwrap_or(MAX_LOG_LINES).min(MAX_LOG_LINES));
     let entries: Vec<_> = controller.log.iter().rev().take(count).collect();
     for entry in entries.iter().rev() {
-        rows.push(vec![seg(format!(" {} ", entry.time), C::DarkGray), seg(entry.text.clone(), hue_color(entry.hue))]);
+        let mut row = vec![seg(format!(" {} ", entry.time), C::DarkGray)];
+        let color = hue_color(entry.hue);
+        match bundle::written(&entry.text) {
+            Some(zip) => {
+                ui.links.push(links::Target::File { path: zip.into(), line: None, column: None });
+                let mut path = seg(zip, color).at(Target::Reveal(ui.links.len() - 1));
+                path.underline = true;
+                row.extend([seg(bundle::WRITTEN, color), path, seg(bundle::SHARE, color)]);
+            }
+            None => row.push(seg(entry.text.clone(), color)),
+        }
+        rows.push(row);
     }
     for _ in entries.len()..count {
         rows.push(Vec::new());
