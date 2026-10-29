@@ -435,16 +435,10 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
     )
 }
 
-fn icon(status: Status, tick: u64, animated: bool, nerd: bool) -> String {
+fn icon(status: Status, spin: Option<&str>, nerd: bool) -> String {
     match status {
         Status::Pending => "·".into(),
-        Status::Running => {
-            if animated {
-                spinner(tick).to_string()
-            } else {
-                "●".into()
-            }
-        }
+        Status::Running => spin.unwrap_or("●").into(),
         Status::Ok => icons::icon(nerd, Icon::Ok).into(),
         Status::Warn => icons::icon(nerd, Icon::Warn).into(),
         Status::Fail => icons::icon(nerd, Icon::Fail).into(),
@@ -491,7 +485,10 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         .map(|item| {
             let detail_color = if item.status == Status::Ok { C::Gray } else { status_color(item.status) };
             vec![
-                seg(format!(" {} ", icon(item.status, tick, animated, ui.nerd)), status_color(item.status)),
+                seg(
+                    format!(" {} ", icon(item.status, animated.then(|| spinner(ui)), ui.nerd)),
+                    status_color(item.status),
+                ),
                 seg(check_name(ui.nerd, &item.name), C::White),
                 seg(item.detail.clone(), detail_color),
             ]

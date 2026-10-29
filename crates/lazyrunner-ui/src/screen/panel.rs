@@ -236,7 +236,7 @@ fn notice(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         ];
     }
     if let Some(busy) = ui.busy {
-        let marker = if ui.reduced_motion { '●' } else { super::columns::spinner(ui.tick()) };
+        let marker = if ui.reduced_motion { "●" } else { super::columns::spinner(ui) };
         return vec![seg(format!(" {marker} {busy}"), C::Yellow)];
     }
     let focused = controller.apps.get(ui.focus).map(|app| app.key.as_str());

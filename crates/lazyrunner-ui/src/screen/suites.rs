@@ -620,7 +620,7 @@ fn group(ui: &Ui, controller: &Controller, rows: &[Row], at: usize) -> Vec<Vec<S
 fn icon(ui: &Ui, status: Status) -> String {
     match status {
         Status::Running if ui.reduced_motion => "●".into(),
-        Status::Running => spinner(ui.tick()).to_string(),
+        Status::Running => spinner(ui).to_string(),
         Status::Idle => "·".into(),
         Status::Queued => icons::icon(ui.nerd, Icon::Queued).into(),
         Status::Passed => icons::icon(ui.nerd, Icon::Ok).into(),

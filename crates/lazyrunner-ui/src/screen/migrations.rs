@@ -244,7 +244,7 @@ pub fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, b
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let all = contexts(controller);
-    let spin = if ui.reduced_motion { '●' } else { spinner(ui.tick()) };
+    let spin = if ui.reduced_motion { "●".to_string() } else { spinner(ui).to_string() };
     let (now, nerd) = (ui.now, ui.nerd);
     let Some(Overlay::Migrations { index, picking }) = &mut ui.overlay else { return Vec::new() };
     *index = (*index).min(all.len().saturating_sub(1));
@@ -288,7 +288,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         .iter()
         .enumerate()
         .map(|(at, context)| {
-            let (icon, summary, color) = summary(context, spin, nerd);
+            let (icon, summary, color) = summary(context, &spin, nerd);
             let label = if several_apps {
                 let app = controller.app(&context.app).map_or(context.app.as_str(), |app| app.name.as_str());
                 format!("{} · {app}", context.name)
@@ -308,7 +308,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         .collect();
     let detail = all
         .get(selected)
-        .map_or_else(Vec::new, |context| details(controller, context, picking, detail_width, height, spin, nerd));
+        .map_or_else(Vec::new, |context| details(controller, context, picking, detail_width, height, &spin, nerd));
     for row in 0..height {
         let mut line = fit(list.get(row).cloned().unwrap_or_default(), list_width);
         line.push(seg("│ ", C::FocusBorder));
@@ -323,7 +323,7 @@ fn cut(text: &str, cells: usize) -> String {
 }
 
 /// What the list says about a context: its icon, its state, its colour.
-fn summary(context: &Context, spin: char, nerd: bool) -> (String, String, C) {
+fn summary(context: &Context, spin: &str, nerd: bool) -> (String, String, C) {
     let mark = |icon| icons::icon(nerd, icon).to_string();
     match context.status {
         Status::Idle => ("·".into(), "not checked".into(), C::DarkGray),
@@ -346,7 +346,7 @@ fn details(
     picking: Option<usize>,
     width: usize,
     height: usize,
-    spin: char,
+    spin: &str,
     nerd: bool,
 ) -> Vec<Vec<Seg>> {
     let app = controller.app(&context.app).map_or(context.app.as_str(), |app| app.name.as_str());

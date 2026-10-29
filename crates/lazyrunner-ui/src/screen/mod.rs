@@ -26,6 +26,7 @@ pub mod reload;
 pub mod requests;
 pub mod seen;
 pub mod seg;
+pub mod spinner;
 pub mod status;
 pub mod suites;
 #[cfg(test)]
@@ -258,6 +259,8 @@ pub struct Ui {
     pub user_key_at: Option<std::time::Instant>,
     /// The key held down: its repeats act only when they move.
     pub held: held::Held,
+    /// What spins while something runs: `"spinner"` in the settings, or lazyrunner's own.
+    pub spinner: spinner::Spinner,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Requests sent again (p in the requests view): how each went, once it has.
@@ -346,6 +349,7 @@ impl Ui {
             follow: follow::Follow::default(),
             user_key_at: None,
             held: held::Held::default(),
+            spinner: spinner::Spinner::default(),
             seen: seen::Seen::default(),
             replays: Vec::new(),
             git_tool_wanted: false,

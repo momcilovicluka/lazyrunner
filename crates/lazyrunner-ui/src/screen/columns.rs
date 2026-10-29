@@ -18,7 +18,6 @@ use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg, take_cells, width};
 use super::theme::C;
 
-const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const ORBIT: [char; 4] = ['◐', '◓', '◑', '◒'];
 pub const SPARKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const BLOCKS: [char; 8] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
@@ -40,8 +39,9 @@ pub const LAYOUTS: [&str; 3] = ["auto", "columns", "stacked"];
 /// How fast the glint runs along a progress bar.
 const GLINT_CELLS_PER_SECOND: f64 = 16.0;
 
-pub fn spinner(tick: u64) -> char {
-    SPINNER[tick as usize % SPINNER.len()]
+/// The spinner's frame now: `"spinner"` in the settings, or lazyrunner's own.
+pub fn spinner(ui: &Ui) -> &str {
+    ui.spinner.frame(ui.now.saturating_duration_since(ui.started))
 }
 
 /// The `"layout"` setting: auto, columns or stacked.
@@ -302,7 +302,7 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
             return vec![seg(
                 format!(
                     "{} building {bar}{done}/{} · {}",
-                    if animated { spinner(tick) } else { '●' },
+                    if animated { spinner(ui) } else { "●" },
                     job.total,
                     format_duration(elapsed)
                 ),
@@ -311,11 +311,11 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
         }
         let estimate = controller.timing_estimate(kind, &key);
         let frame = if !animated {
-            '●'
-        } else if kind != "build" {
-            ORBIT[tick as usize % ORBIT.len()]
+            "●".to_string()
+        } else if kind != "build" && !ui.spinner.custom {
+            ORBIT[tick as usize % ORBIT.len()].to_string()
         } else {
-            spinner(tick)
+            spinner(ui).to_string()
         };
         let verb = if kind == "build" {
             "building".to_string()

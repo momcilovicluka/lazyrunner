@@ -216,6 +216,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 ui.now = now;
                 last_frame = now;
                 update_checklist(&mut ui, &mut controller, &mut still_checking);
+                screen::spinner::refresh(&mut ui, &mut controller);
                 let dump_due = options.frame_dump.is_some() && last_dump.is_none_or(|at| now - at >= FRAME_DUMP_EVERY);
                 let text = surface.render(&mut |frame| {
                     screen::draw(frame, &mut ui, &controller);

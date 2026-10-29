@@ -2359,6 +2359,22 @@ async fn a_held_key_acts_once_but_moving_and_typing_repeat() {
 }
 
 #[tokio::test]
+async fn a_spinner_of_your_own_spins_where_lazyrunners_would() {
+    let mut screen = screen("spinner", json!({ "spinner": { "frames": ["◐", "◓", "◑", "◒"], "rate": 50 } }));
+    super::spinner::refresh(&mut screen.ui, &mut screen.controller);
+    assert!(screen.ui.spinner.custom);
+    assert_eq!(super::columns::spinner(&screen.ui), ["◐", "◓", "◑", "◒"][(10_000 / 50) % 4]);
+
+    screen.controller.config["spinner"] = json!({ "frames": [] });
+    super::spinner::refresh(&mut screen.ui, &mut screen.controller);
+    assert!(screen.last_log().contains("using lazyrunner's own"), "{}", screen.last_log());
+    assert!(!screen.ui.spinner.custom);
+    let logged = screen.controller.log.len();
+    super::spinner::refresh(&mut screen.ui, &mut screen.controller);
+    assert_eq!(screen.controller.log.len(), logged, "said once");
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();

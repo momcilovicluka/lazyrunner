@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.38.0] - 2026-10-29
+
+### Added
+- A spinner of your own, as lazygit's: `"spinner": { "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` in `lazyrunner.config.json`, for every project or in a project's section for that one. It spins wherever lazyrunner's would; one that can't be used says why in the log, and lazyrunner's own spins (#64)
+
 ## [1.37.0] - 2026-10-29
 
 ### Added
