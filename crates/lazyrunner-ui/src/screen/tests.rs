@@ -2496,6 +2496,25 @@ async fn the_rail_sends_an_ember_to_a_new_error_shimmers_back_to_live_and_pulses
 }
 
 #[tokio::test]
+async fn the_rails_top_end_dims_while_the_oldest_lines_drop() {
+    let mut screen = screen("rail-trimmed", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    let state = &mut screen.controller.states[0];
+    state.output = lazyrunner_core::output::Output::new(60);
+    for n in 0..60 {
+        state.add_line(&format!("line {n}"), Hue::Gray, at);
+    }
+    screen.frame();
+    assert!(!super::rail_motion::animating(&screen.ui), "a full buffer seen for the first time isn't news");
+    screen.controller.states[0].add_line("line 60", Hue::Gray, at);
+    screen.frame();
+    assert!(super::rail_motion::animating(&screen.ui), "the oldest line dropped: the top dims");
+    screen.ui.now += Duration::from_millis(700);
+    screen.frame();
+    assert!(!super::rail_motion::animating(&screen.ui), "then it's as it was");
+}
+
+#[tokio::test]
 async fn with_reduced_motion_nothing_moves_on_the_rail() {
     let mut screen = screen("rail-still", json!({ "reducedMotion": true }));
     let at = screen.ui.now - Duration::from_secs(5);

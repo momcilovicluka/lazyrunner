@@ -1,9 +1,10 @@
 //! The rail's motion: an ember from the bracket to the mark of a new error that lands off-screen - the mark waits, dim,
 //! until the ember eases into it, then settles in (a burst sends one, at most one every 750 ms, its tail longer for
 //! each error it carries) - one shimmer as `G` snaps the view back to live, down the map from where the view was to the
-//! bottom, where it hands over to the bracket's `▼` - and one pulse, bright then fading, on the row of a search's match
-//! when the search jumps there. In the theme's focus colour, which every theme sets apart from its background. None
-//! with reduced motion.
+//! bottom, where it hands over to the bracket's `▼` - one pulse, bright then fading, on the row of a search's match
+//! when the search jumps there, and the rail's top end dim while the buffer drops its oldest lines (the map rescales;
+//! the dim says that end is moving). In the theme's focus colour, which every theme sets apart from its background.
+//! None with reduced motion; nothing the column had before its rail first showed counts as new.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -27,11 +28,20 @@ const SHIMMER_TRAIL: usize = 2;
 const PULSE: Duration = Duration::from_millis(400);
 /// How much of the pulse is bright before it fades.
 const PULSE_BRIGHT: f64 = 0.5;
+/// The rows at the top dim while the oldest lines drop, and how long after the last one.
+const TRIMMED_ROWS: usize = 2;
+const TRIMMED: Duration = Duration::from_millis(600);
 
 /// What a column's rail showed last, and what moves on it.
 #[derive(Default)]
 struct Column {
+    /// Its rail has shown before: what changed since is new.
+    seen: bool,
     errors: u64,
+    /// The lines its buffer has dropped.
+    dropped: u64,
+    /// When it last dropped one.
+    trimmed: Option<Instant>,
     scroll: usize,
     matched: Option<usize>,
     /// The first row of the bracket: where a shimmer starts from when the view snaps back to live.
@@ -53,12 +63,13 @@ struct Comet {
 #[derive(Default)]
 pub struct Effects(RefCell<HashMap<String, Column>>);
 
-/// What a column's rail shows in this frame: its app's errors, how far it's scrolled back, its search's match, the
-/// rows of the newest error's mark and of the match, the rows on screen, the rail's height, and whether it's the map
-/// alone (no bracket).
+/// What a column's rail shows in this frame: its app's errors and the lines its buffer has dropped, how far it's
+/// scrolled back, its search's match, the rows of the newest error's mark and of the match, the rows on screen, the
+/// rail's height, and whether it's the map alone (no bracket).
 pub struct Now {
     pub narrow: bool,
     pub errors: u64,
+    pub dropped: u64,
     pub scroll: usize,
     pub matched: Option<usize>,
     pub error_row: Option<usize>,
@@ -84,6 +95,8 @@ pub struct Moving {
     narrow: bool,
     /// The pulsing row, and how far it is through (0 to 1).
     pulse: Option<(usize, f64)>,
+    /// The rows at the top that are dim, the oldest lines dropping there.
+    trimmed: usize,
 }
 
 impl Moving {
@@ -105,6 +118,9 @@ impl Moving {
         if self.landed == Some(at) {
             return on("◆", C::Red, C::FocusBack);
         }
+        if at < self.trimmed {
+            return Seg { fg: C::DarkGray, bg: None, ..cell };
+        }
         match self.pulse {
             Some((row, through)) if row == at && through < PULSE_BRIGHT => {
                 Seg { fg: C::FocusText, bg: Some(C::FocusBack), ..cell }
@@ -125,16 +141,22 @@ impl Moving {
 pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
     let mut all = ui.rail_motion.0.borrow_mut();
     let column = all.entry(key.to_string()).or_default();
-    let new_errors = now.errors.saturating_sub(column.errors);
+    let seen = std::mem::replace(&mut column.seen, true);
+    let new_errors = if seen { now.errors.saturating_sub(column.errors) } else { 0 };
+    let dropping = seen && now.dropped > column.dropped;
     let back_to_live = column.scroll > 0 && now.scroll == 0;
-    let jumped = now.matched.is_some() && now.matched != column.matched;
+    let jumped = seen && now.matched.is_some() && now.matched != column.matched;
     let was_at = column.top;
-    (column.errors, column.scroll, column.matched, column.top) = (now.errors, now.scroll, now.matched, now.top);
+    (column.errors, column.dropped) = (now.errors, now.dropped);
+    (column.scroll, column.matched, column.top) = (now.scroll, now.matched, now.top);
     if ui.reduced_motion {
-        (column.comet, column.shimmer, column.pulse) = (None, None, None);
+        (column.comet, column.shimmer, column.pulse, column.trimmed) = (None, None, None, None);
         return Moving::default();
     }
     let at = ui.now;
+    if dropping {
+        column.trimmed = Some(at);
+    }
     let off_screen = now.error_row.filter(|row| !(now.top..now.bottom).contains(row));
     if let Some(to) = off_screen.filter(|_| new_errors > 0 && now.scroll > 0) {
         let carried = usize::try_from(new_errors).unwrap_or(usize::MAX);
@@ -184,6 +206,10 @@ pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
             column.pulse = None;
         }
     }
+    match column.trimmed {
+        Some(last) if at.saturating_duration_since(last) < TRIMMED => moving.trimmed = TRIMMED_ROWS.min(now.height),
+        _ => column.trimmed = None,
+    }
     moving
 }
 
@@ -219,6 +245,7 @@ pub fn animating(ui: &Ui) -> bool {
         column.comet.as_ref().is_some_and(|comet| now.saturating_duration_since(comet.started) < COMET + SETTLE)
             || column.shimmer.is_some_and(|(at, _)| now.saturating_duration_since(at) < SHIMMER + SHIMMER_LAND)
             || column.pulse.is_some_and(|(_, at)| now.saturating_duration_since(at) < PULSE)
+            || column.trimmed.is_some_and(|at| now.saturating_duration_since(at) < TRIMMED)
     })
 }
 
@@ -260,5 +287,14 @@ mod tests {
         assert_eq!(landed.paint(9, tick.clone()).bg, None, "beside it, the map stays");
         let narrow = Moving { live_edge: Some(9), narrow: true, ..Moving::default() };
         assert_eq!(narrow.paint(9, tick).bg, Some(C::FocusBack), "with no bracket, the map's last row glows");
+    }
+
+    #[test]
+    fn the_top_end_is_dim_while_the_oldest_lines_drop() {
+        let error = seg("█", C::Red);
+        let trimming = Moving { trimmed: TRIMMED_ROWS, ..Moving::default() };
+        assert_eq!(trimming.paint(0, error.clone()).fg, C::DarkGray);
+        assert_eq!(trimming.paint(1, error.clone()).fg, C::DarkGray);
+        assert_eq!(trimming.paint(2, error).fg, C::Red, "below it, as it was");
     }
 }
