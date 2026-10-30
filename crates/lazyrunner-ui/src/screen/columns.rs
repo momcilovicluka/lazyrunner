@@ -362,11 +362,16 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
             segs
         }
         Status::Running => {
-            // Not up yet: the dot pulses and the bar fills against the usual startup time.
+            // Not up yet: the dot pulses (a spinner of your own spins) and the bar fills against the usual startup
+            // time.
             let elapsed =
                 state.started_at.map_or(0.0, |started| ui.now.saturating_duration_since(started).as_secs_f64());
             let estimate = controller.timing_estimate("start", &key);
-            let dot = if animated && tick % 6 >= 3 { '○' } else { '●' };
+            let dot = match animated {
+                true if ui.spinner.custom => spinner(ui).to_string(),
+                true if tick % 6 >= 3 => "○".to_string(),
+                _ => "●".to_string(),
+            };
             let verb = controller.apps[index].traits().start_verb;
             let bar = estimate
                 .map_or(String::new(), |estimate| bar(ui, elapsed / estimate, &format!("start:{key}"), animated));
