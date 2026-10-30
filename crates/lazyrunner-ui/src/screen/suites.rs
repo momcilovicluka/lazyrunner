@@ -243,6 +243,11 @@ fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "Ctrl+D" | "PageDown" => *at = (*at + PAGE).min(last),
         "Ctrl+U" | "PageUp" => *at = at.saturating_sub(PAGE),
         "g" | "Home" | "<" => *at = 0,
+        "a" => {
+            if let Some(test) = names.get(*at) {
+                controller.pin_watch(&key, test);
+            }
+        }
         "G" | "End" | ">" => *at = last,
         "r" | "Enter" => {
             if let Some(test) = names.get(*at) {
@@ -446,12 +451,17 @@ pub fn watching(ui: &Ui, controller: &Controller) -> Option<Seg> {
         .test_watch
         .runs_in(ui.now)
         .map_or(String::new(), |left| format!(" · rerun in {:.1}s", left.as_secs_f64()));
-    Some(seg(format!("   {WATCHED} WATCH {watched}{soon}"), C::Cyan))
+    let pinned = match controller.test_watch.pinned.values().collect::<Vec<_>>().as_slice() {
+        [] => String::new(),
+        [test] => format!(" · pinned: {test}"),
+        tests => format!(" · {} pinned", tests.len()),
+    };
+    Some(seg(format!("   {WATCHED} WATCH {watched}{pinned}{soon}"), C::Cyan))
 }
 
 fn hint(width: usize, picking: bool) -> Vec<Seg> {
     let text = if picking {
-        " j k choose a test · r run it · y copy it · f failed again · s stop · h back to the suites"
+        " j k choose a test · r run it · a watch only it · y copy it · f failed again · s stop · h back to the suites"
     } else {
         " j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its \
          tests · f / F failed again · a / A watch · s stop · o log · y copy failures · Esc back"
@@ -524,7 +534,10 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
         let line = match row {
             Row::Suite(at) => {
                 let Some(suite) = suites.get(*at) else { continue };
-                let summary = summary(suite);
+                let summary = match controller.test_watch.pinned.get(&suite.key) {
+                    Some(test) => format!("{} · {WATCHED} pinned: {test}", summary(suite)),
+                    None => summary(suite),
+                };
                 let room = width.saturating_sub(summary.chars().count() + 9).max(4);
                 let name = pad(&cut(&suite.name, room), room);
                 let icon = icon(ui, suite.status);

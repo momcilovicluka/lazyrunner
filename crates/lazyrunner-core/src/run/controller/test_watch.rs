@@ -2,9 +2,10 @@
 //! the last save, so a formatter pass or a checkout is one run. A green suite runs whole; a red one its failed tests,
 //! then, if they pass, whole, so the green is real. A running suite is never cancelled: a save during its run runs it
 //! again after. .NET suites follow the profile's watch folder; npm and Nx ones their own folder, watched while they
-//! are. For this session only: opening lazyrunner never runs tests by itself.
+//! are. A suite can instead watch one test, pinned in the test picker (`a`): a save runs only it - the tight loop for
+//! a new test. For this session only: opening lazyrunner never runs tests by itself.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -22,6 +23,8 @@ const BETWEEN: Duration = Duration::from_millis(1500);
 pub struct TestWatch {
     /// The suites watched, by key.
     pub suites: BTreeSet<String>,
+    /// The watched suites that watch one test of theirs, not the whole: the test, by the suite's key.
+    pub pinned: BTreeMap<String, String>,
     /// Saved, waiting for the quiet: the suites, and the last save (when, which file).
     due: BTreeSet<String>,
     last_save: Option<(Instant, PathBuf)>,
@@ -58,12 +61,23 @@ impl TestWatch {
 }
 
 impl Controller {
-    /// `a` / `A`: watches these suites, or, when all of them are watched, stops.
+    /// `a` / `A`: watches these suites, or, when all of them are watched, stops; one watching a pinned test watches
+    /// all of itself again.
     pub fn toggle_watch(&mut self, keys: &[String]) {
         let keys: Vec<String> =
             keys.iter().filter(|key| self.suite(key).is_some_and(|suite| !suite.untested)).cloned().collect();
         if keys.is_empty() {
             self.add_log("Nothing to watch here: these projects have no test files.", Hue::DarkGray);
+            return;
+        }
+        if keys.iter().any(|key| self.test_watch.pinned.contains_key(key)) {
+            for key in &keys {
+                self.test_watch.pinned.remove(key);
+                self.test_watch.suites.insert(key.clone());
+            }
+            let names = self.suite_names(&keys);
+            self.add_log(format!("◉ Watching all of {names} again: a save runs them"), Hue::Cyan);
+            self.update_test_watchers();
             return;
         }
         let stop = keys.iter().all(|key| self.test_watch.suites.contains(key));
@@ -81,6 +95,30 @@ impl Controller {
         } else {
             self.add_log(
                 format!("◉ Watching {names}: a save runs them again (s stops a run, a again unwatches)"),
+                Hue::Cyan,
+            );
+        }
+        self.update_test_watchers();
+    }
+
+    /// `a` in the test picker: suite `key` watches only `test` (a save runs just it); again on it stops watching.
+    pub fn pin_watch(&mut self, key: &str, test: &str) {
+        let Some(suite) = self.suite(key) else { return };
+        let suite_name = suite.name.clone();
+        if !suite.tests.iter().any(|known| known.name == test) {
+            self.add_log(format!("{suite_name} has no result for {test} yet - r runs it once"), Hue::DarkGray);
+            return;
+        }
+        if self.test_watch.pinned.get(key).is_some_and(|pinned| pinned == test) {
+            self.test_watch.pinned.remove(key);
+            self.test_watch.suites.remove(key);
+            self.test_watch.due.remove(key);
+            self.add_log(format!("Stopped watching {test}"), Hue::DarkGray);
+        } else {
+            self.test_watch.pinned.insert(key.to_string(), test.to_string());
+            self.test_watch.suites.insert(key.to_string());
+            self.add_log(
+                format!("◉ Watching {test} in {suite_name}: a save runs only it (a on the suite watches all of it)"),
                 Hue::Cyan,
             );
         }
@@ -127,13 +165,15 @@ impl Controller {
         if self.test_watch.due.is_empty() || now.saturating_duration_since(at) < QUIET {
             return;
         }
-        let (mut whole, mut failed) = (Vec::new(), Vec::new());
+        let (mut whole, mut failed, mut pins) = (Vec::new(), Vec::new(), Vec::new());
         for key in std::mem::take(&mut self.test_watch.due) {
             let Some(suite) = self.suite(&key) else { continue };
             if suite.is_active() {
                 self.test_watch.again.insert(key);
             } else if self.test_watch.ran.get(&key).is_some_and(|ran| now.saturating_duration_since(*ran) < BETWEEN) {
                 self.test_watch.due.insert(key);
+            } else if let Some(test) = self.test_watch.pinned.get(&key) {
+                pins.push((key.clone(), test.clone()));
             } else if suite.failed > 0 {
                 failed.push(key);
             } else {
@@ -143,11 +183,11 @@ impl Controller {
         if self.test_watch.due.is_empty() {
             self.test_watch.last_save = None;
         }
-        if whole.is_empty() && failed.is_empty() {
+        if whole.is_empty() && failed.is_empty() && pins.is_empty() {
             return;
         }
         let name = file.file_name().map_or("a file".into(), |name| name.to_string_lossy().into_owned());
-        let all: Vec<String> = whole.iter().chain(&failed).cloned().collect();
+        let all: Vec<String> = whole.iter().chain(&failed).chain(pins.iter().map(|(key, _)| key)).cloned().collect();
         self.add_log(format!("↻ {name} changed - running the watched tests: {}", self.suite_names(&all)), Hue::Cyan);
         for key in &all {
             self.test_watch.ran.insert(key.clone(), now);
@@ -159,10 +199,28 @@ impl Controller {
         if !failed.is_empty() {
             self.run_tests(&failed, true);
         }
+        for (key, test) in pins {
+            self.run_test(&key, &test);
+        }
     }
 
-    /// A suite's run is over: a red watched suite whose failed tests now pass runs whole.
+    /// A suite's run is over: a pinned test that's gone (renamed) stops being watched; a red watched suite whose
+    /// failed tests now pass runs whole.
     pub(super) fn watched_run_over(&mut self, key: &str) {
+        if let Some(test) = self.test_watch.pinned.get(key).cloned()
+            && let Some(suite) = self.suite(key)
+            && suite.total() > 0
+            && !suite.tests.iter().any(|known| known.name == test)
+        {
+            let name = suite.name.clone();
+            self.test_watch.pinned.remove(key);
+            self.test_watch.suites.remove(key);
+            self.add_log(
+                format!("Stopped watching {test}: {name} has no test by that name now (renamed?)"),
+                Hue::Yellow,
+            );
+            self.update_test_watchers();
+        }
         if !self.test_watch.then_whole.remove(key) {
             return;
         }
@@ -180,6 +238,7 @@ impl Controller {
             self.test_watch.suites.iter().filter(|key| self.suite(key).is_none()).cloned().collect();
         for key in &gone {
             self.test_watch.suites.remove(key);
+            self.test_watch.pinned.remove(key);
             self.add_log(format!("Stopped watching {key}: it isn't here any more"), Hue::Yellow);
         }
         if !gone.is_empty() {

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.48.0] - 2026-10-30
+
+### Added
+- Pin-watching one test: in the test picker (`l`), `a` watches only the picked test - a save runs just it, the tight loop for a new test. The suite's row and the header say `pinned: <test>`; `a` on it again stops, `a` on the suite (or `A`) watches all of it again, and a pinned test that's gone after a rename stops being watched (#40)
+
 ## [1.47.0] - 2026-10-30
 
 ### Added
