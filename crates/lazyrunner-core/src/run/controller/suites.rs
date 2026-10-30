@@ -786,6 +786,7 @@ mod tests {
         sample.tick_test_watch(saved + super::super::test_watch::QUIET);
         assert_eq!(log(&sample).lines().last(), Some("Running 1 test: rounds"), "{}", log(&sample));
         assert_eq!(sample.suite("npm:cart").unwrap().rerun, ["rounds"]);
+        assert!(sample.test_watch.queued_at("npm:cart").is_some(), "its row sweeps");
         run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
         let notices: Vec<String> = sample.notifications.iter().map(|(title, _)| title.clone()).collect();
         assert!(notices.contains(&"rounds in cart passes again".to_string()), "red to green notifies: {notices:?}");

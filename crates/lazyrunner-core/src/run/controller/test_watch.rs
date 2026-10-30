@@ -46,6 +46,16 @@ impl TestWatch {
         Some(QUIET.saturating_sub(now.saturating_duration_since(*at)))
     }
 
+    /// How much of the quiet is left, 1 to 0, while the saved suites wait for it (the header's capsule drains it).
+    pub fn quiet_left(&self, now: Instant) -> Option<f64> {
+        self.runs_in(now).map(|left| left.as_secs_f64() / QUIET.as_secs_f64())
+    }
+
+    /// When the watch last queued suite `key` to run (its row sweeps once).
+    pub fn queued_at(&self, key: &str) -> Option<Instant> {
+        self.ran.get(key).copied()
+    }
+
     /// `r` / `f` and the like reset what a save was about to run of these.
     pub(super) fn ran_by_hand(&mut self, keys: &[String]) {
         for key in keys {

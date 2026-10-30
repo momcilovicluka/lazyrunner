@@ -520,6 +520,8 @@ impl Ui {
             || !self.marquees.borrow().is_empty()
             || self.motion.active(self.now)
             || sheet::showing(self)
+            || controller.test_watch.runs_in(self.now).is_some()
+            || suites::sweeping(self, controller)
             || rail_motion::animating(self)
         {
             return true;

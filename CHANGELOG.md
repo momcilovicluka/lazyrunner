@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.50.0] - 2026-10-30
+
+### Added
+- Test watch shows its countdown: while a save waits for the quiet, a capsule beside `◉ WATCH` (the tests view's header, the panel) drains over the real 400 ms and fills again on the next save; a suite the watch queues gets one sweep across its row. With reduced motion, `rerun in 0.3s` and no sweep (#40)
+
 ## [1.49.0] - 2026-10-30
 
 ### Added
