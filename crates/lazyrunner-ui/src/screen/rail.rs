@@ -81,10 +81,12 @@ pub fn add(
     let matched = search.and_then(|search| search.index);
     let match_at = matched.and_then(|position| list.iter().position(|item| item.position == position));
     let now = Now {
+        live_top: height.saturating_sub(thumb),
         narrow: cells == 1,
         errors: state.errors,
         dropped: state.output.total().saturating_sub(state.output.len() as u64),
         scroll,
+        target: state.scroll,
         matched,
         error_row: marks.iter().rposition(|(mark, _)| *mark == Mark::Error),
         match_row: match_at.map(|at| at * height / total),

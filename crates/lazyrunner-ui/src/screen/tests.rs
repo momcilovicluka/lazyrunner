@@ -2515,6 +2515,28 @@ async fn the_rails_top_end_dims_while_the_oldest_lines_drop() {
 }
 
 #[tokio::test]
+async fn g_shimmers_from_where_the_bracket_was_while_the_view_glides_home() {
+    let mut screen = screen("rail-shimmer", json!({}));
+    screen.ui.motion.enabled = true;
+    let at = screen.ui.now - Duration::from_secs(5);
+    let state = &mut screen.controller.states[0];
+    state.output = lazyrunner_core::output::Output::new(1000);
+    for n in 0..400 {
+        state.add_line(&format!("line {n}"), Hue::Gray, at);
+    }
+    state.scroll = 300;
+    screen.frame();
+    screen.ui.now += Duration::from_secs(1);
+    screen.frame();
+    let rows = screen.ui.hits.iter().filter(|hit| matches!(hit.target, Target::Rail { column: 0, .. })).count();
+    screen.press("G");
+    screen.frame();
+    let key = screen.controller.states[0].key.clone();
+    let from = super::rail_motion::shimmer_from(&screen.ui, &key).expect("G starts it at once, mid-glide");
+    assert!(from + 4 < rows / 2, "from where the bracket was, well above the bottom: {from} of {rows}");
+}
+
+#[tokio::test]
 async fn with_reduced_motion_nothing_moves_on_the_rail() {
     let mut screen = screen("rail-still", json!({ "reducedMotion": true }));
     let at = screen.ui.now - Duration::from_secs(5);
