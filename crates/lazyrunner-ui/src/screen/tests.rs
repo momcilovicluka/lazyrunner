@@ -412,6 +412,21 @@ async fn startup_checklist() {
 }
 
 #[tokio::test]
+async fn cut_off_labels_scroll_sideways_several_at_once() {
+    let mut screen = screen("labels-scroll", json!({}));
+    let long = "v1.40.0 is out, but not installed: the release has no Windows build yet, try again in a minute";
+    let item = |name: &str, detail: String| Item { name: name.into(), status: Status::Warn, detail };
+    let items = vec![item("Update", format!("1 {long}")), item("Ports", format!("2 {long}"))];
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(Checklist::fixed(items, Vec::new(), "done"))));
+    let first = screen.render(80, 30);
+    assert!(first.contains("1 v1.40.0 is out") && first.contains("2 v1.40.0 is out"), "{first}");
+    assert!(!first.contains("in a minute"), "cut off at first: {first}");
+    screen.ui.now += Duration::from_secs(6);
+    let later = screen.render(80, 30);
+    assert_eq!(later.matches("try again in a minute").count(), 2, "both scroll to their ends: {later}");
+}
+
+#[tokio::test]
 async fn changelog_view() {
     let mut screen = screen("snap-changelog", json!({}));
     let lines = (1..=40).map(|n| Line { text: format!("  • change {n}"), hue: Hue::Gray }).collect();
@@ -2151,7 +2166,7 @@ async fn a_long_row_widens_its_box_and_a_selected_one_still_too_long_scrolls() {
     assert!(later.contains("(Windows Terminal)"), "then it shows its end: {later}");
     screen.press("k");
     screen.frame();
-    assert!(screen.ui.marquee.borrow().is_none(), "a row that fits doesn't scroll");
+    assert!(screen.ui.marquees.borrow().is_empty(), "a row that fits doesn't scroll");
 }
 
 #[tokio::test]
