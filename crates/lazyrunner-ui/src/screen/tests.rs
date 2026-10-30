@@ -2601,6 +2601,12 @@ async fn a_in_the_tests_view_watches_the_selected_suites_and_says_so() {
     assert!(screen.controller.test_watch.suites.contains("npm:cart"), "{}", screen.last_log());
     let frame = screen.frame();
     assert!(frame.contains("WATCH 1") && frame.contains("◉"), "{frame}");
+    let saved = screen.temp.join("cart").join("cart.test.js");
+    screen.controller.handle(Event::TestFileChanged(saved));
+    screen.ui.now = Instant::now();
+    assert!(screen.frame().contains("WATCH 1 · ▰▰▰▰▰▰▰▰"), "a save fills the capsule: {}", screen.frame());
+    screen.ui.now += Duration::from_millis(200);
+    assert!(screen.frame().contains("WATCH 1 · ▰▰▰▰▱▱▱▱"), "it drains over the quiet: {}", screen.frame());
     screen.press("A");
     assert!(screen.controller.test_watch.suites.is_empty(), "A on all of them watched unwatches");
 }

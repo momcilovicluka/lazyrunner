@@ -14,7 +14,7 @@ use lazyrunner_core::run::suites::{Outcome, Status, Suite, TestResult};
 use super::columns::{chunk, fit, linked, spinner};
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, pad, seg, take_cells};
+use super::seg::{Seg, aim, band, on, pad, seg, take_cells};
 use super::theme::C;
 use super::{Overlay, Ui, copy};
 
@@ -136,6 +136,11 @@ fn untested(controller: &Controller, row: &Row) -> Vec<String> {
         .collect()
 }
 
+/// The countdown capsule's cells: it drains over the real quiet a save waits for (a countdown, so linear).
+const CAPSULE: usize = 8;
+/// How long the sweep across a suite's row takes as the watch queues it, and how wide its band is.
+const SWEEP: std::time::Duration = std::time::Duration::from_millis(300);
+const BAND: usize = 6;
 /// A watched suite's mark: armed, not running - it holds still.
 const WATCHED: &str = "◉";
 
@@ -447,16 +452,40 @@ pub fn watching(ui: &Ui, controller: &Controller) -> Option<Seg> {
     if watched == 0 {
         return None;
     }
-    let soon = controller
-        .test_watch
-        .runs_in(ui.now)
-        .map_or(String::new(), |left| format!(" · rerun in {:.1}s", left.as_secs_f64()));
+    let soon = match (controller.test_watch.runs_in(ui.now), controller.test_watch.quiet_left(ui.now)) {
+        (Some(left), _) if ui.reduced_motion => format!(" · rerun in {:.1}s", left.as_secs_f64()),
+        (_, Some(share)) => {
+            let full = ((share * CAPSULE as f64).ceil() as usize).min(CAPSULE);
+            format!(" · {}{}", "▰".repeat(full), "▱".repeat(CAPSULE - full))
+        }
+        _ => String::new(),
+    };
     let pinned = match controller.test_watch.pinned.values().collect::<Vec<_>>().as_slice() {
         [] => String::new(),
         [test] => format!(" · pinned: {test}"),
         tests => format!(" · {} pinned", tests.len()),
     };
     Some(seg(format!("   {WATCHED} WATCH {watched}{pinned}{soon}"), C::Cyan))
+}
+
+/// How far through its sweep suite `key`'s row is, 0 to 1, just after the watch queued it (never with reduced
+/// motion).
+fn sweep(ui: &Ui, controller: &Controller, key: &str) -> Option<f64> {
+    let queued = controller.test_watch.queued_at(key).filter(|_| !ui.reduced_motion)?;
+    let through = ui.now.saturating_duration_since(queued).as_secs_f64() / SWEEP.as_secs_f64();
+    (through < 1.0).then_some(through)
+}
+
+/// A suite's row with the watch's sweep across it, once, as the watch queues it.
+fn swept(ui: &Ui, controller: &Controller, key: &str, row: Vec<Seg>, width: usize) -> Vec<Seg> {
+    let Some(through) = sweep(ui, controller, key) else { return row };
+    let at = (through * (width + BAND) as f64) as usize;
+    band(row, at.saturating_sub(BAND), at, C::Black, C::Cyan)
+}
+
+/// Whether a watched suite's row is sweeping: frames keep coming until it's done.
+pub fn sweeping(ui: &Ui, controller: &Controller) -> bool {
+    controller.test_watch.suites.iter().any(|key| sweep(ui, controller, key).is_some())
 }
 
 fn hint(width: usize, picking: bool) -> Vec<Seg> {
@@ -542,7 +571,7 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let name = pad(&cut(&suite.name, room), room);
                 let icon = icon(ui, suite.status);
                 let watched = if controller.test_watch.suites.contains(&suite.key) { WATCHED } else { " " };
-                if index == selected {
+                let row = if index == selected {
                     let row = format!("  {watched}▸ {icon} {name} {summary}");
                     vec![on(pad(&row, width), C::FocusText, C::FocusBack)]
                 } else {
@@ -554,7 +583,8 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                         seg(format!("{name} "), name_color),
                         seg(summary, color),
                     ]
-                }
+                };
+                swept(ui, controller, &suite.key, row, width)
             }
             Row::Untested { .. } => {
                 let text = format!("     {}", title(controller, row));

@@ -80,6 +80,33 @@ pub fn take_cells(text: &str, cells: usize) -> String {
     out
 }
 
+/// `segs` with the cells `from..to` drawn in `fg` on `bg`: a band, sweeping across a row, say.
+pub fn band(segs: Vec<Seg>, from: usize, to: usize, fg: C, bg: C) -> Vec<Seg> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    for seg in segs {
+        let mut part = String::new();
+        let mut lit = None;
+        for grapheme in seg.text.graphemes(true) {
+            let inside = (from..to).contains(&at);
+            if lit.is_some_and(|was| was != inside) {
+                out.push(banded(&seg, std::mem::take(&mut part), lit == Some(true), fg, bg));
+            }
+            lit = Some(inside);
+            part.push_str(grapheme);
+            at += grapheme.width();
+        }
+        if !part.is_empty() {
+            out.push(banded(&seg, part, lit == Some(true), fg, bg));
+        }
+    }
+    out
+}
+
+fn banded(seg: &Seg, text: String, lit: bool, fg: C, bg: C) -> Seg {
+    if lit { Seg { text, fg, bg: Some(bg), style: None, ..seg.clone() } } else { Seg { text, ..seg.clone() } }
+}
+
 /// `text` padded with spaces (or cut) to exactly `cells` cells.
 pub fn pad(text: &str, cells: usize) -> String {
     let cut = take_cells(text, cells);
@@ -224,6 +251,14 @@ mod tests {
         assert_eq!(marquee(text, 6, 2.0 * MARQUEE_REST + 0.5), "abcdef", "from the start again");
         assert_eq!(ellipsis(text, 6), "abcde…");
         assert_eq!(ellipsis("abc", 6), "abc   ");
+    }
+
+    #[test]
+    fn a_band_lights_its_cells_across_segments() {
+        let row = vec![seg("abc", C::Gray), seg("defg", C::Red)];
+        let lit = band(row, 2, 5, C::Black, C::Cyan);
+        let parts: Vec<(&str, Option<C>)> = lit.iter().map(|part| (part.text.as_str(), part.bg)).collect();
+        assert_eq!(parts, [("ab", None), ("c", Some(C::Cyan)), ("de", Some(C::Cyan)), ("fg", None)]);
     }
 
     #[test]
