@@ -211,6 +211,7 @@ at once while the palette wipes away.
 | `i` | Install an npm app's packages in the background: `c` `npm ci`, `n` `npm install` (it stops the app first and starts it again after) |
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
+| `p` | Run the focused app on another launch profile (a .NET app's, from its `launchSettings.json`, with their URLs) or npm variant: `Enter` restarts it on the one picked (`●` marks the one it runs), remembered for this branch in lazyrunner's state, not the shared profile. Its column's title says so (`Orders · Orders-Https`); picking the profile's own forgets the choice |
 | `e` | The start sheet: what the focused app is started with - the command line and its folder, the launch profile (its URL and variables) or npm script, the profile's `args` and `env`, and the user secrets with their values masked (`Space` shows the selected one for 5 s; a connection string reads `database @ server`). A part that changed since the app started says so, and `r` restarts it; `y` copies the sheet, secrets masked |
 | `y` | Copy from the focused app's output - it asks what: `y` the last error with its stack trace (a failed build's errors with full paths), `e` every error, `w` every warning, `a` both in order (repeats once), `s` the search match, `o` all of it |
 | `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |

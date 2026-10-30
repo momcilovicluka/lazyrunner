@@ -369,6 +369,7 @@ impl Controller {
         let previous = std::mem::replace(&mut self.branch, branch.clone());
         self.pending_branch = None;
         self.test_profile_change();
+        self.apply_launch_choices();
         self.update_modes();
         self.test_lock_changed();
         self.migrations_changed();

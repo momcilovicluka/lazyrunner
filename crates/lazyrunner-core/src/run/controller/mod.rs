@@ -6,6 +6,7 @@
 mod builds;
 mod handover;
 mod hooks;
+mod launch;
 mod migrations;
 mod npm_ci;
 mod start;
@@ -39,6 +40,7 @@ use crate::paths::Paths;
 use crate::profile::{App, Project};
 
 pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_handover};
+pub use launch::Choice;
 pub use migrations::{EfJob, Work};
 pub use suites::{TestBuild, Totals};
 
@@ -133,6 +135,8 @@ pub struct Controller {
     pub failed_build_errors: HashMap<String, Vec<String>>,
     /// Desktop notifications to show (title, message); the UI takes them and shows them when the setting is on.
     pub notifications: Vec<(String, String)>,
+    /// The launch profile or npm variant chosen for each app on this branch (x then p), when it isn't the profile's.
+    launch_chosen: HashMap<String, String>,
     /// The `"hooks"` setting whose problems were said last.
     hooks_said: Value,
     /// The update the hooks ran for.
@@ -269,6 +273,7 @@ impl Controller {
             failed_build_errors: HashMap::new(),
             notifications: Vec::new(),
             hooks_said: Value::Null,
+            launch_chosen: HashMap::new(),
             hooked_update: None,
             git_dir: None,
             pending_branch: None,
@@ -334,6 +339,7 @@ impl Controller {
         self.git_dir = super::tools::git_dir(root);
         self.branch = self.git_dir.as_deref().and_then(super::tools::branch).unwrap_or_default();
         self.pending_branch = None;
+        self.apply_launch_choices();
         self.update_modes();
         self.frameworks.clear();
         for app in &self.apps {

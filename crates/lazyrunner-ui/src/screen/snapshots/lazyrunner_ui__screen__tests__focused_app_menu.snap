@@ -14,6 +14,7 @@ expression: screen.frame()
         │  w      Open the focused app in the browser  Swagger for an API                           │
         │  o      Open the focused app's log file  its full output                                  │
         │  e      Start sheet: what the focused app is started with                                 │
+        │  p      Run the focused app on another launch profile or npm variant                      │
         │  y      Copy (yank)  the last error, every error or warning, the search match, the output │
         │  /      Search the focused app's output  n older match, N newer                           │
         │  z      Zoom the focused column                                                           │
@@ -21,7 +22,6 @@ expression: screen.frame()
         │  m      Mark a line  the one at the bottom, or the search match; again unmarks            │
         │ press a key, or j k + Enter · Esc / x close                                               │
         └───────────────────────────────────────────────────────────────────────────────────────────┘
-
 
 
 

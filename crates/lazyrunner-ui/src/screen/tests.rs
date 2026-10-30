@@ -2555,6 +2555,34 @@ async fn with_reduced_motion_nothing_moves_on_the_rail() {
 }
 
 #[tokio::test]
+async fn x_then_p_runs_an_app_on_another_launch_profile_and_its_title_says_so() {
+    let mut screen = screen("launch-picker", json!({}));
+    let repo = screen.temp.join("repo");
+    screen.controller.root = repo.clone();
+    let lazyrunner_core::profile::AppKind::Dotnet { project, launch_profile: own, .. } =
+        screen.controller.apps[0].kind.clone()
+    else {
+        panic!("Orders is a .NET app")
+    };
+    let folder = repo.join(std::path::Path::new(&project).parent().unwrap()).join("Properties");
+    let mut profiles = serde_json::Map::new();
+    profiles.insert(own.clone(), json!({ "commandName": "Project", "applicationUrl": "http://localhost:47201" }));
+    profiles.insert("Orders-Https".into(), json!({ "applicationUrl": "https://localhost:47211" }));
+    std::fs::write(folder.join("launchSettings.json"), json!({ "profiles": profiles }).to_string()).unwrap();
+    screen.press("x p");
+    let frame = screen.frame();
+    assert!(
+        frame.contains("Orders runs on") && frame.contains("(its own)") && frame.contains("Orders-Https"),
+        "{frame}"
+    );
+    screen.press("j Enter");
+    let key = screen.controller.apps[0].key.clone();
+    assert_eq!(screen.controller.launch_choice(&key), Some("Orders-Https"));
+    screen.press("z");
+    assert!(screen.frame().contains("Orders · Orders-Https"), "the title says so: {}", screen.frame());
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();
