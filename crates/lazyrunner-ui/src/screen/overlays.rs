@@ -21,6 +21,8 @@ pub const LOGO: [&str; 3] = [
     "▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀",
 ];
 const SPARKLE: [char; 2] = ['✦', '✧'];
+/// The startup checklist's widest text.
+const CHECKLIST_INNER: usize = 84;
 /// How fast the light sweeps across the checklist's logo.
 const SWEEP_COLUMNS_PER_SECOND: f64 = 12.0;
 pub const WHATS_NEW_MAX_LINES: usize = 12;
@@ -39,6 +41,11 @@ pub fn boxed(
 }
 
 /// A box whose bottom edge drains from the right as `drain` goes from 1 to 0: the time until it closes by itself.
+/// How wide a box's text is in a terminal `cells` wide, `max_inner` at most.
+pub fn box_inner(cells: usize, max_inner: usize) -> usize {
+    cells.saturating_sub(8).min(max_inner).max(20)
+}
+
 fn draining_box(
     title: &str,
     lines: Vec<Vec<Seg>>,
@@ -48,7 +55,7 @@ fn draining_box(
     max_inner: usize,
     drain: Option<f64>,
 ) -> Vec<Vec<Seg>> {
-    let inner = cells.saturating_sub(8).min(max_inner).max(20);
+    let inner = box_inner(cells, max_inner);
     let left = " ".repeat(cells.saturating_sub(inner + 4) / 2);
     let mut boxed = vec![vec![
         seg("┌─", C::Cyan),
@@ -484,14 +491,15 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         .filter(|item| !fold || !matches!(item.status, Status::Ok | Status::Skip))
         .map(|item| {
             let detail_color = if item.status == Status::Ok { C::Gray } else { status_color(item.status) };
-            vec![
+            let row = vec![
                 seg(
                     format!(" {} ", icon(item.status, animated.then(|| spinner(ui)), ui.nerd)),
                     status_color(item.status),
                 ),
                 seg(check_name(ui.nerd, &item.name), C::White),
                 seg(item.detail.clone(), detail_color),
-            ]
+            ];
+            ui.scrolling_row(row, 2, box_inner(cells, CHECKLIST_INNER))
         })
         .collect();
     if fold {
@@ -548,7 +556,7 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     }
     let sparkle = if animated { SPARKLE[(tick / 3) as usize % 2] } else { SPARKLE[0] };
     let title = format!("{sparkle} lazyrunner v{VERSION} · startup checklist");
-    draining_box(&title, lines, &list.footer, cells, rows, 84, list.draining(ui.now))
+    draining_box(&title, lines, &list.footer, cells, rows, CHECKLIST_INNER, list.draining(ui.now))
 }
 
 pub fn changelog(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {

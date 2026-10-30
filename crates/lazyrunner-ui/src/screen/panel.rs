@@ -25,7 +25,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>>
     rows.push(vec![seg("─".repeat(cells.saturating_sub(tag.chars().count())), C::DarkGray), seg(tag, C::DarkGray)]);
     rows.push(header(ui, controller));
     rows.push(if ui.follow.on { super::follow::ticker(ui, cells) } else { hints(ui, controller, cells) });
-    rows.push(notice(ui, controller));
+    rows.push(ui.scrolling_row(notice(ui, controller), 0, cells));
     let count = controller.config["panelLogLines"]
         .as_u64()
         .map_or(DEFAULT_LOG_LINES, |n| usize::try_from(n).unwrap_or(MAX_LOG_LINES).min(MAX_LOG_LINES));

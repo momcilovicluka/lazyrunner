@@ -225,7 +225,7 @@ fn pane(
 ) -> Vec<Vec<Seg>> {
     let mut pane = vec![
         aim(title(ui, controller, index, cells), Target::Title(index)),
-        aim(info(controller, index, cells, ui.nerd), Target::Title(index)),
+        aim(info(ui, controller, index, cells), Target::Title(index)),
     ];
     let scroll = ui.motion.scroll(index, controller.states[index].scroll, ui.now);
     pane.extend(
@@ -259,6 +259,7 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let mut segs = vec![on(format!(" {marker}{icon} {} ", app.name), chip_fg, chip_bg)];
     segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
     segs.extend(status(ui, controller, index));
+    let mut segs = ui.scrolling_row(segs, 2, cells);
     let used = width(&segs);
     let rule = if focused { "━" } else { "─" };
     segs.push(seg(format!(" {}", rule.repeat(cells.saturating_sub(used + 1))), border(controller, index)));
@@ -407,7 +408,8 @@ fn memory_growing(state: &AppState) -> bool {
 }
 
 /// Second title line: live CPU and memory with sparklines, the response-time trend, requests, errors, the variant.
-fn info(controller: &Controller, index: usize, cells: usize, nerd: bool) -> Vec<Seg> {
+fn info(ui: &Ui, controller: &Controller, index: usize, cells: usize) -> Vec<Seg> {
+    let nerd = ui.nerd;
     let state = &controller.states[index];
     let mut segs = vec![seg(" ", C::Gray)];
     if state.scroll > 0 {
@@ -455,7 +457,8 @@ fn info(controller: &Controller, index: usize, cells: usize, nerd: bool) -> Vec<
     if let Some(mode) = controller.mode(&state.key) {
         segs.push(seg(format!("  {} · {}", mode.label, mode.script), C::DarkGray));
     }
-    fit(segs, cells)
+    let keep = segs.len().saturating_sub(1);
+    fit(ui.scrolling_row(segs, keep, cells), cells)
 }
 
 /// "1.5/s", "2/s".

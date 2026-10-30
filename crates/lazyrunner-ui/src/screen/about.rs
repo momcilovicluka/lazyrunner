@@ -272,7 +272,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         if link.does == Does::CheckUpdate
             && let Some(check) = &ui.update_check
         {
-            lines.push(update_line(check, spin.as_deref()));
+            lines.push(ui.scrolling_row(update_line(check, spin.as_deref()), 1, inner));
         }
     }
     lines.push(Vec::new());

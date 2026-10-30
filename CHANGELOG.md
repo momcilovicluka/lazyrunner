@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.41.2] - 2026-10-30
+
+### Fixed
+- A label too long for its place scrolls sideways to show the rest, as a selected row does, instead of being cut with … - the update check's line in the About box, the startup checklist's details, the panel's notice line, and a column's title and its info line. Several scroll at once; what names the line (a check's name, an app's chip) stays put (#71, thanks @ognjen004028)
+
 ## [1.41.1] - 2026-10-30
 
 ### Fixed
