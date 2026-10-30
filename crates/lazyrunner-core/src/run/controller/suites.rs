@@ -113,6 +113,7 @@ impl Controller {
         }
         self.suites = Some(suites);
         self.check_packages();
+        self.prune_test_watch();
     }
 
     /// Whether each npm and Nx suite's packages are there (when found, before a run, after npm ci).
@@ -173,6 +174,7 @@ impl Controller {
 
     /// r, R, f, F: queues these suites (only their failed tests with `failed_only`).
     pub fn run_tests(&mut self, keys: &[String], failed_only: bool) {
+        self.test_watch.ran_by_hand(keys);
         self.check_packages();
         let mut queued = Vec::new();
         // Suites that can't run for want of packages: one line per folder, not one per suite.
@@ -259,6 +261,7 @@ impl Controller {
     /// s in the tests view, and quitting: stops the running suites and the test build, and drops the queue (the
     /// queued suites keep their last results).
     pub fn stop_tests(&mut self, quiet: bool) {
+        self.test_watch.drop_pending();
         let dir = self.tests_dir();
         if let Some(build) = self.test_build.take() {
             build.child.kill();
@@ -445,6 +448,7 @@ impl Controller {
     pub(super) fn suite_exited(&mut self, key: &str, job: u64, code: Option<i32>) {
         if self.suite(key).is_some_and(|suite| suite.job == job && suite.status == Status::Running) {
             self.complete_suite(key, code);
+            self.watched_run_over(key);
             self.pump_tests();
         }
     }
@@ -765,6 +769,34 @@ mod tests {
 
     fn keys(names: &[&str]) -> Vec<String> {
         names.iter().map(|name| format!("npm:{name}")).collect()
+    }
+
+    #[tokio::test]
+    async fn a_watched_red_suite_runs_its_failed_tests_on_a_save_then_all_of_it() {
+        let temp = TempDir::new("suites-watch");
+        let (mut sample, mut events) = controller(&temp);
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        sample.toggle_watch(&keys(&["cart"]));
+        assert!(log(&sample).ends_with("(s stops a run, a again unwatches)"), "{}", log(&sample));
+        let saved = std::time::Instant::now();
+        let quiet = super::super::test_watch::QUIET;
+        sample.test_file_saved(&temp.join("checkout").join("pay.js"), false, saved);
+        sample.tick_test_watch(saved + quiet);
+        assert!(!sample.tests_active(), "checkout is not watched");
+        sample.test_file_saved(&temp.join("cart").join("cart.test.js"), false, saved);
+        sample.tick_test_watch(saved + Duration::from_millis(100));
+        assert!(!sample.tests_active(), "not before saving is quiet");
+        sample.tick_test_watch(saved + quiet);
+        let said = log(&sample);
+        assert!(said.contains("cart.test.js changed - running the watched tests: cart"), "{said}");
+        assert!(sample.suite("npm:cart").unwrap().failed_only, "red: its failed tests first");
+        run_until(&mut sample, &mut events, |sample| {
+            log(sample).contains("checking the rest") && !sample.tests_active()
+        })
+        .await;
+        sample.toggle_watch(&keys(&["cart"]));
+        assert!(log(&sample).ends_with("Stopped watching cart"));
     }
 
     #[test]

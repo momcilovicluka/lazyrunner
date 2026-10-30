@@ -76,6 +76,8 @@ pub enum Event {
     /// CPU (% of the machine) and memory (MB) per app, summed over its process tree.
     Metrics(Vec<(String, f32, f32)>),
     FileChanged(PathBuf),
+    /// A file saved in a watched npm or Nx test suite's folder (test watch).
+    TestFileChanged(PathBuf),
     /// The test suites found (T), with their last results.
     Suites(Vec<suites::Suite>),
     /// A hook that didn't go well: its event, its command, and what went wrong.
