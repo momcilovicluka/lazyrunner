@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.43.0] - 2026-10-30
+
+### Added
+- The rail moves: a new error that lands off-screen, while a column is scrolled back, sends an ember from the bracket to its mark - the mark waits, dim, until the ember eases into it, then settles in (a burst sends one, at most one every 750 ms, its tail longer for each error it carries); as `G` snaps the view back to live, a shimmer runs down the map from where the view was and hands over to the bracket's `▼`; a search's jump pulses its row once, bright then fading. In the theme's focus colour, so light themes show it too; none of it with reduced motion (#69)
+
 ## [1.42.0] - 2026-10-30
 
 ### Added

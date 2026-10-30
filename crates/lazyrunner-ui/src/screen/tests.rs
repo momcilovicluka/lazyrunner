@@ -2460,6 +2460,59 @@ async fn the_start_sheet_shows_what_an_app_is_started_with_and_copies_it() {
 }
 
 #[tokio::test]
+async fn the_rail_sends_an_ember_to_a_new_error_shimmers_back_to_live_and_pulses_a_search_jump() {
+    let mut screen = screen("rail-motion", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    let state = &mut screen.controller.states[0];
+    state.output = lazyrunner_core::output::Output::new(1000);
+    for n in 0..400 {
+        state.add_line(&format!("line {n}"), Hue::Gray, at);
+    }
+    state.scroll = 200;
+    screen.frame();
+    let now = screen.ui.now;
+    let state = &mut screen.controller.states[0];
+    state.add_line("fail: late", Hue::Red, now);
+    state.errors += 1;
+    assert!(screen.frame().contains('◉'), "an ember sets off: {}", screen.frame());
+    assert!(super::rail_motion::animating(&screen.ui));
+    screen.ui.now += Duration::from_millis(900);
+    assert!(!screen.frame().contains('◉') && !super::rail_motion::animating(&screen.ui), "then it's done");
+
+    screen.press("G");
+    screen.frame();
+    assert!(super::rail_motion::animating(&screen.ui), "back to live shimmers");
+    screen.ui.now += Duration::from_millis(600);
+    screen.frame();
+    assert!(!super::rail_motion::animating(&screen.ui));
+
+    let key = screen.controller.states[0].key.clone();
+    screen.ui.search = Some(super::Search { query: "line 1".into(), key, index: Some(100), ..Default::default() });
+    screen.frame();
+    assert!(super::rail_motion::animating(&screen.ui), "a jump pulses its row");
+    screen.ui.now += Duration::from_millis(450);
+    screen.frame();
+    assert!(!super::rail_motion::animating(&screen.ui));
+}
+
+#[tokio::test]
+async fn with_reduced_motion_nothing_moves_on_the_rail() {
+    let mut screen = screen("rail-still", json!({ "reducedMotion": true }));
+    let at = screen.ui.now - Duration::from_secs(5);
+    let state = &mut screen.controller.states[0];
+    state.output = lazyrunner_core::output::Output::new(1000);
+    for n in 0..400 {
+        state.add_line(&format!("line {n}"), Hue::Gray, at);
+    }
+    state.scroll = 200;
+    screen.frame();
+    let state = &mut screen.controller.states[0];
+    state.add_line("fail: late", Hue::Red, at);
+    state.errors += 1;
+    assert!(!screen.frame().contains('◉') && !super::rail_motion::animating(&screen.ui));
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();
