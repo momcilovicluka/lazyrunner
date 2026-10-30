@@ -1,5 +1,6 @@
 //! The rail beside a column's output, in place of a scrollbar: a map of every line the column shows - errors red,
-//! warnings yellow, search matches cyan, marks magenta, the rest dim ticks - with a bracket on the lines on screen.
+//! warnings yellow, search matches cyan, marks magenta, the rest dotted by how fast they came (`rail_density`) - with
+//! a bracket on the lines on screen.
 //! Each row stands for an equal share of the lines and takes the colour of the most serious one in it; a click on a
 //! row brings that line to the middle of the column, a drag along it scrolls, and the pointer on a row previews that
 //! line over the column, in its own colours. A narrow column gets the map alone, the lines on screen lit in it. What
@@ -13,6 +14,7 @@ use lazyrunner_core::run::app::AppState;
 
 use super::columns::{self, Shown};
 use super::mouse::Target;
+use super::rail_density::{self, Density};
 use super::rail_motion::{self, Now};
 use super::seg::{self, Seg, on, seg};
 use super::theme::C;
@@ -46,9 +48,16 @@ struct Drawn {
     marks: usize,
 }
 
+/// A column's map: its rows, and how fast each one's lines came.
+#[derive(Clone)]
+struct Map {
+    rows: Vec<Row>,
+    density: Vec<Density>,
+}
+
 /// Each column's map, by its app's key.
 #[derive(Default)]
-pub struct Maps(RefCell<HashMap<String, (Drawn, Vec<Row>)>>);
+pub struct Maps(RefCell<HashMap<String, (Drawn, Map)>>);
 
 /// The cells a `column` cells wide column's rail takes.
 pub fn width(column: usize) -> usize {
@@ -72,7 +81,8 @@ pub fn add(
     if height == 0 || total == 0 {
         return;
     }
-    let marks = map(ui, state, list, search, height);
+    let map = map(ui, state, list, search, height);
+    let marks = &map.rows;
     let thumb = (height * height / total).clamp(1, height);
     let newest_shown = total.saturating_sub(scroll).max(1); // the lines up to this one end at the bottom row
     let bottom = (newest_shown * height).div_ceil(total).clamp(thumb, height); // at the top it keeps its size
@@ -117,7 +127,10 @@ pub fn add(
             Mark::Match => seg("█", C::Cyan),
             Mark::Marked => seg("▌", C::Magenta),
             _ if seen && cells == 1 => seg("▐", bracket),
-            Mark::Normal => seg("╎", C::DarkGray),
+            Mark::Normal => match map.density.get(at) {
+                Some(density) => seg(density.glyph.to_string(), if density.burst { C::Gray } else { C::DarkGray }),
+                None => seg("╎", C::DarkGray),
+            },
             Mark::Empty => seg(" ", C::Gray),
         };
         row.push(moving.paint(at, cell).at(target));
@@ -142,8 +155,9 @@ fn jump(line: usize, height: usize, total: usize) -> usize {
     (total - 1 - line.min(total - 1)).saturating_sub(height / 2).min(total.saturating_sub(height))
 }
 
-/// The rail's rows: the most serious line in each one's share of `list`, and where it is in it (the first of them).
-fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows: usize) -> Vec<Row> {
+/// The rail's rows: the most serious line in each one's share of `list`, and where it is in it (the first of them);
+/// and how fast each one's lines came.
+fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows: usize) -> Map {
     let drawn = Drawn {
         total: state.output.total(),
         shown: list.len(),
@@ -153,10 +167,10 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows:
         marks: state.marks.len(),
     };
     let mut maps = ui.rails.0.borrow_mut();
-    if let Some((was, marks)) = maps.get(&state.key)
+    if let Some((was, map)) = maps.get(&state.key)
         && *was == drawn
     {
-        return marks.clone();
+        return map.clone();
     }
     let mut marks = vec![(Mark::Empty, 0); rows];
     for (at, item) in list.iter().enumerate() {
@@ -166,8 +180,9 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows:
             marks[row] = (mark, at);
         }
     }
-    maps.insert(state.key.clone(), (drawn, marks.clone()));
-    marks
+    let map = Map { rows: marks, density: rail_density::strip(list, rows) };
+    maps.insert(state.key.clone(), (drawn, map.clone()));
+    map
 }
 
 fn mark(state: &AppState, item: &Shown, search: Option<&Search>) -> Mark {

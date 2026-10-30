@@ -9,7 +9,7 @@
 <text x="232.4" y="97.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ › </text>
 <text x="266.0" y="97.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">start</text>
 <text x="308.0" y="97.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▏</text>
-<text x="1106.0" y="97.7" fill="#6c7086" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">26 commands</text>
+<text x="1106.0" y="97.7" fill="#6c7086" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">27 commands</text>
 <text x="1198.4" y="97.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="232.4" y="115.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="249.2" y="115.7" fill="#6c7086" textLength="949.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">─────────────────────────────────────────────────────────────────────────────────────────────────────────────────</text>
@@ -39,176 +39,176 @@
 <text x="358.4" y="169.7" fill="#6c7086" textLength="369.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build if needed, start whatever is stopped</text>
 <text x="1164.8" y="169.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> U </text>
 <text x="1198.4" y="169.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1131.2" y="174.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="174.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="187.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="187.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x] Auto-</text>
-<text x="358.4" y="187.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
-<text x="400.4" y="187.7" fill="#ffffff" textLength="730.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> when lazyrunner opens                                                                 </text>
-<text x="1131.2" y="187.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="187.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> u </text>
+<text x="232.4" y="187.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="282.8" y="187.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">Start</text>
+<text x="324.8" y="187.7" fill="#ffffff" textLength="840.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> sheet: what Orders is started with                                                                 </text>
+<text x="1164.8" y="187.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> e </text>
 <text x="1198.4" y="187.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1131.2" y="192.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="192.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="205.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="205.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] </text>
-<text x="316.4" y="205.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">Start</text>
-<text x="358.4" y="205.7" fill="#ffffff" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">up checklist when lazyrunner opens                                                          </text>
+<text x="282.8" y="205.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x] Auto-</text>
+<text x="358.4" y="205.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="400.4" y="205.7" fill="#ffffff" textLength="730.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> when lazyrunner opens                                                                 </text>
 <text x="1131.2" y="205.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="205.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> w </text>
+<text x="1164.8" y="205.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> u </text>
 <text x="1198.4" y="205.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1131.2" y="210.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="210.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="223.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="223.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Run the </text>
-<text x="350.0" y="223.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
-<text x="392.0" y="223.7" fill="#ffffff" textLength="739.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">up checklist now (and check for an update)                                              </text>
+<text x="282.8" y="223.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] </text>
+<text x="316.4" y="223.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">Start</text>
+<text x="358.4" y="223.7" fill="#ffffff" textLength="772.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">up checklist when lazyrunner opens                                                          </text>
 <text x="1131.2" y="223.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="223.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r </text>
+<text x="1164.8" y="223.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> w </text>
 <text x="1198.4" y="223.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1131.2" y="228.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="228.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="241.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
-<text x="282.8" y="241.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Re</text>
-<text x="299.6" y="241.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
-<text x="341.6" y="241.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Orders</text>
-<text x="400.4" y="241.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if it changed</text>
+<text x="232.4" y="241.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="282.8" y="241.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Run the </text>
+<text x="350.0" y="241.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="392.0" y="241.7" fill="#ffffff" textLength="739.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">up checklist now (and check for an update)                                              </text>
+<text x="1131.2" y="241.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
 <text x="1164.8" y="241.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r </text>
 <text x="1198.4" y="241.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1164.8" y="246.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="259.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ▸  </text>
+<text x="232.4" y="259.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
 <text x="282.8" y="259.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Re</text>
 <text x="299.6" y="259.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
-<text x="341.6" y="259.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all</text>
-<text x="375.2" y="259.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if anything changed</text>
-<text x="1164.8" y="259.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> R </text>
+<text x="341.6" y="259.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Orders</text>
+<text x="400.4" y="259.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if it changed</text>
+<text x="1164.8" y="259.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> r </text>
 <text x="1198.4" y="259.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1131.2" y="264.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="264.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="277.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="277.7" fill="#ffffff" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Auto-re</text>
-<text x="375.2" y="277.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
-<text x="417.2" y="277.7" fill="#ffffff" textLength="714.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> on branch change                                                                    </text>
-<text x="1131.2" y="277.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="277.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> a </text>
+<text x="232.4" y="277.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ▸  </text>
+<text x="282.8" y="277.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Re</text>
+<text x="299.6" y="277.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="341.6" y="277.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all</text>
+<text x="375.2" y="277.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  rebuild if anything changed</text>
+<text x="1164.8" y="277.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> R </text>
 <text x="1198.4" y="277.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1131.2" y="282.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="282.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="295.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="295.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Re</text>
-<text x="333.2" y="295.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
-<text x="375.2" y="295.7" fill="#ffffff" textLength="756.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> the APIs when code changes                                                               </text>
+<text x="282.8" y="295.7" fill="#ffffff" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Auto-re</text>
+<text x="375.2" y="295.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="417.2" y="295.7" fill="#ffffff" textLength="714.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> on branch change                                                                    </text>
 <text x="1131.2" y="295.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="295.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> e </text>
+<text x="1164.8" y="295.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> a </text>
 <text x="1198.4" y="295.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1131.2" y="300.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="300.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="313.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="313.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x] </text>
-<text x="316.4" y="313.7" fill="#f9e2af" textLength="16.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">St</text>
-<text x="333.2" y="313.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">op/Rest</text>
-<text x="392.0" y="313.7" fill="#f9e2af" textLength="25.2" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">art</text>
-<text x="417.2" y="313.7" fill="#ffffff" textLength="714.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all include the frontend                                                            </text>
+<text x="282.8" y="313.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Re</text>
+<text x="333.2" y="313.7" fill="#f9e2af" textLength="42.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">start</text>
+<text x="375.2" y="313.7" fill="#ffffff" textLength="756.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> the APIs when code changes                                                               </text>
 <text x="1131.2" y="313.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="313.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> s </text>
+<text x="1164.8" y="313.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> e </text>
 <text x="1198.4" y="313.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1131.2" y="318.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="318.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="331.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="282.8" y="331.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">In</text>
-<text x="299.6" y="331.7" fill="#f9e2af" textLength="25.2" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">sta</text>
-<text x="324.8" y="331.7" fill="#ffffff" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ll packages: npm ci o</text>
-<text x="501.2" y="331.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
-<text x="509.6" y="331.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> npm ins</text>
-<text x="576.8" y="331.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="585.2" y="331.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">all</text>
-<text x="610.4" y="331.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the focused npm app's</text>
-<text x="1164.8" y="331.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
+<text x="232.4" y="331.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="282.8" y="331.7" fill="#ffffff" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x] </text>
+<text x="316.4" y="331.7" fill="#f9e2af" textLength="16.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">St</text>
+<text x="333.2" y="331.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">op/Rest</text>
+<text x="392.0" y="331.7" fill="#f9e2af" textLength="25.2" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">art</text>
+<text x="417.2" y="331.7" fill="#ffffff" textLength="714.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all include the frontend                                                            </text>
+<text x="1131.2" y="331.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1164.8" y="331.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> s </text>
 <text x="1198.4" y="331.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1131.2" y="336.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="336.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="349.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="349.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] L open</text>
-<text x="366.8" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
-<text x="383.6" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="392.0" y="349.7" fill="#ffffff" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he git tool beside l</text>
-<text x="560.0" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
-<text x="568.4" y="349.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">zy</text>
-<text x="585.2" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
-<text x="593.6" y="349.7" fill="#ffffff" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">unner (Windows </text>
-<text x="719.6" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">T</text>
-<text x="728.0" y="349.7" fill="#ffffff" textLength="403.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">erminal)                                        </text>
-<text x="1131.2" y="349.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="349.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> g </text>
+<text x="232.4" y="349.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="282.8" y="349.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">In</text>
+<text x="299.6" y="349.7" fill="#f9e2af" textLength="25.2" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">sta</text>
+<text x="324.8" y="349.7" fill="#ffffff" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ll packages: npm ci o</text>
+<text x="501.2" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="509.6" y="349.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> npm ins</text>
+<text x="576.8" y="349.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="585.2" y="349.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">all</text>
+<text x="610.4" y="349.7" fill="#6c7086" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the focused npm app's</text>
+<text x="1164.8" y="349.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
 <text x="1198.4" y="349.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1131.2" y="354.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="354.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="367.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="282.8" y="367.7" fill="#ffffff" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Nerd Font icon</text>
-<text x="434.0" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
-<text x="442.4" y="367.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> (</text>
-<text x="459.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="467.6" y="367.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he termin</text>
-<text x="543.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
-<text x="551.6" y="367.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">l's font a Ne</text>
-<text x="660.8" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
-<text x="669.2" y="367.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">d Fon</text>
-<text x="711.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="719.6" y="367.7" fill="#ffffff" textLength="411.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Mono)                                           </text>
+<text x="282.8" y="367.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] L open</text>
+<text x="366.8" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="383.6" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="392.0" y="367.7" fill="#ffffff" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he git tool beside l</text>
+<text x="560.0" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="568.4" y="367.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">zy</text>
+<text x="585.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="593.6" y="367.7" fill="#ffffff" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">unner (Windows </text>
+<text x="719.6" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">T</text>
+<text x="728.0" y="367.7" fill="#ffffff" textLength="403.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">erminal)                                        </text>
 <text x="1131.2" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1164.8" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
+<text x="1164.8" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> g </text>
 <text x="1198.4" y="367.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1131.2" y="372.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1164.8" y="372.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="385.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="282.8" y="385.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Durations</text>
-<text x="358.4" y="385.7" fill="#6c7086" textLength="562.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build, start and npm ci times over the last runs: what got slower</text>
-<text x="1164.8" y="385.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> D </text>
+<text x="232.4" y="385.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="282.8" y="385.7" fill="#ffffff" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Nerd Font icon</text>
+<text x="434.0" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="442.4" y="385.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> (</text>
+<text x="459.2" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="467.6" y="385.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he termin</text>
+<text x="543.2" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="551.6" y="385.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">l's font a Ne</text>
+<text x="660.8" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="669.2" y="385.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">d Fon</text>
+<text x="711.2" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="719.6" y="385.7" fill="#ffffff" textLength="411.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Mono)                                           </text>
+<text x="1131.2" y="385.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1164.8" y="385.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
 <text x="1198.4" y="385.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1164.8" y="390.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="403.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
-<text x="282.8" y="403.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Layout: auto → next</text>
-<text x="442.4" y="403.7" fill="#6c7086" textLength="630.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto (stacked when narrow) / columns side by side / stacked top to bottom</text>
-<text x="1164.8" y="403.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> | </text>
+<text x="232.4" y="403.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="282.8" y="403.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Durations</text>
+<text x="358.4" y="403.7" fill="#6c7086" textLength="562.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build, start and npm ci times over the last runs: what got slower</text>
+<text x="1164.8" y="403.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> D </text>
 <text x="1198.4" y="403.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1122.8" y="408.0" width="67.2" height="18" fill="#6c7086"/>
+<rect x="1164.8" y="408.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="421.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
-<text x="282.8" y="421.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Reload window</text>
-<text x="392.0" y="421.7" fill="#6c7086" textLength="722.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the settings and themes read again, the terminal set up again; the apps keep running</text>
-<text x="1122.8" y="421.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Ctrl+R </text>
+<text x="282.8" y="421.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Layout: auto → next</text>
+<text x="442.4" y="421.7" fill="#6c7086" textLength="630.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto (stacked when narrow) / columns side by side / stacked top to bottom</text>
+<text x="1164.8" y="421.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> | </text>
 <text x="1198.4" y="421.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1164.8" y="426.0" width="25.2" height="18" fill="#6c7086"/>
+<rect x="1122.8" y="426.0" width="67.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="439.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
-<text x="282.8" y="439.7" fill="#ffffff" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Widen the focused column</text>
-<text x="484.4" y="439.7" fill="#6c7086" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  taller when the apps are stacked</text>
-<text x="1164.8" y="439.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> + </text>
+<text x="282.8" y="439.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Reload window</text>
+<text x="392.0" y="439.7" fill="#6c7086" textLength="722.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the settings and themes read again, the terminal set up again; the apps keep running</text>
+<text x="1122.8" y="439.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Ctrl+R </text>
 <text x="1198.4" y="439.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1164.8" y="444.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="457.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ?  </text>
-<text x="282.8" y="457.7" fill="#ffffff" textLength="319.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Settings (on/off toggles, r checklist)</text>
-<text x="602.0" y="457.7" fill="#6c7086" textLength="319.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto-restart, auto-start, checklist…</text>
-<text x="1164.8" y="457.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="232.4" y="457.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
+<text x="282.8" y="457.7" fill="#ffffff" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Widen the focused column</text>
+<text x="484.4" y="457.7" fill="#6c7086" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  taller when the apps are stacked</text>
+<text x="1164.8" y="457.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> + </text>
 <text x="1198.4" y="457.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1164.8" y="462.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="475.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="282.8" y="475.7" fill="#ffffff" textLength="294.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Requests: what the .NET apps served</text>
-<text x="576.8" y="475.7" fill="#6c7086" textLength="445.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  newest or slowest, per endpoint; filter, copy, open</text>
-<text x="1164.8" y="475.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> H </text>
+<text x="232.4" y="475.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ?  </text>
+<text x="282.8" y="475.7" fill="#ffffff" textLength="319.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Settings (on/off toggles, r checklist)</text>
+<text x="602.0" y="475.7" fill="#6c7086" textLength="319.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto-restart, auto-start, checklist…</text>
+<text x="1164.8" y="475.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
 <text x="1198.4" y="475.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1164.8" y="480.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="232.4" y="493.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="282.8" y="493.7" fill="#ffffff" textLength="302.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Tests: run the project's test suites</text>
-<text x="585.2" y="493.7" fill="#6c7086" textLength="529.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  dotnet test, jest, vitest - several at once in the background</text>
-<text x="1164.8" y="493.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> T </text>
+<text x="282.8" y="493.7" fill="#ffffff" textLength="294.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Requests: what the .NET apps served</text>
+<text x="576.8" y="493.7" fill="#6c7086" textLength="445.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  newest or slowest, per endpoint; filter, copy, open</text>
+<text x="1164.8" y="493.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> H </text>
 <text x="1198.4" y="493.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1164.8" y="498.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="511.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
-<text x="282.8" y="511.7" fill="#ffffff" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Copy (yank)</text>
-<text x="375.2" y="511.7" fill="#6c7086" textLength="588.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the last error, every error or warning, the search match, the output</text>
-<text x="1164.8" y="511.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> y </text>
+<text x="232.4" y="511.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
+<text x="282.8" y="511.7" fill="#ffffff" textLength="302.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Tests: run the project's test suites</text>
+<text x="585.2" y="511.7" fill="#6c7086" textLength="529.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  dotnet test, jest, vitest - several at once in the background</text>
+<text x="1164.8" y="511.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> T </text>
 <text x="1198.4" y="511.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1164.8" y="516.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="232.4" y="529.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="282.8" y="529.7" fill="#ffffff" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Switch database</text>
-<text x="408.8" y="529.7" fill="#6c7086" textLength="302.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  connection strings in secrets.json</text>
-<text x="1164.8" y="529.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> d </text>
+<text x="232.4" y="529.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="282.8" y="529.7" fill="#ffffff" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Copy (yank)</text>
+<text x="375.2" y="529.7" fill="#6c7086" textLength="588.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the last error, every error or warning, the search match, the output</text>
+<text x="1164.8" y="529.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> y </text>
 <text x="1198.4" y="529.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="232.4" y="547.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="249.2" y="547.7" fill="#6c7086" textLength="949.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                                    </text>

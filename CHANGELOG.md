@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.45.0] - 2026-10-30
+
+### Added
+- The rail shows how fast the app logged each stretch: its ordinary rows, dim ticks until now, are braille - a dotted line at the app's usual pace, fuller where it logged twice as fast or more, brighter where a burst came (eight times or more, a compiler's report, say). Errors, warnings, matches and marks keep their colours (#69)
+
 ## [1.44.1] - 2026-10-30
 
 ### Fixed

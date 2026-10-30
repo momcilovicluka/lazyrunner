@@ -23,6 +23,7 @@ pub mod overlays;
 pub mod palette;
 pub mod panel;
 pub mod rail;
+pub mod rail_density;
 pub mod rail_motion;
 pub mod reload;
 pub mod requests;

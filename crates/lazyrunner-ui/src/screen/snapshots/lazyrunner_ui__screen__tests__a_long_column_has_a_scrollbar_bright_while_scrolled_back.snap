@@ -5,26 +5,26 @@ expression: screen.frame()
  ▸ ◆ Orders  :47201  ┳ ■ Billing  :47202  ○┬ ■ Shop  :47301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :47303  ○
  ⏸ ↑60 · G follows   ┃                     │   dev server · dev  │   watch build · watc│   live · dev
 orders line 39      █┃                     │                     │                     │
-orders line 40      ╎┃                     │                     │                     │
-orders line 41      ╎┃                     │                     │                     │
-orders line 42      ╎┃                     │                     │                     │
-orders line 43      ╎┃                     │                     │                     │
-orders line 44      ╎┃                     │                     │                     │
-orders line 45      ╎┃                     │                     │                     │
-orders line 46      ╎┃                     │                     │                     │
+orders line 40      ⡯┃                     │                     │                     │
+orders line 41      ⡯┃                     │                     │                     │
+orders line 42      ⡯┃                     │                     │                     │
+orders line 43      ⡯┃                     │                     │                     │
+orders line 44      ⣗┃                     │                     │                     │
+orders line 45      ⣗┃                     │                     │                     │
+orders line 46      ⣗┃                     │                     │                     │
 orders line 47      ▐┃                     │                     │                     │
 orders line 48      ▐┃                     │                     │                     │
 orders line 49      ▐┃                     │                     │                     │
-orders line 50      ╎┃                     │                     │                     │
-orders line 51      ╎┃                     │                     │                     │
-orders line 52      ╎┃                     │                     │                     │
-orders line 53      ╎┃                     │                     │                     │
-orders line 54      ╎┃                     │                     │                     │
-orders line 55      ╎┃                     │                     │                     │
-orders line 56      ╎┃                     │                     │                     │
-orders line 57      ╎┃Building...          │                     │                     │
-orders line 58      ╎┃error: Billing.cs(3,1│                     │                     │
-orders line 59      ╎┃): something is off  │                     │                     │
+orders line 50      ⡯┃                     │                     │                     │
+orders line 51      ⡯┃                     │                     │                     │
+orders line 52      ⡯┃                     │                     │                     │
+orders line 53      ⡯┃                     │                     │                     │
+orders line 54      ⣏┃                     │                     │                     │
+orders line 55      ⣗┃                     │                     │                     │
+orders line 56      ⣗┃                     │                     │                     │
+orders line 57      ⣗┃Building...          │                     │                     │
+orders line 58      ⣗┃error: Billing.cs(3,1│                     │                     │
+orders line 59      ⡗┃): something is off  │                     │                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all     :  commands   x  menu   ?  keys   ,  settings

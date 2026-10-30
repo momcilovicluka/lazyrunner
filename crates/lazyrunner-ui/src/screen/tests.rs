@@ -2421,6 +2421,7 @@ async fn the_rail_maps_where_the_errors_are_and_a_click_jumps_there() {
     screen.click_at(top.0, top.1);
     assert!(screen.controller.states[0].scroll > 300, "{}", screen.controller.states[0].scroll);
     assert!(screen.frame().contains("fail: boom"), "{}", screen.frame());
+    assert!(screen.frame().contains('⡇'), "ordinary rows are dotted by how fast they came: {}", screen.frame());
 
     let bottom = screen
         .ui

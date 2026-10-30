@@ -124,7 +124,7 @@ impl Moving {
             None => {}
         }
         if self.landing == Some(at) {
-            return seg("╎", C::DarkGray);
+            return seg("⡇", C::DarkGray);
         }
         if self.landed == Some(at) {
             return on("◆", C::Red, C::FocusBack);
@@ -291,7 +291,7 @@ mod tests {
         let flying = Moving { comet: vec![5, 4], landing: Some(9), ..Moving::default() };
         assert_eq!(flying.paint(5, mark.clone()).text, "◉");
         assert_eq!(flying.paint(4, mark.clone()).text, "·");
-        assert_eq!(flying.paint(9, mark.clone()).text, "╎", "dim until the ember lands");
+        assert_eq!(flying.paint(9, mark.clone()).text, "⡇", "dim until the ember lands");
         let landed = Moving { landed: Some(9), ..Moving::default() };
         assert_eq!(landed.paint(9, mark.clone()).bg, Some(C::FocusBack));
         let pulse = |through| Moving { pulse: Some((3, through)), ..Moving::default() }.paint(3, mark.clone());
