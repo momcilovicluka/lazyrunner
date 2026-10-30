@@ -772,6 +772,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_pinned_test_is_all_a_save_runs_and_pinning_it_again_stops() {
+        let temp = TempDir::new("suites-pin");
+        let (mut sample, mut events) = controller(&temp);
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        sample.pin_watch("npm:cart", "nothing like it");
+        assert!(log(&sample).ends_with("r runs it once"), "{}", log(&sample));
+        sample.pin_watch("npm:cart", "rounds");
+        assert_eq!(sample.test_watch.pinned.get("npm:cart").map(String::as_str), Some("rounds"));
+        let saved = std::time::Instant::now();
+        sample.test_file_saved(&temp.join("cart").join("cart.test.js"), false, saved);
+        sample.tick_test_watch(saved + super::super::test_watch::QUIET);
+        assert_eq!(log(&sample).lines().last(), Some("Running 1 test: rounds"), "{}", log(&sample));
+        assert_eq!(sample.suite("npm:cart").unwrap().rerun, ["rounds"]);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        sample.toggle_watch(&keys(&["cart"]));
+        assert!(
+            sample.test_watch.pinned.is_empty() && sample.test_watch.suites.contains("npm:cart"),
+            "a on the suite: all of it"
+        );
+        sample.pin_watch("npm:cart", "rounds");
+        sample.pin_watch("npm:cart", "rounds");
+        assert!(sample.test_watch.suites.is_empty(), "pinning it again stops watching");
+    }
+
+    #[tokio::test]
     async fn a_watched_red_suite_runs_its_failed_tests_on_a_save_then_all_of_it() {
         let temp = TempDir::new("suites-watch");
         let (mut sample, mut events) = controller(&temp);
