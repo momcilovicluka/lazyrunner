@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.46.0] - 2026-10-30
+
+### Added
+- `p` (the `x` menu, the palette): run the focused app on another launch profile - a .NET app's, with their URLs - or npm variant. `Enter` restarts it on the one picked, remembered for this branch in lazyrunner's state (not the shared profile); its column's title says so (`Orders · Orders-Https`), its port follows, and picking the profile's own forgets the choice (#50)
+
 ## [1.45.0] - 2026-10-30
 
 ### Added

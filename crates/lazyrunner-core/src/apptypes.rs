@@ -209,6 +209,32 @@ pub fn launch_profile(root: &Path, app: &App) -> Option<(PathBuf, String, Value)
     Some((file, name.clone(), profile.clone()))
 }
 
+/// A .NET app's launch profiles `dotnet run` can run (`"commandName": "Project"`), with their first URL.
+pub fn launch_profiles(root: &Path, app: &App) -> Vec<(String, Option<String>)> {
+    let AppKind::Dotnet { project, .. } = &app.kind else { return Vec::new() };
+    let Some(settings) = json::read(&root.join(launch_settings_path(project))) else { return Vec::new() };
+    let Some(profiles) = field(&settings, "profiles").as_object() else { return Vec::new() };
+    profiles
+        .iter()
+        .filter(|(_, profile)| {
+            let command = json::text(field(profile, "commandName"));
+            command.is_empty() || command.eq_ignore_ascii_case("project")
+        })
+        .map(|(name, profile)| {
+            let url = field(profile, "applicationUrl").as_str().map(|urls| urls.split(';').next().unwrap_or_default());
+            (name.clone(), url.map(str::to_string))
+        })
+        .collect()
+}
+
+/// An npm app's variants whose script its package.json has in this checkout.
+pub fn available_variants(root: &Path, app: &App) -> Vec<Variant> {
+    let AppKind::Npm { dir, variants } = &app.kind else { return Vec::new() };
+    let Some(package) = json::read(&root.join(package_path(dir))) else { return Vec::new() };
+    let scripts = scripts_of(&package);
+    variants.iter().filter(|variant| has_key_ci(&scripts, &variant.script)).cloned().collect()
+}
+
 /// The port an app listens on in this checkout.
 pub fn port(root: &Path, app: &App, active: &[App]) -> Option<u16> {
     match &app.kind {

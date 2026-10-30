@@ -374,6 +374,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         },
         Some(Overlay::Marks { .. }) => super::marks::key(ui, controller, name, key),
         Some(Overlay::Sheet { .. }) => super::sheet::key(ui, controller, name),
+        Some(Overlay::Launch { .. }) => super::launch::key(ui, controller, name),
         Some(Overlay::Durations { top }) => match name {
             "Escape" | "q" | "D" => ui.overlay = None,
             _ => scroll_box(top, name),
@@ -646,6 +647,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::NextMark => super::marks::jump(ui, controller, false),
         Run::Marks => super::marks::open(ui),
         Run::Sheet => super::sheet::open(ui, controller),
+        Run::Launch => super::launch::open(ui, controller),
         Run::LevelFilter => {
             let Some(state) = controller.states.get(ui.focus) else { return };
             let (key, filter) = (state.key.clone(), state.filter.next());

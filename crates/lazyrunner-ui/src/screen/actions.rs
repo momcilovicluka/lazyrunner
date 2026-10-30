@@ -47,6 +47,7 @@ pub enum Run {
     NextMark,
     Marks,
     Sheet,
+    Launch,
     Widen,
     Narrow,
     EqualWidths,
@@ -154,6 +155,9 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Tools", "W", "Open everything in the browser", "every Swagger and npm app", Run::OpenAll).safe(),
         action("Tools", "o", "Open the focused app's log file", "its full output", Run::OpenLog).safe().focused(),
         action("Tools", "e", "Start sheet: what the focused app is started with", "", Run::Sheet).safe().focused(),
+        action("Tools", "p", "Run the focused app on another launch profile or npm variant", "", Run::Launch)
+            .safe()
+            .focused(),
         action(
             "Tools",
             "y",

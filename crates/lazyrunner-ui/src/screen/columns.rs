@@ -256,7 +256,11 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     } else {
         (C::Black, tone)
     };
-    let mut segs = vec![on(format!(" {marker}{icon} {} ", app.name), chip_fg, chip_bg)];
+    let name = match controller.launch_choice(&app.key) {
+        Some(choice) => format!("{} · {choice}", app.name),
+        None => app.name.clone(),
+    };
+    let mut segs = vec![on(format!(" {marker}{icon} {name} "), chip_fg, chip_bg)];
     segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
     segs.extend(status(ui, controller, index));
     let mut segs = ui.scrolling_row(segs, 2, cells);

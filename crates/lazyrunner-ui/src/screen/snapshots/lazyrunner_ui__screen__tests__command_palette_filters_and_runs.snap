@@ -4,7 +4,7 @@ expression: screen.frame()
 ---
 
   ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ › rest▏                                                                                    46 commands │
+  │ › rest▏                                                                                    47 commands │
   │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  ◆  Restart Orders  rebuild if it changed                                                          r   │
   │  ▸  Restart all  rebuild if anything changed                                                       R   │
@@ -18,9 +18,9 @@ expression: screen.frame()
   │  ◧  Marks: every column's, to jump to                                                              '   │
   │  ≡  [x] Startup checklist when lazyrunner opens                                                ,   w   │
   │  ◆  Open Orders in the browser  Swagger for an API                                                 w   │
+  │  ◆  Run Orders on another launch profile or npm variant                                            p   │
   │  ≡  [ ] L opens the git tool beside lazyrunner (Windows Terminal)                              ,   g   │
   │  ◆  Start sheet: what Orders is started with                                                       e   │
-  │  ◆  Search Orders' output  n older match, N newer                                                  /   │
   │ type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 

@@ -14,6 +14,7 @@ pub mod held;
 pub mod icons;
 pub mod jumps;
 pub mod keys;
+pub mod launch;
 pub mod links;
 pub mod marks;
 pub mod migrations;
@@ -145,6 +146,11 @@ pub enum Overlay {
         /// The note being written for the selected mark (`a`).
         note: Option<String>,
     },
+    /// `x` then `p`: what an app runs on (its launch profiles, its npm variants); the selected one.
+    Launch {
+        app: usize,
+        index: usize,
+    },
     /// `x` then `e`: what an app is started with; the selected secret, and when Space showed it.
     Sheet {
         app: usize,
@@ -199,6 +205,7 @@ impl Overlay {
             Self::Durations { .. } => "durations",
             Self::Marks { .. } => "marks",
             Self::Sheet { .. } => "sheet",
+            Self::Launch { .. } => "launch",
             Self::Tests { .. } => "tests",
             Self::Requests(_) => "requests",
             Self::Install { .. } => "install",
@@ -638,6 +645,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
         Some(Overlay::Marks { .. }) => return marks::rows(ui, controller, width, rows),
         Some(Overlay::Sheet { .. }) => return sheet::rows(ui, controller, width, rows),
+        Some(Overlay::Launch { .. }) => return launch::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
         Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),
