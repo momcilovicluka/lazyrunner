@@ -83,6 +83,7 @@ pub fn add(
     let now = Now {
         narrow: cells == 1,
         errors: state.errors,
+        dropped: state.output.total().saturating_sub(state.output.len() as u64),
         scroll,
         matched,
         error_row: marks.iter().rposition(|(mark, _)| *mark == Mark::Error),

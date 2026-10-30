@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.44.0] - 2026-10-30
+
+### Added
+- The rail's top end dims while an app's buffer drops its oldest lines, so the rescaling map reads as that end moving; it clears a moment after the last one (not with reduced motion)
+
+### Fixed
+- A rail showing for the first time no longer counts what the column had before as new: no ember for an old error, no dimming for lines dropped earlier (#69)
+
 ## [1.43.0] - 2026-10-30
 
 ### Added
