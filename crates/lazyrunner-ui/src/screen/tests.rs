@@ -2365,6 +2365,11 @@ async fn a_spinner_of_your_own_spins_where_lazyrunners_would() {
     assert!(screen.ui.spinner.custom);
     assert_eq!(super::columns::spinner(&screen.ui), ["◐", "◓", "◑", "◒"][(10_000 / 50) % 4]);
 
+    screen.controller.states[0].status = lazyrunner_core::run::app::Status::Running;
+    screen.press("z");
+    let frame = screen.frame();
+    assert!(frame.contains("◐ starting") || frame.contains("◐ compiling"), "starting spins it too: {frame}");
+
     screen.controller.config["spinner"] = json!({ "frames": [] });
     super::spinner::refresh(&mut screen.ui, &mut screen.controller);
     assert!(screen.last_log().contains("using lazyrunner's own"), "{}", screen.last_log());

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.41.1] - 2026-10-30
+
+### Fixed
+- A spinner of your own spins while an app starts too (`starting`, `compiling` in its title), where lazyrunner's blinking dot was (#70, thanks @ognjen004028)
+
 ## [1.41.0] - 2026-10-29
 
 ### Added
