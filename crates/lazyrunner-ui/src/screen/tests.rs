@@ -2412,11 +2412,36 @@ async fn the_rail_maps_where_the_errors_are_and_a_click_jumps_there() {
         .iter()
         .filter(|hit| matches!(hit.target, Target::Rail { column: 0, .. }))
         .min_by_key(|hit| hit.y)
-        .map(|hit| (hit.x, hit.y))
+        .map(|hit| (hit.x, hit.y, hit.target))
         .expect("a rail");
+    screen.ui.hover = Some(top.2);
+    let hovered = screen.frame();
+    assert!(hovered.contains(" fail: boom "), "the pointer on it previews the error: {hovered}");
+    screen.ui.hover = None;
     screen.click_at(top.0, top.1);
     assert!(screen.controller.states[0].scroll > 300, "{}", screen.controller.states[0].scroll);
     assert!(screen.frame().contains("fail: boom"), "{}", screen.frame());
+
+    let bottom = screen
+        .ui
+        .hits
+        .iter()
+        .filter(|hit| matches!(hit.target, Target::Rail { column: 0, .. }))
+        .max_by_key(|hit| hit.y)
+        .map(|hit| (hit.x, hit.y))
+        .expect("a rail");
+    let drag = crossterm::event::MouseEvent {
+        kind: crossterm::event::MouseEventKind::Drag(crossterm::event::MouseButton::Left),
+        column: bottom.0,
+        row: bottom.1,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert!(mouse::wanted(&drag) && mouse::handle(&mut screen.ui, &mut screen.controller, drag));
+    assert!(
+        screen.controller.states[0].scroll < 20,
+        "dragged down to the newest: {}",
+        screen.controller.states[0].scroll
+    );
 }
 
 #[tokio::test]
