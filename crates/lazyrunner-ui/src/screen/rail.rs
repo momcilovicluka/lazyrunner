@@ -2,7 +2,8 @@
 //! warnings yellow, search matches cyan, marks magenta, the rest dim ticks - with a bracket on the lines on screen.
 //! Each row stands for an equal share of the lines and takes the colour of the most serious one in it; a click on a
 //! row brings that line to the middle of the column, a drag along it scrolls, and the pointer on a row previews that
-//! line over the column, in its own colours. A narrow column gets the map alone, the lines on screen lit in it.
+//! line over the column, in its own colours. A narrow column gets the map alone, the lines on screen lit in it. What
+//! moves on it is in `rail_motion`.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -12,6 +13,7 @@ use lazyrunner_core::run::app::AppState;
 
 use super::columns::{self, Shown};
 use super::mouse::Target;
+use super::rail_motion::{self, Now};
 use super::seg::{self, Seg, on, seg};
 use super::theme::C;
 use super::{Search, Ui};
@@ -76,6 +78,20 @@ pub fn add(
     let bottom = (newest_shown * height).div_ceil(total).clamp(thumb, height); // at the top it keeps its size
     let top = bottom.saturating_sub(thumb);
     let bracket = if scroll > 0 { C::Cyan } else { C::DarkGray };
+    let matched = search.and_then(|search| search.index);
+    let match_at = matched.and_then(|position| list.iter().position(|item| item.position == position));
+    let now = Now {
+        narrow: cells == 1,
+        errors: state.errors,
+        scroll,
+        matched,
+        error_row: marks.iter().rposition(|(mark, _)| *mark == Mark::Error),
+        match_row: match_at.map(|at| at * height / total),
+        top,
+        bottom,
+        height,
+    };
+    let moving = rail_motion::moving(ui, &state.key, now);
     for (at, row) in rows.iter_mut().enumerate() {
         let (mark, line) = marks[at];
         let position = list.get(line).map_or(0, |item| item.position);
@@ -90,7 +106,7 @@ pub fn add(
                 _ if at + 1 == bottom => "╰",
                 _ => "│",
             };
-            row.push(seg(edge, bracket).at(target));
+            row.push(moving.paint_edge(at, seg(edge, bracket)).at(target));
         }
         let cell = match mark {
             Mark::Error => seg("█", C::Red),
@@ -101,7 +117,7 @@ pub fn add(
             Mark::Normal => seg("╎", C::DarkGray),
             Mark::Empty => seg(" ", C::Gray),
         };
-        row.push(cell.at(target));
+        row.push(moving.paint(at, cell).at(target));
     }
 }
 
