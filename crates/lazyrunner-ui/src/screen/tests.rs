@@ -1450,7 +1450,14 @@ async fn the_tests_view_looks_for_suites_in_the_background_and_says_when_there_a
     let mut screen = screen("tests-none", json!({}));
     screen.press("T");
     assert!(screen.frame().contains("Looking for tests…"));
-    let event = tokio::time::timeout(Duration::from_secs(30), screen.events.recv()).await.unwrap().unwrap();
+    let found = async {
+        loop {
+            if let Some(event @ Event::Suites(_)) = screen.events.recv().await {
+                return event;
+            }
+        }
+    };
+    let event = tokio::time::timeout(Duration::from_secs(30), found).await.expect("the suites, found");
     screen.controller.handle(event);
     assert!(screen.frame().contains("No test suites in this project."));
     assert!(screen.last_log().starts_with("No tests found: .NET projects referencing Microsoft.NET.Test.Sdk"));

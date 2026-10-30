@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.49.0] - 2026-10-30
+
+### Added
+- A watched suite (or its pinned test) that turns red, or green again, gets a desktop notification: `Cart.Tests fails now` / `adds_the_new_item in Cart.Tests passes again`. A run that stays the same colour notifies nothing, and a red suite whose failed tests pass is only green once all of it has run (#40)
+
 ## [1.48.0] - 2026-10-30
 
 ### Added
