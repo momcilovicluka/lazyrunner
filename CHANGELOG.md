@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.42.0] - 2026-10-30
+
+### Added
+- The rail previews and drags: the pointer on a row of a column's rail shows the line a click there brings into view, over the column in the line's own colour, and a drag along the rail scrolls the column as it goes (#69)
+
 ## [1.41.2] - 2026-10-30
 
 ### Fixed

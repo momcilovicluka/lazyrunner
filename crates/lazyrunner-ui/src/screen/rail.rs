@@ -1,7 +1,8 @@
 //! The rail beside a column's output, in place of a scrollbar: a map of every line the column shows - errors red,
 //! warnings yellow, search matches cyan, marks magenta, the rest dim ticks - with a bracket on the lines on screen.
 //! Each row stands for an equal share of the lines and takes the colour of the most serious one in it; a click on a
-//! row brings that line to the middle of the column. A narrow column gets the map alone, the lines on screen lit in it.
+//! row brings that line to the middle of the column, a drag along it scrolls, and the pointer on a row previews that
+//! line over the column, in its own colours. A narrow column gets the map alone, the lines on screen lit in it.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -9,9 +10,9 @@ use std::collections::HashMap;
 use lazyrunner_core::output::{Level, LevelFilter};
 use lazyrunner_core::run::app::AppState;
 
-use super::columns::Shown;
+use super::columns::{self, Shown};
 use super::mouse::Target;
-use super::seg::{Seg, seg};
+use super::seg::{self, Seg, on, seg};
 use super::theme::C;
 use super::{Search, Ui};
 
@@ -77,7 +78,8 @@ pub fn add(
     let bracket = if scroll > 0 { C::Cyan } else { C::DarkGray };
     for (at, row) in rows.iter_mut().enumerate() {
         let (mark, line) = marks[at];
-        let target = Target::Rail { column: index, scroll: jump(line, height, total) };
+        let position = list.get(line).map_or(0, |item| item.position);
+        let target = Target::Rail { column: index, row: at, scroll: jump(line, height, total), line: position };
         let seen = (top..bottom).contains(&at);
         if cells > 1 {
             let edge = match at {
@@ -101,6 +103,19 @@ pub fn add(
         };
         row.push(cell.at(target));
     }
+}
+
+/// While the pointer is on a row of app `index`'s rail: the line that row brings into view, over the column's row
+/// beside it (`cells` wide, before the rail's `rail` cells), in the line's own colour.
+pub fn preview(ui: &Ui, state: &AppState, index: usize, rows: &mut [Vec<Seg>], cells: usize, rail: usize) {
+    let Some(Target::Rail { column, row, line, .. }) = ui.hover else { return };
+    let Some(found) = rows.get_mut(row).filter(|_| column == index) else { return };
+    let back = state.output.len().saturating_sub(line + 1);
+    let Some(shown) = state.output.newest_first(back).next() else { return };
+    let edge = found.split_off(found.len().saturating_sub(rail));
+    let text = seg::ellipsis(&format!(" {} ", shown.text.trim()), cells);
+    *found = vec![on(text, C::Black, columns::line_color(shown))];
+    found.extend(edge);
 }
 
 /// Where a click scrolls to: line `line` of `total` (0 = the oldest) in the middle of the column.

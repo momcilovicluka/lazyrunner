@@ -41,8 +41,9 @@ pub enum Target {
     News(super::jumps::View),
     /// A migration of the context selected in the migrations view, by its place in that list (newest first).
     Migration(usize),
-    /// A row of a column's rail: the column, and where a click scrolls it to (lines back from the newest).
-    Rail { column: usize, scroll: usize },
+    /// A row of a column's rail: the column, the row, where a click scrolls it to (lines back from the newest), and
+    /// the line it brings into view (0 = the oldest kept), which the pointer on it previews.
+    Rail { column: usize, row: usize, scroll: usize, line: usize },
     /// A diagnostics zip's path in the log (in `Ui::links`): a click shows it in its folder.
     Reveal(usize),
 }
@@ -62,12 +63,13 @@ impl Hit {
     }
 }
 
-/// The mouse events lazyrunner acts on: clicks, the wheel, and moves (for what the pointer is over); drags and
-/// releases are dropped before anything redraws.
+/// The mouse events lazyrunner acts on: clicks, the wheel, moves (for what the pointer is over) and drags (along a
+/// rail); releases are dropped before anything redraws.
 pub fn wanted(event: &MouseEvent) -> bool {
     matches!(
         event.kind,
         MouseEventKind::Down(MouseButton::Left)
+            | MouseEventKind::Drag(MouseButton::Left)
             | MouseEventKind::ScrollUp
             | MouseEventKind::ScrollDown
             | MouseEventKind::Moved
@@ -108,9 +110,23 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, event: MouseEvent) -> bo
                 ui.last_click = None; // a box opened or closed: the next click is on what is there now
             }
         }
+        // A drag along a rail scrolls the column as it goes (the line the pointer is on previews).
+        MouseEventKind::Drag(MouseButton::Left) => {
+            let Some(Target::Rail { column, scroll, .. }) = target else { return false };
+            ui.hover = target;
+            to_rail(ui, controller, column, scroll);
+        }
         _ => return false,
     }
     true
+}
+
+/// A click or a drag on a column's rail: the column has the focus and scrolls there.
+fn to_rail(ui: &mut Ui, controller: &mut Controller, column: usize, scroll: usize) {
+    ui.focus = column;
+    if let Some(state) = controller.states.get_mut(column) {
+        state.scroll = scroll;
+    }
 }
 
 fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool, modified: bool) {
@@ -166,12 +182,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
             }
         }
         Some(Target::Output(index)) => ui.focus = index,
-        Some(Target::Rail { column, scroll }) => {
-            ui.focus = column;
-            if let Some(state) = controller.states.get_mut(column) {
-                state.scroll = scroll;
-            }
-        }
+        Some(Target::Rail { column, scroll, .. }) => to_rail(ui, controller, column, scroll),
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
         Some(Target::Reveal(link)) => {

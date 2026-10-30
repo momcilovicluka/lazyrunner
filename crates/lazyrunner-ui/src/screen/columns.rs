@@ -660,6 +660,7 @@ fn body(
     result.reverse();
     if rail > 0 {
         super::rail::add(ui, state, index, &list, search, &mut result, scroll, rail);
+        super::rail::preview(ui, state, index, &mut result, cells, rail);
     }
     if filtered {
         let hidden = total - shown;
