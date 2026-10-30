@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.44.1] - 2026-10-30
+
+### Fixed
+- `G`'s shimmer on the rail starts from where the view was as the view glides home, runs down the map to where the bracket starts, then down the bracket to its `▼`; it started only once the glide had ended, from next to the `▼`, so a long log showed just its last row (#69)
+
 ## [1.44.0] - 2026-10-30
 
 ### Added

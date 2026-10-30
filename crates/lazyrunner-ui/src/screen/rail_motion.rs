@@ -1,7 +1,7 @@
 //! The rail's motion: an ember from the bracket to the mark of a new error that lands off-screen - the mark waits, dim,
 //! until the ember eases into it, then settles in (a burst sends one, at most one every 750 ms, its tail longer for
-//! each error it carries) - one shimmer as `G` snaps the view back to live, down the map from where the view was to the
-//! bottom, where it hands over to the bracket's `▼` - one pulse, bright then fading, on the row of a search's match
+//! each error it carries) - one shimmer as `G` snaps the view back to live, down the map from where the view was to
+//! where the bracket starts at live, then down the bracket to its `▼`, which glows - one pulse, bright then fading, on the row of a search's match
 //! when the search jumps there, and the rail's top end dim while the buffer drops its oldest lines (the map rescales;
 //! the dim says that end is moving). In the theme's focus colour, which every theme sets apart from its background.
 //! None with reduced motion; nothing the column had before its rail first showed counts as new.
@@ -42,7 +42,8 @@ struct Column {
     dropped: u64,
     /// When it last dropped one.
     trimmed: Option<Instant>,
-    scroll: usize,
+    /// The scroll its column heads for (the drawn one glides after it).
+    target: usize,
     matched: Option<usize>,
     /// The first row of the bracket: where a shimmer starts from when the view snaps back to live.
     top: usize,
@@ -64,13 +65,16 @@ struct Comet {
 pub struct Effects(RefCell<HashMap<String, Column>>);
 
 /// What a column's rail shows in this frame: its app's errors and the lines its buffer has dropped, how far it's
-/// scrolled back, its search's match, the rows of the newest error's mark and of the match, the rows on screen, the
-/// rail's height, and whether it's the map alone (no bracket).
+/// scrolled back as drawn and the scroll it heads for (`G` sets it at once; the drawn one glides), its search's match,
+/// the rows of the newest error's mark and of the match, the rows on screen, the first row of the bracket once it
+/// follows live output, the rail's height, and whether it's the map alone (no bracket).
 pub struct Now {
+    pub live_top: usize,
     pub narrow: bool,
     pub errors: u64,
     pub dropped: u64,
     pub scroll: usize,
+    pub target: usize,
     pub matched: Option<usize>,
     pub error_row: Option<usize>,
     pub match_row: Option<usize>,
@@ -88,8 +92,11 @@ pub struct Moving {
     landing: Option<usize>,
     /// The row it just landed on: its mark settles in.
     landed: Option<usize>,
-    /// The map's row the shimmer's head is on.
+    /// The map's row the shimmer's head is on, until it reaches where the bracket starts.
     shimmer: Option<usize>,
+    /// The bracket's row it is on from there, and the bracket's first row (its trail stays in the bracket).
+    shimmer_edge: Option<usize>,
+    edge_from: usize,
     /// The bottom row, once the shimmer hands over to the `▼` there.
     live_edge: Option<usize>,
     narrow: bool,
@@ -100,9 +107,13 @@ pub struct Moving {
 }
 
 impl Moving {
-    /// Row `at`'s bracket cell: the `▼` glows as the shimmer hands over to it.
+    /// Row `at`'s bracket cell: the shimmer runs down it to the `▼`, which glows as it arrives.
     pub fn paint_edge(&self, at: usize, edge: Seg) -> Seg {
-        if self.live_edge == Some(at) { on(edge.text, C::FocusText, C::FocusBack) } else { edge }
+        if self.live_edge == Some(at) || self.shimmer_edge == Some(at) {
+            return on(edge.text, C::FocusText, C::FocusBack);
+        }
+        let trail = |head: usize| at >= self.edge_from && at < head && head - at <= SHIMMER_TRAIL;
+        if self.shimmer_edge.is_some_and(trail) { Seg { fg: C::FocusBack, ..edge } } else { edge }
     }
 
     /// Row `at`'s map cell as what moves on it shows it.
@@ -144,11 +155,13 @@ pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
     let seen = std::mem::replace(&mut column.seen, true);
     let new_errors = if seen { now.errors.saturating_sub(column.errors) } else { 0 };
     let dropping = seen && now.dropped > column.dropped;
-    let back_to_live = column.scroll > 0 && now.scroll == 0;
+    // From the moment G (or a click at the bottom) sets it, not when the drawn scroll has glided home: the shimmer
+    // starts from where the bracket was and runs down with the glide.
+    let back_to_live = column.target > 0 && now.target == 0;
     let jumped = seen && now.matched.is_some() && now.matched != column.matched;
     let was_at = column.top;
     (column.errors, column.dropped) = (now.errors, now.dropped);
-    (column.scroll, column.matched, column.top) = (now.scroll, now.matched, now.top);
+    (column.target, column.matched, column.top) = (now.target, now.matched, now.top);
     if ui.reduced_motion {
         (column.comet, column.shimmer, column.pulse, column.trimmed) = (None, None, None, None);
         return Moving::default();
@@ -191,7 +204,12 @@ pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
         let last = now.height.saturating_sub(1);
         if elapsed < SHIMMER {
             let rows = last.saturating_sub(from) as f64;
-            moving.shimmer = Some((from + (rows * ease(through(elapsed, SHIMMER))).round() as usize).min(last));
+            let head = (from + (rows * ease(through(elapsed, SHIMMER))).round() as usize).min(last);
+            if now.narrow || head < now.live_top {
+                moving.shimmer = Some(head);
+            } else {
+                (moving.shimmer_edge, moving.edge_from) = (Some(head), now.live_top);
+            }
         } else if elapsed < SHIMMER + SHIMMER_LAND {
             moving.live_edge = Some(last);
         } else {
@@ -238,6 +256,12 @@ fn embers(comet: &Comet, progress: f64) -> Vec<usize> {
         .collect()
 }
 
+/// The row a column's shimmer started from, while it runs.
+#[cfg(test)]
+pub fn shimmer_from(ui: &Ui, key: &str) -> Option<usize> {
+    ui.rail_motion.0.borrow().get(key)?.shimmer.map(|(_, from)| from)
+}
+
 /// Whether something moves on a rail: frames keep coming until it's done.
 pub fn animating(ui: &Ui) -> bool {
     let now = ui.now;
@@ -282,6 +306,11 @@ mod tests {
         assert_eq!(running.paint(6, tick.clone()).bg, Some(C::FocusBack), "its head");
         assert_eq!(running.paint(5, tick.clone()).fg, C::FocusBack, "its trail");
         assert_eq!(running.paint(3, tick.clone()).fg, C::DarkGray, "behind the trail, as it was");
+        let bracket = Moving { shimmer_edge: Some(7), edge_from: 6, ..Moving::default() };
+        assert_eq!(bracket.paint_edge(7, seg("│", C::DarkGray)).bg, Some(C::FocusBack), "over in the bracket");
+        assert_eq!(bracket.paint_edge(6, seg("╭", C::DarkGray)).fg, C::FocusBack, "its trail stays in the bracket");
+        assert_eq!(bracket.paint_edge(5, seg(" ", C::DarkGray)).fg, C::DarkGray, "not above where it starts");
+        assert_eq!(bracket.paint(7, tick.clone()).bg, None, "the map beside it is as it was");
         let landed = Moving { live_edge: Some(9), ..Moving::default() };
         assert_eq!(landed.paint_edge(9, seg("▼", C::DarkGray)).bg, Some(C::FocusBack), "the ▼ glows");
         assert_eq!(landed.paint(9, tick.clone()).bg, None, "beside it, the map stays");
