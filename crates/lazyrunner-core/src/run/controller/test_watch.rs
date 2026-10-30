@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use super::Controller;
 use crate::output::Hue;
-use crate::run::suites::Runner;
+use crate::run::suites::{Outcome, Runner};
 use crate::run::watcher::{self, CodeWatcher};
 
 /// How long saving has to be quiet before the watched suites run.
@@ -33,6 +33,8 @@ pub struct TestWatch {
     /// Red, their failed tests running: whole next, if those pass.
     then_whole: BTreeSet<String>,
     ran: HashMap<String, Instant>,
+    /// Whether each watched suite (its pinned test, when it has one) was green after its last run: a flip notifies.
+    colors: HashMap<String, bool>,
     /// The npm and Nx suites' folders, watched.
     watchers: Vec<(PathBuf, CodeWatcher)>,
 }
@@ -73,6 +75,7 @@ impl Controller {
         if keys.iter().any(|key| self.test_watch.pinned.contains_key(key)) {
             for key in &keys {
                 self.test_watch.pinned.remove(key);
+                self.test_watch.colors.remove(key);
                 self.test_watch.suites.insert(key.clone());
             }
             let names = self.suite_names(&keys);
@@ -109,6 +112,7 @@ impl Controller {
             self.add_log(format!("{suite_name} has no result for {test} yet - r runs it once"), Hue::DarkGray);
             return;
         }
+        self.test_watch.colors.remove(key);
         if self.test_watch.pinned.get(key).is_some_and(|pinned| pinned == test) {
             self.test_watch.pinned.remove(key);
             self.test_watch.suites.remove(key);
@@ -205,8 +209,11 @@ impl Controller {
     }
 
     /// A suite's run is over: a pinned test that's gone (renamed) stops being watched; a red watched suite whose
-    /// failed tests now pass runs whole.
+    /// failed tests now pass runs whole; one that turned green or red says so in a desktop notification.
     pub(super) fn watched_run_over(&mut self, key: &str) {
+        if !self.test_watch.suites.contains(key) {
+            return;
+        }
         if let Some(test) = self.test_watch.pinned.get(key).cloned()
             && let Some(suite) = self.suite(key)
             && suite.total() > 0
@@ -220,15 +227,48 @@ impl Controller {
                 Hue::Yellow,
             );
             self.update_test_watchers();
-        }
-        if !self.test_watch.then_whole.remove(key) {
             return;
         }
+        let partly = self.test_watch.then_whole.remove(key);
         let Some(suite) = self.suite(key) else { return };
-        if suite.failed == 0 {
+        if partly && suite.failed == 0 {
             let name = suite.name.clone();
             self.add_log(format!("{name}: the failed tests pass - checking the rest"), Hue::Cyan);
             self.run_tests(&[key.to_string()], false);
+            return;
+        }
+        self.notice_flip(key);
+    }
+
+    /// A watched suite (or its pinned test) that turned green or red since its last run: a desktop notification -
+    /// the transition is what's worth one; staying the same colour isn't.
+    fn notice_flip(&mut self, key: &str) {
+        let Some(green) = self.watch_color(key) else { return };
+        let was = self.test_watch.colors.insert(key.to_string(), green);
+        if was.is_none_or(|was| was == green) {
+            return;
+        }
+        let Some(suite) = self.suite(key) else { return };
+        let what = match self.test_watch.pinned.get(key) {
+            Some(test) => format!("{test} in {}", suite.name),
+            None => suite.name.clone(),
+        };
+        let notice = if green {
+            (format!("{what} passes again"), format!("{} passed", suite.passed))
+        } else {
+            (format!("{what} fails now"), format!("{} failed, {} passed", suite.failed, suite.passed))
+        };
+        self.notifications.push(notice);
+    }
+
+    /// Whether a watched suite is green: its pinned test passed, or none of its tests failed; `None` before a result.
+    fn watch_color(&self, key: &str) -> Option<bool> {
+        let suite = self.suite(key)?;
+        match self.test_watch.pinned.get(key) {
+            Some(test) => {
+                suite.tests.iter().find(|known| known.name == *test).map(|known| known.outcome != Outcome::Failed)
+            }
+            None => (suite.total() > 0).then_some(suite.failed == 0),
         }
     }
 
@@ -246,8 +286,18 @@ impl Controller {
         }
     }
 
-    /// The watched npm and Nx suites' folders are watched; no others.
+    /// The watched npm and Nx suites' folders are watched, no others; each watched suite's colour now is the one a
+    /// flip is measured against.
     fn update_test_watchers(&mut self) {
+        let watched: Vec<String> = self.test_watch.suites.iter().cloned().collect();
+        self.test_watch.colors.retain(|key, _| watched.contains(key));
+        for key in watched {
+            if !self.test_watch.colors.contains_key(&key)
+                && let Some(green) = self.watch_color(&key)
+            {
+                self.test_watch.colors.insert(key, green);
+            }
+        }
         let wanted: BTreeSet<PathBuf> = self
             .suites
             .iter()

@@ -787,6 +787,8 @@ mod tests {
         assert_eq!(log(&sample).lines().last(), Some("Running 1 test: rounds"), "{}", log(&sample));
         assert_eq!(sample.suite("npm:cart").unwrap().rerun, ["rounds"]);
         run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        let notices: Vec<String> = sample.notifications.iter().map(|(title, _)| title.clone()).collect();
+        assert!(notices.contains(&"rounds in cart passes again".to_string()), "red to green notifies: {notices:?}");
         sample.toggle_watch(&keys(&["cart"]));
         assert!(
             sample.test_watch.pinned.is_empty() && sample.test_watch.suites.contains("npm:cart"),
@@ -821,6 +823,8 @@ mod tests {
             log(sample).contains("checking the rest") && !sample.tests_active()
         })
         .await;
+        let flips = sample.notifications.iter().filter(|(title, _)| title.contains("again") || title.contains("now"));
+        assert_eq!(flips.count(), 0, "red, then red after all of it ran: nothing to notify");
         sample.toggle_watch(&keys(&["cart"]));
         assert!(log(&sample).ends_with("Stopped watching cart"));
     }
