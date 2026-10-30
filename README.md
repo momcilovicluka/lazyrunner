@@ -455,6 +455,8 @@ comes when something failed. While a suite runs the right side shows its output;
 message and their own stack frames (a place in a file opens in your editor on a click), or its slowest tests when all
 passed. `y` copies the failures, `o` opens the suite's whole log, `s` stops the tests, `Esc` / `q` / `T` close.
 
+**Test watch:** `a` watches the selected suites (a side or an app: all of its), `A` all of them; again unwatches. A watched suite (`◉`) runs again when its code is saved, once saving has been quiet for 400 ms: a green one whole, a red one its failed tests, then, if they pass, whole. .NET suites follow the profile's watch folder, npm and Nx ones their own folder. A running suite is never cancelled - a save during its run runs it again after - and a suite runs at most every 1.5 s. The header and the panel show `◉ WATCH 2` (and `rerun in 0.3s` while a save waits); `s` drops what a save was about to run but keeps the watch. For this session only: lazyrunner never runs tests by itself when it opens.
+
 `l` opens the selected suite's tests (the failed first, then the skipped and the passed) to pick one: `j` `k` choose,
 the right side shows its message and stack, `r` runs just that test (its result joins the suite's), `y` copies it,
 `h` goes back to the suites. A click picks a test, a double click runs it. The

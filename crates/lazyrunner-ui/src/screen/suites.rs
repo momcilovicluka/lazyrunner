@@ -136,6 +136,9 @@ fn untested(controller: &Controller, row: &Row) -> Vec<String> {
         .collect()
 }
 
+/// A watched suite's mark: armed, not running - it holds still.
+const WATCHED: &str = "◉";
+
 /// What a side or app row says: "Backend · dotnet test", "Orders", "Other".
 fn title(controller: &Controller, row: &Row) -> String {
     let suites = controller.suites.as_deref().unwrap_or_default();
@@ -207,6 +210,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         }
         "r" | "Enter" => controller.run_tests(&selected, false),
         "R" => controller.run_tests(&all, false),
+        "a" => controller.toggle_watch(&selected),
+        "A" => controller.toggle_watch(&all),
         "f" => controller.run_tests(&selected, true),
         "F" => controller.run_tests(&all, true),
         "s" if controller.tests_active() => controller.stop_tests(false),
@@ -422,12 +427,26 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
     } else {
         ("not run yet".to_string(), C::DarkGray)
     };
-    let segs = vec![
+    let mut segs = vec![
         on(format!(" {} Tests ", icons::icon(ui.nerd, Icon::Tests)), C::FocusText, C::FocusBack),
         seg(format!("  {count} suite{} · ", if count == 1 { "" } else { "s" }), C::DarkGray),
         seg(summary, color),
     ];
+    segs.extend(watching(ui, controller));
     fit(segs, width)
+}
+
+/// The test watch, when there is one: `◉ WATCH 2`, and while a save waits for the quiet, how soon it runs.
+pub fn watching(ui: &Ui, controller: &Controller) -> Option<Seg> {
+    let watched = controller.test_watch.suites.len();
+    if watched == 0 {
+        return None;
+    }
+    let soon = controller
+        .test_watch
+        .runs_in(ui.now)
+        .map_or(String::new(), |left| format!(" · rerun in {:.1}s", left.as_secs_f64()));
+    Some(seg(format!("   {WATCHED} WATCH {watched}{soon}"), C::Cyan))
 }
 
 fn hint(width: usize, picking: bool) -> Vec<Seg> {
@@ -435,7 +454,7 @@ fn hint(width: usize, picking: bool) -> Vec<Seg> {
         " j k choose a test · r run it · y copy it · f failed again · s stop · h back to the suites"
     } else {
         " j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its \
-         tests · f / F failed again · s stop · o log · y copy failures · Esc back"
+         tests · f / F failed again · a / A watch · s stop · o log · y copy failures · Esc back"
     };
     fit(vec![seg(text, C::DarkGray)], width)
 }
@@ -509,12 +528,19 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let room = width.saturating_sub(summary.chars().count() + 9).max(4);
                 let name = pad(&cut(&suite.name, room), room);
                 let icon = icon(ui, suite.status);
+                let watched = if controller.test_watch.suites.contains(&suite.key) { WATCHED } else { " " };
                 if index == selected {
-                    vec![on(pad(&format!("   ▸ {icon} {name} {summary}"), width), C::FocusText, C::FocusBack)]
+                    let row = format!("  {watched}▸ {icon} {name} {summary}");
+                    vec![on(pad(&row, width), C::FocusText, C::FocusBack)]
                 } else {
                     let color = tone(suite);
                     let name_color = if hovered { C::White } else { C::Gray };
-                    vec![seg(format!("     {icon} "), color), seg(format!("{name} "), name_color), seg(summary, color)]
+                    vec![
+                        seg(format!("   {watched}"), C::Cyan),
+                        seg(format!(" {icon} "), color),
+                        seg(format!("{name} "), name_color),
+                        seg(summary, color),
+                    ]
                 }
             }
             Row::Untested { .. } => {

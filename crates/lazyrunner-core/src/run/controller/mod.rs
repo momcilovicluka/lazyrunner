@@ -11,6 +11,7 @@ mod migrations;
 mod npm_ci;
 mod start;
 mod suites;
+mod test_watch;
 #[cfg(test)]
 mod tests;
 mod watch;
@@ -43,6 +44,7 @@ pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_h
 pub use launch::Choice;
 pub use migrations::{EfJob, Work};
 pub use suites::{TestBuild, Totals};
+pub use test_watch::TestWatch;
 
 /// Entries the panel's log keeps.
 const MAX_LOG_ENTRIES: usize = 200;
@@ -135,6 +137,8 @@ pub struct Controller {
     pub failed_build_errors: HashMap<String, Vec<String>>,
     /// Desktop notifications to show (title, message); the UI takes them and shows them when the setting is on.
     pub notifications: Vec<(String, String)>,
+    /// The test suites watched (a / A in the tests view), and what a save is about to run.
+    pub test_watch: TestWatch,
     /// The launch profile or npm variant chosen for each app on this branch (x then p), when it isn't the profile's.
     launch_chosen: HashMap<String, String>,
     /// The `"hooks"` setting whose problems were said last.
@@ -274,6 +278,7 @@ impl Controller {
             notifications: Vec::new(),
             hooks_said: Value::Null,
             launch_chosen: HashMap::new(),
+            test_watch: TestWatch::default(),
             hooked_update: None,
             git_dir: None,
             pending_branch: None,
@@ -499,7 +504,11 @@ impl Controller {
             }
             Event::Probe { key, generation, result } => self.probe_result(&key, generation, result),
             Event::Metrics(samples) => self.metrics(samples),
-            Event::FileChanged(path) => self.code.changed(path, now),
+            Event::FileChanged(path) => {
+                self.test_file_saved(&path, true, now);
+                self.code.changed(path, now);
+            }
+            Event::TestFileChanged(path) => self.test_file_saved(&path, false, now),
             Event::Suites(found) => self.suites_found(found),
             Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),
         }
@@ -742,6 +751,7 @@ impl Controller {
                 "lines": state.output.total(),
                 "errors": state.errors,
             })).collect::<Vec<_>>(),
+            "watchedTests": self.test_watch.suites,
             "log": self.log.iter().rev().take(20).rev().map(|entry| entry.text.clone()).collect::<Vec<_>>(),
         })
     }

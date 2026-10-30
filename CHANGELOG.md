@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.47.0] - 2026-10-30
+
+### Added
+- Test watch: `a` in the tests view watches the selected suites, `A` all of them. A watched suite (`◉`) runs again when its code is saved, once saving is quiet for 400 ms - a green one whole, a red one its failed tests, then, if they pass, whole. .NET suites follow the profile's watch folder, npm and Nx ones their own. A running suite is never cancelled (a save during its run runs it again after); one log line per batch of saves; `◉ WATCH 2` in the tests view and the panel. For this session only; an agent sees what's watched in `get_status` (#40)
+
 ## [1.46.0] - 2026-10-30
 
 ### Added

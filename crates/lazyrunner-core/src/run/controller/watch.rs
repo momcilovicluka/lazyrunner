@@ -141,6 +141,7 @@ impl Controller {
         }
         self.pump_migrations();
         self.installed_update();
+        self.tick_test_watch(now);
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {

@@ -2583,6 +2583,22 @@ async fn x_then_p_runs_an_app_on_another_launch_profile_and_its_title_says_so() 
 }
 
 #[tokio::test]
+async fn a_in_the_tests_view_watches_the_selected_suites_and_says_so() {
+    let mut screen = screen("test-watch", json!({}));
+    screen.controller.suites = Some(vec![lazyrunner_core::run::suites::Suite::new(
+        "npm:cart",
+        "cart",
+        lazyrunner_core::run::suites::Runner::Npm { dir: screen.temp.join("cart"), vitest: false },
+    )]);
+    screen.press("T a");
+    assert!(screen.controller.test_watch.suites.contains("npm:cart"), "{}", screen.last_log());
+    let frame = screen.frame();
+    assert!(frame.contains("WATCH 1") && frame.contains("◉"), "{frame}");
+    screen.press("A");
+    assert!(screen.controller.test_watch.suites.is_empty(), "A on all of them watched unwatches");
+}
+
+#[tokio::test]
 async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();

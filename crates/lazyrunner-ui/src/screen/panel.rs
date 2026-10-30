@@ -78,6 +78,9 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(seg("   ", C::Gray));
         segs.push(seg(text, color).at(Target::Tests)); // a click opens T
     }
+    if let Some(watching) = super::suites::watching(ui, controller) {
+        segs.push(watching.at(Target::Tests));
+    }
     for chip in super::seen::chips(ui, controller) {
         let target = Target::News(chip.view);
         let popping = ui.motion.lit(&Spot::Hint(format!("new {}", chip.key)), ui.now).is_some();
