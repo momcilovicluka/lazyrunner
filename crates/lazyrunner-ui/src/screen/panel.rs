@@ -92,8 +92,11 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta),
         seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),
         seg(controller.db_label.clone().unwrap_or_else(|| "n/a".into()), C::Yellow),
-        seg(format!("   {}", controller.root.display()), C::DarkGray),
     ]);
+    if let Some(pending) = super::migrations_rail::pending(controller) {
+        segs.push(seg(format!(" ○ {pending}"), C::Yellow)); // migrations pending on it
+    }
+    segs.push(seg(format!("   {}", controller.root.display()), C::DarkGray));
     segs
 }
 

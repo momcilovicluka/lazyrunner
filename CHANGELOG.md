@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.58.0] - 2026-11-02
+
+### Added
+- The migrations rail starts each month with a `┼ Apr 2026` tick - after a gap, how many months on - and each migration shows its day beside it (#39)
+- After a failed migration, the rest of the way to the target stays cracked (`⠅`, red) (#39)
+- A history the database couldn't be read for is drawn dashed, with `◌` nodes and no bead, instead of a bead above the oldest migration (#39)
+- The status bar shows `○ 3` beside the database while migrations are pending on it (#39)
+
 ## [1.57.0] - 2026-11-02
 
 ### Added
