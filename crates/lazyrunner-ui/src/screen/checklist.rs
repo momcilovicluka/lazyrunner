@@ -8,7 +8,8 @@
 //! stale packages, stopping what holds the apps' ports, the database picker, checking again, or copying the commands
 //! that free ports Windows reserved - and `a` runs every safe one in turn (never one that kills a process, needs
 //! admin rights or asks for a pick). At startup a failed check holds the start until it's fixed or `Enter` starts
-//! anyway; once nothing blocks it any more it counts down to the start (`Esc` holds it there).
+//! anyway; once nothing blocks it any more it counts down to the start (`Esc` holds it there). `c` copies it all as
+//! a Markdown report for an issue.
 
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
@@ -54,6 +55,17 @@ impl Fix {
     /// Whether `a` runs it: it kills nothing, needs no admin rights and asks for no pick.
     pub fn safe(&self) -> bool {
         matches!(self, Self::NpmCi(_) | Self::Retry)
+    }
+
+    /// What the fix does, for the report.
+    pub fn advice(&self) -> String {
+        match self {
+            Self::NpmCi(_) => "`npm ci` in the app's folder".into(),
+            Self::FreePorts => "stop what holds the port (`!` in lazyrunner)".into(),
+            Self::Retry => "check again (`r`)".into(),
+            Self::Database => "pick another database (`d`)".into(),
+            Self::Winnat => format!("`{WINNAT}` in an elevated terminal"),
+        }
     }
 
     /// What `f` does, for the footer.
@@ -142,6 +154,8 @@ pub struct Checklist {
     /// When that countdown ends; `Esc` holds it.
     countdown: Option<Instant>,
     held: bool,
+    /// When `c` copied it: its rows flash.
+    pub flashed: Option<Instant>,
 }
 
 /// The channel a lot of checks report on.
@@ -196,6 +210,7 @@ impl Checklist {
             touched: false,
             countdown: None,
             held: false,
+            flashed: None,
         }
     }
 
@@ -584,6 +599,7 @@ impl Checklist {
         let problems = self.items.iter().filter(|item| matches!(item.status, Status::Warn | Status::Fail)).count();
         let blocking = self.items.iter().filter(|item| item.status == Status::Fail).count();
         let fix = self.fix_hint();
+        let report = if fix.is_empty() { " · c copies a report" } else { "" };
         let left = until.map_or(String::new(), |until| {
             format!(" ({} s)", until.saturating_duration_since(now).as_secs_f64().ceil() as u64)
         });
@@ -600,11 +616,11 @@ impl Checklist {
         } else if self.starts() && blocking > 0 {
             format!("{blocking} blocking the start{fix} · Enter starts anyway{retry}")
         } else if self.manual {
-            format!("any key closes{left}{retry}{fix}")
+            format!("any key closes{left}{retry}{fix}{report}")
         } else if !self.news.is_empty() {
             format!("what's new above (, then c shows the whole changelog) - any key continues{left}{retry}{fix}")
         } else if problems > 0 {
-            format!("{problems} to look at - any key continues{left}{retry}{fix}")
+            format!("{problems} to look at - any key continues{left}{retry}{fix}{report}")
         } else {
             "all good - starting…".into()
         };
@@ -764,6 +780,7 @@ impl Checklist {
             touched: false,
             countdown: None,
             held: false,
+            flashed: None,
         }
     }
 }
@@ -872,7 +889,7 @@ mod tests {
         list.manual = true;
         let now = Instant::now();
         assert!(!list.update(now, &mut controller), "holding, with the problem");
-        assert_eq!(list.footer, "any key closes · r retries git");
+        assert_eq!(list.footer, "any key closes · r retries git · c copies a report");
         assert!(list.retry(&mut controller));
         assert_eq!((list.items[0].status, list.items[1].status), (Status::Ok, Status::Pending));
         assert_eq!(controller.log.back().unwrap().text, "Checking again: git");
@@ -883,7 +900,10 @@ mod tests {
         }
         list.update(Instant::now(), &mut controller);
         assert_eq!(list.items[1].status, Status::Ok, "git is there: {}", list.items[1].detail);
-        assert_eq!(list.footer, "any key closes (60 s)", "nothing left to retry: it closes by itself again");
+        assert_eq!(
+            list.footer, "any key closes (60 s) · c copies a report",
+            "nothing left to retry: it closes by itself again"
+        );
         assert!(!list.retry(&mut controller));
     }
 

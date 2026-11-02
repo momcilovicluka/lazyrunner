@@ -361,7 +361,9 @@ a red edge and a warning an amber one. It fixes what it can: `j` / `k` pick a ch
 
 A fix that worked turns its edge green with a flash; one that didn't pulses red. At startup a failed check holds the
 start until it's fixed or `Enter` starts anyway, and once nothing blocks it any more it counts down - `starting in 3 s`
-- to the start; `Esc` holds it there.
+- to the start; `Esc` holds it there. `c` copies it all as a Markdown report for an issue - lazyrunner's version, the
+project and its apps with their ports and folders, each check's result and time, and what fixes the problems, with
+secrets masked as in the diagnostics zip.
 
 ## Database picker (`d`)
 

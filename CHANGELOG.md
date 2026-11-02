@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.63.0] - 2026-11-02
+
+### Added
+- `c` in the startup checklist copies it as a Markdown report for an issue: lazyrunner's version, the project and its apps with their ports and folders, each check's result and time, and what fixes the problems, secrets masked as in the diagnostics zip (#37)
+
 ## [1.62.0] - 2026-11-02
 
 ### Added
