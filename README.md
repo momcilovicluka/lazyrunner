@@ -367,8 +367,9 @@ install JesseDuffield.lazygit`, `scoop install lazygit`).
 ## Migrations (`M`)
 
 `M` shows the DbContexts on the left and the selected one's migrations on the right as a rail, oldest at the top:
-applied (`●`), pending (`○`), dated from their ids with a gap where months pass and the older ones folded once they
-don't fit - and the database as a bead on the rail, **database is here**, as the database the app uses has them. `dotnet ef` (`dotnet tool install --global dotnet-ef`) runs with the app's project as the startup project,
+applied (`●`), pending (`○`), a `┼ Apr 2026` tick where each month starts (with how many months on, after a gap)
+and each migration's day beside it, the older ones folded once they don't fit - and the database as a bead on the
+rail, **database is here**, as the database the app uses has them. `dotnet ef` (`dotnet tool install --global dotnet-ef`) runs with the app's project as the startup project,
 its Development settings - so the database you picked with `d` - and its last build (`b` rebuilds it); in the
 background, one job at a time, waiting while an app builds.
 
@@ -397,7 +398,9 @@ likely drops what it added (its name starts with Add or Create) - the confirmati
 works the bead travels the rail as it reports each migration done - a hop at a time, faster when several finish at
 once - and breathes while it works; each node it reaches fills (or empties, going back) with a glint, the list shows
 `▰▰▱▱ 2/4`, a shimmer runs along the stretch once it's done, and where one fails the bead pulses red and the node
-says why. With reduced motion the bead steps and nothing flows.
+says why, the rest of the way to the target left cracked (`⠅`). A history the database couldn't be read for is drawn
+dashed, with `◌` nodes and no bead. With reduced motion the bead steps and nothing flows. Outside `M`, the status
+bar shows `○ 3` beside the database while migrations are pending on it.
 
 ## Requests (`H`)
 

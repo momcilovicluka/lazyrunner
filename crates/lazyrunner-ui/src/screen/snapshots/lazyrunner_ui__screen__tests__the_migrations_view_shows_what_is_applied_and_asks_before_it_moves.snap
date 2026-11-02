@@ -8,12 +8,12 @@ expression: screen.frame()
  ▸ ◌ ShopDbContext        1 pending │ ShopDbContext   Orders · Data.csproj
                                     │ 2 applied · 1 pending · checked 09:41:07 on ShopLocal
                                     │
-                                    │ ⡇ ● 1 Jan 2026  Init
-                                    │ ⡧ ● 1 Feb       Orders  ◂ database is here · ShopLocal @ localhost
-                                    │ ⡇ ○ 1 Mar       Invoices
-                                    │
-                                    │
-                                    │
+                                    │ ┼  Jan 2026
+                                    │ ⡇ ●  1  Init
+                                    │ ┼  Feb 2026
+                                    │ ⡧ ●  1  Orders  ◂ database is here · ShopLocal @ localhost
+                                    │ ┼  Mar 2026
+                                    │ ⡇ ○  1  Invoices
                                     │
                                     │
                                     │
@@ -26,5 +26,5 @@ expression: screen.frame()
                                     │
                                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
- lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost ○ 1   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

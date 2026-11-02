@@ -1,21 +1,23 @@
-//! The migrations view's rail: the selected context's migrations oldest at the top - `●` applied, `○` pending, dated
-//! from their ids with a gap row where months pass, the older ones folded once they don't fit - and the database as a
-//! bead on the rail, labelled where it is. Choosing a target lights the stretch between them: green with dashes flowing
-//! down to apply, amber flowing up to revert (`⚠` on what reverting likely loses). While `dotnet ef` moves it, the
-//! bead glides a node a hop as EF reports each migration done - in turn, faster once several wait - breathes while it
-//! works, fills (or empties) each node it reaches with a glint, and pulses red where it fails; once done, a shimmer
-//! runs along the stretch it travelled. With reduced motion the bead steps and nothing flows.
+//! The migrations view's rail: the selected context's migrations oldest at the top - `●` applied, `○` pending, a
+//! `┼ Apr 2026` tick where each month starts (how many months on, after a gap) and each one's day, the older ones
+//! folded once they don't fit - and the database as a bead on the rail, labelled where it is. Choosing a target
+//! lights the stretch between them: green with dashes flowing down to apply, amber flowing up to revert (`⚠` on what
+//! reverting likely loses). While `dotnet ef` moves it, the bead glides a node a hop as EF reports each migration done -
+//! in turn, faster once several wait - breathes while it works, fills (or empties) each node it reaches with a
+//! glint, and pulses red where it fails, the rest of the way left cracked; once done, a shimmer runs along the stretch
+//! it travelled. A history the database couldn't be read for is drawn dashed, with no bead. With reduced motion the
+//! bead steps and nothing flows.
 
 use std::time::{Duration, Instant};
 
 use chrono::{Datelike, NaiveDate};
 use lazyrunner_core::run::Controller;
-use lazyrunner_core::run::migrations::{Context, Migration, Run};
+use lazyrunner_core::run::migrations::{Context, Migration, Run, Status};
 
 use super::columns::fit;
 use super::motion::ease;
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, pad, seg};
+use super::seg::{Seg, aim, on, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -38,9 +40,11 @@ const FLOW: Duration = Duration::from_millis(90);
 const BAR_CELLS: usize = 4;
 /// A migration whose name starts with one of these likely drops what it added when it's reverted.
 const DROPS_WHEN_REVERTED: [&str; 2] = ["Add", "Create"];
-/// The rail's braille: its line (the left column of dots), a row's four dots on the left, and the bead's (both).
+/// The rail's braille: its line (the left column of dots), the same dashed (an unreadable history, a failed run's
+/// crack), a row's four dots on the left, and the bead's (both).
 const BRAILLE: u32 = 0x2800;
 const RAIL: u32 = 0x47;
+const DASHED: u32 = 0x05;
 const LEFT: [u32; 4] = [0x01, 0x02, 0x04, 0x40];
 const BOTH: [u32; 4] = [0x09, 0x12, 0x24, 0xC0];
 
@@ -61,6 +65,18 @@ pub fn risky(migration: &Migration) -> bool {
     DROPS_WHEN_REVERTED.iter().any(|start| {
         migration.name.strip_prefix(start).is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_uppercase()))
     })
+}
+
+/// The migrations pending on the database, across the contexts checked on it (for the status bar); `None`: none.
+pub fn pending(controller: &Controller) -> Option<usize> {
+    let pending: usize = controller
+        .contexts
+        .iter()
+        .flatten()
+        .filter(|context| context.status == Status::Ok && context.known())
+        .map(|context| context.pending().len())
+        .sum();
+    (pending > 0).then_some(pending)
 }
 
 /// When each hop of the bead plays: in turn, from when EF said that migration was done or the hop before ended, a
@@ -129,37 +145,29 @@ fn month(date: NaiveDate) -> i32 {
     date.year() * 12 + date.month0() as i32
 }
 
-/// Each migration's date as the rail says it: `12 Apr`, with the year on the first one and where it changes.
-fn dates(items: &[Migration]) -> Vec<String> {
-    let mut year = None;
-    items
-        .iter()
-        .map(|item| {
-            let Some(date) = date(&item.id) else { return String::new() };
-            let format = if year == Some(date.year()) { "%-d %b" } else { "%-d %b %Y" };
-            year = Some(date.year());
-            date.format(format).to_string()
-        })
-        .collect()
+/// A month's tick: `Apr 2026`, and after a gap how many months on.
+fn tick(month: i32, after: i32) -> String {
+    let start = NaiveDate::from_ymd_opt(month.div_euclid(12), month.rem_euclid(12) as u32 + 1, 1);
+    let name = start.map_or(String::new(), |start| start.format("%b %Y").to_string());
+    if after >= 2 { format!(" {name}  · {after} months later") } else { format!(" {name}") }
 }
 
-/// A row of the rail: a migration, the months that passed between two (two or more), or the older ones folded (how
-/// many, whether all applied).
+/// A row of the rail: a migration, a month's tick (the month as `year * 12 + month0`, and how many months on from
+/// the one before: 0 the first), or the older ones folded (how many, whether all applied).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
     Node(usize),
-    Gap(i32),
+    Tick(i32, i32),
     Fold(usize, bool),
 }
 
 fn layout(items: &[Migration]) -> Vec<Row> {
-    let mut rows = Vec::with_capacity(items.len());
+    let mut rows = Vec::with_capacity(items.len() * 2);
+    let mut before: Option<i32> = None;
     for (at, item) in items.iter().enumerate() {
-        let before = at.checked_sub(1).and_then(|before| date(&items[before].id)).map(month);
-        if let (Some(before), Some(this)) = (before, date(&item.id).map(month))
-            && this - before >= 2
-        {
-            rows.push(Row::Gap(this - before));
+        if let Some(this) = date(&item.id).map(month).filter(|this| before != Some(*this)) {
+            rows.push(Row::Tick(this, before.map_or(0, |before| this - before)));
+            before = Some(this);
         }
         rows.push(Row::Node(at));
     }
@@ -253,8 +261,8 @@ fn ghost(context: &Context, to: usize) -> Option<Ghost> {
 
 /// What the rail shows besides the migrations as checked.
 struct Scene {
-    /// Where the bead is (a place on the rail), its colour, and what it says.
-    bead: f64,
+    /// Where the bead is (a place on the rail; none while the history is unknown), its colour, and what it says.
+    bead: Option<f64>,
     bead_color: C,
     label: String,
     label_color: C,
@@ -262,18 +270,19 @@ struct Scene {
     filled: Vec<(usize, bool)>,
     glint: Vec<usize>,
     ghost: Option<Ghost>,
-    /// The node a run failed on, and why.
+    /// The node a run failed on, and why; the way from it to the target, cracked.
     failed: Option<(usize, String)>,
+    crack: Option<(f64, f64)>,
     /// The finish shimmer: the stretch it runs along, and its head.
     shimmer: Option<(f64, f64, f64)>,
 }
 
 fn scene(context: &Context, picking: Option<usize>, look: &Look) -> Scene {
-    let current = context.current().map_or(-1.0, |at| at as f64);
+    let known = context.known();
     let label =
         if look.db.is_empty() { "◂ database is here".into() } else { format!("◂ database is here · {}", look.db) };
     let mut scene = Scene {
-        bead: current,
+        bead: known.then(|| context.current().map_or(-1.0, |at| at as f64)),
         bead_color: C::Cyan,
         label,
         label_color: C::Cyan,
@@ -281,12 +290,13 @@ fn scene(context: &Context, picking: Option<usize>, look: &Look) -> Scene {
         glint: Vec::new(),
         ghost: None,
         failed: None,
+        crack: None,
         shimmer: None,
     };
     if let Some(run) = &context.run {
         moving(&mut scene, context, run, look);
     }
-    if context.run.as_ref().is_none_or(|run| run.ended.is_some()) {
+    if known && context.run.as_ref().is_none_or(|run| run.ended.is_some()) {
         scene.ghost = picking.and_then(|to| ghost(context, to));
     }
     scene
@@ -297,29 +307,32 @@ fn moving(scene: &mut Scene, context: &Context, run: &Run, look: &Look) {
     let index = |id: &str| context.items.iter().position(|item| item.id == id);
     let from = run.from.as_deref().and_then(index).map_or(-1.0, |at| at as f64);
     let done = run.done();
+    let stops: Vec<f64> = std::iter::once(from)
+        .chain(run.planned.iter().map(|id| index(id).map_or(from, |at| at as f64 - f64::from(u8::from(run.back)))))
+        .collect();
     if let Some(failure) = run.failure() {
         let failed = run.planned.get(done.len()).and_then(|id| index(id));
         let why = failure.lines().next().unwrap_or_default().to_string();
         scene.failed = failed.map(|at| (at, why));
         let since = run.ended.as_ref().map_or(Duration::ZERO, |(at, _)| look.now.saturating_duration_since(*at));
-        let half = PULSE / 2;
-        let dim = !look.still && since < PULSE * PULSES && (since.as_millis() / half.as_millis()) % 2 == 1;
+        let pulsing = !look.still && since < PULSE * PULSES;
+        let dim = pulsing && (since.as_millis() / (PULSE / 2).as_millis()) % 2 == 1;
         scene.bead_color = if dim { C::DarkRed } else { C::Red };
+        if let (Some(at), Some(target)) = (failed, stops.last()) {
+            scene.crack = (!pulsing).then_some((at as f64, *target));
+        }
     }
     if settled(run).is_some_and(|settled| look.now >= settled) {
         return;
     }
     let hops = hops(&done);
     let travelled = travelled(&hops, look);
-    let stops: Vec<f64> = std::iter::once(from)
-        .chain(run.planned.iter().map(|id| index(id).map_or(from, |at| at as f64 - f64::from(u8::from(run.back)))))
-        .collect();
     let whole = travelled.floor() as usize;
-    scene.bead = match (stops.get(whole), stops.get(whole + 1)) {
+    scene.bead = Some(match (stops.get(whole), stops.get(whole + 1)) {
         (Some(low), Some(high)) => low + (high - low) * (travelled - whole as f64),
         (Some(low), None) => *low,
         _ => from,
-    };
+    });
     for (hop, id) in run.planned.iter().enumerate() {
         let Some(at) = index(id) else { continue };
         let reached = hops.get(hop).map(|(_, end)| *end).filter(|end| look.now >= *end);
@@ -365,23 +378,26 @@ pub fn rail(context: &Context, picking: Option<usize>, look: &Look, width: usize
     let focus_node = picking.or(context.current()).unwrap_or(items.len().saturating_sub(1));
     let focus = all.iter().position(|row| *row == Row::Node(focus_node)).unwrap_or(all.len().saturating_sub(1));
     let shown = window(&all, focus, room, items);
-    let track = track(&shown, &scene, look);
-    let bead = row_of(&shown, scene.bead).map(|row| dot(row).0);
-    let dates = dates(items);
-    let date_cells = dates.iter().map(|date| date.chars().count()).max().unwrap_or(0);
+    let line = if context.known() { RAIL } else { DASHED };
+    let track = track(&shown, &scene, look, line);
+    let bead = scene.bead.and_then(|bead| row_of(&shown, bead)).map(|row| dot(row).0);
     let near = |at: usize, head: f64| (at as f64 - head).abs() < 1.0;
     shown
         .iter()
         .enumerate()
-        .map(|(row, line)| {
+        .map(|(row, kind)| {
             let (dots, color) = track[row];
-            let mut segs = vec![seg(format!("{} ", char::from_u32(BRAILLE + dots).unwrap_or(' ')), color)];
-            match *line {
+            let mark = match kind {
+                Row::Tick(..) if (dots, color) == (line, C::DarkGray) => '┼',
+                _ => char::from_u32(BRAILLE + dots).unwrap_or(' '),
+            };
+            let mut segs = vec![seg(format!("{mark} "), color)];
+            match *kind {
                 Row::Fold(older, applied) => {
                     let all = if applied { ", all applied" } else { "" };
                     segs.push(seg(format!("  … {older} older{all}"), C::DarkGray));
                 }
-                Row::Gap(months) => segs.push(seg(format!("  · {months} months ·"), C::DarkGray)),
+                Row::Tick(month, after) => segs.push(seg(tick(month, after), C::DarkGray)),
                 Row::Node(at) => {
                     let item = &items[at];
                     let applied = scene
@@ -394,7 +410,7 @@ pub fn rail(context: &Context, picking: Option<usize>, look: &Look, width: usize
                     let (glyph, mut node_color) = match applied {
                         Some(true) => ("●", C::Green),
                         Some(false) => ("○", C::Yellow),
-                        None => ("?", C::DarkGray),
+                        None => ("◌", C::DarkGray),
                     };
                     if let Some(ghost) = in_ghost {
                         node_color = ghost.color();
@@ -407,7 +423,8 @@ pub fn rail(context: &Context, picking: Option<usize>, look: &Look, width: usize
                     }
                     segs.push(seg(glyph, node_color));
                     let warn = if in_ghost.is_some_and(|ghost| !ghost.forward) && risky(item) { "⚠ " } else { "" };
-                    let text = format!(" {}  {warn}{}", pad(&dates[at], date_cells), item.name);
+                    let day = date(&item.id).map_or(String::new(), |date| date.day().to_string());
+                    let text = format!(" {day:>2}  {warn}{}", item.name);
                     segs.push(if picking == Some(at) {
                         on(text, C::FocusText, C::FocusBack)
                     } else {
@@ -425,7 +442,7 @@ pub fn rail(context: &Context, picking: Option<usize>, look: &Look, width: usize
                 segs.push(seg(format!("  {}", scene.label), scene.label_color));
             }
             let segs = fit(segs, width);
-            match line {
+            match kind {
                 Row::Node(at) => aim(segs, Target::Migration(*at)),
                 _ => segs,
             }
@@ -433,9 +450,17 @@ pub fn rail(context: &Context, picking: Option<usize>, look: &Look, width: usize
         .collect()
 }
 
-/// The rail's cells: its line, a target's flowing path, the finish shimmer, the bead.
-fn track(shown: &[Row], scene: &Scene, look: &Look) -> Vec<(u32, C)> {
-    let mut track = vec![(RAIL, C::DarkGray); shown.len()];
+/// The rail's cells: its `line`, a failed run's crack, a target's flowing path, the finish shimmer, the bead.
+fn track(shown: &[Row], scene: &Scene, look: &Look, line: u32) -> Vec<(u32, C)> {
+    let mut track = vec![(line, C::DarkGray); shown.len()];
+    if let Some((from, to)) = scene.crack
+        && let (Some(from), Some(to)) = (row_of(shown, from), row_of(shown, to))
+    {
+        let (low, high) = (from.min(to).round().max(0.0) as usize, from.max(to).round().max(0.0) as usize);
+        for slot in track.iter_mut().take(high + 1).skip(low) {
+            *slot = (DASHED, C::Red);
+        }
+    }
     if let Some(ghost) = &scene.ghost
         && let (Some(from), Some(to)) = (row_of(shown, ghost.from), row_of(shown, ghost.to as f64))
     {
@@ -464,7 +489,7 @@ fn track(shown: &[Row], scene: &Scene, look: &Look) -> Vec<(u32, C)> {
             }
         }
     }
-    if let Some((cell, k)) = row_of(shown, scene.bead).map(dot)
+    if let Some((cell, k)) = scene.bead.and_then(|bead| row_of(shown, bead)).map(dot)
         && let Some(slot) = track.get_mut(cell)
     {
         *slot = (RAIL | BOTH[k], scene.bead_color);
@@ -492,14 +517,27 @@ mod tests {
     }
 
     #[test]
-    fn dates_come_from_the_ids_with_a_gap_where_months_pass() {
+    fn each_month_starts_with_a_tick_that_says_how_long_a_gap_was() {
         let items = [
             migration("20251203000000_Init"),
             migration("20260112000000_AddOrders"),
+            migration("20260120000000_Vouchers"),
             migration("20260412093011_Refunds"),
         ];
-        assert_eq!(dates(&items), ["3 Dec 2025", "12 Jan 2026", "12 Apr"]);
-        assert_eq!(layout(&items), [Row::Node(0), Row::Node(1), Row::Gap(3), Row::Node(2)]);
+        let (dec, jan, apr) = (2025 * 12 + 11, 2026 * 12, 2026 * 12 + 3);
+        assert_eq!(
+            layout(&items),
+            [
+                Row::Tick(dec, 0),
+                Row::Node(0),
+                Row::Tick(jan, 1),
+                Row::Node(1),
+                Row::Node(2),
+                Row::Tick(apr, 3),
+                Row::Node(3)
+            ]
+        );
+        assert_eq!((tick(jan, 1), tick(apr, 3)), (" Jan 2026".into(), " Apr 2026  · 3 months later".into()));
         assert!(risky(&items[1]) && !risky(&items[0]) && !risky(&migration("20260101000000_Address")));
         assert_eq!(bar(1, 4), "▰▱▱▱ 1/4");
     }

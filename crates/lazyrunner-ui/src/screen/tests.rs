@@ -1146,12 +1146,32 @@ async fn a_run_moves_the_bead_a_node_a_hop_and_says_where_it_failed() {
     let frame = screen.frame();
     let invoices = line_with(&frame, "Invoices");
     assert!(invoices.contains('●') && invoices.contains("Invoices  ◂ applying Refunds…"), "{frame}");
-    assert!(line_with(&frame, "1 Apr").contains('○'), "not there yet: {frame}");
+    assert!(line_with(&frame, "  Refunds").contains('○'), "not there yet: {frame}");
     assert!(frame.contains("▰▰▱▱ 1/2"), "the list's bar: {frame}");
     run.ended = Some((now - Duration::from_secs(1), Some("Invalid column name 'Total'.".into())));
     set(&mut screen, &run, Ef::Ok);
     let frame = screen.frame();
-    assert!(line_with(&frame, "1 Apr").contains("✗ Invalid column name 'Total'."), "{frame}");
+    let refunds = line_with(&frame, "  Refunds");
+    assert!(refunds.contains("✗ Invalid column name 'Total'.") && refunds.contains('⠅'), "cracked: {frame}");
+}
+
+#[tokio::test]
+async fn an_unreadable_history_is_drawn_dashed_and_pending_ones_show_beside_the_database() {
+    let mut screen = screen("migrations-unknown", json!({}));
+    with_shop(&mut screen, &[("20260101000000_Init", true), ("20260301000000_Invoices", false)]);
+    screen.ui.overlay = None;
+    assert!(
+        line_with(&screen.frame(), "ShopLocal @ localhost").contains("ShopLocal @ localhost ○ 1"),
+        "{}",
+        screen.frame()
+    );
+    if let Some(shop) = screen.controller.contexts.as_mut().and_then(|all| all.first_mut()) {
+        shop.items.iter_mut().for_each(|migration| migration.applied = None);
+    }
+    screen.ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
+    let frame = screen.frame();
+    assert!(line_with(&frame, "  Init").contains("⠅ ◌"), "{frame}");
+    assert!(!frame.contains("database is here") && !frame.contains("○ 1"), "no bead, nothing known pending: {frame}");
 }
 
 // ---------------------------------------------------------------- the requests view
