@@ -5,11 +5,12 @@
 
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 use lazyrunner_core::testing::TempDir;
 use lazyrunner_core::update::{TARGET, asset_name, sha256_of};
@@ -64,7 +65,12 @@ fn answer(mut stream: TcpStream, release: &Release, host: &str) {
     };
     let location = if location.is_empty() { String::new() } else { format!("Location: {location}\r\n") };
     let head = format!("HTTP/1.1 {status}\r\n{location}Content-Length: {}\r\nConnection: close\r\n\r\n", body.len());
-    let _ = stream.write_all(head.as_bytes()).and_then(|()| stream.write_all(&body));
+    let _ = stream.write_all(head.as_bytes()).and_then(|()| stream.write_all(&body)).and_then(|()| stream.flush());
+    // Closing with bytes still unread resets the connection on Windows, which can cut the download short: say the
+    // answer is all there, and let the client close first.
+    let _ = stream.shutdown(Shutdown::Write);
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+    let _ = std::io::copy(&mut reader, &mut std::io::sink());
 }
 
 /// This platform's release archive holding `binary`, and its .sha256 (made up when `checksum` is given).
