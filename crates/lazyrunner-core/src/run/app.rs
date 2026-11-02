@@ -16,6 +16,8 @@ use crate::output::{Hue, LevelFilter, Output};
 use crate::profile::App;
 
 /// Lines each column keeps.
+/// Requests whose scoped lines are kept until they finish, the newest (one that never finishes is forgotten).
+const MAX_SCOPED: usize = 256;
 pub const MAX_PANE_LINES: usize = 5000;
 /// Samples kept for the sparklines.
 pub const HISTORY: usize = 30;
@@ -73,6 +75,10 @@ pub struct AppState {
     last_level: String,
     /// The line before was a request log entry's header (its message comes next).
     request_header: bool,
+    /// The RequestId of the entry being printed, from its scope line (an app that logs scopes).
+    scope: Option<String>,
+    /// The lines each request logged in its scope, by RequestId, until it finishes (the newest few hundred).
+    scoped: std::collections::VecDeque<(String, Vec<u64>)>,
     /// Its requests started and not finished yet.
     in_flight: requests::InFlight,
     log: Option<BufWriter<File>>,
@@ -112,6 +118,8 @@ impl AppState {
             flash_until: None,
             last_level: "info".into(),
             request_header: false,
+            scope: None,
+            scoped: std::collections::VecDeque::new(),
             in_flight: requests::InFlight::default(),
             log: None,
             log_bytes: 0,
@@ -209,6 +217,17 @@ impl AppState {
     /// the log file only, and a finished request comes back (for the requests view).
     pub fn receive(&mut self, app: &App, raw: &str, now: Instant) -> Option<requests::Finished> {
         let text = crate::output::strip_ansi(raw).replace('\t', "    ");
+        if app.traits().counts_requests
+            && let Some(id) = requests::scope(&text)
+        {
+            // A request entry's header is hidden: only another entry's header is in the column to belong to it.
+            if let Some(id) = id.clone().filter(|_| !self.request_header) {
+                self.tag(id, self.output.total());
+            }
+            self.scope = id;
+            self.log_line(&text);
+            return None;
+        }
         if app.traits().counts_requests {
             match requests::classify(&text, &mut self.request_header) {
                 requests::Line::Other => {}
@@ -217,13 +236,19 @@ impl AppState {
                     return None;
                 }
                 requests::Line::Started(started) => {
+                    self.scope = None;
                     self.in_flight.start(started, self.output.total());
                     self.log_line(&text);
                     return None;
                 }
                 requests::Line::Finished(mut request) => {
                     self.in_flight.finish(&mut request, self.output.total());
-                    if let Some((first, last)) = request.logs {
+                    if let Some(id) = self.scope.take() {
+                        let numbers = self.untag(&id);
+                        let lines = numbers.iter().filter_map(|number| self.output.numbered(*number, *number).next());
+                        request.db = requests::db_summary(lines.map(|line| line.text.as_str()));
+                        (request.exact, request.mixed) = (Some(numbers), false);
+                    } else if let Some((first, last)) = request.logs {
                         request.db =
                             requests::db_summary(self.output.numbered(first, last).map(|line| line.text.as_str()));
                     }
@@ -242,8 +267,32 @@ impl AppState {
         {
             self.warnings += 1;
         }
+        let entry = LEVEL.is_match(&text);
+        if entry {
+            self.scope = None;
+        }
         self.add_line(&text, hue, now);
+        if let Some(id) = self.scope.clone().filter(|_| !entry) {
+            self.tag(id, self.output.total());
+        }
         None
+    }
+
+    /// Line `number` was logged in request `id`'s scope.
+    fn tag(&mut self, id: String, number: u64) {
+        match self.scoped.iter_mut().find(|(known, _)| *known == id) {
+            Some((_, numbers)) => numbers.push(number),
+            None => self.scoped.push_back((id, vec![number])),
+        }
+        if self.scoped.len() > MAX_SCOPED {
+            self.scoped.pop_front();
+        }
+    }
+
+    /// The lines request `id` logged, as it finishes.
+    fn untag(&mut self, id: &str) -> Vec<u64> {
+        let at = self.scoped.iter().position(|(known, _)| known == id);
+        at.and_then(|at| self.scoped.remove(at)).map(|(_, numbers)| numbers).unwrap_or_default()
     }
 
     fn hue_of(&mut self, app: &App, text: &str) -> Hue {
@@ -279,6 +328,8 @@ impl AppState {
         self.warnings = 0;
         self.requests = 0;
         self.request_header = false;
+        self.scope = None;
+        self.scoped.clear();
         self.in_flight.clear();
         self.cpu = None;
         for history in

@@ -739,20 +739,31 @@ fn request_details(controller: &Controller, request: Option<&Request>, width: us
     lines.push(vec![seg("sent      ", C::DarkGray), seg(body(&request.sent_content, &request.sent_length), C::Gray)]);
     lines.push(vec![seg("returned  ", C::DarkGray), seg(body(&request.content, &request.length), C::Gray)]);
     lines.push(Vec::new());
-    let Some((first, last)) = request.logs else {
-        let why = "Its log lines aren't known: the app logs no \"Request starting\" line for it (Serilog's request log \
-                   says only when one finished).";
-        lines.extend(words(why, width).into_iter().map(|line| vec![seg(line, C::DarkGray)]));
-        return lines;
+    let state = controller.state(&request.app);
+    let (logged, expected): (Vec<_>, usize) = match (&request.exact, request.logs) {
+        (Some(numbers), _) => (
+            state.map_or_else(Vec::new, |state| {
+                numbers.iter().filter_map(|number| state.output.numbered(*number, *number).next()).collect()
+            }),
+            numbers.len(),
+        ),
+        (None, Some((first, last))) => (
+            state.map_or_else(Vec::new, |state| state.output.numbered(first, last).collect()),
+            (last + 1).saturating_sub(first) as usize,
+        ),
+        (None, None) => {
+            let why = "Its log lines aren't known: the app logs no \"Request starting\" line for it (Serilog's \
+                       request log says only when one finished).";
+            lines.extend(words(why, width).into_iter().map(|line| vec![seg(line, C::DarkGray)]));
+            return lines;
+        }
     };
-    let logged: Vec<_> =
-        controller.state(&request.app).map_or_else(Vec::new, |state| state.output.numbered(first, last).collect());
-    let expected = (last + 1).saturating_sub(first) as usize;
     let errors = logged.iter().filter(|line| line_color(line) == C::Red).count();
     lines.push(vec![
         seg("Log ", C::White),
         seg(format!(" {expected} lines"), C::Gray),
         seg(format!(" · {errors} errors"), if errors > 0 { C::Red } else { C::DarkGray }),
+        seg(if request.exact.is_some() { " · its own, by RequestId" } else { "" }, C::DarkGray),
     ]);
     if let Some(db) = &request.db {
         let share = if request.ms > 0.0 {
