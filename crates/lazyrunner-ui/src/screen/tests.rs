@@ -378,6 +378,33 @@ async fn the_timeline_narrows_to_words_an_app_and_a_level() {
 }
 
 #[tokio::test]
+async fn the_timeline_brackets_a_requests_lines_with_its_method_path_and_status() {
+    use lazyrunner_core::run::requests::Finished;
+    let mut screen = screen("timeline-requests", json!({}));
+    let at = screen.ui.now - Duration::from_secs(60);
+    screen.controller.states[1].add_line("Request starting HTTP/1.1", Hue::Gray, at);
+    let first = screen.controller.states[1].output.total();
+    screen.controller.states[0].add_line("orders heartbeat", Hue::Gray, at + Duration::from_millis(10));
+    screen.controller.states[1].add_line("invoice 7 saved", Hue::Gray, at + Duration::from_millis(20));
+    screen.controller.states[1].add_line("billing idle", Hue::Gray, at + Duration::from_millis(30));
+    let (method, path) = ("POST".to_string(), "/api/invoices".to_string());
+    let request =
+        Finished { method, path, status: 201, ms: 34.0, exact: Some(vec![first, first + 1]), ..Finished::default() };
+    screen.controller.requests.add("billing", request, chrono::Local::now());
+    screen.press("~");
+    let frame = screen.frame();
+    let row =
+        |text: &str| frame.lines().position(|line| line.contains(text)).unwrap_or_else(|| panic!("{text}: {frame}"));
+    let line = |text: &str| frame.lines().nth(row(text)).unwrap_or_default().trim_start().to_string();
+    assert!(line("POST /api/invoices").starts_with("╭─ POST /api/invoices · 201 · 34 ms ─"), "{frame}");
+    assert_eq!(row("POST /api/invoices") + 1, row("Request starting"), "the rule is just above its first line");
+    assert!(line("Request starting").starts_with('│'), "{frame}");
+    assert!(line("orders heartbeat").starts_with('┆'), "another app's line while it runs: {frame}");
+    assert!(line("invoice 7 saved").starts_with('╰'), "its last line closes it: {frame}");
+    assert!(!line("billing idle").starts_with(['│', '╰', '┆']), "{frame}");
+}
+
+#[tokio::test]
 async fn search_filters_to_its_matches_and_takes_regex_and_case() {
     let mut screen = screen("search-filter", json!({}));
     let at = screen.ui.now - Duration::from_secs(5);

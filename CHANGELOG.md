@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.55.0] - 2026-11-02
+
+### Added
+- The timeline brackets a request's lines: a faint rule above its first line with its method, path, status and time, `│` down its lines and `╰` on its last, `┆` beside other apps' lines that came while it ran. Its own lines by RequestId, or the lines it logged while it ran when no other request ran with it (#53)
+
 ## [1.54.0] - 2026-11-02
 
 ### Added
