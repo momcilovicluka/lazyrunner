@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.64.0] - 2026-11-02
+
+### Added
+- Test history: each suite's last 20 runs, test by test, with the code they ran on. A failure is new or known, a test that failed and passed on the same code is flaky, one passing again after a failure is fixed; the tests view says `✓214 ✗13 ↻1` and `3 new`, splits the failures `(3 new · 10 known)` with the new ones first, and lists the fixed and the flaky tests (#32)
+- Every test shows its last runs as a strip, two runs a cell, the newest on the right - in the details and beside each test to pick (#32)
+- `v` in the tests view lists all the suites, those with failures, or those with flaky tests; the panel's chip counts the new failures, and `get_test_results` marks each failure `new` and `flaky` (#32)
+
 ## [1.63.0] - 2026-11-02
 
 ### Added

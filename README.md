@@ -491,6 +491,17 @@ comes when something failed. While a suite runs the right side shows its output;
 message and their own stack frames (a place in a file opens in your editor on a click), or its slowest tests when all
 passed. `y` copies the failures, `o` opens the suite's whole log, `s` stops the tests, `Esc` / `q` / `T` close.
 
+**Test history:** every run is kept, test by test, with the code it ran on (the source fingerprint the builds use) -
+the last 20 runs of each suite, in the state folder's `tests/test-history.json`. A failure is **new** when the test
+didn't fail the run before, **known** when it did; a test that failed and passed on the same code is **flaky**; one
+that passes after failing the run before is **fixed**. The list says `✓214 ✗13 ↻1` (passed, failed, flaky) and a red
+`3 new` badge; a suite's counts split its failures `(3 new · 10 known)`, the new ones come first with a `NEW` badge,
+and each test shows its last runs as a strip - two runs a cell, the newest on the right, green passed, red failed - so
+a test that fails every time and one that fails now and then look different. A flaky test says how often it failed;
+the fixed and the flaky ones are listed after the failures. `v` lists all the suites, those with failures, or those
+with flaky tests (the chips in the header). The panel's chip says `1 suite done · 1 red · 3 new failures`, and the
+MCP's `get_test_results` marks each failure `new` and `flaky`.
+
 **Test watch:** `a` watches the selected suites (a side or an app: all of its), `A` all of them; again unwatches. A watched suite (`◉`) runs again when its code is saved, once saving has been quiet for 400 ms: a green one whole, a red one its failed tests, then, if they pass, whole. .NET suites follow the profile's watch folder - only those a save affects: the saved file's project is theirs or one they reference (`<ProjectReference>`, directly or not), and the log says why (`Orders.Tests (references Orders.Core, which changed)`); a file no project owns, such as `Directory.Build.props`, runs them all. npm and Nx suites follow their own folder. A running suite is never cancelled - a save during its run runs it again after - and a suite runs at most every 1.5 s. The header and the panel show `◉ WATCH 2`, and while a save waits a capsule (`▰▰▰▱▱▱▱▱`) that drains over the 400 ms (`rerun in 0.3s` with reduced motion); a suite the watch queues gets one sweep across its row; `s` drops what a save was about to run but keeps the watch. For this session only: lazyrunner never runs tests by itself when it opens. For a new test, `l`, pick it, `a`: the suite watches only that test - a save runs just it - and its row says `pinned: <test>`; `a` on it again stops, `a` on the suite (or `A`) watches all of it again. A pinned test that's gone after a rename stops being watched, with a line in the log. A watched suite (or its pinned test) that turns red or green again gets a desktop notification - the change is what's worth one; a run that stays the same colour notifies nothing.
 
 `l` opens the selected suite's tests (the failed first, then the skipped and the passed) to pick one: `j` `k` choose,

@@ -127,7 +127,11 @@ pub fn chips(ui: &Ui, controller: &Controller) -> Vec<Chip> {
     if !done.is_empty() {
         let reds = done.iter().filter(|suite| red(suite)).count();
         let red_part = if reds > 0 { format!(" · {reds} red") } else { String::new() };
-        let label = format!("{} suite{} done{red_part}", done.len(), plural(done.len()));
+        let history =
+            |suite: &Suite| controller.test_history.suite(&suite.key).map(|history| history.tally(&suite.tests));
+        let new: usize = done.iter().filter_map(|suite| history(suite)).map(|tally| tally.new).sum();
+        let new_part = if new > 0 { format!(" · {new} new failure{}", plural(new)) } else { String::new() };
+        let label = format!("{} suite{} done{red_part}{new_part}", done.len(), plural(done.len()));
         let color = if reds > 0 { C::Red } else { C::Green };
         chips.push(Chip { key: "T", label, color, view: View::Tests });
     }

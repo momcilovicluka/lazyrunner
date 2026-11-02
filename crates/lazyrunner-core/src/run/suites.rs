@@ -156,6 +156,8 @@ pub struct Suite {
     pub failed_only: bool,
     /// The tests such a run asked for.
     pub rerun: Vec<String>,
+    /// The code the run runs on (the source fingerprint), for its tests' history.
+    pub code: Option<String>,
     pub(crate) job: u64,
     pub(crate) child: Option<Child>,
     /// All of the run's output, for its log file.
@@ -186,6 +188,7 @@ impl Suite {
             built: false,
             failed_only: false,
             rerun: Vec::new(),
+            code: None,
             job: 0,
             child: None,
             lines: Vec::new(),
