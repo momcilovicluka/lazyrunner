@@ -3,7 +3,7 @@
 
 use super::{Conflict, Controller, Timeline};
 use crate::output::Hue;
-use crate::run::app::Status;
+use crate::run::app::{RUN_HEADER, Status};
 use crate::run::build;
 use crate::run::child::Child;
 use crate::run::net::{self, Listening};
@@ -235,12 +235,13 @@ impl Controller {
             self.timeline_entry(key).start_from = Some(since);
         }
         let now = (self.now)();
+        self.remember_run(index);
         self.states[index].reset_for_start();
         let app = self.apps[index].clone();
         let command = self.commands.server(&self.root, &app, &self.apps);
         let generation = self.states[index].generation;
         let started = command.and_then(|command| {
-            let header = format!("──── ▶ {} · {} · {} ────", clock(), self.branch, command.label);
+            let header = format!("{RUN_HEADER}{} · {} · {} ────", clock(), self.branch, command.label);
             self.states[index].add_line(&header, Hue::Cyan, now);
             let tag = Tag::App { key: key.to_string(), generation };
             let child = Child::spawn(&command.spec, tag, self.events.clone(), self.guard.as_ref())?;

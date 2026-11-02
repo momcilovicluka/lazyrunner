@@ -82,6 +82,8 @@ pub enum Icon {
     /// The jump list in the panel.
     Back,
     Zip,
+    /// A column showing what's new since its last run.
+    Diff,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -205,6 +207,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Back, true) => "\u{f0e2}", // undo
         (Icon::Zip, false) => "▤",
         (Icon::Zip, true) => "\u{f1c6}", // file archive
+        (Icon::Diff, false) => "Δ",
+        (Icon::Diff, true) => "\u{e728}", // git compare
     }
 }
 
@@ -315,6 +319,7 @@ mod tests {
             Icon::Folder,
             Icon::Back,
             Icon::Zip,
+            Icon::Diff,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");

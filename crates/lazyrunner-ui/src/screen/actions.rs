@@ -49,6 +49,7 @@ pub enum Run {
     Sheet,
     Launch,
     Timeline,
+    Diff,
     Widen,
     Narrow,
     EqualWidths,
@@ -241,6 +242,9 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("View", "]", "Newer mark", "in the focused column", Run::NextMark).safe(),
         action("View", "'", "Marks: every column's, to jump to", "", Run::Marks).safe(),
         action("View", "~", "Timeline: every app's output in the order it came", "", Run::Timeline).safe(),
+        action("View", "Alt+d", "What's new since the last run", "the rest dims; n N step through it", Run::Diff)
+            .safe()
+            .focused(),
         action("View", "+", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),
         action("View", "-", "Narrow the focused column", "shorter when the apps are stacked", Run::Narrow).safe(),
         action("View", "=", "Equal column widths", "", Run::EqualWidths).safe(),

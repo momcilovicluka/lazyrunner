@@ -245,6 +245,7 @@ impl Controller {
             for (text, hue) in &app.lines {
                 state.output.push_hued(text, *hue, aged);
             }
+            state.find_run_start();
             state.resume_log(&logs);
             state.generation = app.generation;
             state.child = Some(child);

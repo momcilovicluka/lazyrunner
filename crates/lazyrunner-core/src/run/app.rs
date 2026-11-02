@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use regex::Regex;
 
 use super::child::Child;
-use super::requests;
+use super::{diff, requests};
 use crate::output::{Hue, LevelFilter, Output};
 use crate::profile::App;
 
@@ -22,6 +22,8 @@ pub const MAX_PANE_LINES: usize = 5000;
 /// Samples kept for the sparklines.
 pub const HISTORY: usize = 30;
 const ERROR_FLASH: Duration = Duration::from_millis(1500);
+/// How a run's first line starts in its column.
+pub const RUN_HEADER: &str = "──── ▶ ";
 /// A column's log file starts over (the old one becomes `<key>.prev.log`) past this size.
 #[cfg(not(test))]
 const LOG_CAP: u64 = 32 * 1024 * 1024;
@@ -94,6 +96,10 @@ pub struct AppState {
     /// The generation that got up, and how long it took.
     pub up_generation: Option<u64>,
     pub up_after: Option<f64>,
+    /// The number of this run's first line (its ▶ header); 0 before lazyrunner saw one start.
+    pub run_from: u64,
+    /// The app's run before this one, as `Alt+d` compares with it.
+    pub previous: Option<diff::Digest>,
 }
 
 impl AppState {
@@ -132,6 +138,8 @@ impl AppState {
             request_history: VecDeque::new(),
             up_generation: None,
             up_after: None,
+            run_from: 0,
+            previous: None,
         }
     }
 
@@ -319,9 +327,10 @@ impl AppState {
         Hue::Gray
     }
 
-    /// Clears the counters and histories for a new run.
+    /// Clears the counters and histories for a new run, whose first line comes next.
     pub fn reset_for_start(&mut self) {
         self.generation += 1;
+        self.run_from = self.output.total() + 1;
         self.marks.clear();
         self.notes.clear();
         self.errors = 0;
@@ -337,6 +346,19 @@ impl AppState {
         {
             history.clear();
         }
+    }
+}
+
+impl AppState {
+    /// A run another lazyrunner handed over starts at its ▶ header among the lines it passed on, else at the oldest.
+    pub fn find_run_start(&mut self) {
+        let len = self.output.len();
+        let back = self.output.newest_first(0).position(|line| line.text.starts_with(RUN_HEADER));
+        self.run_from = match back {
+            Some(back) => self.output.number_at(len - 1 - back),
+            None if len > 0 => self.output.number_at(0),
+            None => 0,
+        };
     }
 }
 

@@ -12,24 +12,24 @@ expression: screen.frame()
   │   b B         Build · focused / all                                             ]           Newer mark │
   │   q           Quit                                                              '           Marks: ev… │
   │ Tools                                                                           ~           Timeline:… │
-  │   d           Switch database                                                   + -         Widen / n… │
-  │   i           Install packages: npm ci or npm install                           =           Equal col… │
-  │   i c         npm ci                                                            |           Layout: c… │
-  │   i n         npm install                                                       Ctrl+L      Clear out… │
-  │   w W         Open in the browser · focused / all                               Ctrl+R      Reload wi… │
-  │   o           Open the focused app's log file                                   t           Theme pic… │
-  │   e           Start sheet: what the focused app is started with               Help                     │
-  │   p           Run the focused app on another launch profile or npm variant      ,           Settings … │
-  │   y           Copy (yank)                                                       ?           Key refer… │
-  │   D           Durations                                                         , A z       Diagnosti… │
-  │   H           Requests: what the .NET apps served                               :           Command p… │
-  │   M           Migrations: what's applied to the database                      Navigate                 │
-  │   T           Tests: run the project's test suites                              h l Tab     focus ano… │
-  │   L           lazygit: git without leaving lazyrunner                           1-5         jump to a… │
-  │   x           Menu for the focused app                                          j k ↑ ↓     scroll a … │
-  │   F           Follow the agent                                                  ^u ^d ^b ^f half page… │
-  │ View                                                                            gg G < >    oldest / … │
-  │   /           Search the focused app's output                                   n N Esc     search: o… │
-  │   z           Zoom the focused column                                                                  │
+  │   d           Switch database                                                   Alt+d       What's ne… │
+  │   i           Install packages: npm ci or npm install                           + -         Widen / n… │
+  │   i c         npm ci                                                            =           Equal col… │
+  │   i n         npm install                                                       |           Layout: c… │
+  │   w W         Open in the browser · focused / all                               Ctrl+L      Clear out… │
+  │   o           Open the focused app's log file                                   Ctrl+R      Reload wi… │
+  │   e           Start sheet: what the focused app is started with                 t           Theme pic… │
+  │   p           Run the focused app on another launch profile or npm variant    Help                     │
+  │   y           Copy (yank)                                                       ,           Settings … │
+  │   D           Durations                                                         ?           Key refer… │
+  │   H           Requests: what the .NET apps served                               , A z       Diagnosti… │
+  │   M           Migrations: what's applied to the database                        :           Command p… │
+  │   T           Tests: run the project's test suites                            Navigate                 │
+  │   L           lazygit: git without leaving lazyrunner                           h l Tab     focus ano… │
+  │   x           Menu for the focused app                                          1-5         jump to a… │
+  │   F           Follow the agent                                                  j k ↑ ↓     scroll a … │
+  │ View                                                                            ^u ^d ^b ^f half page… │
+  │   /           Search the focused app's output                                   gg G < >    oldest / … │
+  │   z           Zoom the focused column                                           n N Esc     search: o… │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

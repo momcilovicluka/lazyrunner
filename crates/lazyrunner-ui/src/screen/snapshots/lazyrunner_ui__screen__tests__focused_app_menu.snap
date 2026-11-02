@@ -4,7 +4,6 @@ expression: screen.frame()
 ---
 
 
-
         ┌─ Orders ──────────────────────────────────────────────────────────────────────────────────┐
         │  Space  Start / stop the focused app  whichever it is not                                 │
         │  u      Start the focused app  builds it first if it changed                              │
@@ -20,6 +19,7 @@ expression: screen.frame()
         │  z      Zoom the focused column                                                           │
         │  f      Filter the focused column by level  errors, warnings and errors, info and up, all │
         │  m      Mark a line  the one at the bottom, or the search match; again unmarks            │
+        │  Alt+d  What's new since the last run  the rest dims; n N step through it                 │
         │ press a key, or j k + Enter · Esc / x close                                               │
         └───────────────────────────────────────────────────────────────────────────────────────────┘
 

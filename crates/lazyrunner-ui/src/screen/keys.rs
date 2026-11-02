@@ -86,7 +86,11 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
 }
 
 fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
-    let name = key_name(&key);
+    let name = match key_name(&key) {
+        // The one Alt+letter that is an action of its own (a search's Alt+r and Alt+c are the search's).
+        name if name == "d" && key.modifiers == KeyModifiers::ALT => "Alt+d".to_string(),
+        name => name,
+    };
     if name == "Ctrl+C" {
         ui.exit = Some(Exit::Quit);
         return;
@@ -220,6 +224,7 @@ fn navigation(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
                 state.scroll = 0;
             }
         }
+        "n" | "N" if super::diff::steps(ui, controller) => super::diff::step(ui, controller, name == "n"),
         "n" => find_match(ui, controller, true),
         "N" => find_match(ui, controller, false),
         "Escape" => ui.search = None,
@@ -651,6 +656,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Sheet => super::sheet::open(ui, controller),
         Run::Launch => super::launch::open(ui, controller),
         Run::Timeline => super::timeline::open(ui),
+        Run::Diff => super::diff::toggle(ui, controller),
         Run::LevelFilter => {
             let Some(state) = controller.states.get(ui.focus) else { return };
             let (key, filter) = (state.key.clone(), state.filter.next());

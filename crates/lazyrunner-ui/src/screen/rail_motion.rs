@@ -64,6 +64,13 @@ struct Comet {
 #[derive(Default)]
 pub struct Effects(RefCell<HashMap<String, Column>>);
 
+impl Effects {
+    /// Forgets what column `key`'s rail saw last: its next frame starts afresh, sending nothing.
+    pub fn forget(&self, key: &str) {
+        self.0.borrow_mut().remove(key);
+    }
+}
+
 /// What a column's rail shows in this frame: its app's errors and the lines its buffer has dropped, how far it's
 /// scrolled back as drawn and the scroll it heads for (`G` sets it at once; the drawn one glides), its search's match,
 /// the rows of the newest error's mark and of the match, the rows on screen, the first row of the bracket once it

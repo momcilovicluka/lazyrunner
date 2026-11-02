@@ -3,11 +3,16 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.60.0] - 2026-11-02
+
+### Added
+- `Alt+d`: what's new since an app's last run, in the focused column. The lines the last run printed too dim - times, durations, ports and ids left out of the comparison - and new ones keep their colour, `▲` before a new error or warning, `●` before any other new line; the top row counts them (`+2 new errors · 3 fixed · 41 new lines`, `fixed?` until the app is up) and `n` / `N` step through them. The rail marks only what's new and sends its ember only for a new error; the last run is kept in the state folder, so the first run after lazyrunner opens again compares too (#54)
+
 ## [1.59.0] - 2026-11-02
 
 ### Changed
-- lazyrunner's MCP answers are compact JSON, and `get_logs` and `get_request` give their log lines as one text, each line after its number, instead of an object per line - the same answers for far fewer tokens. Anything that read `lines[].seq` reads `text` now (#75, thanks @ognjen004028)
-- The requests view and `get_requests` sum up paths with a user's name in them (`/api/users/image/jo@contoso`) as one endpoint, `{id}` (#75, thanks @ognjen004028)
+- lazyrunner's MCP answers are compact JSON, and `get_logs` and `get_request` give their log lines as one text, each line after its number, instead of an object per line - the same answers for far fewer tokens. Anything that read `lines[].seq` reads `text` now (#76, #75, thanks @ognjen004028)
+- The requests view and `get_requests` sum up paths with a user's name in them (`/api/users/image/jo@contoso`) as one endpoint, `{id}` (#76, #75, thanks @ognjen004028)
 
 ## [1.58.0] - 2026-11-02
 
