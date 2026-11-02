@@ -9,6 +9,7 @@ pub mod checks;
 pub mod child;
 pub mod command;
 pub mod controller;
+pub mod diff;
 pub mod history;
 pub mod hooks;
 pub mod migrations;

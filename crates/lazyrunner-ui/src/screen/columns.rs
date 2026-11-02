@@ -261,6 +261,9 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         None => app.name.clone(),
     };
     let mut segs = vec![on(format!(" {marker}{icon} {name} "), chip_fg, chip_bg)];
+    if super::diff::is_on(ui, &app.key) {
+        segs.push(seg(format!(" {}", icons::icon(ui.nerd, Icon::Diff)), C::Cyan));
+    }
     segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
     segs.extend(status(ui, controller, index));
     let mut segs = ui.scrolling_row(segs, 2, cells);
@@ -568,8 +571,9 @@ fn body(
     let searching = search.is_some_and(|search| search.filter);
     // A filtered column (f, or a search that filters) says on its top row what it hides.
     let filtered = state.filter != LevelFilter::All || searching;
+    let diff = super::diff::view(ui, state);
     let shown = list.len();
-    let rows = if filtered { rows.saturating_sub(1) } else { rows };
+    let rows = rows.saturating_sub(usize::from(filtered) + usize::from(diff.is_some()));
     // More lines than rows: the last cells are the rail, a map of them.
     let rail = if shown > rows && rows > 0 && column > 1 { super::rail::width(column) } else { 0 };
     let cells = column - rail;
@@ -592,6 +596,11 @@ fn body(
         } else if age < SETTLING {
             color = bright(color);
         }
+        let number = state.output.number_at(position);
+        let kind = diff.as_ref().and_then(|diff| diff.kind(number));
+        if let (Some(diff), Some(kind)) = (&diff, kind) {
+            color = diff.shade(kind, color);
+        }
         if let Some(search) = search
             && search.matches(&line.text)
         {
@@ -602,6 +611,11 @@ fn body(
             } else {
                 (color, back) = (C::Black, Some(C::Yellow));
             }
+        }
+        if diff.as_ref().is_some_and(|diff| diff.at == Some(number))
+            && ui.motion.lit(&super::motion::Spot::Match { app: index, line: position }, ui.now).is_some()
+        {
+            (color, back) = (C::Black, Some(C::White)); // n N just went to it
         }
         if looked.is_some_and(|lines| lines.contains(&line.text)) {
             (color, back) = (C::Black, Some(C::Magenta)); // an agent read it (follow mode)
@@ -617,8 +631,9 @@ fn body(
                 base + found.len() - 1
             })
             .collect();
-        let marked = state.marks.binary_search(&state.output.number_at(position)).is_ok();
-        let room = if marked { cells.saturating_sub(1) } else { cells };
+        let marked = state.marks.binary_search(&number).is_ok();
+        let gutter = diff.as_ref().filter(|diff| diff.has_gutter());
+        let room = cells.saturating_sub(usize::from(marked) + usize::from(gutter.is_some()));
         let chunks = chunk(&line.text, room);
         let starts: Vec<usize> = chunks
             .iter()
@@ -640,6 +655,9 @@ fn body(
             };
             if marked {
                 segs.insert(0, seg("▌", C::Magenta));
+            }
+            if let Some(diff) = gutter {
+                segs.insert(0, diff.gutter(kind, start == 0));
             }
             result.push(fit(segs, cells));
         }
@@ -663,7 +681,7 @@ fn body(
     }
     result.reverse();
     if rail > 0 {
-        super::rail::add(ui, state, index, &list, search, &mut result, scroll, rail);
+        super::rail::add(ui, state, index, &list, search, diff.as_ref(), &mut result, scroll, rail);
         super::rail::preview(ui, state, index, &mut result, cells, rail);
     }
     if filtered {
@@ -684,6 +702,9 @@ fn body(
         };
         let note = format!(" {} · {hidden} {lines} hidden - {undo}", what.join(" · "));
         result.insert(0, fit(vec![seg(note, C::DarkCyan)], column));
+    }
+    if let Some(diff) = &diff {
+        result.insert(0, super::diff::summary(ui, state, diff, column));
     }
     result
 }

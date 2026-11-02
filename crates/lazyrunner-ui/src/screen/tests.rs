@@ -2388,6 +2388,80 @@ async fn f_filters_the_focused_column_by_level_and_says_what_it_hides() {
     assert!(screen.controller.config["apps"][&key].get("filter").is_none(), "all lines: nothing saved");
 }
 
+/// Orders' column with two runs: the first logged an Orders error, the second a Billing error, a warning and a new
+/// line; the rest both logged. The second run's first line.
+fn two_runs(screen: &mut Screen) -> u64 {
+    use lazyrunner_core::run::app::AppState;
+    use lazyrunner_core::run::diff::Digest;
+    let at = screen.ui.now - Duration::from_secs(5);
+    let add = |state: &mut AppState, lines: &[(&str, Hue)]| {
+        for (text, hue) in lines {
+            state.add_line(text, *hue, at);
+        }
+    };
+    let state = &mut screen.controller.states[0];
+    state.reset_for_start();
+    add(
+        state,
+        &[
+            ("info: Now listening on: http://localhost:5001", Hue::Cyan),
+            ("fail: Orders.Api[0]", Hue::Red),
+            ("      Invoice 7 has no currency.", Hue::Red),
+            ("info: Application started.", Hue::Cyan),
+        ],
+    );
+    state.previous = Some(Digest::of(&state.output, state.run_from));
+    state.reset_for_start();
+    add(
+        state,
+        &[
+            ("info: Now listening on: http://localhost:5002", Hue::Cyan),
+            ("warn: The cache is cold", Hue::Yellow),
+            ("fail: Billing.Api[0]", Hue::Red),
+            ("      Payment 9 was declined.", Hue::Red),
+            ("info: Application started.", Hue::Cyan),
+            ("info: Seeded the orders", Hue::Cyan),
+        ],
+    );
+    state.run_from
+}
+
+#[tokio::test]
+async fn alt_d_dims_what_the_last_run_printed_too_and_counts_and_steps_through_whats_new() {
+    let mut screen = screen("diff", json!({}));
+    let from = two_runs(&mut screen);
+    screen.press("z Alt+d");
+    let frame = screen.frame();
+    assert!(frame.contains("Δ +1 new error · +1 new warning · 1 fixed · 1 new line"), "{frame}");
+    assert!(frame.contains("▲fail: Billing.Api[0]") && frame.contains("│      Payment 9"), "{frame}");
+    assert!(frame.contains("●info: Seeded the orders") && frame.contains(" info: Application started."), "{frame}");
+    let at = |screen: &Screen| super::diff::view(&screen.ui, &screen.controller.states[0]).and_then(|view| view.at);
+    screen.press("n");
+    assert_eq!(at(&screen), Some(from + 2), "n: the newest new error or warning above the bottom, Billing's");
+    screen.press("n");
+    assert_eq!(at(&screen), Some(from + 1), "then the warning");
+    screen.press("n");
+    assert_eq!(at(&screen), Some(from + 2), "round again");
+    screen.press("Alt+d");
+    assert!(!screen.frame().contains('Δ'), "{}", screen.frame());
+}
+
+#[tokio::test]
+async fn without_an_earlier_run_alt_d_says_so_and_quitting_keeps_the_run_for_the_next_one() {
+    let mut screen = screen("diff-first", json!({}));
+    let at = screen.ui.now - Duration::from_secs(5);
+    let state = &mut screen.controller.states[0];
+    state.reset_for_start();
+    state.add_line("info: Application started.", Hue::Cyan, at);
+    let key = state.key.clone();
+    screen.press("z Alt+d");
+    assert!(screen.frame().contains("Δ nothing to compare with yet"), "{}", screen.frame());
+    screen.controller.shutdown();
+    let kept = lazyrunner_core::run::diff::load(screen.controller.state_folder());
+    let started = lazyrunner_core::output::shape("info: Application started.");
+    assert!(kept.get(&key).is_some_and(|run| run.shapes.contains(&started)), "{kept:?}");
+}
+
 #[tokio::test]
 async fn m_marks_lines_brackets_jump_between_them_and_the_marks_box_lists_them() {
     let mut screen = screen("marks", json!({}));

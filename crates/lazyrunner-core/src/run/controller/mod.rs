@@ -30,6 +30,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::app::{AppState, Status};
 use super::build::Timings;
 use super::child::{Child, Guard};
+use super::diff;
 use super::history::{Durations, Kind};
 use super::net::{Listening, ProbeResult};
 use super::watcher::CodeWatcher;
@@ -234,8 +235,10 @@ impl Controller {
         }
         let mut states: Vec<AppState> = apps.iter().map(|app| AppState::new(&app.key)).collect();
         let mut log_problems = Vec::new();
+        let mut runs = diff::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
+            state.previous = runs.remove(&state.key);
             if let Err(error) = state.open_log(&state_dir.join("logs")) {
                 log_problems.push(format!("! {}'s output isn't saved to a log file ({error})", state.key));
             }
@@ -658,8 +661,15 @@ impl Controller {
         self.stop(Some(&[key.to_string()]), false);
     }
 
-    /// Before quitting: cancel the build, npm ci and the tests, and stop every app, quietly.
+    /// Before quitting: cancel the build, npm ci and the tests, and stop every app, quietly. Their runs are kept to
+    /// compare the next ones with - but not those handed over to the next lazyrunner, which go on.
     pub fn shutdown(&mut self) {
+        let handed_over = |state: &AppState| state.is_running() && state.child.is_none();
+        let kept: Vec<bool> =
+            (0..self.states.len()).map(|index| !handed_over(&self.states[index]) && self.keep_run(index)).collect();
+        if kept.contains(&true) {
+            self.save_runs();
+        }
         self.stop_tests(true);
         self.stop_migrations();
         if self.building.is_some() {
@@ -669,6 +679,40 @@ impl Controller {
         self.stop(None, true);
         for state in &mut self.states {
             state.flush_log();
+        }
+    }
+
+    /// Before an app's next run: the run it had becomes the one the next compares with (`Alt+d`), kept in runs.json
+    /// too.
+    pub(super) fn remember_run(&mut self, index: usize) {
+        if self.keep_run(index) {
+            self.save_runs();
+        }
+    }
+
+    /// App `index`'s run so far as the one its next run compares with; a run with no lines left (Ctrl+L) leaves the
+    /// one before it.
+    fn keep_run(&mut self, index: usize) -> bool {
+        let state = &mut self.states[index];
+        if state.run_from == 0 {
+            return false;
+        }
+        let digest = diff::Digest::of(&state.output, state.run_from);
+        if digest.shapes.is_empty() {
+            return false;
+        }
+        state.previous = Some(digest);
+        true
+    }
+
+    fn save_runs(&mut self) {
+        let runs: HashMap<&str, &diff::Digest> =
+            self.states.iter().filter_map(|state| Some((state.key.as_str(), state.previous.as_ref()?))).collect();
+        if let Err(error) = diff::save(&self.state_dir, &runs) {
+            self.add_log(
+                format!("! The runs to compare the next ones with (Alt+d) aren't saved ({error})"),
+                Hue::Yellow,
+            );
         }
     }
 

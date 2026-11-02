@@ -34,6 +34,8 @@ pub struct OutputLine {
     pub born: Instant,
     /// The colour lazyrunner gave the line (app output, its own notes); `None`: by its level.
     pub hue: Option<Hue>,
+    /// The line with what changes from run to run blanked, hashed ([`shape`]).
+    pub shape: u64,
 }
 
 impl OutputLine {
@@ -161,6 +163,7 @@ impl Output {
         let shown = text.rsplit('\r').next().unwrap_or_default().replace('\t', "    ");
         let text: String = shown.chars().filter(|c| !c.is_control()).collect();
         let level = Level::of(&text);
+        let shape = shape(&text);
         match level {
             Level::Error => self.errors += 1,
             Level::Warn => self.warnings += 1,
@@ -169,7 +172,7 @@ impl Output {
         if self.lines.len() == self.capacity {
             self.lines.pop_front();
         }
-        self.lines.push_back(OutputLine { text, level, born: now, hue });
+        self.lines.push_back(OutputLine { text, level, born: now, hue, shape });
         self.total += 1;
         self.last_line_at = Some(now);
     }
@@ -226,6 +229,28 @@ impl Output {
     pub fn last_line_at(&self) -> Option<Instant> {
         self.last_line_at
     }
+}
+
+/// FNV-1a's start: the same hash in every lazyrunner, so the shapes kept in a file still match.
+pub const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME: u64 = 0x0100_0000_01b3;
+
+/// A line's text with every word that has a digit in it - a time, a duration, a port, an id, a GUID's part -
+/// blanked, hashed: the same line in another run has the same shape (`run::diff`).
+pub fn shape(text: &str) -> u64 {
+    text.split_inclusive(|c: char| !c.is_alphanumeric()).fold(FNV_OFFSET, |hash, word| {
+        let (body, end) = match word.char_indices().last() {
+            Some((at, c)) if !c.is_alphanumeric() => (&word[..at], &word[at..]),
+            _ => (word, ""),
+        };
+        let body = if body.bytes().any(|byte| byte.is_ascii_digit()) { "#" } else { body };
+        mix(mix(hash, body.as_bytes()), end.as_bytes())
+    })
+}
+
+/// `hash` with `bytes` fed into it.
+pub fn mix(hash: u64, bytes: &[u8]) -> u64 {
+    bytes.iter().fold(hash, |hash, byte| (hash ^ u64::from(*byte)).wrapping_mul(FNV_PRIME))
 }
 
 /// Drops terminal escape sequences (colours, cursor moves); the P3 output view renders colours itself.
@@ -341,6 +366,7 @@ mod tests {
             level: Level::of(text),
             born: Instant::now(),
             hue,
+            shape: shape(text),
         };
         let stack = line("      at Orders.Api.Checkout()", Some(Hue::Red));
         let warned = line("warn: Orders.Api[2]", Some(Hue::Yellow));
@@ -365,6 +391,19 @@ mod tests {
         for filter in cycle {
             assert_eq!(LevelFilter::from_key(filter.key()), filter);
         }
+    }
+
+    #[test]
+    fn a_lines_shape_leaves_out_what_changes_every_run() {
+        assert_eq!(
+            shape("12:00:01.123 Now listening on: http://localhost:5001"),
+            shape("09:14:59.002 Now listening on: http://localhost:5002")
+        );
+        assert_eq!(
+            shape("Order 0f8fad5b-d9cb-469f-a165-70867728950e saved in 12 ms"),
+            shape("Order 7c9e6679-7425-40de-944b-e07fc1f90ae7 saved in 340 ms")
+        );
+        assert_ne!(shape("Order saved"), shape("Order deleted"));
     }
 
     #[test]

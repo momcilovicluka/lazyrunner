@@ -102,6 +102,7 @@ mod tests {
                 level: Level::Info,
                 born: start + Duration::from_millis(*millis),
                 hue: None,
+                shape: 0,
             })
             .collect();
         let list: Vec<Shown> =

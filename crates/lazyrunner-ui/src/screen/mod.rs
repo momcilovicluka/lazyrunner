@@ -8,6 +8,7 @@ pub mod bundle;
 pub mod checklist;
 pub mod columns;
 pub mod copy;
+pub mod diff;
 pub mod durations;
 pub mod follow;
 pub mod held;
@@ -289,6 +290,8 @@ pub struct Ui {
     pub rails: rail::Maps,
     /// What moves on the rails: an ember to a new error, the shimmer back to live, a search's pulse.
     pub rail_motion: rail_motion::Effects,
+    /// Each column's diff mode (Alt+d: what's new since its last run), by its app's key.
+    pub diffs: std::collections::HashMap<String, diff::Diff>,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Requests sent again (p in the requests view): how each went, once it has.
@@ -378,6 +381,7 @@ impl Ui {
             spinner: spinner::Spinner::default(),
             rails: rail::Maps::default(),
             rail_motion: rail_motion::Effects::default(),
+            diffs: std::collections::HashMap::new(),
             seen: seen::Seen::default(),
             replays: Vec::new(),
             git_tool_wanted: false,
@@ -529,6 +533,7 @@ impl Ui {
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)
+            || diff::animating(self)
             || migrations_rail::animating(self, controller)
         {
             return true;

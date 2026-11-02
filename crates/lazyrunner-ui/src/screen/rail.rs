@@ -13,6 +13,7 @@ use lazyrunner_core::output::{Level, LevelFilter};
 use lazyrunner_core::run::app::AppState;
 
 use super::columns::{self, Shown};
+use super::diff::{Kind, View};
 use super::mouse::Target;
 use super::rail_density::{self, Density};
 use super::rail_motion::{self, Now};
@@ -28,6 +29,8 @@ const WIDE_FROM: usize = 30;
 enum Mark {
     Empty,
     Normal,
+    /// A line the app's last run didn't print (`Alt+d`).
+    New,
     Marked,
     Match,
     Warning,
@@ -46,6 +49,8 @@ struct Drawn {
     filter: LevelFilter,
     search: Option<(String, bool, bool)>,
     marks: usize,
+    /// The first line of the run compared with the last one (`Alt+d`).
+    diff: Option<u64>,
 }
 
 /// A column's map: its rows, and how fast each one's lines came.
@@ -73,6 +78,7 @@ pub fn add(
     index: usize,
     list: &[Shown],
     search: Option<&Search>,
+    diff: Option<&View>,
     rows: &mut [Vec<Seg>],
     scroll: usize,
     cells: usize,
@@ -81,19 +87,21 @@ pub fn add(
     if height == 0 || total == 0 {
         return;
     }
-    let map = map(ui, state, list, search, height);
+    let diff = diff.filter(|diff| diff.has_gutter());
+    let map = map(ui, state, list, search, diff, height);
     let marks = &map.rows;
     let thumb = (height * height / total).clamp(1, height);
     let newest_shown = total.saturating_sub(scroll).max(1); // the lines up to this one end at the bottom row
     let bottom = (newest_shown * height).div_ceil(total).clamp(thumb, height); // at the top it keeps its size
     let top = bottom.saturating_sub(thumb);
     let bracket = if scroll > 0 { C::Cyan } else { C::DarkGray };
-    let matched = search.and_then(|search| search.index);
+    let stepped = diff.and_then(|diff| diff.at).and_then(|number| state.output.position_of(number));
+    let matched = search.and_then(|search| search.index).or(stepped);
     let match_at = matched.and_then(|position| list.iter().position(|item| item.position == position));
     let now = Now {
         live_top: height.saturating_sub(thumb),
         narrow: cells == 1,
-        errors: state.errors,
+        errors: diff.map_or(state.errors, |diff| diff.errors as u64),
         dropped: state.output.total().saturating_sub(state.output.len() as u64),
         scroll,
         target: state.scroll,
@@ -126,6 +134,7 @@ pub fn add(
             Mark::Warning => seg("█", C::Yellow),
             Mark::Match => seg("█", C::Cyan),
             Mark::Marked => seg("▌", C::Magenta),
+            Mark::New => seg("•", C::Cyan),
             _ if seen && cells == 1 => seg("▐", bracket),
             Mark::Normal => match map.density.get(at) {
                 Some(density) => seg(density.glyph.to_string(), if density.burst { C::Gray } else { C::DarkGray }),
@@ -157,7 +166,7 @@ fn jump(line: usize, height: usize, total: usize) -> usize {
 
 /// The rail's rows: the most serious line in each one's share of `list`, and where it is in it (the first of them);
 /// and how fast each one's lines came.
-fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows: usize) -> Map {
+fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, diff: Option<&View>, rows: usize) -> Map {
     let drawn = Drawn {
         total: state.output.total(),
         shown: list.len(),
@@ -165,6 +174,7 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows:
         filter: state.filter,
         search: search.map(|search| (search.query.clone(), search.regex, search.case)),
         marks: state.marks.len(),
+        diff: diff.map(|_| state.run_from),
     };
     let mut maps = ui.rails.0.borrow_mut();
     if let Some((was, map)) = maps.get(&state.key)
@@ -175,7 +185,7 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows:
     let mut marks = vec![(Mark::Empty, 0); rows];
     for (at, item) in list.iter().enumerate() {
         let row = at * rows / list.len();
-        let mark = mark(state, item, search);
+        let mark = mark(state, item, search, diff);
         if mark > marks[row].0 {
             marks[row] = (mark, at);
         }
@@ -185,12 +195,17 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, rows:
     map
 }
 
-fn mark(state: &AppState, item: &Shown, search: Option<&Search>) -> Mark {
-    match item.line.severity() {
-        Level::Error => Mark::Error,
-        Level::Warn => Mark::Warning,
+/// A line's mark: how serious it is, a search's match, a mark of its own - and with `Alt+d`, only what's new
+/// counts as serious.
+fn mark(state: &AppState, item: &Shown, search: Option<&Search>, diff: Option<&View>) -> Mark {
+    let number = state.output.number_at(item.position);
+    let kind = diff.and_then(|diff| diff.kind(number));
+    match (kind, item.line.severity()) {
+        (Some(Kind::Problem { level: Level::Error, .. }) | None, Level::Error) => Mark::Error,
+        (Some(Kind::Problem { .. }) | None, Level::Warn | Level::Error) => Mark::Warning,
         _ if search.is_some_and(|search| search.matches(&item.line.text)) => Mark::Match,
-        _ if state.marks.binary_search(&state.output.number_at(item.position)).is_ok() => Mark::Marked,
+        _ if state.marks.binary_search(&number).is_ok() => Mark::Marked,
+        (Some(Kind::New | Kind::Problem { .. }), _) => Mark::New,
         _ => Mark::Normal,
     }
 }
