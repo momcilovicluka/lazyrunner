@@ -4,14 +4,14 @@ expression: screen.frame()
 ---
 
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
-  │ Run                                                                             z           Zoom the … │
-  │   Space       Start / stop the focused app                                      Ctrl+O      Jump back  │
-  │   u U         Start · focused / all                                             Alt+→       Jump forw… │
-  │   s S         Stop · focused / all                                              f           Filter th… │
-  │   r R         Restart · focused / all                                           m           Mark a li… │
-  │   b B         Build · focused / all                                             [           Older mark │
-  │   q           Quit                                                              ]           Newer mark │
-  │ Tools                                                                           '           Marks: ev… │
+  │ Run                                                                             Ctrl+O      Jump back  │
+  │   Space       Start / stop the focused app                                      Alt+→       Jump forw… │
+  │   u U         Start · focused / all                                             f           Filter th… │
+  │   s S         Stop · focused / all                                              m           Mark a li… │
+  │   r R         Restart · focused / all                                           [           Older mark │
+  │   b B         Build · focused / all                                             ]           Newer mark │
+  │   q           Quit                                                              '           Marks: ev… │
+  │ Tools                                                                           ~           Timeline:… │
   │   d           Switch database                                                   + -         Widen / n… │
   │   i           Install packages: npm ci or npm install                           =           Equal col… │
   │   i c         npm ci                                                            |           Layout: c… │
@@ -30,5 +30,6 @@ expression: screen.frame()
   │   F           Follow the agent                                                  ^u ^d ^b ^f half page… │
   │ View                                                                            gg G < >    oldest / … │
   │   /           Search the focused app's output                                   n N Esc     search: o… │
+  │   z           Zoom the focused column                                                                  │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
