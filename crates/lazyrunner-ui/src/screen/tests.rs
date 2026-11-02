@@ -350,6 +350,34 @@ async fn tilde_shows_every_apps_output_in_the_order_it_came_and_enter_jumps_to_a
 }
 
 #[tokio::test]
+async fn the_timeline_narrows_to_words_an_app_and_a_level() {
+    let mut screen = screen("timeline-filter", json!({}));
+    let at = screen.ui.now - Duration::from_secs(60);
+    screen.controller.states[0].add_line("GET /orders took 12 ms", Hue::Gray, at);
+    screen.controller.states[1].add_line("charging card 42", Hue::Gray, at);
+    screen.controller.states[1].add_line("payment declined", Hue::Red, at);
+    screen.controller.states[0].add_line("GET /orders took 900 ms", Hue::Yellow, at);
+    let shown = |screen: &mut Screen| {
+        let frame = screen.frame();
+        ["took 12 ms", "charging card", "payment declined", "took 900 ms"].map(|text| frame.contains(text))
+    };
+    screen.press("~ / a p p : b i l l");
+    assert_eq!(shown(&mut screen), [false, true, true, false], "app: keeps Billing's lines");
+    screen.press("Space c a r d Enter");
+    assert_eq!(shown(&mut screen), [false, true, false, false], "and words narrow it further");
+    assert!(screen.frame().contains("1 of 4 lines · /app:bill card"), "{}", screen.frame());
+    screen.press("Esc");
+    assert_eq!(shown(&mut screen), [true; 4], "Esc shows every line again");
+    screen.press("/ l e v e l : w Enter");
+    assert_eq!(shown(&mut screen), [false, false, true, true], "level: keeps warnings and up");
+    screen.press("Esc f");
+    assert_eq!(shown(&mut screen), [false, false, true, false], "f: errors only, as in the columns");
+    assert!(screen.frame().contains("errors only"), "{}", screen.frame());
+    screen.press("Esc Esc");
+    assert!(screen.ui.overlay.is_none(), "the second Esc closes it");
+}
+
+#[tokio::test]
 async fn search_filters_to_its_matches_and_takes_regex_and_case() {
     let mut screen = screen("search-filter", json!({}));
     let at = screen.ui.now - Duration::from_secs(5);
