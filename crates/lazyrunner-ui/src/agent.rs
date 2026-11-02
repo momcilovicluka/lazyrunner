@@ -172,9 +172,10 @@ fn app_index(controller: &Controller, args: &Value) -> Result<usize, Refusal> {
         })
 }
 
-/// An app's output, each line with its number: the newest `limit` lines after `since`, those matching `grep`
-/// (ignoring case), errors only when asked. `next` is the number to pass as `since` for what comes after;
-/// `truncated` says older matching lines after `since` didn't fit. A `since` past the newest line (lazyrunner opened
+/// An app's output as one text, each line after its number: the newest `limit` lines after `since`, those matching
+/// `grep` (ignoring case), errors only when asked. Not an object per line: an agent pays for every character, and
+/// `{"seq":…,"text":…}` made a log half again as long. `next` is the number to pass as `since` for what comes
+/// after; `truncated` says older matching lines after `since` didn't fit. A `since` past the newest line (lazyrunner opened
 /// again since) starts over (`reset`).
 fn logs(controller: &Controller, args: &Value) -> Answer {
     let index = app_index(controller, args)?;
@@ -187,21 +188,22 @@ fn logs(controller: &Controller, args: &Value) -> Answer {
     let limit = args["limit"].as_u64().map_or(LOG_LINES, |limit| (limit as usize).clamp(1, MAX_LOG_LINES));
     let grep = args["grep"].as_str().map(str::to_lowercase);
     let errors_only = args["errors_only"].as_bool().unwrap_or(false);
-    let mut lines: Vec<Value> = output
+    let mut lines: Vec<String> = output
         .newest_first(0)
         .zip((oldest..=total).rev())
         .take_while(|(_, seq)| *seq > since)
         .filter(|(line, _)| !errors_only || copy::is_error(line))
         .filter(|(line, _)| grep.as_ref().is_none_or(|grep| line.text.to_lowercase().contains(grep)))
         .take(limit + 1)
-        .map(|(line, seq)| json!({ "seq": seq, "text": line.text }))
+        .map(|(line, seq)| format!("{seq} {}", line.text))
         .collect();
     let truncated = lines.len() > limit;
     lines.truncate(limit);
     lines.reverse();
     Ok(json!({
         "app": controller.apps[index].key,
-        "lines": lines,
+        "count": lines.len(),
+        "text": lines.join("\n"),
         "next": total,
         "truncated": truncated,
         "older_lines_dropped": since.saturating_add(1) < oldest,

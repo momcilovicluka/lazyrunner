@@ -416,7 +416,7 @@ an app that only logs to Seq when it has a Seq key, say:
 lazyrunner starts the .NET apps with ASP.NET's request log turned on (`--Logging:LogLevel:Microsoft.AspNetCore.
 Hosting.Diagnostics=Information`) and keeps those lines out of the columns: `H` lists the requests instead - time,
 app, method, status, milliseconds and path, newest first (`s`: slowest first). Serilog's request logging (`HTTP GET /x
-responded 200 in 12 ms`) shows too. `Tab` sums them up per endpoint (ids in paths become `{id}`): count, errors,
+responded 200 in 12 ms`) shows too. `Tab` sums them up per endpoint (ids and user names like `jo@contoso` in paths become `{id}`): count, errors,
 average, 95th percentile and slowest, sorted by total time (`s` for the others).
 
 `Enter` (or `Space`, or a double click) shows the selected row's details in a panel on the right, and again hides
@@ -510,7 +510,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | Tool | What it does |
 |------|--------------|
 | `get_status` | Each app's state, port, url and error count; what's busy; the test totals; the settings; what's on screen |
-| `get_logs` | An app's output, numbered: `since` (only what's new), `limit`, `grep`, `errors_only` |
+| `get_logs` | An app's output as one text, each line after its number: `since` (only what's new), `limit`, `grep`, `errors_only` |
 | `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
 | `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path, one endpoint - or summed up per endpoint (p50, p95, max); N+1s marked |
 | `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1) |
@@ -775,7 +775,7 @@ Everyone who builds lazyrunner, or tells it what to do next - kept up to date fr
 <!-- contributors:start -->
 <p>
 <a href="https://github.com/momcilovicluka" title="Luka Momčilović (@momcilovicluka) - creator · maintainer"><img src="https://github.com/momcilovicluka.png?size=96" width="56" height="56" alt="Luka Momčilović"></a>
-<a href="https://github.com/ognjen004028" title="Ognjen Maričić (@ognjen004028) - 2 PRs · 3 bug reports · 7 ideas"><img src="https://github.com/ognjen004028.png?size=96" width="56" height="56" alt="Ognjen Maričić"></a>
+<a href="https://github.com/ognjen004028" title="Ognjen Maričić (@ognjen004028) - 2 PRs · 10 bug reports · 15 ideas"><img src="https://github.com/ognjen004028.png?size=96" width="56" height="56" alt="Ognjen Maričić"></a>
 </p>
 <!-- contributors:end -->
 

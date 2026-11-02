@@ -97,7 +97,9 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
     match op {
         "logs" => {
             let app = app_of(controller, &result["app"])?;
-            let lines = result["lines"].as_array()?.iter().filter_map(|line| line["text"].as_str());
+            // Each line after its number and a space.
+            let lines =
+                result["text"].as_str()?.lines().map(|line| line.split_once(' ').map_or(line, |(_, text)| text));
             look_at(ui, controller, app, lines.map(str::to_string).collect());
             let grep = args["grep"].as_str().map_or(String::new(), |grep| format!(" matching \"{grep}\""));
             Some(format!("read {}'s output{grep}", controller.apps[app].name))

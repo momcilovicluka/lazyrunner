@@ -289,7 +289,8 @@ fn an_agent_drives_lazyrunner_over_mcp() {
     let ready: Value = serde_json::from_str(&text(&ready)).unwrap();
     assert_eq!((ready["done"].clone(), ready["summary"].clone()), (json!(true), json!("up: one")), "{ready}");
     let logs = call(5, "tools/call", json!({ "name": "get_logs", "arguments": { "app": "one", "limit": 5 } }));
-    assert!(text(&logs).contains("\"seq\""), "{}", text(&logs));
+    let logs: Value = serde_json::from_str(&text(&logs)).unwrap();
+    assert!(logs["text"].as_str().is_some_and(|text| !text.is_empty()), "{logs}");
     assert!(lazyrunner.log().contains("▸ e2e-agent: start one"), "{}", lazyrunner.log());
 
     drop(call); // closes the server's stdin: it ends
