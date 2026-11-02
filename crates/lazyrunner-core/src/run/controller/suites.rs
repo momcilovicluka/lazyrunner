@@ -293,6 +293,7 @@ impl Controller {
         self.test_queue.clear();
         self.run_keys.clear();
         self.tests_started = None;
+        self.tests_code = None;
         if quiet || (stopped.is_empty() && !queued) {
             return;
         }
@@ -410,7 +411,10 @@ impl Controller {
                 Hue::DarkGray,
             );
         }
+        let code =
+            self.tests_code.get_or_insert_with(|| build::fingerprint(&self.root, &self.project.source_dir)).clone();
         let Some(suite) = self.suite_mut(key) else { return };
+        suite.code = code;
         suite.output.clear();
         suite.lines.clear();
         suite.done = 0;
@@ -483,6 +487,10 @@ impl Controller {
                 return;
             }
         };
+        // A run of some tests only is a run of those in their history.
+        let ran_now: Vec<suites::TestResult> =
+            tests.iter().filter(|test| !failed_only || requested.contains(&test.name)).cloned().collect();
+        let code = suite.code.take();
         let ran = if failed_only {
             suite.merge(tests, &requested)
         } else {
@@ -491,6 +499,10 @@ impl Controller {
         };
         suite.status = if suite.failed > 0 { Status::Failed } else { Status::Passed };
         let (passed, failed, skipped) = (suite.passed, suite.failed, suite.skipped);
+        self.test_history.record(key, code.as_deref(), &ran_now);
+        if let Err(error) = self.test_history.save(&dir) {
+            self.add_log(format!("! The tests' history isn't saved ({error})"), Hue::Yellow);
+        }
         let note = if failed_only {
             String::new()
         } else {
@@ -510,6 +522,7 @@ impl Controller {
 
     /// Every suite of the run is done: one line, and a notification when something failed.
     fn tests_done(&mut self) {
+        self.tests_code = None;
         let Some(started) = self.tests_started.take() else { return };
         let took = format_duration((self.now)().saturating_duration_since(started).as_secs_f64());
         let ran = std::mem::take(&mut self.run_keys);

@@ -185,6 +185,10 @@ pub struct Controller {
     pub requests: super::requests::Requests,
     /// The test suites (T), found the first time the tests view opens.
     pub suites: Option<Vec<super::suites::Suite>>,
+    /// Each suite's last runs, test by test (tests/test-history.json).
+    pub test_history: super::test_history::TestHistory,
+    /// The code this test run runs on, worked out when its first suite starts.
+    tests_code: Option<Option<String>>,
     /// The queued .NET suites' projects building, in one MSBuild run.
     pub test_build: Option<TestBuild>,
     /// The suites waiting to run, in order.
@@ -258,6 +262,8 @@ impl Controller {
             migrations_check: false,
             requests: Default::default(),
             suites: None,
+            test_history: super::test_history::TestHistory::load(&state_dir.join("tests")),
+            tests_code: None,
             test_build: None,
             test_queue: Vec::new(),
             tests_started: None,

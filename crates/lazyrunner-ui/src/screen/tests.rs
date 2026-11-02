@@ -1547,6 +1547,43 @@ async fn the_tests_view_lists_the_suites_and_shows_the_failures() {
 }
 
 #[tokio::test]
+async fn the_tests_view_tells_new_failures_from_known_ones_and_shows_each_tests_last_runs() {
+    use lazyrunner_core::run::suites::{Outcome, TestResult};
+    let mut screen = screen("snap-test-history", json!({}));
+    with_suites(&mut screen);
+    let result = |name: &str, outcome| TestResult {
+        name: name.into(),
+        outcome,
+        ms: 1.0,
+        message: String::new(),
+        stack: String::new(),
+    };
+    let (totals, adds) = ("Orders.Tests.CartTests.Totals(2, 3)", "Orders.Tests.CartTests.Adds");
+    for (code, totals_did, adds_did) in [
+        ("a", Outcome::Passed, Outcome::Passed),
+        ("a", Outcome::Passed, Outcome::Failed),
+        ("a", Outcome::Passed, Outcome::Passed),
+        ("b", Outcome::Failed, Outcome::Passed),
+    ] {
+        let results = [result(totals, totals_did), result(adds, adds_did)];
+        screen.controller.test_history.record("dotnet:orders", Some(code), &results);
+    }
+    screen.press("T");
+    let frame = screen.frame();
+    assert!(frame.contains("✓1 ✗1 ↻1  1 new"), "the list's counts and badge: {frame}");
+    assert!(frame.contains(" NEW  ✗ Orders.Tests.CartTests.Totals(2, 3)"), "the badge, new failures first: {frame}");
+    assert!(frame.contains("↻ 1 flaky") && frame.contains("Flaky (1):"), "Adds failed once on the same code: {frame}");
+    insta::assert_snapshot!(frame);
+    screen.press("v");
+    let frame = screen.frame();
+    assert!(frame.contains("Orders.Tests") && !frame.contains("Billing.Tests"), "failed only: {frame}");
+    screen.press("v");
+    assert!(screen.frame().contains("Orders.Tests"), "flaky only: {}", screen.frame());
+    screen.press("v");
+    assert!(screen.frame().contains("Billing.Tests"), "all again: {}", screen.frame());
+}
+
+#[tokio::test]
 async fn in_the_tests_view_keys_choose_copy_and_say_what_they_cant_do() {
     let mut screen = screen("tests-keys", json!({}));
     with_suites(&mut screen);

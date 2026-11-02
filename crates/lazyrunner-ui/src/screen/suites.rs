@@ -1,6 +1,8 @@
 //! T: the test suites. On the left the list, grouped by what runs them; on the right the selected suite: its live
 //! output while it runs, then its failures (message and its own stack frames, links clickable), or its slowest tests
-//! when all passed.
+//! when all passed. Each suite's history (`run::test_history`) tells its new failures from the known ones, its flaky
+//! tests and the fixed ones; every test shows its last runs as a strip, two runs a cell, the newest on the right.
+//! `v` lists all the suites, those with failures, or those with flaky tests.
 
 use std::collections::VecDeque;
 use std::time::Instant;
@@ -10,6 +12,7 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::format_duration;
 use lazyrunner_core::run::suites::{Outcome, Status, Suite, TestResult};
+use lazyrunner_core::run::test_history::{ABSENT, Story, Tally};
 
 use super::columns::{chunk, fit, linked, spinner};
 use super::icons::{self, Icon};
@@ -17,6 +20,10 @@ use super::mouse::Target;
 use super::seg::{Seg, aim, band, on, pad, seg, take_cells};
 use super::theme::C;
 use super::{Overlay, Ui, copy};
+
+/// A test's strip of last runs, two a cell: in the details, and beside each test to pick from.
+const STRIP_CELLS: usize = 10;
+const PICK_STRIP_CELLS: usize = 5;
 
 /// The list's width: two fifths of the screen, within these.
 const LIST_WIDTH: (usize, usize) = (30, 60);
@@ -40,11 +47,54 @@ const FRAMEWORK: [&str; 7] =
 /// T: opens the view and looks for the suites (again, to find new ones).
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
     controller.find_suites();
+    ui.tests_only = Only::All;
     ui.overlay = Some(Overlay::Tests { index: FIRST_SUITE, scroll: 0, picking: None });
 }
 
 /// The selection when the view opens: the first suite (once there is a list).
 pub(super) const FIRST_SUITE: usize = usize::MAX;
+
+/// Which suites the list shows (`v`): all, those with failures, those with flaky tests.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Only {
+    #[default]
+    All,
+    Failed,
+    Flaky,
+}
+
+impl Only {
+    const EACH: [Only; 3] = [Only::All, Only::Failed, Only::Flaky];
+
+    fn next(self) -> Self {
+        match self {
+            Self::All => Self::Failed,
+            Self::Failed => Self::Flaky,
+            Self::Flaky => Self::All,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::Failed => "failed",
+            Self::Flaky => "flaky",
+        }
+    }
+
+    fn admits(self, controller: &Controller, suite: &Suite) -> bool {
+        match self {
+            Self::All => true,
+            Self::Failed => suite.failed > 0 || suite.status == Status::Error,
+            Self::Flaky => tally(controller, suite).flaky > 0,
+        }
+    }
+}
+
+/// A suite's tests as its history sums them up (nothing to sum without one).
+fn tally(controller: &Controller, suite: &Suite) -> Tally {
+    controller.test_history.suite(&suite.key).map(|history| history.tally(&suite.tests)).unwrap_or_default()
+}
 
 /// A row of the list: a side (Backend, Frontend), one of its apps (or the suites of no app), or a suite (by its
 /// place among the suites).
@@ -91,6 +141,26 @@ pub fn list_rows(controller: &Controller) -> Vec<Row> {
         }
     }
     rows
+}
+
+/// The list as `v` narrows it: the suites it admits, under the sides and apps that still have one.
+fn shown_rows(controller: &Controller, only: Only) -> Vec<Row> {
+    let rows = list_rows(controller);
+    if only == Only::All {
+        return rows;
+    }
+    let suites = controller.suites.as_deref().unwrap_or_default();
+    let admits = |suite: &Suite| only.admits(controller, suite);
+    (0..rows.len())
+        .filter(|&at| match &rows[at] {
+            Row::Suite(index) => suites.get(*index).is_some_and(admits),
+            Row::Untested { .. } => false,
+            Row::Side { .. } | Row::App { .. } => {
+                under(controller, &rows, at).iter().filter_map(|key| controller.suite(key)).any(admits)
+            }
+        })
+        .map(|at| rows[at].clone())
+        .collect()
 }
 
 /// The selection, in the list: the first suite at first, never past the end.
@@ -175,7 +245,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     if matches!(ui.overlay, Some(Overlay::Tests { picking: Some(_), .. })) && pick_key(ui, controller, name) {
         return true;
     }
-    let rows = list_rows(controller);
+    let rows = shown_rows(controller, ui.tests_only);
     let Some(Overlay::Tests { index, scroll, picking }) = &mut ui.overlay else { return false };
     let at = chosen(index, &rows);
     let all: Vec<String> = controller.suites.iter().flatten().map(|suite| suite.key.clone()).collect();
@@ -197,6 +267,10 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             _ if !a_suite => controller.add_log("Choose a suite to pick one of its tests.", Hue::DarkGray),
             _ => controller.add_log("No results for this suite yet - r runs it.", Hue::DarkGray),
         },
+        "v" => {
+            ui.tests_only = ui.tests_only.next();
+            (*index, *scroll, *picking) = (FIRST_SUITE, 0, None);
+        }
         "<" => (*index, *scroll) = (0, 0),
         ">" => (*index, *scroll) = (rows.len().saturating_sub(1), 0),
         digit if digit.len() == 1 && ('1'..='9').contains(&digit.chars().next().unwrap_or('0')) => {
@@ -232,7 +306,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
 /// Picking a test (l): j k choose, r / Enter run it, y copy it, h / Esc / Tab back to the suites; false for the
 /// keys the suites handle (s, o, R, ...).
 fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
-    let rows = list_rows(controller);
+    let rows = shown_rows(controller, ui.tests_only);
     let Some(Overlay::Tests { index, picking, .. }) = &mut ui.overlay else { return false };
     let Some(Row::Suite(at)) = rows.get(chosen(index, &rows)) else { return false };
     let Some(suite) = controller.suites.as_deref().and_then(|suites| suites.get(*at)) else { return false };
@@ -271,7 +345,7 @@ fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
 /// A click on a side or an app runs its suites; on a suite it selects it (and leaves its tests), on a test it picks
 /// it, and a double click runs it.
 pub fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool) -> bool {
-    let rows = list_rows(controller);
+    let rows = shown_rows(controller, ui.tests_only);
     let Some(Overlay::Tests { index, scroll, picking }) = &mut ui.overlay else { return false };
     let header = matches!(target, Some(Target::Item(at)) if !matches!(rows.get(at), Some(Row::Suite(_))));
     match target {
@@ -369,7 +443,8 @@ fn took(test: &TestResult) -> String {
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let suites = controller.suites.as_deref().unwrap_or_default();
-    let list_rows = list_rows(controller);
+    let only = ui.tests_only;
+    let list_rows = shown_rows(controller, only);
     let Some(Overlay::Tests { index, picking, .. }) = &mut ui.overlay else { return Vec::new() };
     let selected = chosen(index, &list_rows);
     let suite = match list_rows.get(selected) {
@@ -386,9 +461,12 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let list = list(ui, controller, &list_rows, selected, list_width);
     let list_top = selected.saturating_sub(height / 2).min(list.len().saturating_sub(height));
     let (detail, tail) = match (suite, picking) {
-        (Some(suite), Some(at)) => (pick(ui, suite, at, detail_width, height), false),
+        (Some(suite), Some(at)) => (pick(ui, controller, suite, at, detail_width, height), false),
         (Some(suite), None) => details(ui, controller, suite, detail_width),
         (None, _) if controller.suites.is_none() => (vec![vec![seg("Looking for tests…", C::DarkGray)]], false),
+        (None, _) if list_rows.is_empty() && only != Only::All => {
+            (vec![vec![seg(format!("No {} suites - v shows them all.", only.label()), C::DarkGray)]], false)
+        }
         (None, _) if list_rows.is_empty() => (vec![vec![seg("No test suites in this project.", C::DarkGray)]], false),
         (None, _) => (group(ui, controller, &list_rows, selected), false),
     };
@@ -441,7 +519,12 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
         on(format!(" {} Tests ", icons::icon(ui.nerd, Icon::Tests)), C::FocusText, C::FocusBack),
         seg(format!("  {count} suite{} · ", if count == 1 { "" } else { "s" }), C::DarkGray),
         seg(summary, color),
+        seg("   ", C::Gray),
     ];
+    for only in Only::EACH {
+        let chip = format!(" {} ", only.label());
+        segs.push(if only == ui.tests_only { on(chip, C::FocusText, C::FocusBack) } else { seg(chip, C::DarkGray) });
+    }
     segs.extend(watching(ui, controller));
     fit(segs, width)
 }
@@ -493,14 +576,16 @@ fn hint(width: usize, picking: bool) -> Vec<Seg> {
         " j k choose a test · r run it · a watch only it · y copy it · f failed again · s stop · h back to the suites"
     } else {
         " j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its \
-         tests · f / F failed again · a / A watch · s stop · o log · y copy failures · Esc back"
+         tests · f / F failed again · a / A watch · v all / failed / flaky · s stop · o log · y copy failures · Esc back"
     };
     fit(vec![seg(text, C::DarkGray)], width)
 }
 
 /// Picking a test: the suite's tests on top (around the picked one), the picked test's message and stack below.
-fn pick(ui: &mut Ui, suite: &Suite, at: usize, width: usize, height: usize) -> Vec<Vec<Seg>> {
+fn pick(ui: &mut Ui, controller: &Controller, suite: &Suite, at: usize, width: usize, height: usize) -> Vec<Vec<Seg>> {
     let list = test_list(suite);
+    let history = controller.test_history.suite(&suite.key);
+    let (strip_cells, gap) = history.map_or((0, ""), |_| (PICK_STRIP_CELLS + 1, " "));
     let running = if suite.status == Status::Running { "   running…" } else { "" };
     let mut lines = vec![vec![
         seg(suite.name.clone(), C::White),
@@ -512,12 +597,20 @@ fn pick(ui: &mut Ui, suite: &Suite, at: usize, width: usize, height: usize) -> V
     for (index, test) in list.iter().enumerate().skip(top).take(room) {
         let (icon, color) = outcome_mark(ui.nerd, test.outcome);
         let ms = if test.ms > 0.0 { format!("{:>7} ms", test.ms.round()) } else { String::new() };
-        let room = width.saturating_sub(ms.chars().count() + 4).max(8);
+        let room = width.saturating_sub(ms.chars().count() + 4 + strip_cells).max(8);
         let name = pad(&end_of(&test.name, room), room);
+        let marks = history.map_or_else(Vec::new, |history| strip(history.line(&test.name), PICK_STRIP_CELLS));
         let row = if index == at {
-            vec![on(pad(&format!(" {icon} {name} {ms}"), width), C::FocusText, C::FocusBack)]
+            let mut row = vec![on(format!(" {icon} "), C::FocusText, C::FocusBack)];
+            row.extend(marks);
+            let rest = width.saturating_sub(3 + strip_cells - gap.len());
+            row.push(on(pad(&format!("{gap}{name} {ms}"), rest), C::FocusText, C::FocusBack));
+            row
         } else {
-            vec![seg(format!(" {icon} "), color), seg(format!("{name} "), C::Gray), seg(ms, C::DarkGray)]
+            let mut row = vec![seg(format!(" {icon} "), color)];
+            row.extend(marks);
+            row.extend([seg(format!("{gap}{name} "), C::Gray), seg(ms, C::DarkGray)]);
+            row
         };
         lines.push(aim(row, Target::Test(index)));
     }
@@ -527,6 +620,16 @@ fn pick(ui: &mut Ui, suite: &Suite, at: usize, width: usize, height: usize) -> V
     let mut out = Details { ui, lines, width };
     out.add(&test.name, C::White, 0);
     out.add(&format!("{:?}{}", test.outcome, took(test)), color, 0);
+    let story = history.map(|history| history.story(&test.name)).unwrap_or_default();
+    let told = match (story.new, story.fixed, story.flaky) {
+        (_, _, Some((failures, runs))) => format!("↻ flaky - it failed {failures} of its last {runs} runs"),
+        (true, _, _) if test.outcome == Outcome::Failed => "a new failure: it didn't fail the run before".into(),
+        (_, true, _) => "fixed: it failed the run before".into(),
+        _ => String::new(),
+    };
+    if !told.is_empty() {
+        out.add(&told, if story.flaky.is_some() { C::Yellow } else { color }, 0);
+    }
     for line in test.message.lines().filter(|line| !line.trim().is_empty()) {
         out.add(line.trim_end(), C::Gray, 2);
     }
@@ -564,25 +667,32 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
             Row::Suite(at) => {
                 let Some(suite) = suites.get(*at) else { continue };
                 let summary = match controller.test_watch.pinned.get(&suite.key) {
-                    Some(test) => format!("{} · {WATCHED} pinned: {test}", summary(suite)),
-                    None => summary(suite),
+                    Some(test) => format!("{} · {WATCHED} pinned: {test}", summary(ui, controller, suite)),
+                    None => summary(ui, controller, suite),
                 };
-                let room = width.saturating_sub(summary.chars().count() + 9).max(4);
+                let news = tally(controller, suite).new;
+                let badge = if news > 0 { format!(" {news} new ") } else { String::new() };
+                let beside = if badge.is_empty() { 0 } else { badge.chars().count() + 1 };
+                let room = width.saturating_sub(summary.chars().count() + beside + 9).max(4);
                 let name = pad(&cut(&suite.name, room), room);
                 let icon = icon(ui, suite.status);
                 let watched = if controller.test_watch.suites.contains(&suite.key) { WATCHED } else { " " };
                 let row = if index == selected {
-                    let row = format!("  {watched}▸ {icon} {name} {summary}");
+                    let row = format!("  {watched}▸ {icon} {name} {summary} {badge}");
                     vec![on(pad(&row, width), C::FocusText, C::FocusBack)]
                 } else {
                     let color = tone(suite);
                     let name_color = if hovered { C::White } else { C::Gray };
-                    vec![
+                    let mut row = vec![
                         seg(format!("   {watched}"), C::Cyan),
                         seg(format!(" {icon} "), color),
                         seg(format!("{name} "), name_color),
                         seg(summary, color),
-                    ]
+                    ];
+                    if !badge.is_empty() {
+                        row.extend([seg(" ", C::Gray), on(badge, C::Black, C::Red)]); // failures the run before didn't have
+                    }
+                    row
                 };
                 swept(ui, controller, &suite.key, row, width)
             }
@@ -680,7 +790,7 @@ fn group(ui: &Ui, controller: &Controller, rows: &[Row], at: usize) -> Vec<Vec<S
         lines.push(vec![
             seg(format!("{} ", icon(ui, suite.status)), color),
             seg(format!("{}  ", suite.name), C::Gray),
-            seg(summary(suite), color),
+            seg(summary(ui, controller, suite), color),
         ]);
     }
     lines
@@ -713,18 +823,28 @@ fn color(status: Status) -> C {
     }
 }
 
-/// What the list says about a suite.
-fn summary(suite: &Suite) -> String {
+/// What the list says about a suite: once it ran, how many passed, failed and are flaky.
+fn summary(ui: &Ui, controller: &Controller, suite: &Suite) -> String {
     if suite.needs_packages.is_some() && !suite.is_active() {
         return "needs packages".into();
     }
+    let mark = |icon| icons::icon(ui.nerd, icon);
     match suite.status {
+        Status::Passed | Status::Failed => {
+            let mut text = format!("{}{}", mark(Icon::Ok), suite.passed);
+            if suite.failed > 0 {
+                text.push_str(&format!(" {}{}", mark(Icon::Fail), suite.failed));
+            }
+            let flaky = tally(controller, suite).flaky;
+            if flaky > 0 {
+                text.push_str(&format!(" {}{flaky}", mark(Icon::Reload)));
+            }
+            text
+        }
         Status::Idle => "not run".into(),
         Status::Queued if suite.note.is_empty() => "queued".into(),
         Status::Queued | Status::Error => suite.note.clone(),
         Status::Running => format!("{} done", suite.done),
-        Status::Passed => format!("{} passed", suite.passed),
-        Status::Failed => format!("{} of {} failed", suite.failed, suite.total()),
         Status::Cancelled => "stopped".into(),
     }
 }
@@ -796,24 +916,58 @@ fn details(ui: &mut Ui, controller: &Controller, suite: &Suite, width: usize) ->
         Status::Passed | Status::Failed => {}
     }
     if suite.total() > 0 {
-        results(&mut out, suite, &when);
+        results(&mut out, controller, suite, &when);
     }
     (out.lines, false)
 }
 
-/// The counts, each failure (its message and own frames), the slowest tests when all passed, and the skipped.
-fn results(out: &mut Details, suite: &Suite, when: &str) {
-    let counts =
-        format!("✓ {} passed   ✗ {} failed   – {} skipped   · {when}", suite.passed, suite.failed, suite.skipped);
+/// The counts, each failure (the new ones first, each with its last runs, its message and own frames), the fixed and
+/// the flaky tests, the slowest tests when all passed, and the skipped.
+fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str) {
+    let history = controller.test_history.suite(&suite.key);
+    let tally = tally(controller, suite);
+    let story = |test: &TestResult| history.map(|history| history.story(&test.name)).unwrap_or_default();
+    let line = |test: &TestResult| history.map(|history| history.line(&test.name));
+    let split = match (tally.new, tally.known) {
+        (0, _) | (_, 0) => String::new(),
+        (new, known) => format!(" ({new} new · {known} known)"),
+    };
+    let flaky = if tally.flaky > 0 { format!("   ↻ {} flaky", tally.flaky) } else { String::new() };
+    let counts = format!(
+        "✓ {} passed   ✗ {} failed{split}   – {} skipped{flaky}   · {when}",
+        suite.passed, suite.failed, suite.skipped
+    );
     out.add(&counts, if suite.failed > 0 { C::Red } else { C::Green }, 0);
     out.blank();
-    for test in suite.tests.iter().filter(|test| test.outcome == Outcome::Failed) {
-        out.add(&format!("✗ {}{}", test.name, took(test)), C::Red, 0);
+    let mut failed: Vec<&TestResult> = suite.tests.iter().filter(|test| test.outcome == Outcome::Failed).collect();
+    failed.sort_by_key(|test| !story(test).new);
+    for test in failed {
+        let story = story(test);
+        out.lines.push(test_row(out.width, line(test), &story, test, C::Red));
+        if let Some((failures, runs)) = story.flaky {
+            out.add(&format!("↻ flaky - it failed {failures} of its last {runs} runs"), C::Yellow, 4);
+        }
         for line in test.message.lines().filter(|line| !line.trim().is_empty()).take(MESSAGE_LINES) {
             out.add(line.trim_end(), C::Gray, 4);
         }
         for frame in own_frames(&test.stack).into_iter().take(STACK_LINES) {
             out.add(frame.trim(), C::DarkGray, 4);
+        }
+        out.blank();
+    }
+    let passed = |wanted: fn(&Story) -> bool| -> Vec<&TestResult> {
+        suite.tests.iter().filter(|test| test.outcome == Outcome::Passed && wanted(&story(test))).collect()
+    };
+    for (title, tests, color) in [
+        ("Fixed since the run before", passed(|story| story.fixed), C::Green),
+        ("Flaky", passed(|story| story.flaky.is_some()), C::Yellow),
+    ] {
+        if tests.is_empty() {
+            continue;
+        }
+        out.add(&format!("{title} ({}):", tests.len()), C::DarkCyan, 0);
+        for test in tests {
+            out.lines.push(test_row(out.width, line(test), &story(test), test, color));
         }
         out.blank();
     }
@@ -834,6 +988,60 @@ fn results(out: &mut Details, suite: &Suite, when: &str) {
         for test in skipped.into_iter().take(SKIPPED_SHOWN) {
             out.add(&format!("– {}", test.name), C::DarkGray, 2);
         }
+    }
+}
+
+/// A test's row in the details: its last runs (once its suite has a history), a badge when its failure is new, its
+/// mark and name.
+fn test_row(width: usize, runs: Option<&str>, story: &Story, test: &TestResult, color: C) -> Vec<Seg> {
+    let mark = match test.outcome {
+        Outcome::Failed => "✗",
+        Outcome::Passed if story.flaky.is_some() && !story.fixed => "↻",
+        Outcome::Passed => "✓",
+        Outcome::Skipped => "–",
+    };
+    let new = story.new && test.outcome == Outcome::Failed;
+    let took = took(test);
+    let strip_cells = runs.map_or(0, |_| STRIP_CELLS + 1);
+    let used = strip_cells + 2 + if new { 6 } else { 0 } + took.chars().count();
+    let mut row = Vec::new();
+    if let Some(runs) = runs {
+        row.extend(strip(runs, STRIP_CELLS));
+        row.push(seg(" ", C::Gray));
+    }
+    if new {
+        row.extend([on(" NEW ", C::Black, C::Red), seg(" ", C::Gray)]);
+    }
+    row.push(seg(format!("{mark} {}{took}", end_of(&test.name, width.saturating_sub(used).max(8))), color));
+    row
+}
+
+/// A test's last runs (its history's line), `cells` wide: two runs a cell, the older's colour on the left half and
+/// the newer's on the right, the newest on the right - green passed, red failed, grey skipped, nothing where it
+/// wasn't in a run.
+fn strip(runs: &str, cells: usize) -> Vec<Seg> {
+    let marks: Vec<char> = runs.chars().collect();
+    let shown = &marks[marks.len().saturating_sub(cells * 2)..];
+    let mut padded = vec![ABSENT; cells * 2 - shown.len()];
+    padded.extend_from_slice(shown);
+    padded
+        .chunks(2)
+        .map(|pair| match (run_color(pair[0]), run_color(pair[1])) {
+            (Some(older), Some(newer)) => on("▌", older, newer),
+            (Some(older), None) => seg("▌", older),
+            (None, Some(newer)) => seg("▐", newer),
+            (None, None) => seg(" ", C::Gray),
+        })
+        .collect()
+}
+
+/// A run's colour in a strip; none where the test wasn't in it.
+fn run_color(mark: char) -> Option<C> {
+    match mark {
+        'p' => Some(C::Green),
+        'f' => Some(C::Red),
+        's' => Some(C::DarkGray),
+        _ => None,
     }
 }
 

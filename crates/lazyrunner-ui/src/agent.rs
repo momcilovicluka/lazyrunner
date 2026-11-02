@@ -404,6 +404,7 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
         return Ok(json!({ "suites": suites.iter().map(suite_summary).collect::<Vec<_>>() }));
     };
     let suite = find_suite(suites, wanted)?;
+    let history = controller.test_history.suite(&suite.key);
     let first = |text: &str| text.lines().take(FAILURE_LINES).collect::<Vec<_>>().join("\n");
     let failures: Vec<Value> = suite
         .tests
@@ -411,11 +412,23 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
         .filter(|test| test.outcome == Outcome::Failed)
         .take(FAILURES_SHOWN)
         .map(|test| {
-            json!({ "name": test.name, "ms": test.ms.round(), "message": first(&test.message), "stack": first(&test.stack) })
+            let story = history.map(|history| history.story(&test.name)).unwrap_or_default();
+            let flaky = story.flaky.map(|(failures, runs)| format!("failed {failures} of its last {runs} runs"));
+            json!({
+                "name": test.name,
+                "ms": test.ms.round(),
+                "message": first(&test.message),
+                "stack": first(&test.stack),
+                "new": story.new,
+                "flaky": flaky,
+            })
         })
         .collect();
+    let tally = history.map(|history| history.tally(&suite.tests)).unwrap_or_default();
     let mut summary = suite_summary(suite);
     summary["failures"] = json!(failures);
+    summary["new_failures"] = json!(tally.new);
+    summary["flaky"] = json!(tally.flaky);
     summary["output"] = json!(suite.output.iter().rev().take(FAILURE_LINES).rev().collect::<Vec<_>>());
     Ok(summary)
 }
