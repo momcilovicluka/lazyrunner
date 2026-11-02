@@ -1,8 +1,9 @@
 //! Test watch (`a` / `A` in the tests view): a watched suite runs again when its code is saved - a quiet moment after
 //! the last save, so a formatter pass or a checkout is one run. A green suite runs whole; a red one its failed tests,
 //! then, if they pass, whole, so the green is real. A running suite is never cancelled: a save during its run runs it
-//! again after. .NET suites follow the profile's watch folder; npm and Nx ones their own folder, watched while they
-//! are. A suite can instead watch one test, pinned in the test picker (`a`): a save runs only it - the tight loop for
+//! again after. .NET suites follow the profile's watch folder - only those a save affects: the saved file's project
+//! is theirs or one they reference (`<ProjectReference>`, directly or not); a file no project owns affects all of
+//! them. npm and Nx ones follow their own folder, watched while they are. A suite can instead watch one test, pinned in the test picker (`a`): a save runs only it - the tight loop for
 //! a new test. For this session only: opening lazyrunner never runs tests by itself.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -28,6 +29,8 @@ pub struct TestWatch {
     /// Saved, waiting for the quiet: the suites, and the last save (when, which file).
     due: BTreeSet<String>,
     last_save: Option<(Instant, PathBuf)>,
+    /// Why a saved .NET suite runs: the project it references that changed.
+    why: HashMap<String, String>,
     /// Saved while they ran: they run again once their run is over.
     again: BTreeSet<String>,
     /// Red, their failed tests running: whole next, if those pass.
@@ -54,6 +57,12 @@ impl TestWatch {
     /// When the watch last queued suite `key` to run (its row sweeps once).
     pub fn queued_at(&self, key: &str) -> Option<Instant> {
         self.ran.get(key).copied()
+    }
+
+    /// Whether suite `key` waits to run for a save, and why (the project it references that changed).
+    #[cfg(test)]
+    pub(super) fn due_for(&self, key: &str) -> Option<Option<&str>> {
+        self.due.contains(key).then(|| self.why.get(key).map(String::as_str))
     }
 
     /// `r` / `f` and the like reset what a save was about to run of these.
@@ -142,22 +151,35 @@ impl Controller {
     /// A file was saved: the watched suites it belongs to run once saving is quiet. `dotnet`: a .NET source in the
     /// profile's watch folder; otherwise one in a watched npm or Nx suite's folder.
     pub(super) fn test_file_saved(&mut self, path: &Path, dotnet: bool, now: Instant) {
-        let hit: Vec<String> = self
+        let owner = if dotnet { owning_project(path, &self.root) } else { None };
+        let hit: Vec<(String, Option<String>)> = self
             .suites
             .iter()
             .flatten()
             .filter(|suite| self.test_watch.suites.contains(&suite.key))
-            .filter(|suite| match &suite.runner {
-                Runner::Dotnet { .. } => dotnet,
-                Runner::Npm { dir, .. } => !dotnet && path.starts_with(dir),
-                Runner::Nx { workspace, .. } => !dotnet && path.starts_with(workspace),
+            .filter_map(|suite| {
+                let why = match &suite.runner {
+                    Runner::Dotnet { project } if dotnet => match &owner {
+                        Some(owner) => Some(affected(project, owner)?),
+                        None => None,
+                    },
+                    Runner::Npm { dir, .. } if !dotnet && path.starts_with(dir) => None,
+                    Runner::Nx { workspace, .. } if !dotnet && path.starts_with(workspace) => None,
+                    _ => return None,
+                };
+                Some((suite.key.clone(), why))
             })
-            .map(|suite| suite.key.clone())
             .collect();
         if hit.is_empty() {
             return;
         }
-        self.test_watch.due.extend(hit);
+        for (key, why) in hit {
+            match why.filter(|why| !why.is_empty()) {
+                Some(why) => self.test_watch.why.insert(key.clone(), why),
+                None => self.test_watch.why.remove(&key),
+            };
+            self.test_watch.due.insert(key);
+        }
         self.test_watch.last_save = Some((now, path.to_path_buf()));
     }
 
@@ -202,7 +224,22 @@ impl Controller {
         }
         let name = file.file_name().map_or("a file".into(), |name| name.to_string_lossy().into_owned());
         let all: Vec<String> = whole.iter().chain(&failed).chain(pins.iter().map(|(key, _)| key)).cloned().collect();
-        self.add_log(format!("↻ {name} changed - running the watched tests: {}", self.suite_names(&all)), Hue::Cyan);
+        let named = if all.len() > 2 {
+            self.suite_names(&all)
+        } else {
+            let label = |key: &String| {
+                let name = self.suite(key).map(|suite| suite.name.clone()).unwrap_or_default();
+                match self.test_watch.why.get(key) {
+                    Some(why) => format!("{name} ({why})"),
+                    None => name,
+                }
+            };
+            all.iter().map(label).collect::<Vec<_>>().join(" + ")
+        };
+        for key in &all {
+            self.test_watch.why.remove(key);
+        }
+        self.add_log(format!("↻ {name} changed - running the watched tests: {named}"), Hue::Cyan);
         for key in &all {
             self.test_watch.ran.insert(key.clone(), now);
         }
@@ -338,4 +375,34 @@ impl Controller {
         }
         keys.iter().filter_map(|key| self.suite(key).map(|suite| suite.name.clone())).collect::<Vec<_>>().join(" + ")
     }
+}
+
+/// The project a saved file belongs to: the nearest .csproj in its folder or one above it, inside the repo.
+fn owning_project(path: &Path, root: &Path) -> Option<PathBuf> {
+    path.ancestors().skip(1).take_while(|dir| dir.starts_with(root)).find_map(|dir| {
+        std::fs::read_dir(dir)
+            .ok()?
+            .flatten()
+            .map(|entry| entry.path())
+            .find(|file| file.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("csproj")))
+    })
+}
+
+/// Whether test project `tests` runs for a change to project `changed`: it is that project (`""`), or references
+/// it, directly or not ("references Orders, which changed"); `None` when it does neither.
+fn affected(tests: &Path, changed: &Path) -> Option<String> {
+    let changed_key = same(changed);
+    if same(tests) == changed_key {
+        return Some(String::new());
+    }
+    let references = crate::run::build::projects(tests);
+    references.iter().any(|project| same(project) == changed_key).then(|| {
+        let name = changed.file_stem().map_or(String::new(), |stem| stem.to_string_lossy().into_owned());
+        format!("references {name}, which changed")
+    })
+}
+
+/// A path as it compares with another: one kind of slash, any case.
+fn same(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/").to_lowercase()
 }

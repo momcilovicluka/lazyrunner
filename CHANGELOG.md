@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.51.0] - 2026-11-02
+
+### Added
+- Test watch runs only the .NET test projects a save affects: the saved file's project is theirs or one they reference, directly or not; the log says why - `Orders.Tests (references Orders.Core, which changed)`. A file no project owns (`Directory.Build.props`) still runs them all (#40)
+
 ## [1.50.0] - 2026-10-30
 
 ### Added
