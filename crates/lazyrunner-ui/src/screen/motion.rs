@@ -111,7 +111,7 @@ impl Default for Motion {
 }
 
 /// Fast at first, gentle at the end.
-fn ease(progress: f64) -> f64 {
+pub(super) fn ease(progress: f64) -> f64 {
     let left = 1.0 - progress.clamp(0.0, 1.0);
     1.0 - left * left * left
 }

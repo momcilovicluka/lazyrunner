@@ -8,9 +8,9 @@ expression: screen.frame()
  ▸ ◌ ShopDbContext        1 pending │ ShopDbContext   Orders · Data.csproj
                                     │ 2 applied · 1 pending · checked 09:41:07 on ShopLocal
                                     │
-                                    │  ◌ 20260301000000  Invoices  pending
-                                    │  ✓ 20260201000000  Orders  ● current
-                                    │  ✓ 20260101000000  Init
+                                    │ ⡇ ● 1 Jan 2026  Init
+                                    │ ⡧ ● 1 Feb       Orders  ◂ database is here · ShopLocal @ localhost
+                                    │ ⡇ ○ 1 Mar       Invoices
                                     │
                                     │
                                     │

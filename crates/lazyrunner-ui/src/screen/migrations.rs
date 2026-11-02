@@ -1,5 +1,5 @@
 //! M: EF Core migrations. On the left each DbContext of the apps with `"migrations"`; on the right the selected one's
-//! migrations, newest first - applied, pending, the current one. `u` applies what's pending, `m` moves the context
+//! migrations on a rail, oldest at the top ([`super::migrations_rail`]). `u` applies what's pending, `m` moves the context
 //! to the chosen migration (forward, or back through their Down()), each after a yes in a box that names the
 //! database.
 
@@ -11,6 +11,7 @@ use lazyrunner_core::run::migrations::{Context, Migration, Status};
 
 use super::columns::{fit, spinner};
 use super::icons::{self, Icon};
+use super::migrations_rail::{self, Look};
 use super::mouse::Target;
 use super::overlays::boxed;
 use super::seg::{Seg, aim, on, pad, seg, take_cells};
@@ -74,7 +75,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "Escape" | "q" | "M" => ui.overlay = None,
         "l" | "RightArrow" | "Enter" | "Tab" if picking.is_none() => {
             if count > 0 {
-                *picking = Some(0);
+                *picking = Some(count - 1);
             } else {
                 controller.add_log("No migrations to choose from yet - r checks again.", Hue::DarkGray);
             }
@@ -156,15 +157,15 @@ fn apply_pending(ui: &mut Ui, controller: &mut Controller, keys: &[String]) {
     ask(ui, Confirm { lines, jobs });
 }
 
-/// m: moves a context to the chosen migration (`at`, newest first) - forward applies up to it, back reverts the
+/// m: moves a context to the chosen migration (`at`, oldest first) - forward applies up to it, back reverts the
 /// newer ones through their Down() - after a yes.
 fn migrate_to(ui: &mut Ui, controller: &mut Controller, context: &Context, at: usize) {
     if let Some(reason) = not_ready(context) {
         controller.add_log(reason, Hue::DarkGray);
         return;
     }
-    let Some(target) = context.items.len().checked_sub(at + 1) else { return };
-    let migration = &context.items[target];
+    let Some(migration) = context.items.get(at) else { return };
+    let target = at;
     let current = context.current();
     if current == Some(target) {
         controller.add_log(format!("{} is already at {}.", context.name, migration.name), Hue::DarkGray);
@@ -189,6 +190,14 @@ fn migrate_to(ui: &mut Ui, controller: &mut Controller, context: &Context, at: u
             "Their Down() runs - that can drop tables, columns and the data in them.".to_string(),
         ]
     };
+    let risky: Vec<&str> = moving
+        .iter()
+        .filter(|migration| !forward && migrations_rail::risky(migration))
+        .map(|migration| migration.name.as_str())
+        .collect();
+    if !risky.is_empty() {
+        lines.push(format!("Likely to lose data: {}", risky.join(", ")));
+    }
     lines.push(String::new());
     lines.extend(moving.iter().take(NAMED).map(|migration| migration.name.clone()));
     if count > NAMED {
@@ -246,6 +255,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let all = contexts(controller);
     let spin = if ui.reduced_motion { "●".to_string() } else { spinner(ui).to_string() };
     let (now, nerd) = (ui.now, ui.nerd);
+    let db_name = controller.db_label.clone().unwrap_or_default();
+    let look = Look { now, since: ui.started, still: ui.reduced_motion, db: db_name, nerd, spin: spin.clone() };
     let Some(Overlay::Migrations { index, picking }) = &mut ui.overlay else { return Vec::new() };
     *index = (*index).min(all.len().saturating_sub(1));
     let (selected, picking) = (*index, *picking);
@@ -288,7 +299,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         .iter()
         .enumerate()
         .map(|(at, context)| {
-            let (icon, summary, color) = summary(context, &spin, nerd);
+            let (icon, summary, color) = summary(context, &look);
             let label = if several_apps {
                 let app = controller.app(&context.app).map_or(context.app.as_str(), |app| app.name.as_str());
                 format!("{} · {app}", context.name)
@@ -308,7 +319,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         .collect();
     let detail = all
         .get(selected)
-        .map_or_else(Vec::new, |context| details(controller, context, picking, detail_width, height, &spin, nerd));
+        .map_or_else(Vec::new, |context| details(controller, context, picking, detail_width, height, &look));
     for row in 0..height {
         let mut line = fit(list.get(row).cloned().unwrap_or_default(), list_width);
         line.push(seg("│ ", C::FocusBorder));
@@ -323,13 +334,17 @@ fn cut(text: &str, cells: usize) -> String {
 }
 
 /// What the list says about a context: its icon, its state, its colour.
-fn summary(context: &Context, spin: &str, nerd: bool) -> (String, String, C) {
+fn summary(context: &Context, look: &Look) -> (String, String, C) {
+    let (spin, nerd) = (look.spin.as_str(), look.nerd);
     let mark = |icon| icons::icon(nerd, icon).to_string();
     match context.status {
         Status::Idle => ("·".into(), "not checked".into(), C::DarkGray),
         Status::Queued => (mark(Icon::Queued), "queued".into(), C::DarkGray),
         Status::Loading => (spin.to_string(), "checking…".into(), C::Yellow),
-        Status::Migrating => (spin.to_string(), "migrating…".into(), C::Yellow),
+        Status::Migrating => match migrations_rail::progress(context, look) {
+            Some((done, total)) => (spin.to_string(), migrations_rail::bar(done, total), C::Yellow),
+            None => (spin.to_string(), "migrating…".into(), C::Yellow),
+        },
         Status::Error => (mark(Icon::Warn), "failed".into(), C::Red),
         Status::Ok if !context.known() => ("?".into(), "history unreadable".into(), C::Yellow),
         Status::Ok => match context.pending().len() {
@@ -346,9 +361,9 @@ fn details(
     picking: Option<usize>,
     width: usize,
     height: usize,
-    spin: &str,
-    nerd: bool,
+    look: &Look,
 ) -> Vec<Vec<Seg>> {
+    let spin = &look.spin;
     let app = controller.app(&context.app).map_or(context.app.as_str(), |app| app.name.as_str());
     let project = context.project.file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
     let mut lines = vec![vec![seg(context.name.clone(), C::White), seg(format!("   {app} · {project}"), C::DarkGray)]];
@@ -388,37 +403,8 @@ fn details(
         lines.push(vec![seg(text, C::Yellow)]);
     }
     lines.push(Vec::new());
-    let newest_first: Vec<&Migration> = context.items.iter().rev().collect();
-    let current = context.current().map(|current| context.items.len() - 1 - current);
     let room = height.saturating_sub(lines.len()).max(1);
-    let top = picking.map_or(0, |at| at.saturating_sub(room / 2).min(newest_first.len().saturating_sub(room)));
-    for (at, migration) in newest_first.iter().enumerate().skip(top).take(room) {
-        let (icon, color) = match migration.applied {
-            Some(true) => (icons::icon(nerd, Icon::Ok), C::Green),
-            Some(false) => (icons::icon(nerd, Icon::Queued), C::Yellow),
-            None => ("?", C::DarkGray),
-        };
-        let stamp = migration.id.split('_').next().filter(|stamp| stamp.len() == 14).unwrap_or_default();
-        let suffix = if current == Some(at) {
-            "  ● current"
-        } else if migration.applied == Some(false) {
-            "  pending"
-        } else {
-            ""
-        };
-        let row = if picking == Some(at) {
-            vec![on(pad(&format!(" {icon} {stamp}  {}{suffix}", migration.name), width), C::FocusText, C::FocusBack)]
-        } else {
-            let name_color = if migration.applied == Some(false) { C::Yellow } else { C::Gray };
-            vec![
-                seg(format!(" {icon} "), color),
-                seg(format!("{stamp}  "), C::DarkGray),
-                seg(migration.name.clone(), name_color),
-                seg(suffix, if current == Some(at) { C::Cyan } else { C::Yellow }),
-            ]
-        };
-        lines.push(aim(row, Target::Migration(at)));
-    }
+    lines.extend(migrations_rail::rail(context, picking, look, width, room));
     lines
 }
 

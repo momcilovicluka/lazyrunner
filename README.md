@@ -366,8 +366,9 @@ install JesseDuffield.lazygit`, `scoop install lazygit`).
 
 ## Migrations (`M`)
 
-`M` shows the DbContexts on the left and the selected one's migrations on the right, newest first: applied (✓), pending (◌) and the current one, as the database the app uses
-has them. `dotnet ef` (`dotnet tool install --global dotnet-ef`) runs with the app's project as the startup project,
+`M` shows the DbContexts on the left and the selected one's migrations on the right as a rail, oldest at the top:
+applied (`●`), pending (`○`), dated from their ids with a gap where months pass and the older ones folded once they
+don't fit - and the database as a bead on the rail, **database is here**, as the database the app uses has them. `dotnet ef` (`dotnet tool install --global dotnet-ef`) runs with the app's project as the startup project,
 its Development settings - so the database you picked with `d` - and its last build (`b` rebuilds it); in the
 background, one job at a time, waiting while an app builds.
 
@@ -389,6 +390,14 @@ checks them again. Each check is kept, per database, for the next run: a context
 you picked - when, with the day once it isn't today - or "not checked" when it has none there. `l` chooses a migration, `m` moves the context to it - forward
 applies up to it, back reverts the newer ones through their `Down()` - and `u` applies what's pending (`U`: in every
 context); each asks first, naming the database.
+
+Choosing a target lights the stretch of rail between the database and it: green with dashes flowing down to apply
+(`applies 3`), amber flowing up to revert (`reverts 2 - may lose data`), with `⚠` on a migration whose `Down()`
+likely drops what it added (its name starts with Add or Create) - the confirmation names those too. While `dotnet ef`
+works the bead travels the rail as it reports each migration done - a hop at a time, faster when several finish at
+once - and breathes while it works; each node it reaches fills (or empties, going back) with a glint, the list shows
+`▰▰▱▱ 2/4`, a shimmer runs along the stretch once it's done, and where one fails the bead pulses red and the node
+says why. With reduced motion the bead steps and nothing flows.
 
 ## Requests (`H`)
 

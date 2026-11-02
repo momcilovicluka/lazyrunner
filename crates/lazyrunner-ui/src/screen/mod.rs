@@ -18,6 +18,7 @@ pub mod launch;
 pub mod links;
 pub mod marks;
 pub mod migrations;
+pub mod migrations_rail;
 pub mod motion;
 pub mod mouse;
 pub mod overlays;
@@ -528,6 +529,7 @@ impl Ui {
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)
+            || migrations_rail::animating(self, controller)
         {
             return true;
         }

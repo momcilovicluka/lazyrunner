@@ -8,6 +8,7 @@ use std::collections::{BTreeSet, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use std::time::Instant;
 
 use regex::Regex;
 use serde_json::Value;
@@ -36,6 +37,35 @@ pub enum Status {
     Error,
 }
 
+/// A `database update`, under way or done: where the database was (its newest applied migration's id), the
+/// migrations it moves in the order it moves them, whether back, when EF began each (`Applying migration '<id>'.`,
+/// `Reverting migration '<id>'.`), and how it ended - when, and why it failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Run {
+    pub from: Option<String>,
+    pub back: bool,
+    pub planned: Vec<String>,
+    pub began: Vec<Instant>,
+    pub ended: Option<(Instant, Option<String>)>,
+}
+
+impl Run {
+    /// When each planned migration was done: one when the next began, and a clean end finishes the rest.
+    pub fn done(&self) -> Vec<Instant> {
+        let mut done: Vec<Instant> = self.began.iter().skip(1).copied().collect();
+        if let Some((at, None)) = self.ended {
+            done.resize(self.planned.len().max(done.len()), at);
+        }
+        done.truncate(self.planned.len());
+        done
+    }
+
+    /// Why it failed, once it has.
+    pub fn failure(&self) -> Option<&str> {
+        self.ended.as_ref().and_then(|(_, failure)| failure.as_deref())
+    }
+}
+
 /// A DbContext of an app, and what its last check found.
 #[derive(Clone, Debug)]
 pub struct Context {
@@ -53,6 +83,8 @@ pub struct Context {
     pub checked_at: Option<chrono::DateTime<chrono::Local>>,
     /// The database it was checked on.
     pub db: String,
+    /// Its last `database update`, while this database is picked.
+    pub run: Option<Run>,
 }
 
 impl Context {
@@ -68,6 +100,7 @@ impl Context {
             output: VecDeque::new(),
             checked_at: None,
             db: String::new(),
+            run: None,
         }
     }
 
@@ -99,6 +132,32 @@ impl Context {
 
     pub fn is_busy(&self) -> bool {
         matches!(self.status, Status::Queued | Status::Loading | Status::Migrating)
+    }
+
+    /// Plans a `database update` to `target` (a migration's id; `None`: what's pending) from where it is now.
+    pub fn plan(&mut self, target: Option<&str>) {
+        let current = self.current();
+        let to = target.and_then(|id| self.items.iter().position(|item| item.id == id));
+        let id = |item: &Migration| item.id.clone();
+        let (back, planned) = match (to, current) {
+            (Some(to), Some(current)) if to < current => {
+                (true, self.items[to + 1..=current].iter().rev().map(id).collect())
+            }
+            (Some(to), _) => {
+                (false, self.items[..=to].iter().filter(|item| item.applied != Some(true)).map(id).collect())
+            }
+            (None, _) => (false, self.pending().into_iter().map(id).collect()),
+        };
+        let from = current.map(|at| self.items[at].id.clone());
+        self.run = Some(Run { from, back, planned, began: Vec::new(), ended: None });
+    }
+
+    /// A line of a `database update`: EF beginning a migration moves its run on.
+    pub(crate) fn hop(&mut self, line: &str, now: Instant) {
+        let Some(run) = self.run.as_mut().filter(|run| run.ended.is_none()) else { return };
+        if line.contains("Applying migration '") || line.contains("Reverting migration '") {
+            run.began.push(now);
+        }
     }
 
     /// A line of dotnet ef's output worth showing (not its data or verbose lines, nor build warnings).
@@ -246,6 +305,37 @@ mod tests {
 
     fn lines(text: &[&str]) -> Vec<String> {
         text.iter().map(|line| line.to_string()).collect()
+    }
+
+    #[test]
+    fn a_run_plans_its_migrations_and_each_is_done_when_the_next_begins() {
+        use std::time::Duration;
+        let migration = |id: &str, applied| Migration { id: id.into(), name: id.into(), applied: Some(applied) };
+        let mut context = Context::new("orders", "ShopDbContext", PathBuf::new(), PathBuf::new());
+        context.items = vec![
+            migration("1_Init", true),
+            migration("2_Orders", true),
+            migration("3_Invoices", false),
+            migration("4_Refunds", false),
+        ];
+        let planned = |context: &Context| context.run.as_ref().map(|run| (run.back, run.planned.join(" ")));
+        context.plan(None);
+        assert_eq!(planned(&context), Some((false, "3_Invoices 4_Refunds".into())), "what's pending");
+        context.plan(Some("1_Init"));
+        assert_eq!(planned(&context), Some((true, "2_Orders".into())), "back: the newer ones, newest first");
+        context.plan(Some("4_Refunds"));
+        assert_eq!(context.run.as_ref().and_then(|run| run.from.clone()), Some("2_Orders".into()));
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        context.hop("info:    Applying migration '3_Invoices'.", at(10));
+        context.hop("info:    Done.", at(15));
+        assert!(context.run.as_ref().is_some_and(|run| run.done().is_empty()), "the first is still going");
+        context.hop("info:    Applying migration '4_Refunds'.", at(20));
+        assert_eq!(context.run.as_ref().map(Run::done), Some(vec![at(20)]));
+        if let Some(run) = &mut context.run {
+            run.ended = Some((at(30), None));
+        }
+        assert_eq!(context.run.as_ref().map(Run::done), Some(vec![at(20), at(30)]), "a clean end finishes it");
     }
 
     #[test]
