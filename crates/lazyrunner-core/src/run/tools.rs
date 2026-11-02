@@ -100,10 +100,17 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
         AppKind::Dotnet { project, launch_profile, args: extra, .. } => {
             let dir = root.join(project).parent().map_or_else(|| root.to_path_buf(), Path::to_path_buf);
             // After --: ASP.NET logs each request it finished, for the requests view (H); then the profile's own.
-            let mut args =
-                ["run", "--no-build", "--launch-profile", launch_profile, "--", super::requests::LOG_REQUESTS]
-                    .map(OsString::from)
-                    .to_vec();
+            let mut args = [
+                "run",
+                "--no-build",
+                "--launch-profile",
+                launch_profile,
+                "--",
+                super::requests::LOG_REQUESTS,
+                super::requests::LOG_SCOPES,
+            ]
+            .map(OsString::from)
+            .to_vec();
             args.extend(extra.iter().map(OsString::from));
             let shown: String = extra.iter().map(|arg| format!(" {arg}")).collect();
             Ok(ServerCommand {
@@ -402,7 +409,8 @@ mod tests {
         let logs = crate::run::requests::LOG_REQUESTS;
         assert_eq!(
             command.spec.args,
-            ["run", "--no-build", "--launch-profile", "Orders", "--", logs].map(OsString::from)
+            ["run", "--no-build", "--launch-profile", "Orders", "--", logs, crate::run::requests::LOG_SCOPES]
+                .map(OsString::from)
         );
         if let AppKind::Dotnet { args, .. } = &mut app.kind {
             *args = vec!["--Seq:ApiKey=".into()];

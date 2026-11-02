@@ -411,8 +411,11 @@ it; `Esc` hides it too. A request's: its status,
 time, protocol, what it sent and returned, and - once its endpoint has a few requests - how it compares with them (p50,
 p95). Below, what the app logged while it ran, from ASP.NET's "Request starting" line to its "Request finished" one:
 the line count, the errors, the EF Core database commands (`Executed DbCommand`: how many, their total time and its
-share of the request's, the slowest), then the lines themselves, the newest that fit. When other requests of the app ran
-at the same time some of those lines may be theirs, and the panel says so. An endpoint's: count and errors, average,
+share of the request's, the slowest), then the lines themselves, the newest that fit. lazyrunner starts the .NET apps
+with their console log's scopes on, so each entry says its request's `RequestId` (lazyrunner keeps those scope lines
+out of the columns): a request's lines are then exactly its own, even when requests overlap. An app that logs no
+scopes gets the lines between its request's start and finish; when other requests ran at the same time some of
+those may be theirs, and the panel says so. An endpoint's: count and errors, average,
 p50, p95 and slowest, a sparkline of its latest times, its statuses, its slowest and its latest failing requests.
 Serilog's request log has no start line, so its requests come without their log lines.
 

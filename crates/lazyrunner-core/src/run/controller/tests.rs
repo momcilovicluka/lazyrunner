@@ -68,6 +68,56 @@ async fn stopping_nothing_says_so_and_stop_all_names_what_it_keeps() {
 }
 
 #[tokio::test]
+async fn an_app_that_logs_scopes_has_each_requests_own_lines_even_when_they_overlap() {
+    let temp = TempDir::new("controller-scopes");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    let generation = sample.states[0].generation;
+    let scope = |connection: &str, path: &str| {
+        format!(
+            "      => SpanId:a1, TraceId:b2 => ConnectionId:{connection} => RequestPath:{path} RequestId:{connection}:00000001"
+        )
+    };
+    let lines = [
+        "info: Microsoft.AspNetCore.Hosting.Diagnostics[1]".to_string(),
+        scope("c1", "/api/orders/7"),
+        "      Request starting HTTP/1.1 GET http://localhost:47201/api/orders/7 - - -".into(),
+        "info: Microsoft.AspNetCore.Hosting.Diagnostics[1]".into(),
+        scope("c2", "/api/orders/8"),
+        "      Request starting HTTP/1.1 GET http://localhost:47201/api/orders/8 - - -".into(),
+        "warn: Orders.Api[0]".into(),
+        scope("c1", "/api/orders/7"),
+        "      Order 7 not found".into(),
+        "info: Orders.Api[0]".into(),
+        scope("c2", "/api/orders/8"),
+        "      Order 8 found".into(),
+        "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]".into(),
+        scope("c1", "/api/orders/7"),
+        "      Request finished HTTP/1.1 GET http://localhost:47201/api/orders/7 - 404 0 - 12.5ms".into(),
+        "info: Microsoft.AspNetCore.Hosting.Diagnostics[2]".into(),
+        scope("c2", "/api/orders/8"),
+        "      Request finished HTTP/1.1 GET http://localhost:47201/api/orders/8 - 200 0 - 15.5ms".into(),
+    ];
+    for line in lines {
+        let tag = crate::run::Tag::App { key: "orders".into(), generation };
+        sample.handle(crate::run::Event::Output { tag, line });
+    }
+    let output = &sample.states[0].output;
+    assert_eq!(output.len(), 4, "the scope lines stay out of the column");
+    let own = |at: usize| -> Vec<String> {
+        let request = &sample.requests.items[at];
+        assert!(!request.mixed, "{} is matched by its RequestId", request.path);
+        let numbers = request.exact.clone().expect("matched by its RequestId");
+        numbers
+            .iter()
+            .filter_map(|number| output.numbered(*number, *number).next())
+            .map(|line| line.text.clone())
+            .collect()
+    };
+    assert_eq!(own(0), ["warn: Orders.Api[0]", "      Order 7 not found"]);
+    assert_eq!(own(1), ["info: Orders.Api[0]", "      Order 8 found"]);
+}
+
+#[tokio::test]
 async fn request_lines_go_to_the_requests_view_and_the_probe_is_left_out() {
     let temp = TempDir::new("controller-requests");
     let (mut sample, _rx) = controller(&temp, json!({}));

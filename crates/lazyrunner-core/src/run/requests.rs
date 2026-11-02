@@ -16,6 +16,9 @@ const MAX_IN_FLIGHT: usize = 256;
 pub const N_PLUS_ONE: usize = 10;
 /// What `dotnet run` passes an app so ASP.NET logs each request it finished.
 pub const LOG_REQUESTS: &str = "--Logging:LogLevel:Microsoft.AspNetCore.Hosting.Diagnostics=Information";
+/// And so its console log writes each entry's scopes - a request's RequestId among them - for matching its lines
+/// to their request exactly.
+pub const LOG_SCOPES: &str = "--Logging:Console:IncludeScopes=true";
 
 fn pattern(regex: &str) -> Regex {
     Regex::new(regex).expect("a valid pattern")
@@ -36,6 +39,10 @@ static STARTING: LazyLock<Regex> =
 static SERILOG: LazyLock<Regex> = LazyLock::new(|| {
     pattern(r"HTTP (?P<method>[A-Z]+) (?P<url>\S+) responded (?P<status>\d{3}) in (?P<ms>[\d.,]+) ms")
 });
+/// The console logger's line of an entry's scopes, after its header: "      => SpanId:1, TraceId:2 => RequestPath:/x
+/// RequestId:0HN7:00000002".
+static SCOPE: LazyLock<Regex> = LazyLock::new(|| pattern(r"^\s+=> "));
+static REQUEST_ID: LazyLock<Regex> = LazyLock::new(|| pattern(r"\bRequestId:(\S+)"));
 /// The console logger's header line of a request entry; its message is on the next line.
 static HEADER: LazyLock<Regex> =
     LazyLock::new(|| pattern(r"^\s*\w+: Microsoft\.AspNetCore\.Hosting\.Diagnostics\[\d+\]\s*$"));
@@ -74,6 +81,9 @@ pub struct Finished {
     pub logs: Option<(u64, u64)>,
     /// Other requests of the app ran at the same time, so some of those lines may be theirs.
     pub mixed: bool,
+    /// The numbers of the lines the app logged in its scope (its RequestId), when the app logs scopes: exactly its
+    /// own, with no guessing by time.
+    pub exact: Option<Vec<u64>>,
     /// Its EF Core commands, from the lines it logged (summed up as it finishes: the lines may be gone later).
     pub db: Option<DbSummary>,
 }
@@ -147,6 +157,12 @@ pub enum Line {
     Started(Started),
     /// A finished request.
     Finished(Finished),
+}
+
+/// An entry's scope line: `Some(the RequestId)` - `Some(None)` when its scopes have none (outside a request);
+/// `None` when the line isn't one.
+pub fn scope(text: &str) -> Option<Option<String>> {
+    SCOPE.is_match(text).then(|| REQUEST_ID.captures(text).map(|found| found[1].trim_end_matches(',').to_string()))
 }
 
 /// Reads one output line of a .NET app; `header` is whether the line before was a request entry's header (it is
@@ -292,6 +308,8 @@ pub struct Request {
     /// See [`Finished::logs`].
     pub logs: Option<(u64, u64)>,
     pub mixed: bool,
+    /// See [`Finished::exact`].
+    pub exact: Option<Vec<u64>>,
     pub db: Option<DbSummary>,
 }
 
@@ -305,8 +323,21 @@ pub struct Requests {
 impl Requests {
     pub fn add(&mut self, app: &str, request: Finished, at: chrono::DateTime<chrono::Local>) {
         self.seq += 1;
-        let Finished { method, path, status, ms, length, content, proto, sent_content, sent_length, logs, mixed, db } =
-            request;
+        let Finished {
+            method,
+            path,
+            status,
+            ms,
+            length,
+            content,
+            proto,
+            sent_content,
+            sent_length,
+            logs,
+            mixed,
+            exact,
+            db,
+        } = request;
         let endpoint = endpoint(&path);
         let seq = self.seq;
         self.items.push_back(Request {
@@ -325,6 +356,7 @@ impl Requests {
             sent_length,
             logs,
             mixed,
+            exact,
             db,
         });
         while self.items.len() > MAX_REQUESTS {

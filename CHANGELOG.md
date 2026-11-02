@@ -3,6 +3,17 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.52.0] - 2026-11-02
+
+### Added
+- A request's log lines are exactly its own: lazyrunner starts the .NET apps with their console log's scopes on (`--Logging:Console:IncludeScopes=true`) and matches each line to its request by `RequestId`, so overlapping requests no longer mix and the details panel drops "possibly mixed" for them. The scope lines stay out of the columns; an app that logs no scopes keeps the time-window match (#21)
+
+### Fixed
+- The self-update tests' local server closes each connection gracefully, so a download can't be cut short on a busy Windows runner
+
+### Changed
+- The demo workflow uses `actions/setup-dotnet@v6` and `actions/setup-node@v7` (#72, #73)
+
 ## [1.51.0] - 2026-11-02
 
 ### Added
