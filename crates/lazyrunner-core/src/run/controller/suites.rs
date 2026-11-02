@@ -772,6 +772,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_net_save_runs_the_watched_test_projects_it_affects_and_says_why() {
+        let temp = TempDir::new("suites-affected");
+        let (mut sample, _events) = controller(&temp);
+        let repo = temp.join("repo");
+        let project = |path: &str, references: &[&str]| {
+            let items: String = references.iter().map(|to| format!(r#"<ProjectReference Include="{to}" />"#)).collect();
+            crate::testing::write(repo.join(path), &format!("<Project><ItemGroup>{items}</ItemGroup></Project>"));
+            repo.join(path)
+        };
+        project("lib/Orders.Core/Orders.Core.csproj", &[]);
+        project("lib/Billing/Billing.csproj", &[]);
+        let tests = project("tests/Orders.Tests/Orders.Tests.csproj", &[r"..\..\lib\Orders.Core\Orders.Core.csproj"]);
+        let key = "dotnet:tests/Orders.Tests/Orders.Tests.csproj".to_string();
+        let mut suites = sample.suites.take().unwrap_or_default();
+        suites.push(Suite::new(key.clone(), "Orders.Tests", Runner::Dotnet { project: tests }));
+        sample.suites = Some(suites);
+        sample.toggle_watch(std::slice::from_ref(&key));
+        let saved = std::time::Instant::now();
+
+        sample.test_file_saved(&repo.join("lib/Billing/Invoice.cs"), true, saved);
+        assert_eq!(sample.test_watch.due_for(&key), None, "Billing isn't referenced: nothing to run");
+        sample.test_file_saved(&repo.join("lib/Orders.Core/Cart.cs"), true, saved);
+        assert_eq!(sample.test_watch.due_for(&key), Some(Some("references Orders.Core, which changed")));
+        sample.test_file_saved(&repo.join("tests/Orders.Tests/CartTests.cs"), true, saved);
+        assert_eq!(sample.test_watch.due_for(&key), Some(None), "its own code: no reason needed");
+        sample.test_file_saved(&repo.join("Directory.Build.props"), true, saved);
+        assert_eq!(sample.test_watch.due_for(&key), Some(None), "a file no project owns affects them all");
+    }
+
+    #[tokio::test]
     async fn a_pinned_test_is_all_a_save_runs_and_pinning_it_again_stops() {
         let temp = TempDir::new("suites-pin");
         let (mut sample, mut events) = controller(&temp);
