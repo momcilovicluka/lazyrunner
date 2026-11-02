@@ -38,13 +38,64 @@ pub type Report<'a> = &'a mut dyn FnMut(&str);
 
 pub struct Check {
     pub name: String,
+    pub kind: Kind,
     pub run: Box<dyn FnOnce(Report) -> Outcome + Send>,
     /// The apps needn't wait for it at startup (the update check): it may finish after the checklist closes.
     pub background: bool,
 }
 
-fn check(name: impl Into<String>, run: impl FnOnce() -> Outcome + Send + 'static) -> Check {
-    Check { name: name.into(), run: Box::new(move |_: Report| run()), background: false }
+/// What a check looks at: where the checklist groups it, and what fixes what it finds.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Update,
+    Tool,
+    Ports,
+    Database,
+    /// An npm app's packages, by its key.
+    Packages(String),
+    Project,
+    Branch,
+}
+
+/// The checklist's groups, in its order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Group {
+    Environment,
+    Project,
+    Ports,
+    Database,
+    Packages,
+    Updates,
+}
+
+impl Kind {
+    pub fn group(&self) -> Group {
+        match self {
+            Self::Tool => Group::Environment,
+            Self::Project | Self::Branch => Group::Project,
+            Self::Ports => Group::Ports,
+            Self::Database => Group::Database,
+            Self::Packages(_) => Group::Packages,
+            Self::Update => Group::Updates,
+        }
+    }
+}
+
+impl Group {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Environment => "Environment",
+            Self::Project => "Project",
+            Self::Ports => "Ports",
+            Self::Database => "Database",
+            Self::Packages => "Packages",
+            Self::Updates => "Updates",
+        }
+    }
+}
+
+fn check(kind: Kind, name: impl Into<String>, run: impl FnOnce() -> Outcome + Send + 'static) -> Check {
+    Check { name: name.into(), kind, run: Box::new(move |_: Report| run()), background: false }
 }
 
 /// The first line a tool prints for `args`, when it runs and succeeds.
@@ -108,6 +159,7 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
     let state_dir = controller.paths().state_dir.clone();
     checks.push(Check {
         name: "lazyrunner".into(),
+        kind: Kind::Update,
         run: Box::new(move |report: Report| {
             let outcome = update::update(&config, &state_dir, false, &mut update::Progress::new(report));
             crate::contributors::refresh(&config, &state_dir);
@@ -120,18 +172,18 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
         }),
         background: true,
     });
-    checks.push(check("git", || match version_of("git") {
+    checks.push(check(Kind::Tool, "git", || match version_of("git") {
         Some(version) => (Status::Ok, version.trim_start_matches("git version ").to_string()),
         None => (Status::Fail, "not found on PATH".into()),
     }));
     if controller.apps.iter().any(|app| app.traits().builds) {
-        checks.push(check(".NET SDK", || match version_of("dotnet") {
+        checks.push(check(Kind::Tool, ".NET SDK", || match version_of("dotnet") {
             Some(version) => (Status::Ok, version),
             None => (Status::Fail, "dotnet not found on PATH".into()),
         }));
     }
     if controller.apps.iter().any(|app| app.traits().installs) {
-        checks.push(check("Node.js / npm", || {
+        checks.push(check(Kind::Tool, "Node.js / npm", || {
             let Some(node) = version_of("node") else { return (Status::Fail, "node not found on PATH".into()) };
             (Status::Ok, format!("node {node} · npm {}", npm_version().unwrap_or_else(|| "?".into())))
         }));
@@ -150,7 +202,7 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
             branch.push_str(&format!(" · {}: {} ({})", app.name.to_lowercase(), mode.label, mode.script));
         }
     }
-    checks.push(check("Branch", move || (Status::Ok, branch)));
+    checks.push(check(Kind::Branch, "Branch", move || (Status::Ok, branch)));
     checks
 }
 
@@ -160,7 +212,7 @@ fn ports_check(controller: &Controller) -> Check {
         .iter()
         .filter_map(|app| Some((controller.port(&app.key)?, controller.is_running(&app.key))))
         .collect();
-    check("Ports", move || ports_report(&wanted, &Listening::now(), &super::net::reserved_ranges()))
+    check(Kind::Ports, "Ports", move || ports_report(&wanted, &Listening::now(), &super::net::reserved_ranges()))
 }
 
 /// The apps' ports (and whether each app runs): free, held by another process (! frees those at start), or reserved
@@ -209,7 +261,7 @@ pub fn sql_endpoint(server: &str) -> Result<(String, u16), String> {
 
 fn database_check(controller: &Controller) -> Check {
     let path = secrets::secrets_path(&controller.root, &controller.apps);
-    check("Database", move || {
+    check(Kind::Database, "Database", move || {
         let Some(path) = path else {
             return (Status::Skip, "the APIs keep no user secrets - nothing to check".into());
         };
@@ -240,11 +292,12 @@ fn database_check(controller: &Controller) -> Check {
 fn packages_check(controller: &Controller, key: &str) -> Check {
     let app = controller.app(key).expect("a known app");
     let name = format!("{} packages", app.name);
-    let AppKind::Npm { dir, .. } = &app.kind else { return check(name, || (Status::Skip, String::new())) };
+    let kind = Kind::Packages(key.to_string());
+    let AppKind::Npm { dir, .. } = &app.kind else { return check(kind, name, || (Status::Skip, String::new())) };
     let folder = controller.root.join(dir);
     let dir = dir.clone();
     let in_sync = controller.lock_in_sync(key);
-    check(name, move || {
+    check(kind, name, move || {
         if !tools::has_packages(&folder) {
             return (
                 Status::Fail,
@@ -271,7 +324,7 @@ fn project_check(controller: &Controller) -> Check {
         format!("{} profile {}", project.source.name(), project.path.display())
     };
     let (name, changed) = (project.name.clone(), controller.profile_changed);
-    check("Project", move || {
+    check(Kind::Project, "Project", move || {
         if changed {
             (Status::Warn, format!("{name} from {file} - this branch changed it (, then p reloads)"))
         } else {

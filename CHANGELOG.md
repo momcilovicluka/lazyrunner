@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.62.0] - 2026-11-02
+
+### Added
+- The startup checklist fixes what it finds: `j` / `k` pick a check, `f` runs its fix - `npm ci` for missing or stale packages, stopping what holds a port, the database picker, checking again, or copying `net stop winnat; net start winnat` for a port Windows reserved - and `a` runs every safe one in turn (#37)
+- Its checks are grouped and timed, each with a bar of its time against the slowest; a group that passed folds while another has a problem, a failed check has a red edge and a warning an amber one, and a fix that worked flashes green while one that didn't pulses red (#37)
+- At startup a failed check holds the start until it's fixed or `Enter` starts anyway; once nothing blocks it, it counts down to the start (`Esc` holds it) (#37)
+
 ## [1.61.0] - 2026-11-02
 
 ### Added

@@ -3,6 +3,12 @@
 //! any time). The checks run side by side, each in a thread of its own, so the screen stays live. At startup the
 //! apps don't wait long for the update check: it goes on in the background (`StillChecking`). Once every check is
 //! done, r runs the ones that failed or warned again (a failed update, say).
+//!
+//! It fixes what it finds too (the startup doctor): `j` / `k` pick a check, `f` runs its fix - npm ci for missing or
+//! stale packages, stopping what holds the apps' ports, the database picker, checking again, or copying the commands
+//! that free ports Windows reserved - and `a` runs every safe one in turn (never one that kills a process, needs
+//! admin rights or asks for a pick). At startup a failed check holds the start until it's fixed or `Enter` starts
+//! anyway; once nothing blocks it any more it counts down to the start (`Esc` holds it there).
 
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
@@ -10,7 +16,7 @@ use std::time::{Duration, Instant};
 use lazyrunner_core::changelog::{self, Entry, Line};
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
-use lazyrunner_core::run::checks::{self, Outcome, Status};
+use lazyrunner_core::run::checks::{self, Kind, Outcome, Status};
 use lazyrunner_core::update;
 
 /// Each check shows its spinner at least this long, so every tick can be seen.
@@ -22,6 +28,63 @@ const BACKGROUND_GRACE: Duration = Duration::from_secs(2);
 const ALL_GOOD_HOLD: f64 = 0.5;
 /// A hold this short closes too soon for a draining bar to mean anything.
 const BAR_MIN_HOLD: Duration = Duration::from_secs(5);
+/// How long a fixed check's edge takes to turn green, and a failed fix pulses.
+pub const SETTLE: Duration = Duration::from_millis(300);
+/// Once nothing blocks the start any more, it starts after this.
+const COUNTDOWN: Duration = Duration::from_secs(3);
+/// What frees the ports Windows reserved: for an elevated terminal, which lazyrunner isn't.
+pub const WINNAT: &str = "net stop winnat; net start winnat";
+
+/// What fixes a check's problem.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Fix {
+    /// npm ci for the app, by its key: its packages are missing or stale.
+    NpmCi(String),
+    /// Stop what holds the ports of the apps that aren't running.
+    FreePorts,
+    /// Check again (the update check).
+    Retry,
+    /// Another database: the picker, once the checklist closes.
+    Database,
+    /// Copy the commands that free ports Windows reserved.
+    Winnat,
+}
+
+impl Fix {
+    /// Whether `a` runs it: it kills nothing, needs no admin rights and asks for no pick.
+    pub fn safe(&self) -> bool {
+        matches!(self, Self::NpmCi(_) | Self::Retry)
+    }
+
+    /// What `f` does, for the footer.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::NpmCi(_) => "f runs npm ci",
+            Self::FreePorts => "f frees them",
+            Self::Retry => "f checks again",
+            Self::Database => "f picks a database",
+            Self::Winnat => "f copies the fix",
+        }
+    }
+}
+
+/// A check's row beyond its result: what it looks at, how long it took, and a fix running for it.
+#[derive(Clone, Debug)]
+pub struct Row {
+    pub kind: Kind,
+    pub started: Option<Instant>,
+    pub took: Option<Duration>,
+    /// The fix running for it - npm ci goes on in the controller - or its check running again after one.
+    pub fixing: Option<Fix>,
+    /// When a fix last ended, and whether the check came back fine.
+    pub settled: Option<(Instant, bool)>,
+}
+
+impl Row {
+    fn new(kind: Kind) -> Self {
+        Self { kind, started: None, took: None, fixing: None, settled: None }
+    }
+}
 
 pub struct Item {
     pub name: String,
@@ -35,7 +98,6 @@ enum Phase {
     Holding {
         from: Instant,
         until: Option<Instant>,
-        problems: usize,
     },
 }
 
@@ -65,7 +127,25 @@ pub struct Checklist {
     /// The background checks the startup stopped waiting for, and those of them that finished since.
     continuing: Vec<usize>,
     late: Vec<(String, Status, String)>,
+    /// Each check's row: its kind, timing and fix.
+    pub rows: Vec<Row>,
+    /// The check `j` / `k` picked, which `f` fixes.
+    pub selected: usize,
+    /// The checks `a` will fix next, and how many it took on.
+    queue: Vec<usize>,
+    queued: usize,
+    /// Checks running again after a fix, each lot with its own channel.
+    again: Vec<(Results, Vec<usize>)>,
+    /// A fix ran, or a failed check held the start: it no longer closes by itself, but counts down once nothing
+    /// blocks the start.
+    touched: bool,
+    /// When that countdown ends; `Esc` holds it.
+    countdown: Option<Instant>,
+    held: bool,
 }
+
+/// The channel a lot of checks report on.
+type Results = Receiver<(usize, Message)>;
 
 /// From the checks' thread: a check began, says what it is doing, or is done.
 enum Message {
@@ -81,6 +161,7 @@ impl Checklist {
             .iter()
             .map(|check| Item { name: check.name.clone(), status: Status::Pending, detail: String::new() })
             .collect();
+        let rows = checks.iter().map(|check| Row::new(check.kind.clone())).collect();
         let background: Vec<bool> = checks.iter().map(|check| check.background).collect();
         let done = vec![false; checks.len()];
         let (sender, results) = channel();
@@ -107,7 +188,209 @@ impl Checklist {
             others_done_at: None,
             continuing: Vec::new(),
             late: Vec::new(),
+            rows,
+            selected: 0,
+            queue: Vec::new(),
+            queued: 0,
+            again: Vec::new(),
+            touched: false,
+            countdown: None,
+            held: false,
         }
+    }
+
+    /// Whether every check is done and it holds: what `j` `k` `f` `a` act on.
+    pub fn is_holding(&self) -> bool {
+        matches!(self.phase, Phase::Holding { .. })
+    }
+
+    /// `j` / `k`: the next or previous check, round the ends.
+    pub fn select(&mut self, step: isize) {
+        self.selected = super::keys::wrapped(self.selected, step, self.items.len());
+    }
+
+    /// What fixes check `index`'s problem, when lazyrunner can.
+    pub fn fix_of(&self, index: usize) -> Option<Fix> {
+        let (item, row) = (self.items.get(index)?, self.rows.get(index)?);
+        match (&row.kind, item.status) {
+            (Kind::Packages(key), Status::Warn | Status::Fail) => Some(Fix::NpmCi(key.clone())),
+            (Kind::Ports, Status::Fail) if item.detail.contains("reserved by Windows") => Some(Fix::Winnat),
+            (Kind::Ports, Status::Warn) => Some(Fix::FreePorts),
+            (Kind::Database, Status::Warn) if item.detail.contains("nothing answers") => Some(Fix::Database),
+            (Kind::Update, Status::Warn | Status::Fail) => Some(Fix::Retry),
+            _ => None,
+        }
+    }
+
+    /// `f` (or `a`): runs `fix` for check `index` - npm ci in the background, the others at once - and checks it
+    /// again once it's done. The database picker and the copied commands are the caller's.
+    pub fn start_fix(&mut self, controller: &mut Controller, index: usize, fix: Fix) {
+        self.touched = true;
+        self.countdown = None;
+        match &fix {
+            Fix::NpmCi(key) => {
+                controller.npm_ci(Some(key));
+                if !controller.npm_ci.as_ref().is_some_and(|job| job.key == *key) {
+                    return; // it couldn't start: the log says why
+                }
+                self.items[index].detail = "npm ci…".into();
+                self.rows[index].fixing = Some(fix);
+            }
+            Fix::FreePorts | Fix::Retry => {
+                if fix == Fix::FreePorts {
+                    controller.free_ports();
+                }
+                self.rows[index].fixing = Some(fix);
+                self.check_again(controller, &[index]);
+            }
+            Fix::Database | Fix::Winnat => {}
+        }
+    }
+
+    /// `a`: every safe fix, one after another.
+    pub fn fix_safe(&mut self, controller: &mut Controller) {
+        self.queue = (0..self.items.len())
+            .filter(|&index| self.rows[index].fixing.is_none() && self.fix_of(index).is_some_and(|fix| fix.safe()))
+            .collect();
+        self.queued = self.queue.len();
+        self.next_fix(controller);
+    }
+
+    /// The next of `a`'s fixes, once none runs.
+    fn next_fix(&mut self, controller: &mut Controller) {
+        if self.rows.iter().any(|row| row.fixing.is_some()) {
+            return;
+        }
+        while !self.queue.is_empty() {
+            let index = self.queue.remove(0);
+            if let Some(fix) = self.fix_of(index) {
+                self.start_fix(controller, index, fix);
+                return;
+            }
+        }
+    }
+
+    /// The winnat fix: says on the check's line whether the commands were copied.
+    pub fn copied(&mut self, index: usize, copied: Result<(), String>) {
+        let Some(item) = self.items.get_mut(index) else { return };
+        item.detail = match copied {
+            Ok(()) => format!("copied `{WINNAT}` - paste it into an elevated terminal, then r"),
+            Err(why) => format!("couldn't copy ({why}) - run `{WINNAT}` in an elevated terminal"),
+        };
+    }
+
+    /// `Esc` while it counts down to the start: holds it there. False when it isn't counting down.
+    pub fn hold(&mut self) -> bool {
+        if self.countdown.take().is_none() {
+            return false;
+        }
+        self.held = true;
+        true
+    }
+
+    /// Runs checks `indexes` again, after a fix.
+    fn check_again(&mut self, controller: &Controller, indexes: &[usize]) {
+        let (sender, results) = channel();
+        for check in checks::checks(controller) {
+            let Some(index) = indexes.iter().copied().find(|&index| self.items[index].name == check.name) else {
+                continue;
+            };
+            let sender = sender.clone();
+            std::thread::spawn(move || run_check(index, check, &sender));
+        }
+        drop(sender);
+        for &index in indexes {
+            let item = &mut self.items[index];
+            (item.status, item.detail) = (Status::Pending, String::new());
+            if let Some(done) = self.done.get_mut(index) {
+                *done = false;
+            }
+        }
+        self.again.push((results, indexes.to_vec()));
+    }
+
+    /// A message from a check's thread.
+    fn receive(&mut self, index: usize, message: Message, now: Instant) {
+        let Some(item) = self.items.get_mut(index) else { return };
+        match message {
+            Message::Running => {
+                item.status = Status::Running;
+                if let Some(row) = self.rows.get_mut(index) {
+                    row.started = Some(now);
+                }
+            }
+            Message::Detail(detail) => item.detail = detail,
+            Message::Done((status, detail)) => {
+                if self.continuing.contains(&index) {
+                    // The startup stopped waiting for it: StillChecking reports it.
+                    self.late.push((item.name.clone(), status, detail.clone()));
+                }
+                item.status = status;
+                item.detail = detail;
+                if let Some(done) = self.done.get_mut(index) {
+                    *done = true;
+                }
+                if let Some(row) = self.rows.get_mut(index) {
+                    row.took = row.started.map(|started| now.saturating_duration_since(started));
+                    if row.fixing.take().is_some() {
+                        row.settled = Some((now, matches!(status, Status::Ok | Status::Skip)));
+                    }
+                }
+            }
+        }
+    }
+
+    /// The checks running again after a fix: their results, and what didn't finish fails.
+    fn receive_again(&mut self, now: Instant) {
+        let mut again = std::mem::take(&mut self.again);
+        again.retain(|(results, indexes)| {
+            loop {
+                match results.try_recv() {
+                    Ok((index, message)) => self.receive(index, message, now),
+                    Err(TryRecvError::Empty) => return true,
+                    Err(TryRecvError::Disconnected) => {
+                        for &index in indexes {
+                            if matches!(self.items[index].status, Status::Pending | Status::Running) {
+                                self.receive(
+                                    index,
+                                    Message::Done((Status::Fail, "the check didn't finish".into())),
+                                    now,
+                                );
+                            }
+                        }
+                        return false;
+                    }
+                }
+            }
+        });
+        self.again = again;
+    }
+
+    /// npm ci running for a check: its last line on the check's; once it's done, the check runs again.
+    fn follow_npm_ci(&mut self, controller: &Controller) {
+        let mut done = Vec::new();
+        for index in 0..self.rows.len() {
+            let Some(Fix::NpmCi(key)) = &self.rows[index].fixing else { continue };
+            if matches!(self.items[index].status, Status::Pending | Status::Running) {
+                continue; // checking again already
+            }
+            match controller.npm_ci.as_ref().filter(|job| job.key == *key) {
+                Some(job) => {
+                    if let Some(line) = job.lines.last().map(|line| line.trim()).filter(|line| !line.is_empty()) {
+                        self.items[index].detail = format!("npm ci: {line}");
+                    }
+                }
+                None => done.push(index),
+            }
+        }
+        if !done.is_empty() {
+            self.check_again(controller, &done);
+        }
+    }
+
+    /// Whether a fix runs, or `a` has more to run.
+    fn fixing(&self) -> bool {
+        !self.queue.is_empty() || self.rows.iter().any(|row| row.fixing.is_some())
     }
 
     /// Whether checks are running: at first, or again after r.
@@ -219,8 +502,15 @@ impl Checklist {
         self.continuing = unfinished;
     }
 
+    /// What didn't finish ends as `status` - all but the checks running again after a fix, which have their own
+    /// channel.
     fn finish_unfinished(&mut self, status: Status, detail: &str) {
-        for item in self.items.iter_mut().filter(|item| matches!(item.status, Status::Pending | Status::Running)) {
+        let again: Vec<usize> = self.again.iter().flat_map(|(_, indexes)| indexes.iter().copied()).collect();
+        let unfinished =
+            self.items.iter_mut().enumerate().filter(|(index, item)| {
+                !again.contains(index) && matches!(item.status, Status::Pending | Status::Running)
+            });
+        for (_, item) in unfinished {
             item.status = status;
             item.detail = detail.into();
         }
@@ -230,24 +520,7 @@ impl Checklist {
     pub fn update(&mut self, now: Instant, controller: &mut Controller) -> bool {
         loop {
             match self.results.try_recv() {
-                Ok((index, outcome)) => {
-                    let Some(item) = self.items.get_mut(index) else { continue };
-                    match outcome {
-                        Message::Running => item.status = Status::Running,
-                        Message::Detail(detail) => item.detail = detail,
-                        Message::Done((status, detail)) => {
-                            if self.continuing.contains(&index) {
-                                // The startup stopped waiting for it: StillChecking reports it.
-                                self.late.push((item.name.clone(), status, detail.clone()));
-                            }
-                            item.status = status;
-                            item.detail = detail;
-                            if let Some(done) = self.done.get_mut(index) {
-                                *done = true;
-                            }
-                        }
-                    }
-                }
+                Ok((index, message)) => self.receive(index, message, now),
                 Err(TryRecvError::Empty) => break,
                 // Done, or the checks' thread died: what didn't finish never will.
                 Err(TryRecvError::Disconnected) => {
@@ -256,6 +529,9 @@ impl Checklist {
                 }
             }
         }
+        self.receive_again(now);
+        self.follow_npm_ci(controller);
+        self.next_fix(controller);
         if self.skip {
             self.finish_unfinished(Status::Skip, "skipped");
         }
@@ -276,6 +552,10 @@ impl Checklist {
             if problems.is_empty() {
                 controller.add_log("✓ Startup checklist: all good", Hue::Green);
             }
+            // f fixes the first problem straight away.
+            if let Some(first) = self.items.iter().position(|item| matches!(item.status, Status::Warn | Status::Fail)) {
+                self.selected = first;
+            }
             self.updated_to = update::installed().filter(|version| self.installed_before.as_ref() != Some(version));
             // Linger a moment: longer when something needs a look or there is news; any key continues.
             let hold = if self.updated_to.is_some() && !self.manual {
@@ -290,32 +570,97 @@ impl Checklist {
                 ALL_GOOD_HOLD
             };
             let until = Some(now + Duration::from_secs_f64(hold));
-            self.phase = Phase::Holding { from: now, until, problems: problems.len() };
+            self.phase = Phase::Holding { from: now, until };
             // Opened by hand, or after r: what can be retried stays up until a key, never closing under the next r.
             if (self.manual || self.retried) && self.can_retry() {
-                self.phase = Phase::Holding { from: now, until: None, problems: problems.len() };
+                self.phase = Phase::Holding { from: now, until: None };
             }
         }
-        let Phase::Holding { until, problems, .. } = self.phase else { return false };
+        self.steer_hold(now);
+        let Phase::Holding { until, .. } = self.phase else { return false };
         if self.skip || until.is_some_and(|until| now >= until) {
             return true;
         }
+        let problems = self.items.iter().filter(|item| matches!(item.status, Status::Warn | Status::Fail)).count();
+        let blocking = self.items.iter().filter(|item| item.status == Status::Fail).count();
+        let fix = self.fix_hint();
         let left = until.map_or(String::new(), |until| {
             format!(" ({} s)", until.saturating_duration_since(now).as_secs_f64().ceil() as u64)
         });
         let retry = if self.can_retry() { format!(" · {}", self.retry_hint()) } else { String::new() };
+        let seconds = until.map_or(0, |until| until.saturating_duration_since(now).as_secs_f64().ceil() as u64);
         self.footer = if let Some(version) = self.updated_to.as_ref().filter(|_| !self.manual) {
             format!("v{version} installed - reopening lazyrunner…")
+        } else if self.fixing() {
+            self.fixing_footer()
+        } else if self.countdown.is_some() {
+            format!("nothing blocks the start - starting in {seconds} s · Esc holds it")
+        } else if self.held {
+            format!("held - Enter starts{fix}")
+        } else if self.starts() && blocking > 0 {
+            format!("{blocking} blocking the start{fix} · Enter starts anyway{retry}")
         } else if self.manual {
-            format!("any key closes{left}{retry}")
+            format!("any key closes{left}{retry}{fix}")
         } else if !self.news.is_empty() {
-            format!("what's new above (, then c shows the whole changelog) - any key continues{left}{retry}")
+            format!("what's new above (, then c shows the whole changelog) - any key continues{left}{retry}{fix}")
         } else if problems > 0 {
-            format!("{problems} to look at (also in the log below) - any key continues{left}{retry}")
+            format!("{problems} to look at - any key continues{left}{retry}{fix}")
         } else {
             "all good - starting…".into()
         };
         false
+    }
+
+    /// Whether the apps start once it closes (and not a new version of lazyrunner).
+    fn starts(&self) -> bool {
+        self.start_after && !self.manual && self.updated_to.is_none()
+    }
+
+    /// While it holds: it never closes during a fix; a failed check holds the start; once a fix ran (or a failed
+    /// check held the start) and nothing blocks it, it counts down to the start - or waits for a key without one.
+    fn steer_hold(&mut self, now: Instant) {
+        let blocking = self.items.iter().any(|item| item.status == Status::Fail);
+        let fixing = self.fixing();
+        let starts = self.starts();
+        let Phase::Holding { from, until, .. } = &mut self.phase else { return };
+        if fixing {
+            *until = None;
+        } else if starts && blocking {
+            (*until, self.touched, self.countdown) = (None, true, None);
+        } else if starts && self.touched && !self.held {
+            let end = *self.countdown.get_or_insert(now + COUNTDOWN);
+            if *until != Some(end) {
+                (*from, *until) = (now, Some(end));
+            }
+        } else if self.touched {
+            *until = None;
+        }
+    }
+
+    /// What `f` would fix, and how many `a` would, for the footer.
+    fn fix_hint(&self) -> String {
+        let mut hint = String::new();
+        if let Some(fix) = self.fix_of(self.selected) {
+            hint.push_str(&format!(" · {}", fix.label()));
+        }
+        let safe = (0..self.items.len()).filter(|&index| self.fix_of(index).is_some_and(|fix| fix.safe())).count();
+        if safe > 0 {
+            hint.push_str(&format!(" · a fixes {safe}"));
+        }
+        let problems = self.items.iter().filter(|item| matches!(item.status, Status::Warn | Status::Fail)).count();
+        if !hint.is_empty() && problems > 1 {
+            hint.push_str(" · j k pick");
+        }
+        hint
+    }
+
+    /// While fixes run: which of `a`'s, as a bar.
+    fn fixing_footer(&self) -> String {
+        if self.queued < 2 {
+            return "fixing…".into();
+        }
+        let at = (self.queued - self.queue.len()).min(self.queued);
+        format!("fixing {at} of {} {}{}", self.queued, "▰".repeat(at), "▱".repeat(self.queued - at))
     }
 }
 
@@ -393,6 +738,7 @@ impl Checklist {
     pub fn fixed(items: Vec<Item>, news: Vec<Line>, footer: &str) -> Self {
         let (_, results) = channel();
         let items_len = items.len();
+        let rows = items.iter().map(|item| Row::new(kind_of(&item.name))).collect();
         Self {
             items,
             footer: footer.into(),
@@ -410,7 +756,29 @@ impl Checklist {
             others_done_at: None,
             continuing: Vec::new(),
             late: Vec::new(),
+            rows,
+            selected: 0,
+            queue: Vec::new(),
+            queued: 0,
+            again: Vec::new(),
+            touched: false,
+            countdown: None,
+            held: false,
         }
+    }
+}
+
+/// A check's kind by its name, for checklists made up in tests.
+#[cfg(test)]
+fn kind_of(name: &str) -> Kind {
+    match name {
+        "lazyrunner" => Kind::Update,
+        "Ports" => Kind::Ports,
+        "Database" => Kind::Database,
+        "Project" => Kind::Project,
+        "Branch" => Kind::Branch,
+        _ if name.ends_with(" packages") => Kind::Packages(name.trim_end_matches(" packages").to_lowercase()),
+        _ => Kind::Tool,
     }
 }
 
@@ -528,7 +896,7 @@ mod tests {
         let now = Instant::now();
         assert!(!list.update(now, &mut controller));
         assert!(!list.update(now + Duration::from_secs(600), &mut controller), "it never closes by itself");
-        assert_eq!(list.footer, "any key closes · r retries lazyrunner");
+        assert_eq!(list.footer, "any key closes · r retries lazyrunner · f checks again · a fixes 1");
         assert_eq!(list.draining(now), None, "so nothing drains");
     }
 
@@ -538,7 +906,8 @@ mod tests {
         let mut list = Checklist::fixed(vec![item_named("Ports", Status::Warn)], Vec::new(), "checking…");
         let now = Instant::now();
         assert!(!list.update(now, &mut controller));
-        assert_eq!(list.footer, "1 to look at (also in the log below) - any key continues (8 s) · r retries Ports");
+        let fix = " · f frees them";
+        assert_eq!(list.footer, format!("1 to look at - any key continues (8 s) · r retries Ports{fix}"));
         assert_eq!(list.draining(now), Some(1.0));
         assert_eq!(list.draining(now + Duration::from_secs(2)), Some(0.75), "the bar drains with the time left");
         assert!(list.update(now + Duration::from_secs(8), &mut controller), "then the apps start");
@@ -551,7 +920,7 @@ mod tests {
         sender.send((0, Message::Done((Status::Warn, "47211 is in use".into())))).unwrap();
         assert!(!list.update(now, &mut controller));
         assert!(!list.update(now + Duration::from_secs(600), &mut controller), "after r it waits for a key");
-        assert_eq!(list.footer, "1 to look at (also in the log below) - any key continues · r retries Ports");
+        assert_eq!(list.footer, format!("1 to look at - any key continues · r retries Ports{fix}"));
     }
 
     #[test]
@@ -573,6 +942,53 @@ mod tests {
         assert!(updated.can_retry());
         updated.updated_to = Some("9.9.9".into());
         assert!(!updated.can_retry(), "a new version is about to open");
+    }
+
+    #[test]
+    fn each_problem_has_its_fix_and_a_runs_only_the_safe_ones() {
+        let problem = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
+        let list = Checklist::fixed(
+            vec![
+                problem("Web packages", Status::Fail, "node_modules is missing"),
+                problem("Ports", Status::Warn, "47211 used by node"),
+                problem("Database", Status::Warn, "Local · nothing answers on port 1433"),
+                problem("lazyrunner", Status::Warn, "GitHub didn't answer"),
+                problem("git", Status::Fail, "not found on PATH"),
+            ],
+            Vec::new(),
+            "",
+        );
+        let fixes: Vec<Option<Fix>> = (0..5).map(|index| list.fix_of(index)).collect();
+        assert_eq!(
+            fixes,
+            [Some(Fix::NpmCi("web".into())), Some(Fix::FreePorts), Some(Fix::Database), Some(Fix::Retry), None]
+        );
+        let safe: Vec<bool> = fixes.iter().flatten().map(Fix::safe).collect();
+        assert_eq!(safe, [true, false, false, true], "a kills nothing and asks for no pick");
+        let reserved = problem("Ports", Status::Fail, "47211 reserved by Windows (47200-47299) - net stop winnat");
+        assert_eq!(Checklist::fixed(vec![reserved], Vec::new(), "").fix_of(0), Some(Fix::Winnat));
+    }
+
+    #[test]
+    fn a_failed_check_holds_the_start_and_once_fixed_it_counts_down_to_it() {
+        let (_temp, mut controller) = crate::screen::tests::controller("checklist-blocking");
+        let mut list = Checklist::fixed(vec![item(Status::Fail), item_named("Ports", Status::Ok)], Vec::new(), "");
+        list.start_after = true;
+        let now = Instant::now();
+        assert!(!list.update(now, &mut controller));
+        assert!(!list.update(now + Duration::from_secs(600), &mut controller), "it never starts by itself");
+        assert_eq!(list.footer, "1 blocking the start · Enter starts anyway · r retries git");
+
+        let (sender, results) = channel();
+        list.again.push((results, vec![0]));
+        list.items[0].status = Status::Pending;
+        sender.send((0, Message::Done((Status::Ok, "2.50".into())))).unwrap();
+        assert!(!list.update(now, &mut controller), "fixed: it counts down");
+        assert_eq!(list.footer, "nothing blocks the start - starting in 3 s · Esc holds it");
+        assert!(list.hold(), "Esc holds it");
+        assert!(!list.update(now + Duration::from_secs(600), &mut controller));
+        assert_eq!(list.footer, "held - Enter starts");
+        assert!(!list.hold(), "nothing to hold any more");
     }
 
     #[test]

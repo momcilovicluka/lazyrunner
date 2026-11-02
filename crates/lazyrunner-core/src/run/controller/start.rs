@@ -316,6 +316,29 @@ impl Controller {
         if conflicts.is_empty() {
             return;
         }
+        self.kill_conflicts(conflicts);
+        self.start(None, false);
+    }
+
+    /// The startup checklist's fix for busy ports: kills what holds the ports of the apps that aren't running, and
+    /// starts nothing.
+    pub fn free_ports(&mut self) {
+        let listening = Listening::now();
+        let conflicts: Vec<Conflict> = self
+            .keys()
+            .into_iter()
+            .filter(|key| !self.is_running(key))
+            .filter_map(|key| {
+                let port = self.port(&key)?;
+                let owner = listening.ports.get(&port)?;
+                Some(Conflict { key, port, pid: owner.pid, name: owner.name.clone() })
+            })
+            .collect();
+        self.kill_conflicts(conflicts);
+    }
+
+    /// Kills what holds each conflict's port - if it still does, never a reused PID nor the system.
+    fn kill_conflicts(&mut self, conflicts: Vec<Conflict>) {
         let listening = Listening::now();
         for conflict in conflicts {
             // The conflict may be minutes old: kill only what still holds the port, never a reused PID.
@@ -352,7 +375,6 @@ impl Controller {
             }
         }
         self.last_stop = Some((self.now)()); // what was killed lets go of its ports in a moment: the start waits
-        self.start(None, false);
     }
 
     // ---------------------------------------------------------------- after a database switch

@@ -484,6 +484,37 @@ async fn startup_checklist() {
 }
 
 #[tokio::test]
+async fn the_checklist_groups_its_checks_times_them_and_f_fixes_the_picked_one() {
+    let mut screen = screen("snap-doctor", json!({}));
+    let item = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
+    let reserved = "47201 reserved by Windows (47200-47299) - net stop winnat, then net start winnat, in an elevated                     terminal frees it";
+    let items = vec![
+        item("git", Status::Ok, "2.50"),
+        item(".NET SDK", Status::Ok, "10.0.100"),
+        item("Ports", Status::Fail, reserved),
+        item("Project", Status::Ok, "Shop from this repo's lazyrunner.json"),
+    ];
+    let mut list = Checklist::fixed(items, Vec::new(), "");
+    list.rows[0].took = Some(Duration::from_millis(120));
+    list.rows[1].took = Some(Duration::from_millis(400));
+    list.rows[3].took = Some(Duration::from_millis(30));
+    let now = screen.ui.now;
+    list.update(now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    let frame = screen.frame();
+    assert!(frame.contains("Environment") && frame.contains("2 passed"), "a group that passed folds: {frame}");
+    assert!(frame.contains("r retries Ports · f copies the fix"), "{frame}");
+    insta::assert_snapshot!(frame);
+    screen.press("f");
+    assert_eq!(copied(), [super::checklist::WINNAT], "f on the reserved port copies what frees it");
+    assert!(screen.frame().contains("copied `net stop winnat"), "{}", screen.frame());
+    screen.press("k k");
+    assert!(screen.frame().contains(".NET SDK"), "picking a check in a folded group opens it: {}", screen.frame());
+    let Some(Overlay::Checklist(list)) = &screen.ui.overlay else { panic!("the checklist is open") };
+    assert!(!list.skip, "the doctor's keys don't close it");
+}
+
+#[tokio::test]
 async fn cut_off_labels_scroll_sideways_several_at_once() {
     let mut screen = screen("labels-scroll", json!({}));
     let long = "v1.40.0 is out, but not installed: the release has no Windows build yet, try again in a minute";
@@ -493,7 +524,7 @@ async fn cut_off_labels_scroll_sideways_several_at_once() {
     let first = screen.render(80, 30);
     assert!(first.contains("1 v1.40.0 is out") && first.contains("2 v1.40.0 is out"), "{first}");
     assert!(!first.contains("in a minute"), "cut off at first: {first}");
-    screen.ui.now += Duration::from_secs(6);
+    screen.ui.now += Duration::from_secs(8);
     let later = screen.render(80, 30);
     assert_eq!(later.matches("try again in a minute").count(), 2, "both scroll to their ends: {later}");
 }
