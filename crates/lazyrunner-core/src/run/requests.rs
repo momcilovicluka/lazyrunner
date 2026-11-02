@@ -48,7 +48,9 @@ static HEADER: LazyLock<Regex> =
     LazyLock::new(|| pattern(r"^\s*\w+: Microsoft\.AspNetCore\.Hosting\.Diagnostics\[\d+\]\s*$"));
 /// A path segment that is an id: a number, a GUID, a long hex string.
 static ID: LazyLock<Regex> = LazyLock::new(|| {
-    pattern(r"^(\d+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24,})$")
+    pattern(
+        r"^(\d+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24,}|.+(@|%40).+)$",
+    )
 });
 
 /// A request as its start line says it.
@@ -281,7 +283,8 @@ pub fn db_command_ms(text: &str) -> Option<f64> {
     rest.split_once("ms)")?.0.replace(',', "").trim().parse().ok()
 }
 
-/// The endpoint a path belongs to: without the query, ids (numbers, GUIDs, long hex) as `{id}`.
+/// The endpoint a path belongs to: without the query, ids (numbers, GUIDs, long hex, user names like `jo@contoso`)
+/// as `{id}`.
 pub fn endpoint(path: &str) -> String {
     let path = path.split('?').next().unwrap_or_default();
     path.split('/').map(|part| if ID.is_match(part) { "{id}" } else { part }).collect::<Vec<_>>().join("/")
@@ -516,6 +519,9 @@ mod tests {
     fn endpoints_group_ids_and_sum_up() {
         let path = "/api/orders/42/lines/0f8fad5b-d9cb-469f-a165-70867728950e?x=1";
         assert_eq!(endpoint(path), "/api/orders/{id}/lines/{id}");
+        assert_eq!(endpoint("/api/users/image/jo@contoso"), "/api/users/image/{id}");
+        assert_eq!(endpoint("/api/users/image/jo%40contoso.com"), "/api/users/image/{id}");
+        assert_eq!(endpoint("/api/users/@me"), "/api/users/@me", "not a user's name");
         let mut requests = Requests::default();
         let now = chrono::Local::now();
         for (path, status, ms) in [("/api/orders/1", 200, 10.0), ("/api/orders/2", 500, 30.0), ("/api/cart", 200, 5.0)]
