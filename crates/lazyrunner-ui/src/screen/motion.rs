@@ -253,16 +253,23 @@ impl Motion {
     }
 
     /// The row to draw the palette's selection bar on, on its way to `target`: a row every `BAR_STEP`, a jump of more
-    /// than `BAR_ROWS` cut.
+    /// than `BAR_ROWS` cut. A new target while it's still on its way (a held key repeats faster than it slides) has
+    /// it go on from the row before the target, a row behind the key rather than stalling.
     pub fn bar(&mut self, target: usize, now: Instant) -> usize {
         if !self.on() {
             return target;
         }
         match &self.bar {
             Some(glide) if glide.to == target => {}
-            Some(_) => {
+            Some(glide) => {
                 let current = self.bar_at(now);
-                let from = if current.abs_diff(target) > BAR_ROWS { target } else { current };
+                let from = match target.cmp(&current) {
+                    _ if current.abs_diff(target) > BAR_ROWS => target,
+                    _ if current == glide.to => current,
+                    std::cmp::Ordering::Greater => target - 1,
+                    std::cmp::Ordering::Less => target + 1,
+                    std::cmp::Ordering::Equal => target,
+                };
                 self.bar = Some(Glide { from, to: target, at: now });
             }
             None => self.bar = Some(Glide { from: target, to: target, at: now }),
@@ -377,6 +384,15 @@ mod tests {
         assert_eq!(motion.bar(9, later(start, 100)), 9, "more than 3 rows: cut");
         assert_eq!(motion.bar(7, later(start, 110)), 9);
         assert_eq!(motion.bar(7, later(start, 151)), 8, "back up a row at a time");
+    }
+
+    #[test]
+    fn a_held_key_moves_the_bar_a_row_behind_it_instead_of_stalling() {
+        let (mut motion, start) = (Motion::default(), Instant::now());
+        motion.bar(0, start);
+        let shown: Vec<usize> = (1..=8).map(|row| motion.bar(row, later(start, 33 * row as u64))).collect();
+        assert_eq!(shown, [0, 1, 2, 3, 4, 5, 6, 7], "a repeat every 33 ms, faster than a row's 40: a row behind");
+        assert_eq!(motion.bar(8, later(start, 33 * 8 + 41)), 8, "and onto the last row once it's let go");
     }
 
     #[test]
