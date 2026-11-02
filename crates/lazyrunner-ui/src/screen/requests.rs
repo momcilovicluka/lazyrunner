@@ -531,7 +531,7 @@ fn ms(ms: f64) -> String {
     if ms >= 10_000.0 { format!("{:.1}s", ms / 1000.0) } else { format!("{ms:.0}") }
 }
 
-fn status_color(status: u16) -> C {
+pub(super) fn status_color(status: u16) -> C {
     match status {
         500.. => C::Red,
         400.. => C::Yellow,
