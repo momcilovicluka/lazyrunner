@@ -180,6 +180,12 @@ pub fn tool_line(text: &str, building: bool) -> ToolLine {
 }
 
 /// The compiler errors of a failed build, each once.
+/// A build's warnings, each once (dotnet repeats them at the end).
+pub fn warnings(lines: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    lines.iter().filter(|line| line.contains(": warning ")).filter(|line| seen.insert(line.as_str())).cloned().collect()
+}
+
 pub fn errors(lines: &[String]) -> Vec<String> {
     let mut seen = HashSet::new();
     lines.iter().filter(|line| line.contains(": error ")).filter(|line| seen.insert(line.as_str())).cloned().collect()

@@ -88,6 +88,13 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(on(format!(" {} ", chip.key), C::Black, if popping { C::White } else { chip.color }).at(target));
         segs.push(seg(format!(" {}", chip.label), chip.color).at(target));
     }
+    for (index, label) in super::diff::chips(ui, controller) {
+        let target = Target::RunNews(index);
+        let key = if index < 9 { (index + 1).to_string() } else { icons::icon(ui.nerd, Icon::Diff).to_string() };
+        segs.push(seg("   ", C::Gray));
+        segs.push(on(format!(" {key} "), C::Black, C::Red).at(target));
+        segs.push(seg(format!(" {label}"), C::Red).at(target));
+    }
     segs.extend([
         seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta),
         seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),

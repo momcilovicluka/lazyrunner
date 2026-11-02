@@ -172,6 +172,8 @@ pub struct Controller {
     timings: Timings,
     /// How long builds, starts and npm ci took over their last runs (D).
     pub durations: Durations,
+    /// Each app's last good build's warnings, to tell the next build's new ones (builds.json).
+    pub build_warnings: HashMap<String, diff::Warnings>,
     /// The DbContexts of the apps with migrations (M), once the view opened.
     pub contexts: Option<Vec<super::migrations::Context>>,
     /// dotnet ef's job, and the ones waiting.
@@ -249,6 +251,7 @@ impl Controller {
         let mut controller = Self {
             timings: Timings::load(&state_dir),
             durations: Durations::load(&state_dir),
+            build_warnings: diff::load_builds(&state_dir),
             contexts: None,
             migration_job: None,
             migration_queue: VecDeque::new(),

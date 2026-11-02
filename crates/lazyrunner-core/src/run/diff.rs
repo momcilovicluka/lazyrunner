@@ -1,7 +1,8 @@
 //! What changed since an app's previous run (`Alt+d` on its column). A run is kept as its digest - the shapes of its
 //! lines (`output::shape`: what changes every run blanked) and its errors and warnings, each one entry with the lines
 //! that belong to it - when the next run starts, and in runs.json in the project's state folder when lazyrunner
-//! quits, so the first run after it opens again compares too.
+//! quits, so the first run after it opens again compares too. A good build's warnings are compared with the last good
+//! build's the same way (builds.json).
 
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -12,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::output::{self, Level, Output, OutputLine};
 
 pub const FILE: &str = "runs.json";
+pub const BUILDS_FILE: &str = "builds.json";
 
 /// A run as the next one compares with it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -55,6 +57,42 @@ impl Digest {
             .collect();
         Self { shapes: lines.iter().map(|(_, line)| line.shape).collect(), problems }
     }
+}
+
+/// A good build's warnings, as the next build compares with them: how many, and their shapes.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Warnings {
+    pub count: usize,
+    pub shapes: HashSet<u64>,
+}
+
+/// A good build's `warnings` (each once) next to the last good build's (`previous`): how many more or fewer - none
+/// with no build to compare with - the new ones, as they came, and these to compare the next build with.
+pub fn warning_change<'a>(
+    previous: Option<&Warnings>,
+    warnings: &'a [String],
+) -> (Option<isize>, Vec<&'a str>, Warnings) {
+    let now =
+        Warnings { count: warnings.len(), shapes: warnings.iter().map(|warning| output::shape(warning)).collect() };
+    let Some(previous) = previous else { return (None, Vec::new(), now) };
+    let new = warnings
+        .iter()
+        .filter(|warning| !previous.shapes.contains(&output::shape(warning)))
+        .map(String::as_str)
+        .collect();
+    (Some(now.count as isize - previous.count as isize), new, now)
+}
+
+/// How many errors and warnings the run of `output` from line `from` on has that `previous` didn't.
+pub fn new_problems(previous: &Digest, output: &Output, from: u64) -> (usize, usize) {
+    let known: HashSet<u64> = previous.problems.iter().map(|problem| problem.shape).collect();
+    let fresh = blocks(&numbered(output, from)).into_iter().filter(|block| !known.contains(&block.shape));
+    fresh.fold(
+        (0, 0),
+        |(errors, warnings), block| {
+            if block.level == Level::Error { (errors + 1, warnings) } else { (errors, warnings + 1) }
+        },
+    )
 }
 
 /// The lines of `output` from line `from` on that are still kept, with their numbers.
@@ -103,6 +141,18 @@ pub fn save(state: &Path, runs: &HashMap<&str, &Digest>) -> io::Result<()> {
     std::fs::write(state.join(FILE), text)
 }
 
+/// Each app's last good build's warnings kept in the state folder `state` (builds.json).
+pub fn load_builds(state: &Path) -> HashMap<String, Warnings> {
+    crate::json::read(&state.join(BUILDS_FILE)).and_then(|value| serde_json::from_value(value).ok()).unwrap_or_default()
+}
+
+/// Keeps each app's last good build's warnings in the state folder `state`.
+pub fn save_builds(state: &Path, builds: &HashMap<String, Warnings>) -> io::Result<()> {
+    let text = serde_json::to_string(builds).map_err(io::Error::other)?;
+    std::fs::create_dir_all(state)?;
+    std::fs::write(state.join(BUILDS_FILE), text)
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
@@ -140,6 +190,29 @@ mod tests {
             [("fail: Orders.Api[0]", true), ("fail: Billing.Api[0]", true), ("warn: slow for 40 ms", false)],
             "an entry's indented lines belong to it; the next entry starts another"
         );
+    }
+
+    #[test]
+    fn a_runs_new_errors_and_warnings_are_those_the_last_one_didnt_have() {
+        let output = run();
+        let mut previous = Digest::of(&output, 2);
+        assert_eq!(new_problems(&previous, &output, 2), (0, 0));
+        previous.problems.retain(|problem| problem.text != "fail: Billing.Api[0]");
+        assert_eq!(new_problems(&previous, &output, 2), (1, 0));
+    }
+
+    #[test]
+    fn a_builds_warnings_are_compared_with_the_last_good_builds() {
+        let first = ["A.cs(12,5): warning CS8618: Name is null".to_string()];
+        let (change, new, kept) = warning_change(None, &first);
+        assert_eq!((change, new.len(), kept.count), (None, 0, 1), "nothing to compare the first with");
+        let second = [
+            "A.cs(14,5): warning CS8618: Name is null".to_string(),
+            "B.cs(3,1): warning CS0168: e is never used".to_string(),
+        ];
+        let (change, new, _) = warning_change(Some(&kept), &second);
+        assert_eq!(change, Some(1));
+        assert_eq!(new, ["B.cs(3,1): warning CS0168: e is never used"], "the one that moved two lines isn't new");
     }
 
     #[test]

@@ -39,6 +39,8 @@ pub enum Target {
     Tests,
     /// A view's chip of news on the panel's status line: a click opens the view on the first new thing.
     News(super::jumps::View),
+    /// An app's chip of new errors since its last run, by its index: a click shows its column's (`Alt+d`).
+    RunNews(usize),
     /// A migration of the context selected in the migrations view, by its place in that list (newest first).
     Migration(usize),
     /// A row of a column's rail: the column, the row, where a click scrolls it to (lines back from the newest), and
@@ -185,6 +187,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::Rail { column, scroll, .. }) => to_rail(ui, controller, column, scroll),
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
+        Some(Target::RunNews(index)) => super::diff::open_news(ui, controller, index),
         Some(Target::Reveal(link)) => {
             if link_click(ui, controller, modified) {
                 super::bundle::reveal(ui, controller, link);

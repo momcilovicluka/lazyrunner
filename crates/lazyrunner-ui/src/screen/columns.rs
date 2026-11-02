@@ -573,7 +573,8 @@ fn body(
     let filtered = state.filter != LevelFilter::All || searching;
     let diff = super::diff::view(ui, state);
     let shown = list.len();
-    let rows = rows.saturating_sub(usize::from(filtered) + usize::from(diff.is_some()));
+    let listed = diff.as_ref().map_or(0, |diff| 1 + diff.fixed_rows());
+    let rows = rows.saturating_sub(usize::from(filtered) + listed);
     // More lines than rows: the last cells are the rail, a map of them.
     let rail = if shown > rows && rows > 0 && column > 1 { super::rail::width(column) } else { 0 };
     let cells = column - rail;
@@ -704,9 +705,41 @@ fn body(
         result.insert(0, fit(vec![seg(note, C::DarkCyan)], column));
     }
     if let Some(diff) = &diff {
-        result.insert(0, super::diff::summary(ui, state, diff, column));
+        let mut top = vec![super::diff::summary(ui, state, diff, column)];
+        top.extend(fixed_rows(diff, index, column, found, base));
+        result.splice(0..0, top);
     }
     result
+}
+
+/// Under diff mode's top row while `Enter` lists them: the last run's errors and warnings that didn't come back,
+/// dimmed behind a tick, their links clickable.
+fn fixed_rows(
+    view: &super::diff::View,
+    index: usize,
+    cells: usize,
+    found: &mut Vec<links::Target>,
+    base: usize,
+) -> Vec<Vec<Seg>> {
+    let mut rows = Vec::new();
+    for (text, error) in view.gone.iter().take(super::diff::FIXED_SHOWN) {
+        let line_links = links::find(text);
+        let ids: Vec<usize> = line_links
+            .iter()
+            .map(|link| {
+                found.push(link.target.clone());
+                base + found.len() - 1
+            })
+            .collect();
+        let mut segs = vec![seg("  ✓ ", if *error { C::Green } else { C::DarkGreen })];
+        segs.extend(linked(text, 0, &line_links, &ids, C::DarkGray, index));
+        rows.push(fit(segs, cells));
+    }
+    if view.gone.len() > super::diff::FIXED_SHOWN {
+        let more = format!("  … and {} more", view.gone.len() - super::diff::FIXED_SHOWN);
+        rows.push(fit(vec![seg(more, C::DarkGray)], cells));
+    }
+    rows
 }
 
 /// How far back to scroll so `found` (an index into `shown`) sits in the middle of a column `rows` tall and `cells`
