@@ -213,6 +213,7 @@ impl Controller {
     pub fn migrate(&mut self, key: &str, target: Option<String>, what: String) {
         let Some(context) = self.context_mut(key) else { return };
         context.status = Status::Queued;
+        context.plan(target.as_deref());
         self.migration_queue.push_back(Work::Update { context: key.to_string(), target, what });
         self.pump_migrations();
     }
@@ -232,6 +233,9 @@ impl Controller {
     pub(super) fn migrations_changed(&mut self) {
         if self.contexts.is_none() {
             return;
+        }
+        for context in self.contexts.iter_mut().flatten().filter(|context| !context.is_busy()) {
+            context.run = None;
         }
         self.restore_checks();
         if self.setting(Toggle::CheckMigrationsOnOpen) {
@@ -313,6 +317,7 @@ impl Controller {
     }
 
     pub(super) fn migration_output(&mut self, id: u64, line: &str) {
+        let now = (self.now)();
         let Some(job) = self.migration_job.as_mut().filter(|job| job.id == id) else { return };
         let text = strip_ansi(line);
         job.lines.push(text.clone());
@@ -320,6 +325,7 @@ impl Controller {
             && let Some(context) = self.context_mut(&context)
         {
             context.receive(&text);
+            context.hop(&text, now);
         }
     }
 
@@ -342,8 +348,13 @@ impl Controller {
                     self.add_log(format!("✗ Migrating {name} failed: {failure}"), Hue::Red);
                     self.notifications.push(("Migration failed".into(), format!("{name} on {db}")));
                 }
+                let now = (self.now)();
                 if let Some(context) = self.context_mut(&key) {
                     context.status = Status::Queued;
+                    let failure = (code != Some(0)).then(|| context.error.clone());
+                    if let Some(run) = &mut context.run {
+                        run.ended = Some((now, failure));
+                    }
                 }
                 self.migration_queue.push_front(Work::List { context: key }); // what is applied now
             }
@@ -404,6 +415,9 @@ impl Controller {
             && let Some(context) = self.context_mut(context)
         {
             context.status = Status::Queued;
+            if let Some(run) = context.run.as_mut().filter(|run| run.ended.is_none()) {
+                run.began.clear(); // it starts over after the build
+            }
         }
         self.migration_queue.push_front(job.work);
     }

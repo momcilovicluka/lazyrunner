@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.57.0] - 2026-11-02
+
+### Added
+- Migrations as a timeline (`M`): a context's migrations on a rail, oldest at the top - `●` applied, `○` pending, dates from their ids with a gap where months pass, the older ones folded - and the database as a bead, **database is here**. Choosing a target lights the path to it: green flowing down to apply, amber flowing up to revert, `⚠` on what reverting likely loses (named in the confirmation too). While `dotnet ef` works the bead travels a node a hop as each migration is done - in turn, catching up when several finish at once - and breathes between them; nodes fill or empty with a glint, the list shows a `▰▰▱▱ 2/4` bar, a shimmer runs along the stretch once done, and a failure pulses red with its reason on the node (#39)
+
 ## [1.56.1] - 2026-11-02
 
 ### Fixed

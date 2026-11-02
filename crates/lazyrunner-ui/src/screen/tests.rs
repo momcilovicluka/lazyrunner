@@ -1067,17 +1067,91 @@ async fn the_migrations_view_shows_what_is_applied_and_asks_before_it_moves() {
     screen.controller.apps[0].migrations = Some(setup);
     screen.ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
     insta::assert_snapshot!(screen.frame());
-    screen.press("l j j m");
+    screen.press("l k k m");
     let frame = screen.frame();
     assert!(frame.contains("Revert 1 migration of ShopDbContext on ShopLocal @ localhost, back to Init?"), "{frame}");
     assert!(frame.contains("Their Down() runs"));
     screen.press("n");
     screen.frame();
-    assert!(matches!(screen.ui.overlay, Some(Overlay::Migrations { picking: Some(2), .. })), "back to the view");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Migrations { picking: Some(0), .. })), "back to the view");
     screen.press("u y");
     screen.frame();
     assert!(matches!(screen.ui.overlay, Some(Overlay::Migrations { .. })));
     assert_eq!(screen.last_log(), "✗ Migrations: Orders has no build yet - b builds it, then r here");
+}
+
+/// The sample's Orders with a ShopDbContext of these migrations (`20260101000000_Init` and so on), checked on
+/// ShopLocal, in the migrations view.
+fn with_shop(screen: &mut Screen, items: &[(&str, bool)]) {
+    use lazyrunner_core::run::migrations::{Context, Migration, Status as Ef};
+    let mut shop =
+        Context::new("orders", "ShopDbContext", "/work/sample/Data.csproj".into(), "/nowhere/Orders.csproj".into());
+    let migration =
+        |(id, applied): &(&str, bool)| Migration { id: id.to_string(), name: id[15..].into(), applied: Some(*applied) };
+    shop.items = items.iter().map(migration).collect();
+    (shop.status, shop.checked_at, shop.db) = (Ef::Ok, Some(chrono::Local::now()), "ShopLocal".into());
+    screen.controller.contexts = Some(vec![shop]);
+    let setup = lazyrunner_core::profile::Migrations { project: None, contexts: vec!["ShopDbContext".into()] };
+    screen.controller.apps[0].migrations = Some(setup);
+    screen.ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
+}
+
+/// The line of `frame` that holds `text`.
+fn line_with(frame: &str, text: &str) -> String {
+    frame.lines().find(|line| line.contains(text)).unwrap_or_else(|| panic!("{text} in {frame}")).to_string()
+}
+
+#[tokio::test]
+async fn choosing_a_target_lights_the_path_to_it_and_marks_what_reverting_may_lose() {
+    let mut screen = screen("migrations-ghost", json!({ "reducedMotion": true }));
+    let items =
+        [("20260101000000_Init", true), ("20260201000000_AddRefunds", true), ("20260301000000_Invoices", false)];
+    with_shop(&mut screen, &items);
+    assert!(line_with(&screen.frame(), "AddRefunds").contains("AddRefunds  ◂ database is here · ShopLocal"));
+    screen.press("l");
+    assert!(line_with(&screen.frame(), "Invoices").contains("Invoices  ◂ applies 1"), "{}", screen.frame());
+    screen.press("k k");
+    let frame = screen.frame();
+    assert!(line_with(&frame, "AddRefunds").contains("⚠ AddRefunds"), "{frame}");
+    assert!(line_with(&frame, "Init").contains("Init  ◂ reverts 1 - may lose data"), "{frame}");
+    screen.press("m");
+    assert!(screen.frame().contains("Likely to lose data: AddRefunds"), "{}", screen.frame());
+}
+
+#[tokio::test]
+async fn a_run_moves_the_bead_a_node_a_hop_and_says_where_it_failed() {
+    use lazyrunner_core::run::migrations::{Run, Status as Ef};
+    let mut screen = screen("migrations-run", json!({}));
+    let items = [
+        ("20260101000000_Init", true),
+        ("20260201000000_Orders", true),
+        ("20260301000000_Invoices", false),
+        ("20260401000000_Refunds", false),
+    ];
+    with_shop(&mut screen, &items);
+    let now = screen.ui.now;
+    let mut run = Run {
+        from: Some("20260201000000_Orders".into()),
+        back: false,
+        planned: vec!["20260301000000_Invoices".into(), "20260401000000_Refunds".into()],
+        began: vec![now - Duration::from_secs(3), now - Duration::from_secs(2)],
+        ended: None,
+    };
+    let set = |screen: &mut Screen, run: &Run, status| {
+        if let Some(shop) = screen.controller.contexts.as_mut().and_then(|all| all.first_mut()) {
+            (shop.run, shop.status) = (Some(run.clone()), status);
+        }
+    };
+    set(&mut screen, &run, Ef::Migrating);
+    let frame = screen.frame();
+    let invoices = line_with(&frame, "Invoices");
+    assert!(invoices.contains('●') && invoices.contains("Invoices  ◂ applying Refunds…"), "{frame}");
+    assert!(line_with(&frame, "1 Apr").contains('○'), "not there yet: {frame}");
+    assert!(frame.contains("▰▰▱▱ 1/2"), "the list's bar: {frame}");
+    run.ended = Some((now - Duration::from_secs(1), Some("Invalid column name 'Total'.".into())));
+    set(&mut screen, &run, Ef::Ok);
+    let frame = screen.frame();
+    assert!(line_with(&frame, "1 Apr").contains("✗ Invalid column name 'Total'."), "{frame}");
 }
 
 // ---------------------------------------------------------------- the requests view
