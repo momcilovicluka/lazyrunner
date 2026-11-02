@@ -2,8 +2,10 @@
 //! dim, the new ones stay as they are with a mark in the gutter - `▲` a new error or warning, `●` any other new line -
 //! and its top row counts them, with the errors and warnings of the last run that didn't come back (`fixed?` until the
 //! app is up: they may only not have come yet). `n` / `N` step through the new errors and warnings, or the new lines
-//! when there are none. The rail marks only what's new, and sends its ember only for a new error. With reduced motion
-//! the lines dim at once and the count doesn't flash.
+//! when there are none; `Enter` lists what was fixed - the last run's errors and warnings that didn't come back. The
+//! rail marks only what's new, and sends its ember only for a new error. With reduced motion the lines dim at once and
+//! the count doesn't flash. A run with new errors that diff mode wasn't on for puts a chip in the panel's header
+//! (`1 Orders +2 new errors`): the column's number or a click turns diff mode on there, on the first of them.
 
 use std::cell::Cell;
 use std::collections::HashSet;
@@ -23,6 +25,8 @@ use super::theme::C;
 
 /// How long the lines take to dim, or to come back.
 const FADE: Duration = Duration::from_millis(200);
+/// What was fixed lists this many, then how many more.
+pub const FIXED_SHOWN: usize = 5;
 
 /// A column's diff mode, by its app's key in `Ui::diffs`.
 pub struct Diff {
@@ -33,6 +37,10 @@ pub struct Diff {
     /// The new errors counted at the last frame, and when that number last rose.
     counted: Cell<Option<usize>>,
     bumped: Cell<Option<Instant>>,
+    /// The run it was turned on or off in (its first line's number): that run's chip is done with.
+    run: u64,
+    /// Whether what was fixed is listed (`Enter`).
+    fixed: bool,
 }
 
 /// What a line of the column is to the run before.
@@ -63,6 +71,9 @@ pub struct View {
     /// Whether the run is far enough along for `fixed` to count: up, or over.
     settled: bool,
     pub at: Option<u64>,
+    /// While `Enter` lists them: the last run's errors and warnings that didn't come back - their first lines, and
+    /// whether each was an error.
+    pub gone: Vec<(String, bool)>,
 }
 
 impl View {
@@ -106,6 +117,11 @@ impl View {
         }
     }
 
+    /// The rows the list of what was fixed takes under the top row.
+    pub fn fixed_rows(&self) -> usize {
+        self.gone.len().min(FIXED_SHOWN) + usize::from(self.gone.len() > FIXED_SHOWN)
+    }
+
     /// Whether the column gives the marks a gutter: while it's on and has a run to compare with.
     pub fn has_gutter(&self) -> bool {
         self.on && self.compared
@@ -125,11 +141,31 @@ impl View {
 
 /// Alt+d: diff mode on the focused column, or off.
 pub fn toggle(ui: &mut Ui, controller: &Controller) {
-    let Some(key) = controller.apps.get(ui.focus).map(|app| app.key.clone()) else { return };
-    let now = ui.now;
-    let on = !is_on(ui, &key);
-    ui.diffs.insert(key.clone(), Diff { on, since: now, at: None, counted: Cell::new(None), bumped: Cell::new(None) });
+    let on = !focused_on(ui, controller);
+    set(ui, controller, ui.focus, on);
+}
+
+/// Diff mode on app `index`'s column, or off.
+fn set(ui: &mut Ui, controller: &Controller, index: usize, on: bool) {
+    let Some(state) = controller.states.get(index) else { return };
+    let key = state.key.clone();
+    let (counted, bumped) = (Cell::new(None), Cell::new(None));
+    let diff = Diff { on, since: ui.now, at: None, counted, bumped, run: state.run_from, fixed: false };
+    ui.diffs.insert(key.clone(), diff);
     ui.rail_motion.forget(&key); // the error count it goes by changes: no ember for that
+}
+
+/// Whether the focused column has diff mode on.
+pub fn focused_on(ui: &Ui, controller: &Controller) -> bool {
+    controller.apps.get(ui.focus).is_some_and(|app| is_on(ui, &app.key))
+}
+
+/// `Enter` with diff mode on: lists what was fixed, or no longer.
+pub fn toggle_fixed(ui: &mut Ui, controller: &Controller) {
+    let Some(app) = controller.apps.get(ui.focus) else { return };
+    if let Some(diff) = ui.diffs.get_mut(&app.key) {
+        diff.fixed = !diff.fixed;
+    }
 }
 
 /// Whether app `key`'s column has diff mode on.
@@ -158,6 +194,7 @@ pub fn view(ui: &Ui, state: &AppState) -> Option<View> {
         fixed: 0,
         settled,
         at: diff.at,
+        gone: Vec::new(),
     };
     let Some(previous) = state.previous.as_ref().filter(|_| state.run_from > 0) else { return Some(view) };
     let lines = diff::numbered(&state.output, state.run_from);
@@ -185,7 +222,11 @@ pub fn view(ui: &Ui, state: &AppState) -> Option<View> {
         }
     }
     view.lines = view.kinds.iter().filter(|kind| **kind == Kind::New).count();
-    view.fixed = previous.problems.iter().filter(|problem| !now_shapes.contains(&problem.shape)).count();
+    let gone = previous.problems.iter().filter(|problem| !now_shapes.contains(&problem.shape));
+    view.fixed = gone.clone().count();
+    if diff.on && diff.fixed {
+        view.gone = gone.map(|problem| (problem.text.clone(), problem.error)).collect();
+    }
     if moving {
         let before = diff.counted.replace(Some(view.errors));
         if before.is_some_and(|before| view.errors > before) {
@@ -228,16 +269,49 @@ pub fn summary(ui: &Ui, state: &AppState, view: &View, cells: usize) -> Vec<Seg>
         }
         segs.push(part);
     }
-    let keys = if view.errors + view.warnings + view.lines > 0 { " - n N step, Alt+d shows all" } else { " - Alt+d" };
-    segs.push(seg(keys, C::DarkGray));
+    let mut keys = Vec::new();
+    if view.errors + view.warnings + view.lines > 0 {
+        keys.push("n N step");
+    }
+    if view.fixed > 0 {
+        keys.push(if view.gone.is_empty() { "Enter lists the fixed" } else { "Enter hides them" });
+    }
+    keys.push("Alt+d shows all");
+    segs.push(seg(format!(" - {}", keys.join(", ")), C::DarkGray));
     fit(segs, cells)
+}
+
+/// What app `index`'s chip in the panel says: its run's new errors, while diff mode wasn't on or off in this run.
+pub fn chip(ui: &Ui, controller: &Controller, index: usize) -> Option<String> {
+    let state = controller.states.get(index)?;
+    let previous = state.previous.as_ref().filter(|_| state.run_from > 0)?;
+    if ui.diffs.get(&state.key).is_some_and(|diff| diff.on || diff.run == state.run_from) {
+        return None;
+    }
+    let (errors, _) = diff::new_problems(previous, &state.output, state.run_from);
+    let name = &controller.apps.get(index)?.name;
+    (errors > 0).then(|| format!("{name} +{errors} new {}", plural(errors, "error")))
+}
+
+/// Each app's chip, with its index.
+pub fn chips(ui: &Ui, controller: &Controller) -> Vec<(usize, String)> {
+    (0..controller.states.len()).filter_map(|index| Some((index, chip(ui, controller, index)?))).collect()
+}
+
+/// A chip's key or click: diff mode on its app's column, on the first new error or warning.
+pub fn open_news(ui: &mut Ui, controller: &mut Controller, index: usize) {
+    ui.focus = index;
+    set(ui, controller, index, true);
+    if let Some(diff) = controller.states.get(index).and_then(|state| ui.diffs.get_mut(&state.key)) {
+        diff.at = Some(0);
+    }
+    step(ui, controller, false);
 }
 
 /// Whether `n` / `N` step through what's new in the focused column (diff mode on, no search to step through).
 pub fn steps(ui: &Ui, controller: &Controller) -> bool {
     let searching = ui.search.as_ref().is_some_and(|search| !search.query.is_empty());
-    let key = controller.apps.get(ui.focus).map(|app| app.key.as_str()).unwrap_or_default();
-    !searching && is_on(ui, key)
+    !searching && focused_on(ui, controller)
 }
 
 /// `n` (older) / `N` (newer): to the next new error or warning - or new line - in the focused column, wrapping

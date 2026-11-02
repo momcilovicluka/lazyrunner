@@ -2442,8 +2442,29 @@ async fn alt_d_dims_what_the_last_run_printed_too_and_counts_and_steps_through_w
     assert_eq!(at(&screen), Some(from + 1), "then the warning");
     screen.press("n");
     assert_eq!(at(&screen), Some(from + 2), "round again");
+    screen.press("Enter");
+    assert!(screen.frame().contains("  ✓ fail: Orders.Api[0]"), "Enter lists what was fixed: {}", screen.frame());
+    screen.press("Enter");
+    assert!(!screen.frame().contains("✓ fail: Orders.Api[0]"), "and hides it again: {}", screen.frame());
     screen.press("Alt+d");
     assert!(!screen.frame().contains('Δ'), "{}", screen.frame());
+}
+
+#[tokio::test]
+async fn a_run_with_new_errors_puts_a_chip_in_the_panel_and_its_number_shows_them() {
+    let mut screen = screen("diff-chip", json!({}));
+    let from = two_runs(&mut screen);
+    let key = screen.controller.states[0].key.clone();
+    assert!(screen.frame().contains(" 1  Orders +1 new error"), "{}", screen.frame());
+    screen.press("l 1");
+    assert_eq!(screen.ui.focus, 0);
+    let view = super::diff::view(&screen.ui, &screen.controller.states[0]).expect("diff mode on");
+    assert_eq!(view.at, Some(from + 1), "on the first new error or warning");
+    assert!(!screen.frame().contains("Orders +1 new error"), "the chip is done with: {}", screen.frame());
+    screen.press("Alt+d");
+    assert!(!screen.frame().contains("Orders +1 new error"), "for this run, even with diff mode off again");
+    screen.press("1");
+    assert!(!super::diff::is_on(&screen.ui, &key), "1 only focuses Orders again");
 }
 
 #[tokio::test]

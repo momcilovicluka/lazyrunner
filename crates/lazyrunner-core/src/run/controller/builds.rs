@@ -11,10 +11,13 @@ use crate::profile::AppKind;
 use crate::run::Tag;
 use crate::run::build::{self, ToolLine};
 use crate::run::child::Child;
+use crate::run::diff;
 use crate::run::history::Kind;
 
 /// A failed build's errors shown in the panel's log (o opens the full log).
 const MAX_BUILD_ERROR_LINES: usize = 6;
+/// A good build's new warnings shown in its column.
+const MAX_NEW_WARNINGS: usize = 5;
 /// `y` copies at most this many errors of a failed build.
 const MAX_COPIED_BUILD_ERRORS: usize = 200;
 
@@ -239,9 +242,29 @@ impl Controller {
         }
         self.timings.add("build", key, seconds);
         let note = self.record_duration(Kind::Build, key, seconds, true);
-        let warnings = if job.warnings > 0 { format!(", {} warnings", job.warnings) } else { String::new() };
-        let summary = format!("built in {whole}s ({} projects{warnings}){note}", job.done);
+        let warnings = build::warnings(&job.lines);
+        let (change, new, kept) = diff::warning_change(self.build_warnings.get(key), &warnings);
+        let counted = match (warnings.len(), change) {
+            (0, Some(change)) if change < 0 => format!(", no warnings ({change})"),
+            (0, _) => String::new(),
+            (count, Some(change)) if change != 0 => format!(", {count} warnings ({change:+})"),
+            (count, _) => format!(", {count} warnings"),
+        };
+        let summary = format!("built in {whole}s ({} projects{counted}){note}", job.done);
         self.pane(key, &format!("✓ {summary}"), Hue::Green);
+        for warning in new.iter().take(MAX_NEW_WARNINGS) {
+            self.pane(key, &format!("  ▲ {}", build::format_error(warning)), Hue::Yellow);
+        }
+        if new.len() > MAX_NEW_WARNINGS {
+            self.pane(key, &format!("  … and {} more new warnings", new.len() - MAX_NEW_WARNINGS), Hue::DarkYellow);
+        }
+        self.build_warnings.insert(key.to_string(), kept);
+        if let Err(error) = diff::save_builds(&self.state_dir, &self.build_warnings) {
+            self.add_log(
+                format!("! The build's warnings to compare the next one with aren't saved ({error})"),
+                Hue::Yellow,
+            );
+        }
         self.add_log(format!("✓ {} {summary}", app.name), Hue::Green);
         self.happened("build.passed", Some(key), format!("{} {summary}", app.name));
         self.build_queue.retain(|queued| queued != key);

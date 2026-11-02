@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.61.0] - 2026-11-02
+
+### Added
+- With `Alt+d` on, `Enter` lists what was fixed: the last run's errors and warnings that didn't come back, with their links (#54)
+- A run with new errors puts a chip in the panel's header, `1 Orders +2 new errors`: the column's number or a click shows them with `Alt+d`, on the first one (#54)
+- A good build says how its warnings changed since the last good build - `12 warnings (+3)` - and lists the new ones in its column; each warning counts once (#54)
+
 ## [1.60.0] - 2026-11-02
 
 ### Added

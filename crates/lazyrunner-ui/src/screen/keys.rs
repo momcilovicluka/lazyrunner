@@ -225,12 +225,15 @@ fn navigation(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             }
         }
         "n" | "N" if super::diff::steps(ui, controller) => super::diff::step(ui, controller, name == "n"),
+        "Enter" if super::diff::focused_on(ui, controller) => super::diff::toggle_fixed(ui, controller),
         "n" => find_match(ui, controller, true),
         "N" => find_match(ui, controller, false),
         "Escape" => ui.search = None,
         digit if digit.len() == 1 && ('1'..='9').contains(&digit.chars().next().unwrap_or('0')) => {
             let index = digit.parse::<usize>().unwrap_or(1) - 1;
-            if index < controller.apps.len() {
+            if super::diff::chip(ui, controller, index).is_some() {
+                super::diff::open_news(ui, controller, index); // as its chip says
+            } else if index < controller.apps.len() {
                 ui.focus = index;
             }
         }
