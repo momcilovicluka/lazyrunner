@@ -291,7 +291,8 @@ impl<C: Channel> Server<C> {
         };
         Some(match outcome {
             Ok(Value::String(text)) => tool_result(text, false),
-            Ok(value) => tool_result(serde_json::to_string_pretty(&value).unwrap_or_default(), false),
+            // Compact: the indentation of pretty JSON is tokens the agent pays for and doesn't need.
+            Ok(value) => tool_result(serde_json::to_string(&value).unwrap_or_default(), false),
             Err(why) => tool_result(why, true),
         })
     }

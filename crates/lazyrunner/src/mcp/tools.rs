@@ -23,9 +23,9 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "get_logs",
-            "An app's output, each line numbered: the newest `limit` (100, at most 500) after `since` (pass the \
-             last answer's `next` to get only what's new; `truncated` says older matching lines didn't fit), \
-             those containing `grep` (ignoring case), or only the error lines.",
+            "An app's output as one text, each line after its number: the newest `limit` (100, at most 500) \
+             after `since` (pass the last answer's `next` to get only what's new; `truncated` says older matching \
+             lines didn't fit), those containing `grep` (ignoring case), or only the error lines.",
             json!({
                 "app": app,
                 "since": { "type": "integer", "minimum": 0 },

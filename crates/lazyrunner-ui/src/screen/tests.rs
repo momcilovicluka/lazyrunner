@@ -2067,7 +2067,9 @@ async fn an_agent_reads_the_requests_their_endpoints_and_one_request_in_full() {
     assert_eq!(one["sent"]["content_type"], "application/json");
     assert_eq!((one["log"]["known"].as_bool(), one["log"]["count"].as_u64()), (Some(true), Some(4)));
     assert_eq!(one["log"]["possibly_mixed"], true);
-    assert_eq!(one["log"]["lines"][3]["text"], "      System.InvalidOperationException: Invoice 7 has no currency.");
+    let fourth = one["log"]["text"].as_str().and_then(|text| text.lines().nth(3)).and_then(|line| line.split_once(' '));
+    let currency = "      System.InvalidOperationException: Invoice 7 has no currency.";
+    assert_eq!(fourth.map(|(_, text)| text), Some(currency), "each line after its number");
     assert_eq!((one["database"]["commands"].as_u64(), one["database"]["total_ms"].as_f64()), (Some(1), Some(1204.0)));
     let unlogged = agent(&mut screen, "request", json!({ "id": 1 }), None);
     assert_eq!(unlogged["result"]["log"]["known"], false);
@@ -2096,16 +2098,15 @@ async fn an_agent_reads_the_status_and_numbered_logs_and_the_last_error() {
     assert_eq!(status["result"]["busy"]["build"], Value::Null);
 
     let found = agent(&mut screen, "logs", json!({ "app": "Orders", "since": base + 1, "grep": "EXCEPTION" }), None);
-    assert_eq!(found["result"]["lines"], json!([{ "seq": base + 3, "text": lines[2] }]));
+    assert_eq!(found["result"]["text"], format!("{} {}", base + 3, lines[2]));
     assert_eq!(found["result"]["next"], base + 5);
     let newest = agent(&mut screen, "logs", json!({ "app": "orders", "limit": 2 }), None);
-    let seqs: Vec<u64> =
-        newest["result"]["lines"].as_array().unwrap().iter().map(|line| line["seq"].as_u64().unwrap()).collect();
-    assert_eq!(seqs, [base + 4, base + 5], "the newest, oldest first");
+    let expected = format!("{} {}\n{} {}", base + 4, lines[3], base + 5, lines[4]);
+    assert_eq!(newest["result"]["text"], expected, "the newest, oldest first");
     assert_eq!(newest["result"]["truncated"], true, "older lines after since didn't fit");
     let after_a_restart = agent(&mut screen, "logs", json!({ "app": "orders", "since": base + 500 }), None);
     assert_eq!(after_a_restart["result"]["reset"], true);
-    assert_eq!(after_a_restart["result"]["lines"].as_array().map(Vec::len), Some(base as usize + 5));
+    assert_eq!(after_a_restart["result"]["count"], base + 5);
     let error = agent(&mut screen, "errors", json!({ "app": "orders" }), None);
     let text = error["result"]["text"].as_str().unwrap();
     assert!(text.starts_with("fail: Orders.Api.Checkout[0]") && text.contains("Checkout.cs:line 42"), "{text}");
