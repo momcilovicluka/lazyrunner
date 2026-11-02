@@ -493,6 +493,12 @@ pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let fold =
         !news.is_empty() && finished && passed > 1 && list.items.len() + news.len().min(WHATS_NEW_MAX_LINES) + 4 > room;
     let mut checks = check_rows(ui, list, box_inner(cells, CHECKLIST_INNER), fold);
+    let copied = list.flashed.is_some_and(|at| ui.now.saturating_duration_since(at) < super::motion::COPY_FLASH);
+    if animated && copied {
+        for part in checks.iter_mut().flatten() {
+            (part.fg, part.bg) = (C::Black, Some(C::Cyan)); // c just copied them
+        }
+    }
     if fold {
         checks.insert(
             0,

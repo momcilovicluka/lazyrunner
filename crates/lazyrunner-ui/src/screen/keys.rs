@@ -105,6 +105,10 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     if ui.reload.take().is_some() && name == "Escape" {
         return;
     }
+    if name == "c" && matches!(&ui.overlay, Some(Overlay::Checklist(list)) if list.is_holding()) {
+        copy_checklist(ui, controller);
+        return;
+    }
     if let Some(Overlay::Checklist(list)) = &mut ui.overlay {
         if list.is_holding() && checklist_key(list, controller, &name, &mut ui.replay, ui.clipboard) {
             return;
@@ -156,6 +160,23 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         return;
     }
     action_key(ui, controller, &name);
+}
+
+/// `c` while the checklist holds: copies it as a Markdown report for an issue, its rows flashing.
+fn copy_checklist(ui: &mut Ui, controller: &mut Controller) {
+    let Some(Overlay::Checklist(list)) = &ui.overlay else { return };
+    let report = super::bundle::checklist_report(ui, controller, list);
+    match (ui.clipboard)(&report) {
+        Ok(()) => {
+            let now = ui.now;
+            if let Some(Overlay::Checklist(list)) = &mut ui.overlay {
+                list.flashed = Some(now);
+            }
+            controller
+                .add_log("Copied the startup checklist as a Markdown report - paste it into an issue", Hue::Green);
+        }
+        Err(why) => controller.add_log(format!("✗ Couldn't copy the startup checklist ({why})"), Hue::Red),
+    }
 }
 
 /// The startup doctor's keys while the checklist holds: `j` `k` pick a check, `f` fixes it, `a` fixes the safe ones,

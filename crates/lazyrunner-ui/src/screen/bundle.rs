@@ -2,7 +2,8 @@
 //! their states, the settings and the project profile with their secrets masked, each app's recent output and
 //! lazyrunner's log (passwords in connection strings, a URL's user:password and bearer tokens masked), and the screen
 //! as a picture in the theme's colours. Written in the background (the tools take a moment to say their versions)
-//! into the project's state folder; the log says where.
+//! into the project's state folder; the log says where. The startup checklist's report (`c`) shares its about and
+//! its masking.
 
 use std::io::Write as _;
 use std::path::Path;
@@ -11,6 +12,8 @@ use std::sync::LazyLock;
 use lazyrunner_core::changelog::VERSION;
 use lazyrunner_core::links;
 use lazyrunner_core::output::Hue;
+use lazyrunner_core::profile::AppKind;
+use lazyrunner_core::run::checks::Status;
 use lazyrunner_core::run::{Controller, checks};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -18,6 +21,7 @@ use regex::Regex;
 use serde_json::{Value, json};
 
 use super::Ui;
+use super::checklist::Checklist;
 use crate::svg;
 
 const FOLDER: &str = "diagnostics";
@@ -105,6 +109,56 @@ fn screen(ui: &mut Ui, controller: &Controller, size: (u16, u16)) -> String {
     let title = format!("lazyrunner — {}", controller.project.name);
     let (fg, bg) = (fg.unwrap_or_else(|| svg::DEFAULT_FG.into()), bg.unwrap_or_else(|| svg::DEFAULT_BG.into()));
     svg::render(terminal.backend().buffer(), &title, &fg, &bg)
+}
+
+/// The startup checklist as Markdown for an issue (`c`): lazyrunner, the project and its apps, each check's result
+/// and how long it took, the apps' ports and where they are, and what fixes the problems - secrets masked.
+pub fn checklist_report(ui: &Ui, controller: &Controller, list: &Checklist) -> String {
+    let size = crossterm::terminal::size().unwrap_or(SCREEN);
+    let mut lines = vec![
+        "## lazyrunner startup checklist".to_string(),
+        String::new(),
+        "```".into(),
+        about(ui, controller, size),
+        "```".into(),
+        String::new(),
+        "| Group | Check | Result | Detail | Took |".into(),
+        "|---|---|---|---|---|".into(),
+    ];
+    for (item, row) in list.items.iter().zip(&list.rows) {
+        let took = row.took.map_or(String::new(), |took| format!("{:.1} s", took.as_secs_f64()));
+        let result = match item.status {
+            Status::Ok => "ok",
+            Status::Warn => "warning",
+            Status::Fail => "failed",
+            Status::Skip => "skipped",
+            Status::Pending | Status::Running => "not done",
+        };
+        let (group, detail) = (row.kind.group().name(), cell(&mask_text(&item.detail)));
+        lines.push(format!("| {group} | {} | {result} | {detail} | {took} |", cell(&item.name)));
+    }
+    lines.extend([String::new(), "| App | Port | Where |".into(), "|---|---|---|".into()]);
+    for app in &controller.apps {
+        let port = controller.port(&app.key).map_or(String::new(), |port| port.to_string());
+        let place = match &app.kind {
+            AppKind::Dotnet { project, .. } => project,
+            AppKind::Npm { dir, .. } => dir,
+        };
+        lines.push(format!("| {} | {port} | {} |", cell(&app.name), cell(place)));
+    }
+    let fixes: Vec<String> = (0..list.items.len())
+        .filter_map(|index| Some(format!("- {}: {}", list.items[index].name, list.fix_of(index)?.advice())))
+        .collect();
+    if !fixes.is_empty() {
+        lines.extend([String::new(), "What fixes them:".into()]);
+        lines.extend(fixes);
+    }
+    lines.join("\n") + "\n"
+}
+
+/// Text for a Markdown table's cell: its pipes escaped.
+fn cell(text: &str) -> String {
+    text.replace('|', "\\|")
 }
 
 /// `, b`: gathers the report, then writes it in the background; the log says where it went.

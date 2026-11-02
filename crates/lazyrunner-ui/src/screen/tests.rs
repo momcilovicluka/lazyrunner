@@ -515,6 +515,31 @@ async fn the_checklist_groups_its_checks_times_them_and_f_fixes_the_picked_one()
 }
 
 #[tokio::test]
+async fn c_copies_the_checklist_as_a_markdown_report_with_its_secrets_masked() {
+    let mut screen = screen("doctor-report", json!({}));
+    let item = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
+    let items = vec![
+        item("git", Status::Ok, "2.50"),
+        item("Web packages", Status::Fail, "web/node_modules is missing - press i (npm ci)"),
+        item("Database", Status::Warn, "Local · Password=hunter2 · nothing answers on port 1433"),
+    ];
+    let mut list = Checklist::fixed(items, Vec::new(), "");
+    list.rows[0].took = Some(Duration::from_millis(120));
+    list.update(screen.ui.now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    screen.press("c");
+    let report = copied().pop().expect("a report on the clipboard");
+    assert!(report.contains("| Environment | git | ok | 2.50 | 0.1 s |"), "{report}");
+    assert!(report.contains("| Packages | Web packages | failed |"), "{report}");
+    assert!(report.contains("Password=***") && !report.contains("hunter2"), "secrets masked: {report}");
+    assert!(report.contains("- Web packages: `npm ci` in the app's folder"), "{report}");
+    assert!(report.contains("| Orders | 47201 |"), "the apps' ports and where they are: {report}");
+    assert!(screen.last_log().starts_with("Copied the startup checklist"), "{}", screen.last_log());
+    let Some(Overlay::Checklist(list)) = &screen.ui.overlay else { panic!("it stays open") };
+    assert!(list.flashed.is_some() && !list.skip);
+}
+
+#[tokio::test]
 async fn cut_off_labels_scroll_sideways_several_at_once() {
     let mut screen = screen("labels-scroll", json!({}));
     let long = "v1.40.0 is out, but not installed: the release has no Windows build yet, try again in a minute";
