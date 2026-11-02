@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.56.0] - 2026-11-02
+
+### Added
+- The timeline's activity strip: down its right edge, one lane per app over the whole stretch kept - oldest at the top - each cell shaded by how many lines the app logged then, red where one was an error, and an edge beside the time the rows on screen cover (dim while following, cyan when scrolled back). It follows the search and the level filter, so `level:error` shows where errors cluster (#53)
+
 ## [1.55.0] - 2026-11-02
 
 ### Added

@@ -4,7 +4,8 @@
 //! to the picked line in its own column. `/` narrows it to lines holding some words, `app:orders` to an app's lines,
 //! `level:warn` to warnings and up; `f` cycles the levels as in the columns. A request's lines are bracketed by a
 //! faint rule with its method, path and status - its own lines by RequestId, or the lines it logged while it ran
-//! when no other request ran with it.
+//! when no other request ran with it. A strip down the right edge shows how busy each app was over the whole stretch
+//! kept ([`super::timeline_strip`]).
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -18,6 +19,7 @@ use super::columns::{contains_ignore_case, fit, line_color};
 use super::icons;
 use super::seg::{Seg, on, pad, seg};
 use super::theme::C;
+use super::timeline_strip;
 use super::{Overlay, Ui};
 
 /// A quiet stretch longer than this gets a row of its own.
@@ -80,10 +82,10 @@ impl Query {
 }
 
 /// A row: a request's rule above its first line (the request, that line's place), a line (its app, its place among
-/// the app's kept lines, its bracket mark), or a quiet stretch.
+/// the app's kept lines, its bracket mark, when it came), or a quiet stretch.
 enum Row {
     Request { request: usize, app: usize, position: usize },
-    Line { app: usize, position: usize, mark: &'static str },
+    Line { app: usize, position: usize, mark: &'static str, born: Instant },
     Gap(Duration),
 }
 
@@ -107,13 +109,21 @@ fn owners(controller: &Controller) -> HashMap<(usize, u64), usize> {
     owners
 }
 
+/// A line the view shows: when it came, its app, its place among the app's kept lines, whether it's an error.
+struct Entry {
+    born: Instant,
+    app: usize,
+    position: usize,
+    error: bool,
+}
+
 /// For each line (in the timeline's order): the request whose rule goes above it, and its bracket mark - `│` a
 /// request's line, `╰` its last, `┆` another line while one is open.
-fn brackets(controller: &Controller, lines: &[(Instant, usize, usize)]) -> Vec<(Option<usize>, &'static str)> {
+fn brackets(controller: &Controller, lines: &[Entry]) -> Vec<(Option<usize>, &'static str)> {
     let owners = owners(controller);
     let owner: Vec<Option<usize>> = lines
         .iter()
-        .map(|(_, app, position)| owners.get(&(*app, controller.states[*app].output.number_at(*position))).copied())
+        .map(|line| owners.get(&(line.app, controller.states[line.app].output.number_at(line.position))).copied())
         .collect();
     let mut spans: HashMap<usize, (usize, usize)> = HashMap::new();
     for (at, request) in owner.iter().enumerate() {
@@ -139,21 +149,31 @@ fn brackets(controller: &Controller, lines: &[(Instant, usize, usize)]) -> Vec<(
     marks
 }
 
-/// The lines the view shows, the oldest first, with the quiet stretches between them.
-fn rows_of(controller: &Controller, view: &View) -> Vec<Row> {
+/// The lines the view shows, the oldest first.
+fn lines_of(controller: &Controller, view: &View) -> Vec<Entry> {
     let query = Query::of(&view.query);
-    let mut lines: Vec<(Instant, usize, usize)> = Vec::new();
+    let mut lines = Vec::new();
     for (app, state) in controller.states.iter().enumerate() {
         let name = controller.apps.get(app).map_or("", |app| app.name.as_str());
         let len = state.output.len();
         let shown = state.output.newest_first(0).enumerate().filter(|(_, line)| query.admits(view, name, line));
-        lines.extend(shown.map(|(back, line)| (line.born, app, len - 1 - back)));
+        lines.extend(shown.map(|(back, line)| Entry {
+            born: line.born,
+            app,
+            position: len - 1 - back,
+            error: line.severity() == Level::Error,
+        }));
     }
-    lines.sort_by_key(|(born, app, position)| (*born, *app, *position));
-    let brackets = brackets(controller, &lines);
+    lines.sort_by_key(|line| (line.born, line.app, line.position));
+    lines
+}
+
+/// The rows for `lines`: each line, a request's rule above its first, the quiet stretches between them.
+fn rows_of(controller: &Controller, lines: &[Entry]) -> Vec<Row> {
+    let brackets = brackets(controller, lines);
     let mut rows = Vec::with_capacity(lines.len());
     let mut before: Option<Instant> = None;
-    for ((born, app, position), (rule, mark)) in lines.into_iter().zip(brackets) {
+    for (&Entry { born, app, position, .. }, (rule, mark)) in lines.iter().zip(brackets) {
         if let Some(quiet) = before.map(|before| born.saturating_duration_since(before)).filter(|quiet| *quiet > GAP) {
             rows.push(Row::Gap(quiet));
         }
@@ -161,7 +181,7 @@ fn rows_of(controller: &Controller, view: &View) -> Vec<Row> {
         if let Some(request) = rule {
             rows.push(Row::Request { request, app, position });
         }
-        rows.push(Row::Line { app, position, mark });
+        rows.push(Row::Line { app, position, mark, born });
     }
     rows
 }
@@ -197,7 +217,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         view.scroll = 0;
         return;
     }
-    let rows = rows_of(controller, view);
+    let rows = rows_of(controller, &lines_of(controller, view));
     let last = rows.len().saturating_sub(1);
     match name {
         "Escape" if view.narrowed() => *view = View::default(),
@@ -263,56 +283,73 @@ fn hint(view: &View) -> &'static str {
     }
 }
 
+/// A row as drawn, `cells` wide; `None` when its line or request is gone.
+fn draw(ui: &Ui, controller: &Controller, row: &Row, cells: usize) -> Option<Vec<Seg>> {
+    match row {
+        Row::Gap(quiet) => Some(fit(vec![seg(format!("      · {:.1} s ·", quiet.as_secs_f64()), C::DarkGray)], cells)),
+        Row::Request { request, .. } => controller.requests.items.get(*request).map(|request| rule(request, cells)),
+        Row::Line { app, position, mark, .. } => {
+            let state = &controller.states[*app];
+            let line = state.output.newest_first(state.output.len() - 1 - position).next()?;
+            let name = controller.apps.get(*app).map_or("", |app| app.name.as_str());
+            let icon = controller.apps.get(*app).map_or(String::new(), |found| {
+                icons::app(ui.nerd, found, controller.framework(&found.key)).to_string()
+            });
+            let tag = format!("{icon} {} ", pad(name, NAME_CELLS));
+            let segs = vec![
+                seg(*mark, C::DarkGray),
+                seg(tag, TAGS[app % TAGS.len()]),
+                seg(line.text.clone(), line_color(line)),
+            ];
+            Some(fit(segs, cells))
+        }
+    }
+}
+
+/// The activity strip beside the body's `rows` rows (`window`, those on screen).
+fn activity(controller: &Controller, lines: &[Entry], window: &[Row], rows: usize, live: bool) -> Vec<Vec<Seg>> {
+    let lanes = controller.states.len();
+    let colors: Vec<C> = (0..lanes).map(|app| TAGS[app % TAGS.len()]).collect();
+    let mut borns = window.iter().filter_map(|row| match row {
+        Row::Line { born, .. } => Some(*born),
+        _ => None,
+    });
+    let first = borns.next();
+    let on_screen = first.map(|first| (first, borns.next_back().unwrap_or(first)));
+    let lines: Vec<(Instant, usize, bool)> = lines.iter().map(|line| (line.born, line.app, line.error)).collect();
+    timeline_strip::strip(&lines, &colors, rows, on_screen, live)
+}
+
 pub fn rows(ui: &Ui, controller: &Controller, cells: usize, height: usize) -> Vec<Vec<Seg>> {
     let Some(Overlay::Timeline(view)) = &ui.overlay else { return Vec::new() };
-    let all = rows_of(controller, view);
-    let shown = all.iter().filter(|row| matches!(row, Row::Line { .. })).count();
+    let lines = lines_of(controller, view);
+    let all = rows_of(controller, &lines);
     let body = height.saturating_sub(2);
     let scroll = view.scroll.min(all.len().saturating_sub(1));
     let end = all.len().saturating_sub(scroll);
     let start = end.saturating_sub(body);
-    let mut out = vec![header(ui, controller, view, shown, cells)];
+    let lanes = controller.states.len();
+    let strip = (lanes > 0 && cells >= timeline_strip::FROM_CELLS)
+        .then(|| activity(controller, &lines, &all[start..end], body, scroll == 0));
+    let inner = cells - strip.as_ref().map_or(0, |_| timeline_strip::width(lanes));
+    let mut drawn = Vec::with_capacity(body);
     if all.is_empty() && view.narrowed() {
-        out.push(fit(vec![seg("      no line matches - Esc shows every line", C::DarkGray)], cells));
+        drawn.push(fit(vec![seg("      no line matches - Esc shows every line", C::DarkGray)], inner));
     }
-    for (at, row) in all[start..end].iter().enumerate() {
-        let segs = match row {
-            Row::Gap(quiet) => {
-                out.push(fit(vec![seg(format!("      · {:.1} s ·", quiet.as_secs_f64()), C::DarkGray)], cells));
-                continue;
-            }
-            Row::Request { request, .. } => {
-                let Some(request) = controller.requests.items.get(*request) else { continue };
-                rule(request, cells)
-            }
-            Row::Line { app, position, mark } => {
-                let state = &controller.states[*app];
-                let Some(line) = state.output.newest_first(state.output.len() - 1 - position).next() else {
-                    continue;
-                };
-                let name = controller.apps.get(*app).map_or("", |app| app.name.as_str());
-                let icon = controller.apps.get(*app).map_or(String::new(), |found| {
-                    icons::app(ui.nerd, found, controller.framework(&found.key)).to_string()
-                });
-                let tag = format!("{icon} {} ", pad(name, NAME_CELLS));
-                let segs = vec![
-                    seg(*mark, C::DarkGray),
-                    seg(tag, TAGS[app % TAGS.len()]),
-                    seg(line.text.clone(), line_color(line)),
-                ];
-                fit(segs, cells)
-            }
-        };
-        out.push(if start + at + 1 == end && scroll > 0 {
-            let text: String = segs.iter().map(|seg| seg.text.as_str()).collect();
-            vec![on(text, C::FocusText, C::FocusBack)]
+    for (at, row) in all.iter().enumerate().take(end).skip(start) {
+        let Some(segs) = draw(ui, controller, row, inner) else { continue };
+        drawn.push(if at + 1 == end && scroll > 0 && !matches!(row, Row::Gap(_)) {
+            vec![on(segs.iter().map(|seg| seg.text.as_str()).collect::<String>(), C::FocusText, C::FocusBack)]
         } else {
             segs
         });
     }
-    while out.len() < height.saturating_sub(1) {
-        out.push(Vec::new());
-    }
+    drawn.resize_with(body, || fit(Vec::new(), inner));
+    let mut out = vec![header(ui, controller, view, lines.len(), cells)];
+    out.extend(drawn.into_iter().enumerate().map(|(at, row)| match &strip {
+        Some(strip) => row.into_iter().chain(strip.get(at).into_iter().flatten().cloned()).collect(),
+        None => row,
+    }));
     out.push(fit(vec![seg(hint(view), C::DarkGray)], cells));
     out.truncate(height);
     out

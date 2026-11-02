@@ -39,6 +39,7 @@ mod tests;
 pub mod theme;
 pub mod theme_picker;
 pub mod timeline;
+pub mod timeline_strip;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
