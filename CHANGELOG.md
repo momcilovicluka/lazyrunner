@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.59.0] - 2026-11-02
+
+### Changed
+- lazyrunner's MCP answers are compact JSON, and `get_logs` and `get_request` give their log lines as one text, each line after its number, instead of an object per line - the same answers for far fewer tokens. Anything that read `lines[].seq` reads `text` now (#75, thanks @ognjen004028)
+- The requests view and `get_requests` sum up paths with a user's name in them (`/api/users/image/jo@contoso`) as one endpoint, `{id}` (#75, thanks @ognjen004028)
+
 ## [1.58.0] - 2026-11-02
 
 ### Added

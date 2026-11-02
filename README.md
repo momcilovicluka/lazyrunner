@@ -416,8 +416,8 @@ an app that only logs to Seq when it has a Seq key, say:
 lazyrunner starts the .NET apps with ASP.NET's request log turned on (`--Logging:LogLevel:Microsoft.AspNetCore.
 Hosting.Diagnostics=Information`) and keeps those lines out of the columns: `H` lists the requests instead - time,
 app, method, status, milliseconds and path, newest first (`s`: slowest first). Serilog's request logging (`HTTP GET /x
-responded 200 in 12 ms`) shows too. `Tab` sums them up per endpoint (ids and user names like `jo@contoso` in paths become `{id}`): count, errors,
-average, 95th percentile and slowest, sorted by total time (`s` for the others).
+responded 200 in 12 ms`) shows too. `Tab` sums them up per endpoint (ids and user names like `jo@contoso` in paths
+become `{id}`): count, errors, average, 95th percentile and slowest, sorted by total time (`s` for the others).
 
 `Enter` (or `Space`, or a double click) shows the selected row's details in a panel on the right, and again hides
 it; `Esc` hides it too. A request's: its status,

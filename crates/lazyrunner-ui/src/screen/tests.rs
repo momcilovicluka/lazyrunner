@@ -2067,7 +2067,9 @@ async fn an_agent_reads_the_requests_their_endpoints_and_one_request_in_full() {
     assert_eq!(one["sent"]["content_type"], "application/json");
     assert_eq!((one["log"]["known"].as_bool(), one["log"]["count"].as_u64()), (Some(true), Some(4)));
     assert_eq!(one["log"]["possibly_mixed"], true);
-    assert_eq!(one["log"]["lines"][3]["text"], "      System.InvalidOperationException: Invoice 7 has no currency.");
+    let fourth = one["log"]["text"].as_str().and_then(|text| text.lines().nth(3)).and_then(|line| line.split_once(' '));
+    let currency = "      System.InvalidOperationException: Invoice 7 has no currency.";
+    assert_eq!(fourth.map(|(_, text)| text), Some(currency), "each line after its number");
     assert_eq!((one["database"]["commands"].as_u64(), one["database"]["total_ms"].as_f64()), (Some(1), Some(1204.0)));
     let unlogged = agent(&mut screen, "request", json!({ "id": 1 }), None);
     assert_eq!(unlogged["result"]["log"]["known"], false);

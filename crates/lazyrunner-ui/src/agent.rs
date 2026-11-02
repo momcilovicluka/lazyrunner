@@ -175,8 +175,8 @@ fn app_index(controller: &Controller, args: &Value) -> Result<usize, Refusal> {
 /// An app's output as one text, each line after its number: the newest `limit` lines after `since`, those matching
 /// `grep` (ignoring case), errors only when asked. Not an object per line: an agent pays for every character, and
 /// `{"seq":…,"text":…}` made a log half again as long. `next` is the number to pass as `since` for what comes
-/// after; `truncated` says older matching lines after `since` didn't fit. A `since` past the newest line (lazyrunner opened
-/// again since) starts over (`reset`).
+/// after; `truncated` says older matching lines after `since` didn't fit. A `since` past the newest line (lazyrunner
+/// opened again since) starts over (`reset`).
 fn logs(controller: &Controller, args: &Value) -> Answer {
     let index = app_index(controller, args)?;
     let output = &controller.states[index].output;
@@ -353,10 +353,10 @@ fn one_request(controller: &Controller, args: &Value) -> Answer {
     let output = controller.state(&request.app).map(|state| &state.output);
     let kept: Vec<_> = output.map_or_else(Vec::new, |output| output.numbered(first, last).collect());
     let oldest = output.map_or(first, |output| output.total() + 1 - output.len() as u64).max(first);
-    let lines: Vec<Value> = (oldest..)
+    let lines: Vec<String> = (oldest..)
         .zip(kept.iter())
         .skip(kept.len().saturating_sub(REQUEST_LOG_LINES))
-        .map(|(seq, line)| json!({ "seq": seq, "text": line.text }))
+        .map(|(seq, line)| format!("{seq} {}", line.text))
         .collect();
     answer["log"] = json!({
         "known": true,
@@ -364,7 +364,7 @@ fn one_request(controller: &Controller, args: &Value) -> Answer {
         "kept": kept.len(),
         "errors": kept.iter().filter(|line| copy::is_error(line)).count(),
         "possibly_mixed": request.mixed,
-        "lines": lines,
+        "text": lines.join("\n"),
     });
     let db = request.db.clone().unwrap_or_default();
     let share = if request.ms > 0.0 { (db.total_ms / request.ms * 100.0).round() / 100.0 } else { 0.0 };

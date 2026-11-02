@@ -48,10 +48,12 @@ static HEADER: LazyLock<Regex> =
     LazyLock::new(|| pattern(r"^\s*\w+: Microsoft\.AspNetCore\.Hosting\.Diagnostics\[\d+\]\s*$"));
 /// A path segment that is an id: a number, a GUID, a long hex string.
 static ID: LazyLock<Regex> = LazyLock::new(|| {
-    pattern(
-        r"^(\d+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24,}|.+(@|%40).+)$",
-    )
+    pattern(r"^(\d+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24,})$")
 });
+/// A path segment that is a user's name: `jo@contoso`, `jo%40contoso.com`.
+static USER: LazyLock<Regex> = LazyLock::new(|| pattern(r"^.+(@|%40).+$"));
+/// An image at a scale, `logo@2x.png`: a file, not a user's name.
+static SCALED: LazyLock<Regex> = LazyLock::new(|| pattern(r"@\d+(\.\d+)?x\.\w+$"));
 
 /// A request as its start line says it.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -287,7 +289,11 @@ pub fn db_command_ms(text: &str) -> Option<f64> {
 /// as `{id}`.
 pub fn endpoint(path: &str) -> String {
     let path = path.split('?').next().unwrap_or_default();
-    path.split('/').map(|part| if ID.is_match(part) { "{id}" } else { part }).collect::<Vec<_>>().join("/")
+    path.split('/').map(|part| if is_id(part) { "{id}" } else { part }).collect::<Vec<_>>().join("/")
+}
+
+fn is_id(part: &str) -> bool {
+    ID.is_match(part) || (USER.is_match(part) && !SCALED.is_match(part))
 }
 
 /// A request one of the apps served.
@@ -522,6 +528,7 @@ mod tests {
         assert_eq!(endpoint("/api/users/image/jo@contoso"), "/api/users/image/{id}");
         assert_eq!(endpoint("/api/users/image/jo%40contoso.com"), "/api/users/image/{id}");
         assert_eq!(endpoint("/api/users/@me"), "/api/users/@me", "not a user's name");
+        assert_eq!(endpoint("/img/logo@2x.png"), "/img/logo@2x.png", "an image at a scale, not a user's name");
         let mut requests = Requests::default();
         let now = chrono::Local::now();
         for (path, status, ms) in [("/api/orders/1", 200, 10.0), ("/api/orders/2", 500, 30.0), ("/api/cart", 200, 5.0)]
