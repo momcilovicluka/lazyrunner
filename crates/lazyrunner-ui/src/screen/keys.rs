@@ -12,7 +12,7 @@ use lazyrunner_core::run::{Command, Controller, Origin};
 use serde_json::{Map, Value, json};
 
 use super::actions::{self, Action, Run};
-use super::checklist::Checklist;
+use super::checklist::{Checklist, Fix, WINNAT};
 use super::columns;
 use super::motion::Spot;
 use super::overlays::menu_items;
@@ -106,6 +106,9 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         return;
     }
     if let Some(Overlay::Checklist(list)) = &mut ui.overlay {
+        if list.is_holding() && checklist_key(list, controller, &name, &mut ui.replay, ui.clipboard) {
+            return;
+        }
         if name == "r" {
             // r is the checklist's own: it retries what failed, does nothing while checks run, else only closes it -
             // it never reaches the columns (pressed again during a retry it used to restart the focused app).
@@ -153,6 +156,37 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         return;
     }
     action_key(ui, controller, &name);
+}
+
+/// The startup doctor's keys while the checklist holds: `j` `k` pick a check, `f` fixes it, `a` fixes the safe ones,
+/// `Esc` holds the countdown to the start. False for any other key: it continues, as before.
+fn checklist_key(
+    list: &mut Checklist,
+    controller: &mut Controller,
+    name: &str,
+    replay: &mut Option<KeyEvent>,
+    clipboard: fn(&str) -> Result<(), String>,
+) -> bool {
+    match name {
+        "j" | "DownArrow" => list.select(1),
+        "k" | "UpArrow" => list.select(-1),
+        "a" => list.fix_safe(controller),
+        "f" => {
+            let index = list.selected;
+            match list.fix_of(index) {
+                Some(Fix::Database) => {
+                    list.skip = true;
+                    *replay = Some(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)); // the picker, once closed
+                }
+                Some(Fix::Winnat) => list.copied(index, clipboard(WINNAT)),
+                Some(fix) => list.start_fix(controller, index, fix),
+                None => {}
+            }
+        }
+        "Escape" => return list.hold(),
+        _ => return false,
+    }
+    true
 }
 
 /// A key a view (tests, requests) doesn't use, run as on the columns; what it opens (settings, the key reference,

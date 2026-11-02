@@ -1,0 +1,32 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+
+
+
+
+
+           ┌─ ✧ lazyrunner v<version> · startup checklist ───────────────────────────────────────────┐
+           │                                                                                      │
+           │    █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                                           │
+           │    █   █▀█ ▄▀  ▀█▀ █▀▄ █ █ █ █ █ █ █▀  █▀▄                                           │
+           │    ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                                           │
+           │                                                                                      │
+           │   Environment   ✓ 2 passed                                                  0.5 s    │
+           │   Project       ✓ 1 passed                                                  0.0 s    │
+           │ ▌ Ports       ▸ ✗ Ports              47201 reserved by Windows (47200-4729           │
+           │                                                                                      │
+           │ 1 to look at - any key continues (8 s) · r retries Ports · f copies the fix          │
+           └──────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00 ✗ Ports: 47201 reserved by Windows (47200-47299) - net stop winnat, then net start winnat, in an ele

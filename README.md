@@ -346,6 +346,23 @@ At startup it moves on by itself after a few seconds, the time left draining alo
 (`,` then `r`), or once you've pressed `r`, it stays up while there is something to retry, until a key closes it.
 Turn it off with `,` then `w`.
 
+The checks are grouped - environment, project, ports, database, packages, updates - each with how long it took and a
+bar of that against the slowest; a group that passed folds to one row while another has a problem. A failed check has
+a red edge and a warning an amber one. It fixes what it can: `j` / `k` pick a check (the first problem is picked),
+`f` runs its fix and `a` every safe one in turn:
+
+| Problem | `f` | With `a` |
+|---------|-----|----------|
+| An npm app's packages missing, or `package-lock.json` changed | `npm ci` for it, its last line on the check's | yes |
+| A port another process holds | stops that process (only one that still holds it, never the system's) | no |
+| A port Windows reserved | copies `net stop winnat; net start winnat` for an elevated terminal | no |
+| The database server doesn't answer | the database picker, once the checklist closes | no |
+| The update check failed | checks again | yes |
+
+A fix that worked turns its edge green with a flash; one that didn't pulses red. At startup a failed check holds the
+start until it's fixed or `Enter` starts anyway, and once nothing blocks it any more it counts down - `starting in 3 s`
+- to the start; `Esc` holds it there.
+
 ## Database picker (`d`)
 
 .NET apps that use user secrets read their connection strings from `secrets.json` in the user secrets folder
