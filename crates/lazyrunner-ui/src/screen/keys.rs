@@ -61,6 +61,7 @@ pub fn prompt(ui: &Ui) -> bool {
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.typing)
+        || matches!(&ui.overlay, Some(Overlay::Timeline(view)) if view.typing)
 }
 
 pub(super) fn typed(key: &KeyEvent) -> Option<char> {
@@ -375,7 +376,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Marks { .. }) => super::marks::key(ui, controller, name, key),
         Some(Overlay::Sheet { .. }) => super::sheet::key(ui, controller, name),
         Some(Overlay::Launch { .. }) => super::launch::key(ui, controller, name),
-        Some(Overlay::Timeline { .. }) => super::timeline::key(ui, controller, name),
+        Some(Overlay::Timeline(_)) => super::timeline::key(ui, controller, name, key),
         Some(Overlay::Durations { top }) => match name {
             "Escape" | "q" | "D" => ui.overlay = None,
             _ => scroll_box(top, name),

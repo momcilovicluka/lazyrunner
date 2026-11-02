@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.54.0] - 2026-11-02
+
+### Added
+- The timeline searches and filters: `/` narrows it to lines holding some words, `app:orders` to an app's lines, `level:warn` to warnings and up - together as you like; `f` cycles the levels as in the columns, and the header says how many lines of all are shown. `Esc` shows every line again (#53)
+
 ## [1.53.0] - 2026-11-02
 
 ### Added
