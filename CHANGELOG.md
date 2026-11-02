@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.56.1] - 2026-11-02
+
+### Fixed
+- Holding ↓ or ↑ in the command palette moves the selection smoothly: the bar keeps a row behind the key instead of stalling and then jumping (#74, thanks @ognjen004028)
+
 ## [1.56.0] - 2026-11-02
 
 ### Added
