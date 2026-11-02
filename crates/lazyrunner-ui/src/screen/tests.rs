@@ -333,6 +333,23 @@ async fn search_finds_and_steps_through_matches() {
 }
 
 #[tokio::test]
+async fn tilde_shows_every_apps_output_in_the_order_it_came_and_enter_jumps_to_a_line() {
+    let mut screen = screen("timeline", json!({}));
+    let at = screen.ui.now - Duration::from_secs(60);
+    screen.controller.states[0].add_line("orders first", Hue::Gray, at);
+    screen.controller.states[1].add_line("billing second", Hue::Gray, at + Duration::from_secs(1));
+    screen.controller.states[0].add_line("orders third", Hue::Gray, at + Duration::from_secs(10));
+    screen.press("~");
+    let frame = screen.frame();
+    let place = |text: &str| frame.find(text).unwrap_or_else(|| panic!("{text} in {frame}"));
+    assert!(place("orders first") < place("billing second"), "{frame}");
+    assert!(place("billing second") < place("· 9.0 s ·") && place("· 9.0 s ·") < place("orders third"), "{frame}");
+    screen.press("k Enter");
+    assert!(screen.ui.overlay.is_none(), "Enter closes it");
+    assert_eq!(screen.ui.focus, 1, "and jumps to the picked line's column: Billing");
+}
+
+#[tokio::test]
 async fn search_filters_to_its_matches_and_takes_regex_and_case() {
     let mut screen = screen("search-filter", json!({}));
     let at = screen.ui.now - Duration::from_secs(5);

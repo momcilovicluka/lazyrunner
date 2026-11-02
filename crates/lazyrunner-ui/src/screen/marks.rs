@@ -212,7 +212,7 @@ fn clock(ui: &Ui, born: Instant) -> String {
 }
 
 /// Focuses `app` and scrolls its marked line `number` into the middle, when the column still shows it.
-fn go_to(ui: &mut Ui, controller: &mut Controller, app: usize, number: u64) {
+pub(super) fn go_to(ui: &mut Ui, controller: &mut Controller, app: usize, number: u64) {
     ui.focus = app;
     let Some(state) = controller.states.get(app) else { return };
     let shown = columns::shown_lines(state, ui.search.as_ref());

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.53.0] - 2026-11-02
+
+### Added
+- The timeline (`~`, or the palette): every app's output in one list, in the order it came - each line tagged with its app and coloured by its level, a quiet stretch of more than 3 s shown as a dim `· 4.2 s ·` row so bursts stand apart. `j` `k` scroll, `G` follows new output, `Enter` jumps to the picked line in its own column (#53)
+
 ## [1.52.0] - 2026-11-02
 
 ### Added
