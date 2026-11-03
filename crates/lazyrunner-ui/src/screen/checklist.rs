@@ -4,10 +4,11 @@
 //! apps don't wait long for the update check: it goes on in the background (`StillChecking`). Once every check is
 //! done, r runs the ones that failed or warned again (a failed update, say).
 //!
-//! It fixes what it finds too (the startup doctor): `j` / `k` pick a check, `f` runs its fix - npm ci for missing or
-//! stale packages, stopping what holds the apps' ports, the database picker, checking again, or copying the commands
-//! that free ports Windows reserved - and `a` runs every safe one in turn (never one that kills a process, needs
-//! admin rights or asks for a pick). At startup a failed check holds the start until it's fixed or `Enter` starts
+//! It fixes what it finds too (the startup doctor): `j` / `k` move through the checks as they're drawn, by group, from
+//! the first; `n` / `N` jump to the next and previous problem; `f` runs the picked check's fix (or the first
+//! problem's) - npm ci for missing or stale packages, stopping what holds the apps' ports, the database picker, checking again,
+//! or copying the commands that free ports Windows reserved - and `a` runs every safe one in turn (never one that
+//! kills a process, needs admin rights or asks for a pick). `i` ignores a problem for this run; a click picks a check, and one on its `FIX` tag runs the fix. At startup a failed check holds the start until it's fixed or `Enter` starts
 //! anyway; once nothing blocks it any more it counts down to the start (`Esc` holds it there). `c` copies it all as
 //! a Markdown report for an issue.
 
@@ -33,6 +34,10 @@ const BAR_MIN_HOLD: Duration = Duration::from_secs(5);
 pub const SETTLE: Duration = Duration::from_millis(300);
 /// Once nothing blocks the start any more, it starts after this.
 const COUNTDOWN: Duration = Duration::from_secs(3);
+/// Checks that finish together tick up the header's counts this far apart.
+const TICK: Duration = Duration::from_millis(40);
+/// A finished check's mark is bright this long as it lands.
+pub const LAND: Duration = Duration::from_millis(120);
 /// What frees the ports Windows reserved: for an elevated terminal, which lazyrunner isn't.
 pub const WINNAT: &str = "net stop winnat; net start winnat";
 
@@ -90,11 +95,13 @@ pub struct Row {
     pub fixing: Option<Fix>,
     /// When a fix last ended, and whether the check came back fine.
     pub settled: Option<(Instant, bool)>,
+    /// When its check last finished.
+    pub done_at: Option<Instant>,
 }
 
 impl Row {
     fn new(kind: Kind) -> Self {
-        Self { kind, started: None, took: None, fixing: None, settled: None }
+        Self { kind, started: None, took: None, fixing: None, settled: None, done_at: None }
     }
 }
 
@@ -156,6 +163,22 @@ pub struct Checklist {
     held: bool,
     /// When `c` copied it: its rows flash.
     pub flashed: Option<Instant>,
+    /// The problems `i` ignored for this run: they hold nothing, and count as skipped.
+    ignored: Vec<bool>,
+    /// The project it checks, for its header.
+    pub project: String,
+    /// When the checks started, and when the last of them was done.
+    started: Option<Instant>,
+    finished: Option<Instant>,
+}
+
+/// The doctor header's numbers: the checks done, and how many passed, warned, are blocked and were skipped, each
+/// with when it last went up.
+#[derive(Default)]
+pub struct Tally {
+    pub done: usize,
+    pub counts: [usize; 4],
+    pub bumped: [Option<Instant>; 4],
 }
 
 /// The channel a lot of checks report on.
@@ -175,7 +198,8 @@ impl Checklist {
             .iter()
             .map(|check| Item { name: check.name.clone(), status: Status::Pending, detail: String::new() })
             .collect();
-        let rows = checks.iter().map(|check| Row::new(check.kind.clone())).collect();
+        let rows: Vec<Row> = checks.iter().map(|check| Row::new(check.kind.clone())).collect();
+        let first = first_drawn(&rows);
         let background: Vec<bool> = checks.iter().map(|check| check.background).collect();
         let done = vec![false; checks.len()];
         let (sender, results) = channel();
@@ -202,8 +226,9 @@ impl Checklist {
             others_done_at: None,
             continuing: Vec::new(),
             late: Vec::new(),
+            ignored: vec![false; rows.len()],
             rows,
-            selected: 0,
+            selected: first,
             queue: Vec::new(),
             queued: 0,
             again: Vec::new(),
@@ -211,6 +236,9 @@ impl Checklist {
             countdown: None,
             held: false,
             flashed: None,
+            project: controller.project.name.clone(),
+            started: Some(Instant::now()),
+            finished: None,
         }
     }
 
@@ -219,13 +247,128 @@ impl Checklist {
         matches!(self.phase, Phase::Holding { .. })
     }
 
-    /// `j` / `k`: the next or previous check, round the ends.
-    pub fn select(&mut self, step: isize) {
-        self.selected = super::keys::wrapped(self.selected, step, self.items.len());
+    /// The checks in the order they're drawn: by group, and in a group lazyrunner, then the tools, the profile, the
+    /// ports and the branch.
+    pub fn order(&self) -> Vec<usize> {
+        drawn(&self.rows)
+    }
+
+    /// `j` / `k`: the next or previous check as they're drawn, round the ends; true when it went round one.
+    pub fn select(&mut self, step: isize) -> bool {
+        let order = self.order();
+        let at = order.iter().position(|&index| index == self.selected).unwrap_or(0);
+        let next = super::keys::wrapped(at, step, order.len());
+        self.selected = order.get(next).copied().unwrap_or(0);
+        (step > 0 && next < at) || (step < 0 && next > at)
+    }
+
+    /// Whether check `index` warned or failed, and `i` didn't ignore it.
+    pub fn is_problem(&self, index: usize) -> bool {
+        let shows = self.items.get(index).is_some_and(|item| matches!(item.status, Status::Warn | Status::Fail));
+        shows && !self.is_ignored(index)
+    }
+
+    pub fn is_ignored(&self, index: usize) -> bool {
+        self.ignored.get(index).copied().unwrap_or(false)
+    }
+
+    /// `n` / `N`: the next or previous problem as they're drawn, round the ends; false when there's none.
+    pub fn next_problem(&mut self, forward: bool) -> bool {
+        let order = self.order();
+        let at = order.iter().position(|&index| index == self.selected).unwrap_or(0);
+        let count = order.len();
+        let found = (1..=count)
+            .map(|step| if forward { (at + step) % count } else { (at + count - step % count) % count })
+            .map(|at| order[at])
+            .find(|&index| self.is_problem(index));
+        if let Some(index) = found {
+            self.selected = index;
+        }
+        found.is_some()
+    }
+
+    /// `i`: the picked check's problem ignored for this run, or no longer.
+    pub fn ignore(&mut self) {
+        let index = self.selected;
+        let shows = self.items.get(index).is_some_and(|item| matches!(item.status, Status::Warn | Status::Fail));
+        if let Some(ignored) = self.ignored.get_mut(index).filter(|_| shows) {
+            *ignored = !*ignored;
+        }
+    }
+
+    /// The check `f` fixes: the picked one, or the first problem with a fix when it has none.
+    pub fn fix_target(&self) -> Option<usize> {
+        let picked = Some(self.selected).filter(|&index| self.fix_of(index).is_some());
+        picked.or_else(|| self.order().into_iter().find(|&index| self.fix_of(index).is_some()))
+    }
+
+    /// How many passed, warned, are blocked, and were skipped (or ignored).
+    pub fn counts(&self) -> (usize, usize, usize, usize) {
+        let [passed, warned, blocked, skipped] = self.tally(None).counts;
+        (passed, warned, blocked, skipped)
+    }
+
+    /// The header's numbers at `now`: checks that finished together count a `TICK` apart, so they tick up one at a
+    /// time. With no `now` (reduced motion) every finished check counts at once.
+    pub fn tally(&self, now: Option<Instant>) -> Tally {
+        let mut tally = Tally::default();
+        for (index, counted) in self.counted().into_iter().enumerate() {
+            let Some(at) = self.category(index) else { continue };
+            if counted.zip(now).is_some_and(|(counted, now)| counted > now) {
+                continue;
+            }
+            tally.done += 1;
+            tally.counts[at] += 1;
+            tally.bumped[at] = tally.bumped[at].max(counted);
+        }
+        tally
+    }
+
+    /// When each finished check counts: as it finished, but a `TICK` after the one before at the soonest; none: at
+    /// once (it ended without finishing - skipped, say).
+    fn counted(&self) -> Vec<Option<Instant>> {
+        let mut finished: Vec<(Instant, usize)> = (0..self.rows.len())
+            .filter(|&index| self.category(index).is_some())
+            .filter_map(|index| Some((self.rows[index].done_at?, index)))
+            .collect();
+        finished.sort();
+        let mut counted = vec![None; self.rows.len()];
+        let mut last: Option<Instant> = None;
+        for (at, index) in finished {
+            let at = last.map_or(at, |last| at.max(last + TICK));
+            (counted[index], last) = (Some(at), Some(at));
+        }
+        counted
+    }
+
+    /// Where check `index` counts: passed, warned, blocked, or skipped (ignored ones too); none while it's to do.
+    fn category(&self, index: usize) -> Option<usize> {
+        match self.items.get(index)?.status {
+            Status::Pending | Status::Running => None,
+            _ if self.is_ignored(index) => Some(3),
+            Status::Ok => Some(0),
+            Status::Warn => Some(1),
+            Status::Fail => Some(2),
+            Status::Skip => Some(3),
+        }
+    }
+
+    /// The countdown to the start while it runs: how much of it is left (1 to 0), and the seconds.
+    pub fn counting_down(&self, now: Instant) -> Option<(f64, u64)> {
+        let left = self.countdown?.saturating_duration_since(now);
+        Some((left.as_secs_f64() / COUNTDOWN.as_secs_f64(), left.as_secs_f64().ceil() as u64))
+    }
+
+    /// How long the checks took (so far, while they run); none for a checklist made up in a test.
+    pub fn elapsed(&self, now: Instant) -> Option<Duration> {
+        Some(self.finished.unwrap_or(now).saturating_duration_since(self.started?))
     }
 
     /// What fixes check `index`'s problem, when lazyrunner can.
     pub fn fix_of(&self, index: usize) -> Option<Fix> {
+        if self.is_ignored(index) {
+            return None;
+        }
         let (item, row) = (self.items.get(index)?, self.rows.get(index)?);
         match (&row.kind, item.status) {
             (Kind::Packages(key), Status::Warn | Status::Fail) => Some(Fix::NpmCi(key.clone())),
@@ -307,7 +450,8 @@ impl Checklist {
     fn check_again(&mut self, controller: &Controller, indexes: &[usize]) {
         let (sender, results) = channel();
         for check in checks::checks(controller) {
-            let Some(index) = indexes.iter().copied().find(|&index| self.items[index].name == check.name) else {
+            let same = |index: usize| self.items[index].name == check.name && self.rows[index].kind == check.kind;
+            let Some(index) = indexes.iter().copied().find(|&index| same(index)) else {
                 continue;
             };
             let sender = sender.clone();
@@ -347,6 +491,7 @@ impl Checklist {
                 }
                 if let Some(row) = self.rows.get_mut(index) {
                     row.took = row.started.map(|started| now.saturating_duration_since(started));
+                    row.done_at = Some(now);
                     if row.fixing.take().is_some() {
                         row.settled = Some((now, matches!(status, Status::Ok | Status::Skip)));
                     }
@@ -433,7 +578,8 @@ impl Checklist {
             .collect();
         let (sender, results) = channel();
         for check in checks::checks(controller) {
-            let Some(index) = failed.iter().copied().find(|&index| self.items[index].name == check.name) else {
+            let same = |index: usize| self.items[index].name == check.name && self.rows[index].kind == check.kind;
+            let Some(index) = failed.iter().copied().find(|&index| same(index)) else {
                 continue;
             };
             let sender = sender.clone();
@@ -567,10 +713,7 @@ impl Checklist {
             if problems.is_empty() {
                 controller.add_log("✓ Startup checklist: all good", Hue::Green);
             }
-            // f fixes the first problem straight away.
-            if let Some(first) = self.items.iter().position(|item| matches!(item.status, Status::Warn | Status::Fail)) {
-                self.selected = first;
-            }
+            self.finished.get_or_insert(now);
             self.updated_to = update::installed().filter(|version| self.installed_before.as_ref() != Some(version));
             // Linger a moment: longer when something needs a look or there is news; any key continues.
             let hold = if self.updated_to.is_some() && !self.manual {
@@ -596,10 +739,10 @@ impl Checklist {
         if self.skip || until.is_some_and(|until| now >= until) {
             return true;
         }
-        let problems = self.items.iter().filter(|item| matches!(item.status, Status::Warn | Status::Fail)).count();
-        let blocking = self.items.iter().filter(|item| item.status == Status::Fail).count();
-        let fix = self.fix_hint();
-        let report = if fix.is_empty() { " · c copies a report" } else { "" };
+        let problems = (0..self.items.len()).filter(|&index| self.is_problem(index)).count();
+        let blocking = (0..self.items.len())
+            .filter(|&index| self.is_problem(index) && self.items[index].status == Status::Fail)
+            .count();
         let left = until.map_or(String::new(), |until| {
             format!(" ({} s)", until.saturating_duration_since(now).as_secs_f64().ceil() as u64)
         });
@@ -612,15 +755,15 @@ impl Checklist {
         } else if self.countdown.is_some() {
             format!("nothing blocks the start - starting in {seconds} s · Esc holds it")
         } else if self.held {
-            format!("held - Enter starts{fix}")
+            "held - Enter starts".into()
         } else if self.starts() && blocking > 0 {
-            format!("{blocking} blocking the start{fix} · Enter starts anyway{retry}")
+            format!("{blocking} blocking the start · Enter starts anyway{retry}")
         } else if self.manual {
-            format!("any key closes{left}{retry}{fix}{report}")
+            format!("any key closes{left}{retry}")
         } else if !self.news.is_empty() {
-            format!("what's new above (, then c shows the whole changelog) - any key continues{left}{retry}{fix}")
+            format!("what's new above (, then c shows the whole changelog) - any key continues{left}{retry}")
         } else if problems > 0 {
-            format!("{problems} to look at - any key continues{left}{retry}{fix}{report}")
+            format!("{problems} to look at - any key continues{left}{retry}")
         } else {
             "all good - starting…".into()
         };
@@ -635,7 +778,8 @@ impl Checklist {
     /// While it holds: it never closes during a fix; a failed check holds the start; once a fix ran (or a failed
     /// check held the start) and nothing blocks it, it counts down to the start - or waits for a key without one.
     fn steer_hold(&mut self, now: Instant) {
-        let blocking = self.items.iter().any(|item| item.status == Status::Fail);
+        let blocking =
+            (0..self.items.len()).any(|index| self.is_problem(index) && self.items[index].status == Status::Fail);
         let fixing = self.fixing();
         let starts = self.starts();
         let Phase::Holding { from, until, .. } = &mut self.phase else { return };
@@ -653,21 +797,27 @@ impl Checklist {
         }
     }
 
-    /// What `f` would fix, and how many `a` would, for the footer.
-    fn fix_hint(&self) -> String {
-        let mut hint = String::new();
-        if let Some(fix) = self.fix_of(self.selected) {
-            hint.push_str(&format!(" · {}", fix.label()));
+    /// How many problems `a` would fix.
+    pub fn safe_fixes(&self) -> usize {
+        (0..self.items.len()).filter(|&index| self.fix_of(index).is_some_and(|fix| fix.safe())).count()
+    }
+
+    /// What check `index`'s problem holds up, for its details.
+    pub fn blocks(&self, index: usize) -> &'static str {
+        let (Some(item), Some(row)) = (self.items.get(index), self.rows.get(index)) else { return "" };
+        match &row.kind {
+            Kind::Version | Kind::Branch => "nothing",
+            Kind::Update => "nothing - this version goes on running",
+            Kind::Project => "nothing until the profile is reloaded (, then p)",
+            Kind::Ports => "the apps whose ports are taken: they can't listen on them",
+            Kind::Database => "the APIs' database calls, and the migrations (M)",
+            Kind::Packages(_) => "the app's start, and its tests",
+            Kind::Tool if item.name == "git" => {
+                "the branch, the source checks that skip builds, the test history's code"
+            }
+            Kind::Tool if item.name == ".NET SDK" => "building and starting the .NET apps, and their tests",
+            Kind::Tool => "the npm apps, and their tests",
         }
-        let safe = (0..self.items.len()).filter(|&index| self.fix_of(index).is_some_and(|fix| fix.safe())).count();
-        if safe > 0 {
-            hint.push_str(&format!(" · a fixes {safe}"));
-        }
-        let problems = self.items.iter().filter(|item| matches!(item.status, Status::Warn | Status::Fail)).count();
-        if !hint.is_empty() && problems > 1 {
-            hint.push_str(" · j k pick");
-        }
-        hint
     }
 
     /// While fixes run: which of `a`'s, as a bar.
@@ -678,6 +828,18 @@ impl Checklist {
         let at = (self.queued - self.queue.len()).min(self.queued);
         format!("fixing {at} of {} {}{}", self.queued, "▰".repeat(at), "▱".repeat(self.queued - at))
     }
+}
+
+/// The checks' order on screen: by group, then by kind within one, else as they came.
+fn drawn(rows: &[Row]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..rows.len()).collect();
+    order.sort_by_key(|&index| (rows[index].kind.group(), rows[index].kind.rank()));
+    order
+}
+
+/// The check drawn first, which the selection starts on.
+fn first_drawn(rows: &[Row]) -> usize {
+    drawn(rows).first().copied().unwrap_or(0)
 }
 
 /// Runs one check in its thread, saying when it starts, what it is doing and how it ended.
@@ -754,7 +916,8 @@ impl Checklist {
     pub fn fixed(items: Vec<Item>, news: Vec<Line>, footer: &str) -> Self {
         let (_, results) = channel();
         let items_len = items.len();
-        let rows = items.iter().map(|item| Row::new(kind_of(&item.name))).collect();
+        let rows: Vec<Row> = items.iter().map(|item| Row::new(kind_of(&item.name))).collect();
+        let first = first_drawn(&rows);
         Self {
             items,
             footer: footer.into(),
@@ -772,8 +935,9 @@ impl Checklist {
             others_done_at: None,
             continuing: Vec::new(),
             late: Vec::new(),
+            ignored: vec![false; rows.len()],
             rows,
-            selected: 0,
+            selected: first,
             queue: Vec::new(),
             queued: 0,
             again: Vec::new(),
@@ -781,6 +945,9 @@ impl Checklist {
             countdown: None,
             held: false,
             flashed: None,
+            project: String::new(),
+            started: None,
+            finished: None,
         }
     }
 }
@@ -792,7 +959,7 @@ fn kind_of(name: &str) -> Kind {
         "lazyrunner" => Kind::Update,
         "Ports" => Kind::Ports,
         "Database" => Kind::Database,
-        "Project" => Kind::Project,
+        "Profile" => Kind::Project,
         "Branch" => Kind::Branch,
         _ if name.ends_with(" packages") => Kind::Packages(name.trim_end_matches(" packages").to_lowercase()),
         _ => Kind::Tool,
@@ -889,7 +1056,7 @@ mod tests {
         list.manual = true;
         let now = Instant::now();
         assert!(!list.update(now, &mut controller), "holding, with the problem");
-        assert_eq!(list.footer, "any key closes · r retries git · c copies a report");
+        assert_eq!(list.footer, "any key closes · r retries git");
         assert!(list.retry(&mut controller));
         assert_eq!((list.items[0].status, list.items[1].status), (Status::Ok, Status::Pending));
         assert_eq!(controller.log.back().unwrap().text, "Checking again: git");
@@ -900,10 +1067,7 @@ mod tests {
         }
         list.update(Instant::now(), &mut controller);
         assert_eq!(list.items[1].status, Status::Ok, "git is there: {}", list.items[1].detail);
-        assert_eq!(
-            list.footer, "any key closes (60 s) · c copies a report",
-            "nothing left to retry: it closes by itself again"
-        );
+        assert_eq!(list.footer, "any key closes (60 s)", "nothing left to retry: it closes by itself again");
         assert!(!list.retry(&mut controller));
     }
 
@@ -916,7 +1080,7 @@ mod tests {
         let now = Instant::now();
         assert!(!list.update(now, &mut controller));
         assert!(!list.update(now + Duration::from_secs(600), &mut controller), "it never closes by itself");
-        assert_eq!(list.footer, "any key closes · r retries lazyrunner · f checks again · a fixes 1");
+        assert_eq!(list.footer, "any key closes · r retries lazyrunner");
         assert_eq!(list.draining(now), None, "so nothing drains");
     }
 
@@ -926,7 +1090,7 @@ mod tests {
         let mut list = Checklist::fixed(vec![item_named("Ports", Status::Warn)], Vec::new(), "checking…");
         let now = Instant::now();
         assert!(!list.update(now, &mut controller));
-        let fix = " · f frees them";
+        let fix = "";
         assert_eq!(list.footer, format!("1 to look at - any key continues (8 s) · r retries Ports{fix}"));
         assert_eq!(list.draining(now), Some(1.0));
         assert_eq!(list.draining(now + Duration::from_secs(2)), Some(0.75), "the bar drains with the time left");
@@ -1009,6 +1173,64 @@ mod tests {
         assert!(!list.update(now + Duration::from_secs(600), &mut controller));
         assert_eq!(list.footer, "held - Enter starts");
         assert!(!list.hold(), "nothing to hold any more");
+    }
+
+    #[test]
+    fn the_selection_starts_on_the_first_row_and_moves_as_the_rows_are_drawn() {
+        let problem = |name: &str, status| Item { name: name.into(), status, detail: String::new() };
+        let mut list = Checklist::fixed(
+            vec![
+                problem("lazyrunner", Status::Warn),
+                problem("git", Status::Ok),
+                problem("Ports", Status::Warn),
+                problem("Web packages", Status::Fail),
+                problem("Profile", Status::Ok),
+            ],
+            Vec::new(),
+            "",
+        );
+        let names = |list: &Checklist| -> Vec<String> {
+            list.order().into_iter().map(|index| list.items[index].name.clone()).collect()
+        };
+        assert_eq!(names(&list), ["git", "Profile", "Ports", "Web packages", "lazyrunner"], "by group, as drawn");
+        assert_eq!(list.items[list.selected].name, "git", "the first row, not the first problem");
+        let mut walked = Vec::new();
+        for _ in 0..5 {
+            list.select(1);
+            walked.push(list.items[list.selected].name.clone());
+        }
+        assert_eq!(walked, ["Profile", "Ports", "Web packages", "lazyrunner", "git"], "down, round the end");
+        assert!(list.next_problem(true));
+        assert_eq!(list.items[list.selected].name, "Ports", "n: the next problem");
+        list.ignore();
+        assert!(
+            list.next_problem(true) && list.items[list.selected].name == "Web packages",
+            "an ignored one is passed by"
+        );
+        assert_eq!(list.counts(), (2, 1, 1, 1), "the ignored warning counts as skipped");
+        assert_eq!(list.fix_target(), Some(list.selected), "f: the picked problem's fix");
+    }
+
+    #[test]
+    fn the_counts_tick_up_a_check_at_a_time_the_bar_says_when_it_goes_round_and_the_countdown_drains() {
+        let item = |name: &str, status| Item { name: name.into(), status, detail: String::new() };
+        let items = vec![item("git", Status::Ok), item("Ports", Status::Warn), item("Profile", Status::Ok)];
+        let mut list = Checklist::fixed(items, Vec::new(), "");
+        let now = Instant::now();
+        for row in &mut list.rows {
+            row.done_at = Some(now);
+        }
+        let at = |ms: u64| list.tally(Some(now + Duration::from_millis(ms)));
+        assert_eq!((at(0).done, at(0).counts), (1, [1, 0, 0, 0]), "finished together: one at a time");
+        assert_eq!((at(40).done, at(40).counts), (2, [1, 1, 0, 0]));
+        assert_eq!(at(40).bumped[1], Some(now + TICK), "the warnings went up then: they pulse");
+        assert_eq!((at(80).done, at(80).counts), (3, [2, 1, 0, 0]));
+        assert_eq!(list.tally(None).done, 3, "reduced motion: all at once");
+        let went_round: Vec<bool> = [1, 1, 1, -1].into_iter().map(|step| list.select(step)).collect();
+        assert_eq!(went_round, [false, false, true, true], "round the end, both ways");
+        assert_eq!(list.counting_down(now), None);
+        list.countdown = Some(now + COUNTDOWN);
+        assert_eq!(list.counting_down(now + Duration::from_millis(1500)), Some((0.5, 2)));
     }
 
     #[test]

@@ -3,6 +3,19 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.66.0] - 2026-11-03
+
+### Changed
+- The startup checklist is laid out as the concept in #37 has it: a header with the project, a bar of the checks done, the counts, how long they took and the slowest; the groups Environment (with lazyrunner's version), Project (the profile, the ports, the branch), Database, Packages and Update, each under a header line with its worst result and time, all open unless the terminal is too short; `FIX` tags; the picked check's details beside the list (under it when narrow); a legend and the keys (#77)
+
+### Fixed
+- The startup checklist's selection starts on the first row, and `j` / `k` follow the rows as they're drawn instead of the order the checks ran in (#77)
+
+### Added
+- In the startup checklist, `n` / `N` jump to the next and previous problem, `f` fixes the picked check or the first problem, and `i` ignores a problem for this run (#77)
+- The startup checklist moves (not with reduced motion): the selection bar glides between the rows and flashes going round the end, the header's counts tick up a check at a time and pulse when they change, each check's mark lands bright as it finishes, and a bar with an hourglass drains with the countdown to the start (#77)
+- In the startup checklist a click picks a check, and a click on its `FIX` tag runs the fix; a click inside it no longer continues (one outside it still does) (#77)
+
 ## [1.65.0] - 2026-11-02
 
 ### Added

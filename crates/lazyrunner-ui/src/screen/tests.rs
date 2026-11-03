@@ -470,7 +470,7 @@ async fn startup_checklist() {
         item("git", Status::Ok, "2.50"),
         item(".NET SDK", Status::Warn, "9.0 - the apps want 10.0"),
         item("Ports", Status::Running, ""),
-        item("Project", Status::Pending, ""),
+        item("Profile", Status::Pending, ""),
     ];
     let news = vec![
         Line { text: "0.2.0".into(), hue: Hue::Cyan },
@@ -484,15 +484,16 @@ async fn startup_checklist() {
 }
 
 #[tokio::test]
-async fn the_checklist_groups_its_checks_times_them_and_f_fixes_the_picked_one() {
+async fn the_doctor_shows_every_group_open_its_header_and_the_picked_checks_details() {
     let mut screen = screen("snap-doctor", json!({}));
     let item = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
-    let reserved = "47201 reserved by Windows (47200-47299) - net stop winnat, then net start winnat, in an elevated                     terminal frees it";
+    let reserved = "47201 reserved by Windows (47200-47299) - net stop winnat, then net start winnat, in an elevated \
+                    terminal frees it";
     let items = vec![
         item("git", Status::Ok, "2.50"),
         item(".NET SDK", Status::Ok, "10.0.100"),
         item("Ports", Status::Fail, reserved),
-        item("Project", Status::Ok, "Shop from this repo's lazyrunner.json"),
+        item("Profile", Status::Ok, "Shop from this repo's lazyrunner.json"),
     ];
     let mut list = Checklist::fixed(items, Vec::new(), "");
     list.rows[0].took = Some(Duration::from_millis(120));
@@ -502,16 +503,53 @@ async fn the_checklist_groups_its_checks_times_them_and_f_fixes_the_picked_one()
     list.update(now, &mut screen.controller);
     screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
     let frame = screen.frame();
-    assert!(frame.contains("Environment") && frame.contains("2 passed"), "a group that passed folds: {frame}");
-    assert!(frame.contains("r retries Ports · f copies the fix"), "{frame}");
+    assert!(frame.contains("DOCTOR") && frame.contains("4 / 4 checks"), "{frame}");
+    assert!(
+        frame.contains("ENVIRONMENT") && frame.contains("PROJECT") && frame.contains("10.0.100"),
+        "all open: {frame}"
+    );
+    assert!(frame.contains(" FIX "), "the reserved port's fix: {frame}");
     insta::assert_snapshot!(frame);
+    let picked = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Checklist(list)) => list.items[list.selected].name.clone(),
+        _ => String::new(),
+    };
+    assert_eq!(picked(&screen), "git", "the first row");
+    screen.press("j j");
+    assert_eq!(picked(&screen), "Profile", "down as drawn: the profile comes before the ports");
+    screen.press("n");
+    assert_eq!(picked(&screen), "Ports", "n: the next problem");
+    assert!(screen.frame().contains("WHAT IT BLOCKS"), "its details: {}", screen.frame());
     screen.press("f");
     assert_eq!(copied(), [super::checklist::WINNAT], "f on the reserved port copies what frees it");
     assert!(screen.frame().contains("copied `net stop winnat"), "{}", screen.frame());
-    screen.press("k k");
-    assert!(screen.frame().contains(".NET SDK"), "picking a check in a folded group opens it: {}", screen.frame());
     let Some(Overlay::Checklist(list)) = &screen.ui.overlay else { panic!("the checklist is open") };
     assert!(!list.skip, "the doctor's keys don't close it");
+}
+
+#[tokio::test]
+async fn in_the_doctor_a_click_picks_a_check_one_on_its_fix_tag_runs_the_fix_and_one_outside_continues() {
+    let mut screen = screen("doctor-mouse", json!({}));
+    let item = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
+    let items = vec![
+        item("git", Status::Ok, "2.50"),
+        item("Ports", Status::Fail, "47201 reserved by Windows (47200-47299)"),
+        item("Profile", Status::Ok, "Shop"),
+    ];
+    let mut list = Checklist::fixed(items, Vec::new(), "");
+    list.update(screen.ui.now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    let picked = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Checklist(list)) => (list.items[list.selected].name.clone(), list.skip),
+        _ => (String::new(), true),
+    };
+    screen.click(Target::Item(2));
+    assert_eq!(picked(&screen), ("Profile".into(), false), "a click picks a check");
+    screen.click(Target::Fix(1));
+    assert_eq!(copied(), [super::checklist::WINNAT], "a click on its FIX tag runs the fix");
+    assert_eq!(picked(&screen), ("Ports".into(), false), "and picks it");
+    screen.click_at(0, 0);
+    assert!(picked(&screen).1, "a click outside continues");
 }
 
 #[tokio::test]
@@ -3121,7 +3159,7 @@ async fn the_checklist_drains_its_bottom_edge_until_it_moves_on() {
     list.update(screen.ui.now, &mut screen.controller);
     screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
     let edge = |screen: &mut Screen| {
-        let rows = super::overlays::checklist(&screen.ui, 120, 40);
+        let rows = super::overlays::checklist(&mut screen.ui, 120, 40);
         let bottom = rows.into_iter().rev().find(|row| row.iter().any(|seg| seg.text.contains('└'))).unwrap();
         bottom
             .iter()

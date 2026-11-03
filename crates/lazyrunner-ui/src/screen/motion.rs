@@ -55,6 +55,8 @@ pub enum Spot {
     Match { app: usize, line: usize },
     /// What was clicked.
     Clicked(Target),
+    /// The startup doctor's selection bar going round the end of its list.
+    Wrapped,
 }
 
 impl Spot {

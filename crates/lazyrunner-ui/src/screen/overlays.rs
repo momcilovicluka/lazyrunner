@@ -5,13 +5,14 @@ use lazyrunner_core::changelog;
 use lazyrunner_core::run::Controller;
 use std::time::Duration;
 
-use lazyrunner_core::run::checks::{Group, Status};
+use lazyrunner_core::run::checks::{Group, Kind, Status};
 use unicode_width::UnicodeWidthStr;
 
 use super::actions::{self, Action};
-use super::checklist::{Checklist, SETTLE};
+use super::checklist::{Checklist, LAND, SETTLE};
 use super::columns::{fit, hue_color, spinner};
 use super::icons::{self, Icon};
+use super::motion::{FLASH, Spot};
 use super::mouse::Target;
 use super::seg::{Seg, aim, limit, on, pad, seg, width};
 use super::theme::C;
@@ -23,15 +24,13 @@ pub const LOGO: [&str; 3] = [
     "▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀",
 ];
 const SPARKLE: [char; 2] = ['✦', '✧'];
-/// The startup checklist's widest text.
-const CHECKLIST_INNER: usize = 84;
+/// The startup doctor's widest text, and from how wide the picked check's details go beside the list.
+const DOCTOR_INNER: usize = 150;
+const TWO_PANES_FROM: usize = 110;
+/// A check's `FIX` tag, and the space before it.
+const FIX_CELLS: usize = 6;
 /// A check's row ends with how long it took and a bar of its share: this many cells.
 const TOOK_CELLS: usize = 10;
-/// A group's name beside its first check takes this many cells, in a box at least `GROUPS_FROM` wide.
-const GROUP_CELLS: usize = 13;
-const GROUPS_FROM: usize = 80;
-/// How fast the light sweeps across the checklist's logo.
-const SWEEP_COLUMNS_PER_SECOND: f64 = 12.0;
 pub const WHATS_NEW_MAX_LINES: usize = 12;
 const VERSION: &str = lazyrunner_core::changelog::VERSION;
 
@@ -478,165 +477,274 @@ fn status_color(status: Status) -> C {
     }
 }
 
-/// The startup checklist: the logo with a light sweeping across it, the checks, and what's new after an update.
-/// A small terminal loses the logo first; with news to show, the checks that passed fold into one line; then the
-/// news is cut.
-pub fn checklist(ui: &Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let Some(Overlay::Checklist(list)) = &ui.overlay else { return Vec::new() };
-    let list: &Checklist = list;
-    let tick = ui.tick();
+/// The startup doctor (#37, #77): a header - the project, a bar of the checks done, what they found, how long they
+/// took and the slowest - then the checks under their groups' headers, every group open unless the terminal is too
+/// short for them all, beside the picked check's details (under it on a narrower terminal); then what's new after an
+/// update, a legend, the countdown to the start, and the keys. It moves too (not with reduced motion): the selection
+/// bar glides a row at a time and flashes going round the end, the counts tick up a check at a time and pulse as they
+/// change, and each check's mark lands bright as it finishes.
+pub fn checklist(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let animated = !ui.reduced_motion;
-    let room = rows.saturating_sub(3);
-    let news = changelog::wrap(&list.news, cells.saturating_sub(8).clamp(20, 84).saturating_sub(3));
-    let passed = list.items.iter().filter(|item| matches!(item.status, Status::Ok | Status::Skip)).count();
-    let finished = list.items.iter().all(|item| !matches!(item.status, Status::Pending | Status::Running));
-    let fold =
-        !news.is_empty() && finished && passed > 1 && list.items.len() + news.len().min(WHATS_NEW_MAX_LINES) + 4 > room;
-    let mut checks = check_rows(ui, list, box_inner(cells, CHECKLIST_INNER), fold);
+    let inner = box_inner(cells, DOCTOR_INNER);
+    let wide = inner >= TWO_PANES_FROM;
+    let left_width = if wide { inner * 3 / 5 } else { inner };
+    let right_width = inner.saturating_sub(left_width + 3);
+    let Some(list) = doctor(ui) else { return Vec::new() };
+    let news = changelog::wrap(&list.news, left_width.saturating_sub(3));
+    let news_rows = if news.is_empty() { 0 } else { news.len().min(WHATS_NEW_MAX_LINES) + 2 };
+    let fold = 7 + groups(list).len() + list.items.len() + news_rows > rows.saturating_sub(4);
+    let (mut left, picked) = checks_pane(ui, list, left_width, wide, fold);
+    let bar = ui.motion.bar(picked, ui.now);
+    let bright = ui.motion.lit(&Spot::Wrapped, ui.now).is_some();
+    if let Some(row) = left.get_mut(bar) {
+        light(row, left_width, bright);
+    }
+    let Some(list) = doctor(ui) else { return Vec::new() };
     let copied = list.flashed.is_some_and(|at| ui.now.saturating_duration_since(at) < super::motion::COPY_FLASH);
     if animated && copied {
-        for part in checks.iter_mut().flatten() {
+        for part in left.iter_mut().flatten() {
             (part.fg, part.bg) = (C::Black, Some(C::Cyan)); // c just copied them
         }
     }
-    if fold {
-        checks.insert(
-            0,
-            vec![
-                seg(format!(" {} ", icons::icon(ui.nerd, Icon::Ok)), C::Green),
-                seg(format!("{passed} checks passed"), C::Gray),
-            ],
-        );
-    }
-    let news_room = WHATS_NEW_MAX_LINES.min(room.saturating_sub(checks.len() + 3));
-    let mut lines: Vec<Vec<Seg>> = Vec::new();
-    let news_rows = if news.is_empty() { 1 } else { news.len().min(WHATS_NEW_MAX_LINES) + 3 };
-    if checks.len() + news_rows + LOGO.len() + 2 <= room {
-        lines.push(Vec::new());
-        // The light's column: left to right, then a pause.
-        let cycle = LOGO[0].chars().count() as f64 + 15.0;
-        let sweep = if animated { (ui.seconds() * SWEEP_COLUMNS_PER_SECOND) % cycle - 6.0 } else { -99.0 };
-        for row in LOGO {
-            let mut segs = vec![seg("   ", C::Gray)];
-            for (i, c) in row.chars().enumerate() {
-                let distance = (i as f64 - sweep).abs();
-                segs.push(seg(
-                    c.to_string(),
-                    if distance <= 1.0 {
-                        C::White
-                    } else if distance <= 3.0 {
-                        C::Cyan
-                    } else {
-                        C::DarkCyan
-                    },
-                ));
-            }
-            lines.push(segs);
+    if !news.is_empty() {
+        left.extend([Vec::new(), vec![seg(" ✦ What's new", C::Cyan)]]);
+        for line in news.iter().take(WHATS_NEW_MAX_LINES) {
+            left.push(vec![seg(format!("   {}", line.text), hue_color(line.hue))]);
+        }
+        if news.len() > WHATS_NEW_MAX_LINES {
+            let more = format!("   … {} more lines - , then c shows the changelog", news.len() - WHATS_NEW_MAX_LINES);
+            left.push(vec![seg(more, C::DarkGray)]);
         }
     }
+    left.extend([Vec::new(), legend(ui)]);
+    let right = if wide { details(ui, list, list.selected, right_width, false) } else { Vec::new() };
+    let mut lines = header(ui, list, inner);
     lines.push(Vec::new());
-    lines.extend(checks);
-    lines.push(Vec::new());
-    if !news.is_empty() && news_room >= 1 {
-        lines.push(vec![seg(" ✦ What's new", C::Cyan)]);
-        let shown = if news.len() > news_room { news_room.saturating_sub(1) } else { news.len() };
-        for line in news.iter().take(shown) {
-            lines.push(vec![seg(format!("   {}", line.text), hue_color(line.hue))]);
+    for at in 0..left.len().max(right.len()) {
+        let mut row = fit(left.get(at).cloned().unwrap_or_default(), left_width);
+        if wide {
+            row.push(seg(" │ ", C::DarkGray));
+            row.extend(fit(right.get(at).cloned().unwrap_or_default(), right_width));
         }
-        if news.len() > shown {
-            lines.push(vec![seg(
-                format!("   … {} more lines - , then c shows the changelog", news.len() - shown),
-                C::DarkGray,
-            )]);
-        }
-        lines.push(Vec::new());
+        lines.push(row);
     }
-    let sparkle = if animated { SPARKLE[(tick / 3) as usize % 2] } else { SPARKLE[0] };
-    let title = format!("{sparkle} lazyrunner v{VERSION} · startup checklist");
-    draining_box(&title, lines, &list.footer, cells, rows, CHECKLIST_INNER, list.draining(ui.now))
+    lines.extend([countdown(ui, list, inner), vec![seg(keys_line(ui), C::DarkGray)]]);
+    let sparkle = if animated { SPARKLE[(ui.tick() / 3) as usize % 2] } else { SPARKLE[0] };
+    let title = format!("{sparkle} lazyrunner v{VERSION} · startup doctor");
+    draining_box(&title, lines, &list.footer, cells, rows, DOCTOR_INNER, list.draining(ui.now))
 }
 
-/// The checks' rows, by group in the checklist's order: an edge in red where a check fails (it holds the start) and
-/// amber where it warns, the group's name beside its first check, the check `f` fixes marked, and how long each took
-/// with a bar of its share of the slowest. A group that passed folds to one row while another has a problem; `fold`
-/// (news to show) leaves the passed ones out.
-fn check_rows(ui: &Ui, list: &Checklist, inner: usize, fold: bool) -> Vec<Vec<Seg>> {
-    let finished = list.items.iter().all(|item| !matches!(item.status, Status::Pending | Status::Running));
-    let problems = list.items.iter().any(|item| matches!(item.status, Status::Warn | Status::Fail));
+/// The startup checklist, while it's open.
+fn doctor(ui: &Ui) -> Option<&Checklist> {
+    match &ui.overlay {
+        Some(Overlay::Checklist(list)) => Some(list.as_ref()),
+        _ => None,
+    }
+}
+
+/// The checks under their groups' headers (a group that passed folds to one row when `fold`), with the picked
+/// check's details under its row when they aren't beside the list; and the line of the picked check.
+fn checks_pane(ui: &Ui, list: &Checklist, width: usize, wide: bool, fold: bool) -> (Vec<Vec<Seg>>, usize) {
     let slowest = list.rows.iter().filter_map(|row| row.took).max().unwrap_or_default();
-    let labels = inner >= GROUPS_FROM;
-    let mut groups: Vec<Group> = list.rows.iter().map(|row| row.kind.group()).collect();
-    groups.sort();
-    groups.dedup();
-    let mut rows = Vec::new();
-    for group in groups {
-        let members: Vec<usize> =
-            (0..list.items.len()).filter(|&index| list.rows[index].kind.group() == group).collect();
-        let passed = finished
-            && members.iter().all(|&index| {
-                matches!(list.items[index].status, Status::Ok | Status::Skip) && list.rows[index].fixing.is_none()
-            });
-        if passed && fold {
+    let (mut left, mut picked) = (Vec::new(), 0);
+    for (group, members) in &groups(list) {
+        let passed = members
+            .iter()
+            .all(|&index| list.is_ignored(index) || matches!(list.items[index].status, Status::Ok | Status::Skip));
+        if fold && passed && !members.contains(&list.selected) {
+            left.push(group_header(ui, list, *group, members, width, true));
             continue;
         }
-        let picked = list.is_holding() && members.contains(&list.selected);
-        if passed && problems && !picked {
-            let took: Duration = members.iter().filter_map(|&index| list.rows[index].took).sum();
-            let label = if labels { group_label(ui.nerd, group) } else { String::new() };
-            let row = vec![
-                seg(" ", C::Gray),
-                seg(label, C::DarkGray),
-                seg(format!("  {} ", icons::icon(ui.nerd, Icon::Ok)), C::DarkGreen),
-                seg(format!("{} passed", members.len()), C::DarkGray),
-            ];
-            rows.push(with_took(ui, row, 3, inner, Some(took), None));
-            continue;
-        }
-        for (at, &index) in members.iter().enumerate() {
-            let label = match (labels, at) {
-                (true, 0) => group_label(ui.nerd, group),
-                (true, _) => " ".repeat(GROUP_CELLS),
-                (false, _) => String::new(),
-            };
-            rows.push(check_row(ui, list, index, label, inner, slowest));
+        left.push(group_header(ui, list, *group, members, width, false));
+        for &index in members {
+            if index == list.selected {
+                picked = left.len();
+            }
+            left.push(check_row(ui, list, index, width, slowest));
+            if !wide && index == list.selected && list.is_holding() && list.is_problem(index) {
+                for row in details(ui, list, index, width.saturating_sub(4), true) {
+                    let mut indented = vec![seg("    ", C::Gray)];
+                    indented.extend(row);
+                    left.push(indented);
+                }
+            }
         }
     }
-    rows
+    (left, picked)
 }
 
-/// A check's row. A running fix spins its mark; once it worked the edge turns green and the mark flashes once, and
-/// when it didn't the mark pulses red twice.
-fn check_row(ui: &Ui, list: &Checklist, index: usize, label: String, inner: usize, slowest: Duration) -> Vec<Seg> {
+/// The selection bar across a row of the checks: in the focus colours, or bright as it goes round the end of the
+/// list. What has colours of its own (a `FIX` tag, a mark landing) keeps them.
+fn light(row: &mut Vec<Seg>, width: usize, bright: bool) {
+    *row = fit(std::mem::take(row), width);
+    for part in row.iter_mut().filter(|part| part.bg.is_none()) {
+        if bright {
+            (part.fg, part.bg) = (C::Black, Some(C::Cyan));
+            continue;
+        }
+        part.bg = Some(C::FocusBack);
+        if matches!(part.fg, C::Gray | C::DarkGray | C::White) {
+            part.fg = C::FocusText;
+        }
+    }
+}
+
+/// Whether the doctor moves: not with reduced motion, nor in the screen tests' frozen frames.
+fn moving(ui: &Ui) -> bool {
+    ui.motion.enabled && !ui.reduced_motion
+}
+
+/// The countdown to the start (none with reduced motion: the footer has it too): its hourglass, the seconds left,
+/// and a bar across the box that drains with it.
+fn countdown(ui: &Ui, list: &Checklist, inner: usize) -> Vec<Seg> {
+    let Some((left, seconds)) = list.counting_down(ui.now).filter(|_| moving(ui)) else { return Vec::new() };
+    let text = format!(" {} starting in {seconds} s  ", icons::icon(ui.nerd, Icon::Hourglass));
+    let cells = inner.saturating_sub(text.width());
+    let bar = share_bar(left, cells).trim_end().to_string();
+    let rest = cells.saturating_sub(bar.width());
+    vec![seg(text, C::Cyan), seg(bar, C::Cyan), seg("─".repeat(rest), C::DarkGray)]
+}
+
+/// The doctor's keys, under the checks.
+fn keys_line(ui: &Ui) -> String {
+    let clipboard = icons::icon(ui.nerd, Icon::Clipboard);
+    format!(
+        " j k move · n N problems · f fix · a fix all safe · i ignore · r retry · c {clipboard} report · Enter \
+         continues"
+    )
+}
+
+/// The checks by group, in the order they're drawn.
+fn groups(list: &Checklist) -> Vec<(Group, Vec<usize>)> {
+    let mut groups: Vec<(Group, Vec<usize>)> = Vec::new();
+    for index in list.order() {
+        let group = list.rows[index].kind.group();
+        match groups.last_mut() {
+            Some((last, members)) if *last == group => members.push(index),
+            _ => groups.push((group, vec![index])),
+        }
+    }
+    groups
+}
+
+/// The header: the project, a bar of the checks done, what they found, how long they took and the slowest.
+fn header(ui: &Ui, list: &Checklist, inner: usize) -> Vec<Vec<Seg>> {
+    let total = list.items.len();
+    let tally = list.tally(moving(ui).then_some(ui.now));
+    let done = tally.done;
+    let mut first = vec![on(" DOCTOR ", C::Black, C::Cyan)];
+    if !list.project.is_empty() {
+        first.push(seg(format!(" {}", list.project), C::White));
+    }
+    first.push(seg(" startup checks", C::DarkGray));
+    let cells = (inner / 4).clamp(10, 30);
+    let filled = (done * cells).checked_div(total).unwrap_or(0);
+    let mut second = vec![
+        seg("▰".repeat(filled), C::Green),
+        seg("▱".repeat(cells - filled), C::DarkGray),
+        seg(format!("  {done} / {total} checks   "), C::Gray),
+    ];
+    let kinds =
+        [(Status::Ok, C::Green), (Status::Warn, C::Yellow), (Status::Fail, C::Red), (Status::Skip, C::DarkGray)];
+    for (at, (status, color)) in kinds.into_iter().enumerate() {
+        let text = format!("{} {}", mark(ui, status), tally.counts[at]);
+        let bumped = tally.bumped[at].filter(|_| moving(ui));
+        let pulsing = bumped.is_some_and(|bumped| ui.now.saturating_duration_since(bumped) < FLASH);
+        second.extend([if pulsing { on(text, C::Black, color) } else { seg(text, color) }, seg("   ", C::Gray)]);
+    }
+    if let Some(took) = list.elapsed(ui.now) {
+        second.push(seg(format!("checked in {}", seconds(took)), C::DarkGray));
+    }
+    let slowest = list
+        .order()
+        .into_iter()
+        .filter_map(|index| Some((index, list.rows[index].took?)))
+        .max_by_key(|(_, took)| *took);
+    if let Some((index, took)) = slowest {
+        second.push(seg(format!(" · slowest {} {}", list.items[index].name, seconds(took)), C::DarkGray));
+    }
+    vec![first, second]
+}
+
+/// A group's header: its icon (with Nerd Font icons) and name, a rule, its worst result and its time; folded, how
+/// many passed.
+fn group_header(ui: &Ui, list: &Checklist, group: Group, members: &[usize], width: usize, folded: bool) -> Vec<Seg> {
+    let icon = if ui.nerd { format!("{} ", icons::icon(true, group_icon(group))) } else { String::new() };
+    let worst = members.iter().map(|&index| shown(list, index)).max_by_key(|status| severity(*status));
+    let worst = worst.unwrap_or(Status::Ok);
+    let took: Duration = members.iter().filter_map(|&index| list.rows[index].took).sum();
+    let passed = if folded { format!(" · {} passed", members.len()) } else { String::new() };
+    let name = format!(" {icon}{}{passed} ", group.name().to_uppercase());
+    let result = format!(" {} {}", mark(ui, worst), seconds(took));
+    let rule = width.saturating_sub(name.width() + result.width());
+    vec![seg(name, C::DarkCyan), seg("─".repeat(rule), C::DarkGray), seg(result, status_color(worst))]
+}
+
+/// A check's result as drawn: running while a fix runs, skipped once `i` ignored it.
+fn shown(list: &Checklist, index: usize) -> Status {
+    match list.rows[index].fixing {
+        Some(_) => Status::Running,
+        None if list.is_ignored(index) => Status::Skip,
+        None => list.items[index].status,
+    }
+}
+
+/// How much a result needs a look, for a group's worst.
+fn severity(status: Status) -> u8 {
+    match status {
+        Status::Fail => 5,
+        Status::Warn => 4,
+        Status::Running => 3,
+        Status::Pending => 2,
+        Status::Ok => 1,
+        Status::Skip => 0,
+    }
+}
+
+/// A check's row: an edge in red where it holds the start and amber where it warns, its mark, name and detail (dim
+/// when skipped or ignored), how long it took with a bar of its share of the slowest, and a `FIX` tag when it has
+/// one. A running fix spins its mark; once it worked the edge turns green and the mark flashes once, and when it
+/// didn't the mark pulses red twice. A check that just finished lands with its mark bright for a moment.
+fn check_row(ui: &Ui, list: &Checklist, index: usize, width: usize, slowest: Duration) -> Vec<Seg> {
     let (item, row) = (&list.items[index], &list.rows[index]);
     let animated = !ui.reduced_motion;
+    let ignored = list.is_ignored(index);
     let settling = row
         .settled
         .map(|(at, worked)| (ui.now.saturating_duration_since(at), worked))
         .filter(|(since, _)| animated && *since < SETTLE * 2);
-    let status = if row.fixing.is_some() { Status::Running } else { item.status };
+    let status = shown(list, index);
+    let landing = moving(ui)
+        && status != Status::Running
+        && row.done_at.is_some_and(|at| ui.now.saturating_duration_since(at) < LAND);
     let edge = match (item.status, settling) {
+        _ if ignored => seg(" ", C::Gray),
         (_, Some((since, true))) if since < SETTLE => seg("▌", if since < SETTLE / 2 { C::Yellow } else { C::Green }),
         (Status::Fail, _) => seg("▌", C::Red),
         (Status::Warn, _) => seg("▌", C::Yellow),
         _ => seg(" ", C::Gray),
     };
-    let cursor = if list.is_holding() && list.selected == index { seg("▸", C::Cyan) } else { seg(" ", C::Gray) };
     let mut mark = seg(format!(" {} ", icon(status, animated.then(|| spinner(ui)), ui.nerd)), status_color(status));
     match settling {
-        Some((since, true)) if since < super::motion::FLASH => mark = on(mark.text, C::Black, C::Green),
+        Some((since, true)) if since < FLASH => mark = on(mark.text, C::Black, C::Green),
         Some((since, false)) if (since.as_millis() / (SETTLE.as_millis() / 2)).is_multiple_of(2) => {
             mark = on(mark.text, C::Black, C::Red);
         }
+        None if landing => mark = on(mark.text, C::Black, status_color(status)),
         _ => {}
     }
-    let detail_color = if item.status == Status::Ok { C::Gray } else { status_color(item.status) };
+    let dim = status == Status::Skip;
+    let detail = if ignored { format!("{} · ignored for this run", item.detail) } else { item.detail.clone() };
+    let detail_color = match item.status {
+        _ if dim => C::DarkGray,
+        Status::Ok => C::Gray,
+        other => status_color(other),
+    };
     let segs = vec![
         edge,
-        seg(label, C::DarkGray),
-        cursor,
         mark,
-        seg(check_name(ui.nerd, &item.name), C::White),
-        seg(item.detail.clone(), detail_color),
+        seg(check_name(ui.nerd, &item.name), if dim { C::DarkGray } else { C::White }),
+        seg(detail, detail_color),
     ];
     let running = row.started.filter(|_| status == Status::Running && row.took.is_none());
     let took = row.took.or_else(|| running.map(|started| ui.now.saturating_duration_since(started)));
@@ -644,7 +752,137 @@ fn check_row(ui: &Ui, list: &Checklist, index: usize, label: String, inner: usiz
         .took
         .filter(|_| !slowest.is_zero())
         .map(|took| (took.as_secs_f64() / slowest.as_secs_f64(), took == slowest));
-    with_took(ui, segs, 5, inner, took, share)
+    let mut out = fit(with_took(ui, segs, 3, width.saturating_sub(FIX_CELLS), took, share), width - FIX_CELLS);
+    out.push(seg(" ", C::Gray));
+    let tag = if item.status == Status::Fail { C::Red } else { C::Yellow };
+    out.push(match list.fix_of(index) {
+        Some(_) => on(" FIX ", C::Black, tag).at(Target::Fix(index)),
+        None => seg("     ", C::Gray),
+    });
+    aim(out, Target::Item(index))
+}
+
+/// The picked check's details: its result, what it found, what its problem holds up, the keys that fix it, the
+/// other problems, and `a` when there are safe fixes. `inline` (under its row, on a narrow terminal): only what its
+/// problem holds up and what fixes it - the row says the rest.
+fn details(ui: &Ui, list: &Checklist, index: usize, width: usize, inline: bool) -> Vec<Vec<Seg>> {
+    let (Some(item), Some(row)) = (list.items.get(index), list.rows.get(index)) else { return Vec::new() };
+    let ignored = list.is_ignored(index);
+    let (word, color) = match item.status {
+        _ if ignored => ("ignored for this run", C::DarkGray),
+        Status::Ok => ("passed", C::Green),
+        Status::Warn => ("warning", C::Yellow),
+        Status::Fail => ("blocked", C::Red),
+        Status::Skip => ("skipped", C::DarkGray),
+        Status::Running => ("checking…", C::Yellow),
+        Status::Pending => ("waiting to be checked", C::DarkGray),
+    };
+    let took = row.took.map_or(String::new(), |took| format!(" · {}", seconds(took)));
+    let mut out = vec![
+        vec![seg(item.name.clone(), C::White)],
+        vec![seg(format!("{} {word}{took}", mark(ui, item.status)), color)],
+    ];
+    let room = width.saturating_sub(2).max(8);
+    let section =
+        |out: &mut Vec<Vec<Seg>>, title: &str| out.extend([Vec::new(), vec![seg(title.to_string(), C::DarkCyan)]]);
+    let wrapped = |out: &mut Vec<Vec<Seg>>, text: &str, color: C| {
+        out.extend(words(text, room).into_iter().map(|piece| vec![seg(format!("  {piece}"), color)]));
+    };
+    if inline {
+        out.clear();
+    } else if !item.detail.is_empty() {
+        section(&mut out, "DETAILS");
+        wrapped(&mut out, &item.detail, if item.status == Status::Ok { C::Gray } else { color });
+    }
+    let problem = matches!(item.status, Status::Warn | Status::Fail);
+    if problem && !ignored {
+        section(&mut out, "WHAT IT BLOCKS");
+        wrapped(&mut out, list.blocks(index), C::Gray);
+    }
+    let mut fixes: Vec<(&str, String)> = Vec::new();
+    if let Some(fix) = list.fix_of(index) {
+        fixes.push(("f", fix.label().trim_start_matches("f ").to_string()));
+    }
+    if problem {
+        fixes.push(("r", "check it again".into()));
+    }
+    if problem && row.kind == Kind::Database {
+        fixes.push(("d", "choose another database".into()));
+    }
+    if problem {
+        fixes.push(("i", if ignored { "stop ignoring it" } else { "ignore it for this run" }.into()));
+    }
+    if !fixes.is_empty() {
+        section(&mut out, "FIX");
+        for (key, what) in fixes {
+            out.push(vec![seg(format!("  {key:<6}"), C::Cyan), seg(what, C::Gray)]);
+        }
+    }
+    let others: Vec<usize> =
+        list.order().into_iter().filter(|&other| other != index && list.is_problem(other)).collect();
+    if !others.is_empty() && !inline {
+        section(&mut out, "ALSO TO LOOK AT");
+        for other in others {
+            let other = &list.items[other];
+            let text = format!("{} · {}", other.name, other.detail);
+            out.push(vec![
+                seg(format!("  {} ", mark(ui, other.status)), status_color(other.status)),
+                seg(text, C::Gray),
+            ]);
+        }
+    }
+    let safe = list.safe_fixes();
+    if safe > 0 && !inline {
+        out.extend([Vec::new(), vec![seg("  a     ", C::Cyan), seg(format!("fix all safe ({safe})"), C::Gray)]]);
+    }
+    out
+}
+
+/// `text` wrapped at its spaces into lines of `cells` at most (a word longer than that is cut).
+fn words(text: &str, cells: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        if !line.is_empty() && line.width() + 1 + word.width() > cells {
+            lines.push(std::mem::take(&mut line));
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(word);
+        while line.width() > cells {
+            let rest = line.split_off(line.char_indices().nth(cells).map_or(line.len(), |(at, _)| at));
+            lines.push(std::mem::replace(&mut line, rest));
+        }
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    lines
+}
+
+/// What the marks mean.
+fn legend(ui: &Ui) -> Vec<Seg> {
+    let mut legend = vec![seg(" ", C::Gray)];
+    for (status, what, color) in [
+        (Status::Ok, "passed", C::Green),
+        (Status::Warn, "warning", C::Yellow),
+        (Status::Fail, "blocked", C::Red),
+        (Status::Skip, "skipped", C::DarkGray),
+    ] {
+        legend.push(seg(format!("{} {what}   ", mark(ui, status)), color));
+    }
+    legend
+}
+
+/// A result's mark: the status icon, plain or Nerd Font.
+fn mark(ui: &Ui, status: Status) -> String {
+    icon(status, None, ui.nerd)
+}
+
+/// A time in seconds, one decimal.
+fn seconds(took: Duration) -> String {
+    format!("{:.1} s", took.as_secs_f64())
 }
 
 /// A row, its parts after the first `keep` scrolling sideways when they don't fit, with how long it took at its end
@@ -680,17 +918,15 @@ fn share_bar(share: f64, cells: usize) -> String {
     format!("{bar:<cells$}")
 }
 
-/// A group's name beside its first check: after its icon with Nerd Font icons.
-fn group_label(nerd: bool, group: Group) -> String {
-    let icon = match group {
+/// A group's icon, for its header with Nerd Font icons.
+fn group_icon(group: Group) -> Icon {
+    match group {
         Group::Environment => Icon::Terminal,
         Group::Project => Icon::Folder,
-        Group::Ports => Icon::Plug,
         Group::Database => Icon::Database,
         Group::Packages => Icon::Package,
-        Group::Updates => Icon::Update,
-    };
-    if nerd { format!("{} {:<11}", icons::icon(true, icon), group.name()) } else { format!(" {:<12}", group.name()) }
+        Group::Update => Icon::Update,
+    }
 }
 
 pub fn changelog(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {

@@ -346,10 +346,22 @@ At startup it moves on by itself after a few seconds, the time left draining alo
 (`,` then `r`), or once you've pressed `r`, it stays up while there is something to retry, until a key closes it.
 Turn it off with `,` then `w`.
 
-The checks are grouped - environment, project, ports, database, packages, updates - each with how long it took and a
-bar of that against the slowest; a group that passed folds to one row while another has a problem. A failed check has
-a red edge and a warning an amber one. It fixes what it can: `j` / `k` pick a check (the first problem is picked),
-`f` runs its fix and `a` every safe one in turn:
+It's laid out as a doctor: a header with the project, a bar of the checks done (`7 / 10 checks`), how many passed,
+warned, are blocked and were skipped, how long they took and the slowest; then the checks under their groups' headers:
+Environment (lazyrunner, git, the .NET SDK, Node.js / npm), Project (the profile, the ports, the branch), Database,
+Packages and Update - each header with its group's worst result and time, every group open unless the terminal is too
+short for them all. Each check shows how long it took with a bar of that against the slowest, and a `FIX` tag when it
+has one; a failed check has a red edge and a warning an amber one, a skipped one is dimmed. Beside the list (under the
+picked check, on a terminal narrower than 118 cells) are the picked check's details: what it found, what its problem
+holds up, the keys that fix it, and the other problems. A legend and the keys close it. Unless reduced motion is on it
+moves too: the counts tick up as the checks finish and pulse as they change, each check's mark lands bright, the
+selection bar glides between the rows (and flashes going round the end), and once nothing blocks the start a bar with
+an hourglass drains with the countdown to it.
+
+`j` / `k` (or a click) move through the checks as they're drawn, from the first; `n` / `N` jump to the next and
+previous problem; a click on a check's `FIX` tag runs its fix.
+It fixes what it can: `f` runs the picked check's fix (or the first problem's when it has none), `a` every safe one in
+turn, and `i` ignores a problem for this run - it holds nothing and counts as skipped:
 
 | Problem | `f` | With `a` |
 |---------|-----|----------|

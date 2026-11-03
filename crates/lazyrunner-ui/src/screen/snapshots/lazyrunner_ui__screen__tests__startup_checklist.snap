@@ -2,28 +2,28 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-
-
-           ┌─ ✧ lazyrunner v<version> · startup checklist ───────────────────────────────────────────┐
-           │                                                                                      │
-           │    █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                                           │
-           │    █   █▀█ ▄▀  ▀█▀ █▀▄ █ █ █ █ █ █ █▀  █▀▄                                           │
-           │    ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                                           │
-           │                                                                                      │
-           │   Environment   ✓ git                2.50                                            │
-           │ ▌               ! .NET SDK           9.0 - the apps want 10.0                        │
-           │   Project       · Project                                                            │
-           │   Ports         ⠋ Ports                                                              │
-           │   Updates       ✓ lazyrunner         v<version>                                         │
-           │                                                                                      │
-           │  ✦ What's new                                                                        │
-           │    0.2.0                                                                             │
-           │      • A faster lazyrunner                                                           │
-           │                                                                                      │
-           │ checking…                                                                            │
-           └──────────────────────────────────────────────────────────────────────────────────────┘
-
-
+  ┌─ ✧ lazyrunner v<version> · startup doctor ────────────────────────────────────────────────────────────────┐
+  │  DOCTOR  startup checks                                                                                │
+  │ ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 / 5 checks   ✓ 2   ! 1   ✗ 0   – 0                                        │
+  │                                                                                                        │
+  │  ENVIRONMENT ───────────────────────────────────────────────────────────────────────────────── ! 0.0 s │
+  │   ✓ git                2.50                                                                            │
+  │ ▌ ! .NET SDK           9.0 - the apps want 10.0                                                        │
+  │  PROJECT ───────────────────────────────────────────────────────────────────────────────────── ● 0.0 s │
+  │   · Profile                                                                                            │
+  │   ⠋ Ports                                                                                              │
+  │  UPDATE ────────────────────────────────────────────────────────────────────────────────────── ✓ 0.0 s │
+  │   ✓ lazyrunner         v<version>                                                                         │
+  │                                                                                                        │
+  │  ✦ What's new                                                                                          │
+  │    0.2.0                                                                                               │
+  │      • A faster lazyrunner                                                                             │
+  │                                                                                                        │
+  │  ✓ passed   ! warning   ✗ blocked   – skipped                                                          │
+  │                                                                                                        │
+  │  j k move · n N problems · f fix · a fix all safe · i ignore · r retry · c ⧉ report · Enter continues  │
+  │ checking…                                                                                              │
+  └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
