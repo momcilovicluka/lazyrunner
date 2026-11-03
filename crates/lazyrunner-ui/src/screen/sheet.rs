@@ -529,7 +529,8 @@ fn shown_value(var: &Var, reveal: Option<f64>) -> (String, C) {
 }
 
 /// A variable's line - an override's amber edge, its icon, name, value and where it comes from - then what it wins
-/// over, dimmed. The picked one is lit, one just saved flashes green.
+/// over, dimmed. The picked one is lit - its value scrolling sideways when it's longer than its room - and one just
+/// saved flashes green.
 fn var_lines(ui: &Ui, var: &Var, picked: bool, reveal: Option<f64>, flash: bool, inner: usize) -> Vec<Vec<Seg>> {
     let edge = if var.source == Source::Override { seg("▌", C::Yellow) } else { seg(" ", C::Gray) };
     let icon = match var.source {
@@ -543,7 +544,7 @@ fn var_lines(ui: &Ui, var: &Var, picked: bool, reveal: Option<f64>, flash: bool,
         edge,
         seg(format!("{icon} "), C::DarkGray),
         seg(pad(&var.name, KEY_CELLS), C::DarkGray),
-        seg(format!(" {}", pad(&value, room)), color),
+        seg(format!(" {}", if picked { ui.scrolling(&value, room) } else { pad(&value, room) }), color),
         seg(format!("{:>PILL_CELLS$}", var.source.name()), var.source.color()),
     ];
     if picked || flash {
