@@ -9,6 +9,7 @@ mod hooks;
 mod launch;
 mod migrations;
 mod npm_ci;
+mod overrides;
 mod start;
 mod suites;
 mod test_watch;
@@ -44,6 +45,7 @@ use crate::profile::{App, Project};
 pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_handover};
 pub use launch::Choice;
 pub use migrations::{EfJob, Work};
+pub use overrides::Override;
 pub use suites::{TestBuild, Totals};
 pub use test_watch::TestWatch;
 
@@ -142,6 +144,8 @@ pub struct Controller {
     pub test_watch: TestWatch,
     /// The launch profile or npm variant chosen for each app on this branch (x then p), when it isn't the profile's.
     launch_chosen: HashMap<String, String>,
+    /// Each app's environment overrides on this branch (the start sheet), by name.
+    env_overrides: HashMap<String, Vec<Override>>,
     /// The `"hooks"` setting whose problems were said last.
     hooks_said: Value,
     /// The update the hooks ran for.
@@ -293,6 +297,7 @@ impl Controller {
             notifications: Vec::new(),
             hooks_said: Value::Null,
             launch_chosen: HashMap::new(),
+            env_overrides: HashMap::new(),
             test_watch: TestWatch::default(),
             hooked_update: None,
             git_dir: None,

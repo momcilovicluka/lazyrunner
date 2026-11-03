@@ -62,6 +62,9 @@ pub enum Icon {
     /// The boxes' titles, and what they hold.
     Terminal,
     Bookmark,
+    /// A secret's key, and a variable overridden on this machine (the start sheet).
+    Lock,
+    Pencil,
     Keyboard,
     Package,
     Clipboard,
@@ -173,6 +176,10 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Terminal, true) => "\u{f120}", // terminal
         (Icon::Bookmark, false) => "▌",
         (Icon::Bookmark, true) => "\u{f02e}", // bookmark
+        (Icon::Lock, false) => "*",
+        (Icon::Lock, true) => "\u{f023}", // lock
+        (Icon::Pencil, false) => "✎",
+        (Icon::Pencil, true) => "\u{f040}", // pencil
         (Icon::Keyboard, false) => "?",
         (Icon::Keyboard, true) => "\u{f11c}", // keyboard
         (Icon::Package, false) => "▣",
@@ -302,6 +309,8 @@ mod tests {
             Icon::Faster,
             Icon::Terminal,
             Icon::Bookmark,
+            Icon::Lock,
+            Icon::Pencil,
             Icon::Keyboard,
             Icon::Package,
             Icon::Clipboard,

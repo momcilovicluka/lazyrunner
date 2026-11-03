@@ -1608,7 +1608,7 @@ async fn the_tests_view_tells_new_failures_from_known_ones_and_shows_each_tests_
     }
     screen.press("T");
     let frame = screen.frame();
-    assert!(frame.contains("✓1 ✗1 ↻1  1 new"), "the list's counts and badge: {frame}");
+    assert!(frame.contains("✓ 1  ✗ 1  ↻ 1  1 new"), "the list's counts and badge: {frame}");
     assert!(frame.contains(" NEW  ✗ Orders.Tests.CartTests.Totals(2, 3)"), "the badge, new failures first: {frame}");
     assert!(frame.contains("↻ 1 flaky") && frame.contains("Flaky (1):"), "Adds failed once on the same code: {frame}");
     insta::assert_snapshot!(frame);
@@ -2936,6 +2936,47 @@ async fn the_start_sheet_shows_what_an_app_is_started_with_and_copies_it() {
     let copied = copied();
     assert!(copied.last().is_some_and(|text| text.starts_with("Command line")), "{copied:?}");
     screen.press("Esc");
+    assert!(screen.ui.overlay.is_none());
+}
+
+#[tokio::test]
+async fn the_start_sheet_overrides_a_variable_on_this_machine_over_the_profiles() {
+    let mut screen = screen("sheet-overrides", json!({}));
+    let type_in = |screen: &mut Screen, text: &str| {
+        for c in text.chars() {
+            keys::press(&mut screen.ui, &mut screen.controller, KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+    };
+    screen.controller.apps[0].env = vec![("ASPNETCORE_ENVIRONMENT".into(), "Development".into())];
+    screen.press("x e");
+    let frame = screen.frame();
+    assert!(frame.contains("ASPNETCORE_ENVIRONMENT") && frame.contains("profile"), "the profile's: {frame}");
+    screen.press("a");
+    type_in(&mut screen, "ASPNETCORE_ENVIRONMENT=Staging");
+    screen.press("Enter");
+    let key = screen.controller.apps[0].key.clone();
+    let kept: Vec<(String, String)> =
+        screen.controller.env_overrides(&key).iter().map(|found| (found.name.clone(), found.value.clone())).collect();
+    assert_eq!(kept, [("ASPNETCORE_ENVIRONMENT".to_string(), "Staging".to_string())]);
+    let frame = screen.frame();
+    assert!(frame.contains("Staging") && frame.contains("override") && frame.contains("└ Development"), "{frame}");
+    assert!(frame.contains("=…") && !frame.contains("=Staging"), "on the command line, its value left out: {frame}");
+    screen.press("v V");
+    let copied = copied();
+    let change = "ASPNETCORE_ENVIRONMENT: Development (profile) → Staging";
+    assert!(copied.last().is_some_and(|text| text.contains(change)), "{copied:?}");
+    screen.press("d");
+    assert!(screen.controller.env_overrides(&key).is_empty(), "d drops the picked override");
+    screen.press("a");
+    type_in(&mut screen, "API_TOKEN=abc123");
+    screen.press("Enter");
+    assert!(screen.last_log().contains("looks like a secret"), "{}", screen.last_log());
+    assert!(!screen.frame().contains("abc123"), "masked: {}", screen.frame());
+    screen.press("a");
+    type_in(&mut screen, "no equals");
+    screen.press("Enter");
+    assert!(screen.frame().contains("a name without spaces"), "it says what's wrong: {}", screen.frame());
+    screen.press("Esc Esc");
     assert!(screen.ui.overlay.is_none());
 }
 

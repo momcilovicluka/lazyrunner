@@ -60,6 +60,8 @@ pub struct AppState {
     /// The npm script this run uses (a branch can need another).
     pub script: Option<String>,
     pub label: Option<String>,
+    /// The environment overrides this run started with (the start sheet says when they changed since).
+    pub env_at_start: Vec<(String, String)>,
     pub child: Option<Child>,
     pub output: Output,
     pub scroll: usize,
@@ -112,6 +114,7 @@ impl AppState {
             started_wall: None,
             script: None,
             label: None,
+            env_at_start: Vec::new(),
             child: None,
             output: Output::new(MAX_PANE_LINES),
             scroll: 0,

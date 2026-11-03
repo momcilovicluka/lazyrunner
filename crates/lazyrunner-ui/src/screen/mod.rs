@@ -158,11 +158,15 @@ pub enum Overlay {
         app: usize,
         index: usize,
     },
-    /// `x` then `e`: what an app is started with; the selected secret, and when Space showed it.
+    /// `x` then `e`: what an app is started with; the picked variable, when Space showed it, the override being
+    /// typed, whether only the overrides show, and the override saved last (its row flashes).
     Sheet {
         app: usize,
         index: usize,
         shown: Option<Instant>,
+        typing: Option<sheet::Typing>,
+        only: bool,
+        saved: Option<(String, Instant)>,
     },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {
@@ -541,7 +545,7 @@ impl Ui {
             || self.theme_ripple.is_some()
             || !self.marquees.borrow().is_empty()
             || self.motion.active(self.now)
-            || sheet::showing(self)
+            || sheet::animating(self)
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)

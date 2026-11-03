@@ -99,6 +99,15 @@ fn ui_block(ui: &Ui, controller: &Controller) -> Value {
     })
 }
 
+/// What an app gets on this machine on top of what it's started with (the start sheet), secrets masked.
+fn env_overrides(controller: &Controller, key: &str) -> Value {
+    let overrides = controller.env_overrides(key).iter().map(|found| {
+        let secret = lazyrunner_core::run::secrets::looks_secret(&found.name, &found.value);
+        (found.name.clone(), json!(if secret { "***" } else { found.value.as_str() }))
+    });
+    Value::Object(overrides.collect())
+}
+
 fn status(ui: &Ui, controller: &Controller) -> Value {
     let apps: Vec<Value> = controller
         .apps
@@ -118,6 +127,7 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
                 "warnings": state.warnings,
                 "lines": state.output.total(),
                 "build_errors": controller.failed_build_errors.get(&app.key).map(Vec::len),
+                "env_overrides": env_overrides(controller, &app.key),
             })
         })
         .collect();

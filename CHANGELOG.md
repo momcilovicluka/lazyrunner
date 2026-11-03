@@ -3,6 +3,18 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.67.0] - 2026-11-03
+
+### Added
+- Environment overrides, from the start sheet (`e`): what an app gets on this machine on top of what it's started with, kept in lazyrunner's state and never in a shared file. `a` adds one, `Enter` overrides the picked variable (a user secret through its variable), `d` drops one, `b` keeps one to this branch, `s` moves one that looks like a secret into the user secrets; `v` shows only the overrides and `V` copies them as what they change. A .NET app gets them as `dotnet run -e`, which beats its launch profile; an npm app in its environment. The column's title says `env*`, and `get_status` lists them (#80)
+
+### Changed
+- The start sheet lists the app's environment as one list, each variable with where it comes from (`launch`, `profile`, `secrets`, `override`) and what it hides; a secret's value wipes in when `Space` shows it (#80)
+
+### Fixed
+- The start sheet showed the profile's `env` as if it applied where the launch profile sets the same variable; `dotnet run` gives the launch profile's precedence, and the sheet now says so (#80)
+- In the tests view, a suite's counts put a space after each mark (`✓ 12  ✗ 13  ↻ 1`): with Nerd Font icons the check ran into the number
+
 ## [1.66.0] - 2026-11-03
 
 ### Changed
