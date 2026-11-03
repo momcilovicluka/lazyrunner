@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use super::suites::{Outcome, TestResult};
 
 pub const FILE: &str = "test-history.json";
+/// The project's test runs, all suites together (`TestRuns`).
+pub const RUNS_FILE: &str = "test-runs.json";
 /// Runs kept per suite.
 pub const RUNS_KEPT: usize = 20;
 const PASSED: char = 'p';
@@ -27,6 +29,10 @@ pub struct SuiteHistory {
     pub runs: Vec<String>,
     /// Each test's outcome in each run, a character a run: `p` passed, `f` failed, `s` skipped, `-` not in it.
     pub tests: BTreeMap<String, String>,
+    /// When each run finished (`2026-11-02 09:41:07`), oldest first; runs kept from before this was are missing at
+    /// the front.
+    #[serde(default)]
+    pub at: Vec<String>,
 }
 
 /// What a test's history says about it now.
@@ -53,6 +59,10 @@ impl SuiteHistory {
     /// A run on `code` (none outside git) and its `results`; the tests it didn't run weren't in it.
     pub fn record(&mut self, code: Option<&str>, results: &[TestResult]) {
         let column = self.runs.len();
+        while self.at.len() < column {
+            self.at.insert(0, String::new());
+        }
+        self.at.push(chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
         self.runs.push(code.unwrap_or_default().to_string());
         for test in results {
             let mark = match test.outcome {
@@ -70,11 +80,34 @@ impl SuiteHistory {
         if self.runs.len() > RUNS_KEPT {
             let drop = self.runs.len() - RUNS_KEPT;
             self.runs.drain(..drop);
+            self.at.drain(..drop.min(self.at.len()));
             for line in self.tests.values_mut() {
                 *line = line.chars().skip(drop).collect();
             }
             self.tests.retain(|_, line| line.chars().any(|mark| mark != ABSENT));
         }
+    }
+
+    /// When run `run` (0 = the oldest kept) finished, when that's known.
+    pub fn when(&self, run: usize) -> Option<&str> {
+        let missing = self.runs.len().saturating_sub(self.at.len());
+        self.at.get(run.checked_sub(missing)?).map(String::as_str).filter(|at| !at.is_empty())
+    }
+
+    /// How many tests passed and failed in run `run` (0 = the oldest kept).
+    pub fn counts(&self, run: usize) -> (usize, usize) {
+        let marks = self.tests.values().filter_map(|line| line.chars().nth(run));
+        marks.fold((0, 0), |(passed, failed), mark| match mark {
+            PASSED => (passed + 1, failed),
+            FAILED => (passed, failed + 1),
+            _ => (passed, failed),
+        })
+    }
+
+    /// The tests that failed in run `run` (0 = the oldest kept), by name.
+    pub fn failed_in(&self, run: usize) -> Vec<&str> {
+        let failed = self.tests.iter().filter(|(_, line)| line.chars().nth(run) == Some(FAILED));
+        failed.map(|(name, _)| name.as_str()).collect()
     }
 
     /// Test `name`'s outcomes in the suite's runs, oldest first: `p` `f` `s`, `-` where it wasn't in a run.
@@ -151,6 +184,41 @@ impl TestHistory {
     }
 }
 
+/// A test run of the project (one or more suites): when it finished, how its tests did, how long it took.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct TestRun {
+    pub at: String,
+    pub passed: usize,
+    pub failed: usize,
+    /// Suites that didn't run (their build failed, they left no results).
+    pub errors: usize,
+    pub seconds: f64,
+}
+
+/// The project's last test runs, oldest first (test-runs.json in the tests' folder).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct TestRuns(pub Vec<TestRun>);
+
+impl TestRuns {
+    pub fn load(dir: &Path) -> Self {
+        crate::json::read(&dir.join(RUNS_FILE)).and_then(|value| serde_json::from_value(value).ok()).unwrap_or_default()
+    }
+
+    /// A run that just finished, now; the oldest go past `RUNS_KEPT`.
+    pub fn push(&mut self, passed: usize, failed: usize, errors: usize, seconds: f64) {
+        let at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        self.0.push(TestRun { at, passed, failed, errors, seconds });
+        let extra = self.0.len().saturating_sub(RUNS_KEPT);
+        self.0.drain(..extra);
+    }
+
+    pub fn save(&self, dir: &Path) -> io::Result<()> {
+        let text = serde_json::to_string(self).map_err(io::Error::other)?;
+        std::fs::create_dir_all(dir)?;
+        std::fs::write(dir.join(RUNS_FILE), text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,6 +248,8 @@ mod tests {
             history.record(Some("same"), &[result("Retries", outcome), result("Steady", Outcome::Passed)]);
         }
         assert_eq!(history.story("Retries").flaky, Some((1, 3)));
+        assert_eq!((history.counts(1), history.failed_in(1)), ((1, 1), vec!["Retries"]), "the second run");
+        assert!(history.when(1).is_some_and(|at| at.len() == 19), "when it finished: {:?}", history.when(1));
         assert_eq!(history.story("Steady").flaky, None);
         let mut outside_git = SuiteHistory::default();
         for outcome in [Outcome::Passed, Outcome::Failed] {
@@ -200,6 +270,18 @@ mod tests {
         assert_eq!(history.runs.len(), RUNS_KEPT);
         assert_eq!(history.line("One").len(), RUNS_KEPT);
         assert_eq!(history.line("Two"), "", "a test in none of the runs kept is forgotten");
+    }
+
+    #[test]
+    fn the_projects_runs_keep_the_newest() {
+        let temp = TempDir::new("test-runs");
+        let mut runs = TestRuns::default();
+        for failed in 0..RUNS_KEPT + 2 {
+            runs.push(10, failed, 0, 1.5);
+        }
+        assert_eq!((runs.0.len(), runs.0[0].failed), (RUNS_KEPT, 2), "the two oldest went");
+        runs.save(temp.path()).unwrap();
+        assert_eq!(TestRuns::load(temp.path()), runs);
     }
 
     #[test]

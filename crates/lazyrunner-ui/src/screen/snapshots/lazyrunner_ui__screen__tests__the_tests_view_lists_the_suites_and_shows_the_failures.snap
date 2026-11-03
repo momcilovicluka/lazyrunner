@@ -7,14 +7,14 @@ expression: screen.frame()
  Backend · dotnet test             1 failed │ Orders.Tests   .NET · dotnet test
  1 Orders                          1 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   · last run 09:41:07 · 6s
    ▸ ✗ Orders.Tests                   ✓1 ✗1 │
- 2 Billing                         1 passed │ ✗ Orders.Tests.CartTests.Totals(2, 3) (41 ms)
-     ✓ Billing.Tests                     ✓1 │     Expected 5 but was 6
- Frontend · vitest · nx test        not run │     at Orders.Tests.CartTests.Totals() in C:\work\Orders.Tests\C
- 3 Shop                             not run │     artTests.cs:line 42
-     · Shop                         not run │
-     1 project without test files           │ Skipped (1):
+ 2 Billing                         1 passed │ FAILURES 1
+     ✓ Billing.Tests                     ✓1 │ ✗ Orders.Tests.CartTests.Totals(2, 3) (41 ms)
+ Frontend · vitest · nx test        not run │     Expected 5 but was 6
+ 3 Shop                             not run │     at Orders.Tests.CartTests.Totals() in C:\work\Orders.Tests\C
+     · Shop                         not run │     artTests.cs:line 42
+     1 project without test files           │
+                                            │ Skipped (1):
                                             │   – Orders.Tests.CartTests.Later
-                                            │
                                             │
                                             │
                                             │

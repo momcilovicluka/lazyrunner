@@ -1584,6 +1584,85 @@ async fn the_tests_view_tells_new_failures_from_known_ones_and_shows_each_tests_
 }
 
 #[tokio::test]
+async fn a_suites_runs_show_as_cells_a_trend_and_a_grid_and_brackets_pick_one() {
+    use lazyrunner_core::run::history::Kind;
+    use lazyrunner_core::run::suites::{Outcome, TestResult};
+    let mut screen = screen("suite-runs", json!({}));
+    with_suites(&mut screen);
+    let result = |name: &str, outcome| TestResult {
+        name: name.into(),
+        outcome,
+        ms: 1.0,
+        message: String::new(),
+        stack: String::new(),
+    };
+    let totals = "Orders.Tests.CartTests.Totals(2, 3)";
+    for (outcome, seconds) in
+        [(Outcome::Passed, 6.0), (Outcome::Passed, 6.2), (Outcome::Passed, 6.1), (Outcome::Failed, 9.0)]
+    {
+        screen.controller.test_history.record("dotnet:orders", Some("a"), &[result(totals, outcome)]);
+        screen.controller.durations.add(
+            Kind::Test,
+            "dotnet:orders",
+            "Orders.Tests",
+            seconds,
+            outcome == Outcome::Passed,
+        );
+    }
+    screen.press("T");
+    let frame = screen.frame();
+    assert!(frame.contains("runs   ················████") && frame.contains("[ picks a run"), "{frame}");
+    assert!(frame.contains("time   ") && frame.contains("last 9s"), "the trend of their times: {frame}");
+    screen.press("[");
+    assert!(screen.frame().contains("the newest run"), "{}", screen.frame());
+    screen.press("[ [");
+    let frame = screen.frame();
+    assert!(frame.contains("2 runs back") && frame.contains("✓1 ✗0 · on the newest run's code"), "{frame}");
+    screen.press("] ] ]");
+    assert!(screen.frame().contains("[ picks a run"), "back to none picked: {}", screen.frame());
+    screen.press("k");
+    let frame = screen.frame();
+    assert!(
+        frame.contains("Last runs, the newest on the right") && frame.contains("Orders.Tests"),
+        "the app's grid: {frame}"
+    );
+    screen.press("j j j Alt+f");
+    assert_eq!(screen.last_log(), "No flaky tests to run again.", "Billing.Tests has none");
+}
+
+#[tokio::test]
+async fn the_tests_view_has_each_suites_line_the_projects_runs_and_a_filter_by_name() {
+    use lazyrunner_core::run::history::Kind;
+    use lazyrunner_core::run::suites::{Outcome, TestResult};
+    let mut screen = screen("suite-lines", json!({}));
+    with_suites(&mut screen);
+    let totals = TestResult {
+        name: "Orders.Tests.CartTests.Totals(2, 3)".into(),
+        outcome: Outcome::Failed,
+        ms: 41.0,
+        message: String::new(),
+        stack: String::new(),
+    };
+    screen.controller.test_history.record("dotnet:orders", Some("a"), &[totals]);
+    for seconds in [6.0, 6.2, 6.1, 9.0] {
+        screen.controller.durations.add(Kind::Test, "dotnet:orders", "Orders.Tests", seconds, true);
+    }
+    screen.controller.test_runs.push(451, 0, 0, 6.8);
+    screen.controller.test_runs.push(438, 13, 0, 8.2);
+    screen.press("T");
+    let frame = screen.frame();
+    assert!(frame.contains("FAILURES 1   NEW 1"), "{frame}");
+    assert!(frame.contains("usual 6s (dotted) · last 9s"), "the two-row line of its times: {frame}");
+    assert!(frame.contains("RUN HISTORY") && frame.contains("✗13") && frame.contains("all green"), "{frame}");
+    screen.press("/ b i l");
+    let frame = screen.frame();
+    assert!(frame.contains("/bil") && frame.contains("Billing.Tests") && !frame.contains("✗ Orders.Tests"), "{frame}");
+    screen.press("Enter Esc");
+    assert!(screen.frame().contains("✗ Orders.Tests"), "Esc dropped the filter: {}", screen.frame());
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { .. })), "and kept the view open");
+}
+
+#[tokio::test]
 async fn in_the_tests_view_keys_choose_copy_and_say_what_they_cant_do() {
     let mut screen = screen("tests-keys", json!({}));
     with_suites(&mut screen);
