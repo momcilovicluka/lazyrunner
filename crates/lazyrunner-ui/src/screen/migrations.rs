@@ -36,8 +36,21 @@ pub struct Confirm {
 /// M.
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
     if controller.open_migrations() {
-        ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
+        let index = opening(contexts(controller));
+        ui.overlay = Some(Overlay::Migrations { index, picking: None });
     }
+}
+
+/// The context the view opens on: the one with the newest pending migration, else the one with the newest migration
+/// (their ids start with when they were made), else the first.
+fn opening(contexts: &[Context]) -> usize {
+    let pending = contexts.iter().any(|context| !context.pending().is_empty());
+    let newest = |context: &Context| {
+        let counted = context.items.iter().filter(|migration| !pending || migration.applied == Some(false));
+        counted.map(|migration| migration.id.clone()).max()
+    };
+    let found = contexts.iter().enumerate().filter_map(|(at, context)| Some((newest(context)?, at)));
+    found.max_by(|one, other| one.0.cmp(&other.0).then(other.1.cmp(&one.1))).map_or(0, |(_, at)| at)
 }
 
 fn contexts(controller: &Controller) -> &[Context] {
@@ -417,4 +430,35 @@ pub fn confirm_rows(ui: &Ui, width: usize, rows: usize) -> Vec<Vec<Seg>> {
         .map(|line| vec![seg(line.clone(), if line.contains("Down() runs") { C::Yellow } else { C::White })])
         .collect();
     boxed(&icons::titled(ui.nerd, Icon::Help, "Confirm"), lines, "y / Enter: yes · n / Esc: no", width, rows, 90)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn the_view_opens_on_the_newest_pending_migration_else_the_newest_one() {
+        let context = |name: &str, items: &[(&str, bool)]| {
+            let mut context = Context::new("api", name, PathBuf::new(), PathBuf::new());
+            context.items = items
+                .iter()
+                .map(|(id, applied)| Migration { id: (*id).into(), name: (*id).into(), applied: Some(*applied) })
+                .collect();
+            context
+        };
+        let mut contexts = vec![
+            context("Orders", &[("20250101000000_Init", true)]),
+            context("Billing", &[("20250301000000_Init", true), ("20250401000000_Fees", false)]),
+            context("Audit", &[("20250201000000_Init", false)]),
+            context("Users", &[("20250901000000_Init", true)]),
+        ];
+        assert_eq!(opening(&contexts), 1, "the newest pending, not the newest one nor the first pending");
+        for context in &mut contexts {
+            context.items.iter_mut().for_each(|migration| migration.applied = Some(true));
+        }
+        assert_eq!(opening(&contexts), 3, "nothing pending: the newest");
+        assert_eq!(opening(&[]), 0);
+    }
 }

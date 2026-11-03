@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.67.2] - 2026-11-03
+
+### Changed
+- The migrations view (`M`) opens on the DbContext with the newest pending migration, else the one with the newest migration, instead of the first
+
+### Fixed
+- In the start sheet, the picked variable's value scrolls sideways when it's longer than its room (a revealed secret, a long connection string), as the other lists' rows do
+
 ## [1.67.1] - 2026-11-03
 
 ### Fixed
