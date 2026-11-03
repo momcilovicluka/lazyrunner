@@ -1608,7 +1608,7 @@ async fn the_tests_view_tells_new_failures_from_known_ones_and_shows_each_tests_
     }
     screen.press("T");
     let frame = screen.frame();
-    assert!(frame.contains("✓ 1  ✗ 1  ↻ 1  1 new"), "the list's counts and badge: {frame}");
+    assert!(frame.contains("✓1 ×1 ≈1  1 new"), "the list's counts and badge: {frame}");
     assert!(frame.contains(" NEW  ✗ Orders.Tests.CartTests.Totals(2, 3)"), "the badge, new failures first: {frame}");
     assert!(frame.contains("↻ 1 flaky") && frame.contains("Flaky (1):"), "Adds failed once on the same code: {frame}");
     insta::assert_snapshot!(frame);

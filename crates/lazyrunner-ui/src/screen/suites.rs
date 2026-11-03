@@ -23,6 +23,10 @@ use super::seg::{Seg, aim, band, on, pad, seg, take_cells};
 use super::theme::C;
 use super::{Overlay, Ui, copy};
 
+/// The marks before a suite's counts in the list (`✓12 ×13 ≈1`).
+const PASSED_MARK: &str = "✓";
+const FAILED_MARK: &str = "×";
+const FLAKY_MARK: &str = "≈";
 /// A test's strip of last runs, two a cell: in the details, and beside each test to pick from.
 const STRIP_CELLS: usize = 10;
 const PICK_STRIP_CELLS: usize = 5;
@@ -724,8 +728,8 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
             Row::Suite(at) => {
                 let Some(suite) = suites.get(*at) else { continue };
                 let summary = match controller.test_watch.pinned.get(&suite.key) {
-                    Some(test) => format!("{} · {WATCHED} pinned: {test}", summary(ui, controller, suite)),
-                    None => summary(ui, controller, suite),
+                    Some(test) => format!("{} · {WATCHED} pinned: {test}", summary(controller, suite)),
+                    None => summary(controller, suite),
                 };
                 let news = tally(controller, suite).new;
                 let badge = if news > 0 { format!(" {news} new ") } else { String::new() };
@@ -866,7 +870,7 @@ fn group(ui: &Ui, controller: &Controller, rows: &[Row], at: usize, width: usize
         lines.push(vec![
             seg(format!("{} ", icon(ui, suite.status)), color),
             seg(format!("{}  ", suite.name), C::Gray),
-            seg(summary(ui, controller, suite), color),
+            seg(summary(controller, suite), color),
         ]);
     }
     let grid = super::suite_runs::grid(ui, controller, &keys, width);
@@ -904,22 +908,21 @@ fn color(status: Status) -> C {
     }
 }
 
-/// What the list says about a suite: once it ran, how many passed, failed and are flaky.
-fn summary(ui: &Ui, controller: &Controller, suite: &Suite) -> String {
+/// What the list says about a suite: once it ran, how many passed, failed and are flaky. Marks narrower than a cell,
+/// which a font's Nerd Font icons aren't (they run into the number), and which Nerd Fonts have themselves.
+fn summary(controller: &Controller, suite: &Suite) -> String {
     if suite.needs_packages.is_some() && !suite.is_active() {
         return "needs packages".into();
     }
-    let mark = |icon| icons::icon(ui.nerd, icon);
     match suite.status {
         Status::Passed | Status::Failed => {
-            // A space after each mark: a Nerd Font's is drawn wider than its cell and would run into the number.
-            let mut text = format!("{} {}", mark(Icon::Ok), suite.passed);
+            let mut text = format!("{PASSED_MARK}{}", suite.passed);
             if suite.failed > 0 {
-                text.push_str(&format!("  {} {}", mark(Icon::Fail), suite.failed));
+                text.push_str(&format!(" {FAILED_MARK}{}", suite.failed));
             }
             let flaky = tally(controller, suite).flaky;
             if flaky > 0 {
-                text.push_str(&format!("  {} {flaky}", mark(Icon::Reload)));
+                text.push_str(&format!(" {FLAKY_MARK}{flaky}"));
             }
             text
         }

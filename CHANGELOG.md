@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.67.1] - 2026-11-03
+
+### Fixed
+- In the tests view, a suite's counts read `✓12 ×13 ≈1` again without spaces, in marks narrower than a cell: with Nerd Font icons the check ran into the number, and `✗` and `↻` weren't in every Nerd Font
+
 ## [1.67.0] - 2026-11-03
 
 ### Added
