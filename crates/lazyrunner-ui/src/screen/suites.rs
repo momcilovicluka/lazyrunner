@@ -912,13 +912,14 @@ fn summary(ui: &Ui, controller: &Controller, suite: &Suite) -> String {
     let mark = |icon| icons::icon(ui.nerd, icon);
     match suite.status {
         Status::Passed | Status::Failed => {
-            let mut text = format!("{}{}", mark(Icon::Ok), suite.passed);
+            // A space after each mark: a Nerd Font's is drawn wider than its cell and would run into the number.
+            let mut text = format!("{} {}", mark(Icon::Ok), suite.passed);
             if suite.failed > 0 {
-                text.push_str(&format!(" {}{}", mark(Icon::Fail), suite.failed));
+                text.push_str(&format!("  {} {}", mark(Icon::Fail), suite.failed));
             }
             let flaky = tally(controller, suite).flaky;
             if flaky > 0 {
-                text.push_str(&format!(" {}{flaky}", mark(Icon::Reload)));
+                text.push_str(&format!("  {} {flaky}", mark(Icon::Reload)));
             }
             text
         }

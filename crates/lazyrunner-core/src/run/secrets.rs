@@ -25,6 +25,31 @@ static DATABASE: LazyLock<Regex> =
 static SECRETS_ID: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<UserSecretsId>\s*([^<\s]+)\s*</UserSecretsId>").expect("a valid pattern"));
 
+/// Words in a setting's name that say its value is a secret.
+pub const SECRET_WORDS: [&str; 8] =
+    ["password", "pwd", "secret", "token", "apikey", "api_key", "credential", "privatekey"];
+
+/// Passwords in connection strings, a URL's user:password, bearer tokens - and what masks them.
+static IN_TEXT: LazyLock<[(Regex, &str); 3]> = LazyLock::new(|| {
+    let pattern = |pattern: &str| Regex::new(pattern).expect("a valid pattern");
+    [
+        (pattern(r"(?i)\b((?:password|pwd)\s*=\s*)[^;'\x22\s]*"), "${1}***"),
+        (pattern(r"(?i)(://[^:/\s@]+:)[^@\s/]+@"), "${1}***@"),
+        (pattern(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]+"), "${1}***"),
+    ]
+});
+
+/// `text` with the secrets in it masked.
+pub fn mask_text(text: &str) -> String {
+    IN_TEXT.iter().fold(text.to_string(), |text, (pattern, with)| pattern.replace_all(&text, *with).into_owned())
+}
+
+/// Whether a variable's value is likely a secret: by its name, or a password, credentials or a token in it.
+pub fn looks_secret(name: &str, value: &str) -> bool {
+    let lower = name.to_lowercase();
+    SECRET_WORDS.iter().any(|word| lower.contains(word)) || mask_text(value) != value
+}
+
 /// The secrets.json the APIs read: `LAZYRUNNER_SECRETS_PATH`, else the first API with a UserSecretsId's.
 pub fn secrets_path(root: &Path, apps: &[App]) -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("LAZYRUNNER_SECRETS_PATH").filter(|path| !path.is_empty()) {
@@ -246,6 +271,40 @@ pub fn add(path: &Path, entry: &Entry, database: &str) -> Result<()> {
     write(path, &lines.join(newline), bom, "with the new line")
 }
 
+/// Sets `key` (flat, `Section:Key`) to `value` in secrets.json: its active line rewritten, else a new line at the top
+/// of the object; the file made when there is none.
+pub fn set(path: &Path, key: &str, value: &str) -> Result<()> {
+    let (name, quoted) = (serde_json::to_string(key)?, serde_json::to_string(value)?);
+    if !path.exists() {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(path, format!("{{\n  {name}: {quoted}\n}}\n"))?;
+        return Ok(());
+    }
+    let (text, bom, newline) = read(path)?;
+    let mut lines = lines(&text);
+    let active = |line: &String| {
+        LINE.captures(line).is_some_and(|found| found.name("comment").is_none() && found["key"] == *key)
+    };
+    match lines.iter().position(active) {
+        Some(at) => {
+            let found = LINE.captures(&lines[at]).ok_or_else(|| anyhow!("secrets.json changed while it was read"))?;
+            lines[at] = format!("{}{name}: {quoted}{}", &found["indent"], &found["comma"]);
+        }
+        None => {
+            let open = lines.iter().position(|line| line.trim_start().starts_with('{'));
+            let open = open.ok_or_else(|| anyhow!("secrets.json has no object to add {key} to"))?;
+            let more = lines.iter().skip(open + 1).any(|line| {
+                let line = line.trim();
+                !line.is_empty() && !line.starts_with("//") && !line.starts_with('}')
+            });
+            lines.insert(open + 1, format!("  {name}: {quoted}{}", if more { "," } else { "" }));
+        }
+    }
+    write(path, &lines.join(newline), bom, &format!("with {key}"))
+}
+
 /// JSON with comments and trailing commas made plain JSON (for checking it).
 pub fn strip_jsonc(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -298,6 +357,24 @@ mod tests {
     use crate::testing::{TempDir, write as write_file};
 
     const SECRETS: &str = "{\r\n  //\"DefaultConnection\": \"Server=dev-sql;Database=Shop;User Id=x;Password=secret\",\r\n  \"DefaultConnection\": \"Server=localhost;Database=ShopLocal;Trusted_Connection=True\",\r\n  \"Storage\": \"UseDevelopmentStorage=true\",\r\n  \"Other\": \"Data Source=reports;Initial Catalog=Reports\"\r\n}\r\n";
+
+    #[test]
+    fn set_rewrites_a_settings_active_line_or_adds_one_and_makes_the_file_when_there_is_none() {
+        let temp = TempDir::new("secrets-set");
+        let path = temp.join("secrets.json");
+        write_file(&path, SECRETS);
+        set(&path, "Storage", "elsewhere").unwrap();
+        set(&path, "Seq:ApiKey", "k\"1").unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("  \"Storage\": \"elsewhere\",\r\n"), "rewritten in place, its comma kept: {text}");
+        assert!(text.starts_with("{\r\n  \"Seq:ApiKey\": \"k\\\"1\",\r\n"), "added at the top, quoted: {text}");
+        assert!(text.contains("//\"DefaultConnection\""), "the commented one left alone");
+        let fresh = temp.join("new").join("secrets.json");
+        set(&fresh, "Api:Token", "t").unwrap();
+        assert_eq!(flatten(&std::fs::read_to_string(&fresh).unwrap()), [("Api:Token".to_string(), "t".to_string())]);
+        assert!(looks_secret("API_TOKEN", "x") && looks_secret("DB", "Server=a;Password=p"));
+        assert!(!looks_secret("ASPNETCORE_ENVIRONMENT", "Development"));
+    }
 
     #[test]
     fn every_setting_reads_as_dotnet_names_it_and_a_connection_string_by_its_database() {

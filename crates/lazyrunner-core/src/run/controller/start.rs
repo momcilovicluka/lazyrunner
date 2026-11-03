@@ -224,7 +224,7 @@ impl Controller {
     /// What app `key` is started with now: its command line, folder and variables.
     pub fn server_command(&self, key: &str) -> anyhow::Result<super::super::tools::ServerCommand> {
         let app = self.app(key).ok_or_else(|| anyhow::anyhow!("no app '{key}'"))?;
-        self.commands.server(&self.root, app, &self.apps)
+        self.commands.server(&self.root, app, &self.apps).map(|command| self.with_overrides(key, command))
     }
 
     /// Starts one app's server.
@@ -238,7 +238,10 @@ impl Controller {
         self.remember_run(index);
         self.states[index].reset_for_start();
         let app = self.apps[index].clone();
-        let command = self.commands.server(&self.root, &app, &self.apps);
+        let command =
+            self.commands.server(&self.root, &app, &self.apps).map(|command| self.with_overrides(key, command));
+        let overrides: Vec<(String, String)> =
+            self.env_overrides(key).iter().map(|found| (found.name.clone(), found.value.clone())).collect();
         let generation = self.states[index].generation;
         let started = command.and_then(|command| {
             let header = format!("{RUN_HEADER}{} · {} · {} ────", clock(), self.branch, command.label);
@@ -256,6 +259,7 @@ impl Controller {
                 state.started_wall = Some(std::time::SystemTime::now());
                 state.label = Some(command.label);
                 state.script = command.script;
+                state.env_at_start = overrides;
                 self.update_metric_roots();
             }
             Err(error) => {

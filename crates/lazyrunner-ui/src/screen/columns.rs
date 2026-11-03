@@ -256,10 +256,13 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     } else {
         (C::Black, tone)
     };
-    let name = match controller.launch_choice(&app.key) {
+    let mut name = match controller.launch_choice(&app.key) {
         Some(choice) => format!("{} · {choice}", app.name),
         None => app.name.clone(),
     };
+    if !controller.env_overrides(&app.key).is_empty() {
+        name.push_str(" · env*"); // what it gets on this machine differs (the start sheet)
+    }
     let mut segs = vec![on(format!(" {marker}{icon} {name} "), chip_fg, chip_bg)];
     if super::diff::is_on(ui, &app.key) {
         segs.push(seg(format!(" {}", icons::icon(ui.nerd, Icon::Diff)), C::Cyan));

@@ -6,9 +6,9 @@ expression: screen.frame()
  j k choose a test · r run it · a watch only it · y copy it · f failed again · s stop · h back to the suites
  Backend · dotnet test             1 failed │ Orders.Tests   3 tests · r runs the picked one
  1 Orders                          1 failed │  ✗ Orders.Tests.CartTests.Totals(2, 3)                     41 ms
-   ▸ ✗ Orders.Tests                   ✓1 ✗1 │  – Orders.Tests.CartTests.Later
+   ▸ ✗ Orders.Tests                ✓ 1  ✗ 1 │  – Orders.Tests.CartTests.Later
  2 Billing                         1 passed │  ✓ Orders.Tests.CartTests.Adds                             12 ms
-     ✓ Billing.Tests                     ✓1 │ ────────────────────────────────────────────────────────────────
+     ✓ Billing.Tests                    ✓ 1 │ ────────────────────────────────────────────────────────────────
  Frontend · vitest · nx test        not run │ Orders.Tests.CartTests.Later
  3 Shop                             not run │ Skipped
      · Shop                         not run │

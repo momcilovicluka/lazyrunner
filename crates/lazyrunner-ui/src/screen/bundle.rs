@@ -7,17 +7,16 @@
 
 use std::io::Write as _;
 use std::path::Path;
-use std::sync::LazyLock;
 
 use lazyrunner_core::changelog::VERSION;
 use lazyrunner_core::links;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::profile::AppKind;
 use lazyrunner_core::run::checks::Status;
+use lazyrunner_core::run::secrets::{SECRET_WORDS, mask_text};
 use lazyrunner_core::run::{Controller, checks};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use regex::Regex;
 use serde_json::{Value, json};
 
 use super::Ui;
@@ -32,24 +31,8 @@ pub const SHARE: &str = " - look over its logs before you share it";
 const OUTPUT_LINES: usize = 1000;
 const MASK: &str = "***";
 /// Settings and profile keys whose values are masked.
-const SECRET_KEYS: [&str; 8] = ["password", "pwd", "secret", "token", "apikey", "api_key", "credential", "privatekey"];
 /// The screen's size when the terminal doesn't say.
 const SCREEN: (u16, u16) = (160, 45);
-
-/// Passwords in connection strings, a URL's user:password, bearer tokens.
-static SECRETS: LazyLock<[(Regex, &str); 3]> = LazyLock::new(|| {
-    let pattern = |pattern: &str| Regex::new(pattern).expect("a valid pattern");
-    [
-        (pattern(r"(?i)\b((?:password|pwd)\s*=\s*)[^;'\x22\s]*"), "${1}***"),
-        (pattern(r"(?i)(://[^:/\s@]+:)[^@\s/]+@"), "${1}***@"),
-        (pattern(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]+"), "${1}***"),
-    ]
-});
-
-/// A line with its secrets masked.
-fn mask_text(text: &str) -> String {
-    SECRETS.iter().fold(text.to_string(), |text, (pattern, with)| pattern.replace_all(&text, *with).into_owned())
-}
 
 /// Settings or a profile with their secrets masked: the values of secret-sounding keys, and secrets inside strings.
 fn mask(value: &Value) -> Value {
@@ -58,7 +41,7 @@ fn mask(value: &Value) -> Value {
             map.iter()
                 .map(|(key, value)| {
                     let lower = key.to_lowercase();
-                    let secret = SECRET_KEYS.iter().any(|word| lower.contains(word));
+                    let secret = SECRET_WORDS.iter().any(|word| lower.contains(word));
                     let masked =
                         if secret && !value.is_object() && !value.is_array() { json!(MASK) } else { mask(value) };
                     (key.clone(), masked)

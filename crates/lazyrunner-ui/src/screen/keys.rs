@@ -60,6 +60,7 @@ pub fn prompt(ui: &Ui) -> bool {
         || ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
+        || matches!(&ui.overlay, Some(Overlay::Sheet { typing: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.typing)
         || matches!(&ui.overlay, Some(Overlay::Timeline(view)) if view.typing)
         || (ui.tests_typing && matches!(ui.overlay, Some(Overlay::Tests { .. })))
@@ -463,7 +464,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             _ => scroll_box(top, name),
         },
         Some(Overlay::Marks { .. }) => super::marks::key(ui, controller, name, key),
-        Some(Overlay::Sheet { .. }) => super::sheet::key(ui, controller, name),
+        Some(Overlay::Sheet { .. }) => super::sheet::key(ui, controller, name, key),
         Some(Overlay::Launch { .. }) => super::launch::key(ui, controller, name),
         Some(Overlay::Timeline(_)) => super::timeline::key(ui, controller, name, key),
         Some(Overlay::Durations { top }) => match name {

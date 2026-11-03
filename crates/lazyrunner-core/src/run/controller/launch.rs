@@ -133,6 +133,7 @@ impl Controller {
                 self.ports.insert(key, port);
             }
         }
+        self.load_env_overrides();
     }
 
     fn saved_launch_choices(&self) -> Map<String, Value> {
