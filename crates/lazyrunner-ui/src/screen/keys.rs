@@ -62,6 +62,7 @@ pub fn prompt(ui: &Ui) -> bool {
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.typing)
         || matches!(&ui.overlay, Some(Overlay::Timeline(view)) if view.typing)
+        || (ui.tests_typing && matches!(ui.overlay, Some(Overlay::Tests { .. })))
 }
 
 pub(super) fn typed(key: &KeyEvent) -> Option<char> {
@@ -87,8 +88,8 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
 
 fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     let name = match key_name(&key) {
-        // The one Alt+letter that is an action of its own (a search's Alt+r and Alt+c are the search's).
-        name if name == "d" && key.modifiers == KeyModifiers::ALT => "Alt+d".to_string(),
+        // The Alt+letters that are actions of their own (a search's Alt+r and Alt+c are the search's).
+        name if matches!(name.as_str(), "d" | "f") && key.modifiers == KeyModifiers::ALT => format!("Alt+{name}"),
         name => name,
     };
     if name == "Ctrl+C" {
@@ -446,7 +447,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         },
         // The views' own keys first; the rest do what they do on the columns (, settings, d database, ...).
         Some(Overlay::Tests { .. }) => {
-            if !super::suites::key(ui, controller, name) {
+            if !super::suites::typing_key(ui, name, key) && !super::suites::key(ui, controller, name) {
                 from_view(ui, controller, name);
             }
         }

@@ -35,6 +35,7 @@ pub mod seg;
 pub mod sheet;
 pub mod spinner;
 pub mod status;
+pub mod suite_runs;
 pub mod suites;
 #[cfg(test)]
 mod tests;
@@ -294,6 +295,11 @@ pub struct Ui {
     pub diffs: std::collections::HashMap<String, diff::Diff>,
     /// Which suites the tests view lists (`v`).
     pub tests_only: suites::Only,
+    /// The run `[` `]` picked in the tests view, runs back from the newest.
+    pub tests_run: Option<usize>,
+    /// The tests view's filter by name (`/`), and whether it's being typed.
+    pub tests_query: String,
+    pub tests_typing: bool,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Requests sent again (p in the requests view): how each went, once it has.
@@ -385,6 +391,9 @@ impl Ui {
             rail_motion: rail_motion::Effects::default(),
             diffs: std::collections::HashMap::new(),
             tests_only: suites::Only::All,
+            tests_run: None,
+            tests_query: String::new(),
+            tests_typing: false,
             seen: seen::Seen::default(),
             replays: Vec::new(),
             git_tool_wanted: false,
@@ -537,6 +546,7 @@ impl Ui {
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)
             || diff::animating(self)
+            || suite_runs::animating(self, controller)
             || migrations_rail::animating(self, controller)
         {
             return true;
@@ -551,7 +561,8 @@ impl Ui {
                 Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. } | Overlay::About { .. })
             )
             || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
-            || matches!(&self.overlay, Some(Overlay::Requests(view)) if view.typing);
+            || matches!(&self.overlay, Some(Overlay::Requests(view)) if view.typing)
+            || (self.tests_typing && matches!(self.overlay, Some(Overlay::Tests { .. })));
         typing
             || self.busy.is_some()
             || controller.building.is_some()

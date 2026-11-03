@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.65.0] - 2026-11-02
+
+### Added
+- A suite's last runs as a row of cells with its times as a braille line two rows high under them, the usual dotted across, amber where a run was slower than the usual; `[` / `]` pick a run - when it finished, its counts, whether it ran on the same code, the tests that failed in it (#32)
+- Each suite's row in the list shows its last time and a line of its last times; the failures start with `FAILURES 13` and a `NEW 3` badge (#32)
+- Backend, Frontend or an app shows its suites' runs as a grid, the newest on the right, their lines on one scale; the project's run history (time, passed, failed, how long) is under the list (#32)
+- `/` in the tests view narrows the list by name, `Alt+f` runs the flaky tests again, and a run just finished glints in (#32)
+
 ## [1.64.0] - 2026-11-02
 
 ### Added

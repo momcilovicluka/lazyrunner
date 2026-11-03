@@ -158,6 +158,8 @@ pub struct Suite {
     pub rerun: Vec<String>,
     /// The code the run runs on (the source fingerprint), for its tests' history.
     pub code: Option<String>,
+    /// When its last run finished (while lazyrunner runs).
+    pub finished: Option<Instant>,
     pub(crate) job: u64,
     pub(crate) child: Option<Child>,
     /// All of the run's output, for its log file.
@@ -189,6 +191,7 @@ impl Suite {
             failed_only: false,
             rerun: Vec::new(),
             code: None,
+            finished: None,
             job: 0,
             child: None,
             lines: Vec::new(),

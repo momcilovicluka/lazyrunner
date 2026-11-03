@@ -223,6 +223,36 @@ impl Controller {
         self.pump_tests();
     }
 
+    /// Alt+f in the tests view: these suites' flaky tests again - those that failed and passed on the same code.
+    pub fn run_flaky(&mut self, keys: &[String]) {
+        let mut queued = Vec::new();
+        for key in keys {
+            let Some(suite) = self.suite(key).filter(|suite| !suite.is_active() && suite.needs_packages.is_none())
+            else {
+                continue;
+            };
+            let Some(history) = self.test_history.suite(key) else { continue };
+            let flaky: Vec<String> = suite
+                .tests
+                .iter()
+                .filter(|test| history.story(&test.name).flaky.is_some())
+                .map(|test| test.name.clone())
+                .collect();
+            if !flaky.is_empty() {
+                queued.extend(self.queue_suite(key, Some(flaky)));
+            }
+        }
+        if queued.is_empty() {
+            self.add_log("No flaky tests to run again.", Hue::DarkGray);
+            return;
+        }
+        let now = (self.now)();
+        self.tests_started.get_or_insert(now);
+        let what = if queued.len() == 1 { queued.remove(0) } else { format!("{} test suites", queued.len()) };
+        self.add_log(format!("Running tests: {what} (flaky tests only)"), Hue::Cyan);
+        self.pump_tests();
+    }
+
     /// One test of a suite (picked in the tests view); its result joins the suite's.
     pub fn run_test(&mut self, key: &str, test: &str) {
         match self.suite(key) {
@@ -466,6 +496,7 @@ impl Controller {
         suite.child = None;
         let _ = std::fs::write(suite.log_file(&dir), suite.lines.join("\n") + "\n");
         suite.seconds = suite.started.map_or(0.0, |started| now.saturating_duration_since(started).as_secs_f64());
+        suite.finished = Some(now);
         suite.last_run = Some(chrono::Local::now());
         let failed_only = std::mem::take(&mut suite.failed_only);
         let requested = std::mem::take(&mut suite.rerun);
@@ -524,9 +555,14 @@ impl Controller {
     fn tests_done(&mut self) {
         self.tests_code = None;
         let Some(started) = self.tests_started.take() else { return };
-        let took = format_duration((self.now)().saturating_duration_since(started).as_secs_f64());
+        let seconds = (self.now)().saturating_duration_since(started).as_secs_f64();
+        let took = format_duration(seconds);
         let ran = std::mem::take(&mut self.run_keys);
         let totals = self.totals(|suite| ran.contains(&suite.key));
+        self.test_runs.push(totals.passed, totals.failed, totals.errors, seconds);
+        if let Err(error) = self.test_runs.save(&self.tests_dir()) {
+            self.add_log(format!("! The test runs aren't saved ({error})"), Hue::Yellow);
+        }
         if totals.failed == 0 && totals.errors == 0 {
             self.add_log(format!("Tests done in {took}: all {} passed", totals.passed), Hue::Green);
             self.happened("tests.green", None, format!("all {} passed", totals.passed));
