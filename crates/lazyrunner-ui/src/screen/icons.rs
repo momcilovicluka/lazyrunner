@@ -227,7 +227,7 @@ pub fn check(name: &str) -> Option<Icon> {
         "Branch" => Some(Icon::Branch),
         "Ports" => Some(Icon::Plug),
         "Database" => Some(Icon::Database),
-        "Project" => Some(Icon::Folder),
+        "Profile" => Some(Icon::Folder),
         _ if name.ends_with(" packages") => Some(Icon::Package),
         _ => None,
     }

@@ -1,0 +1,32 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+
+
+
+  ┌─ ✧ lazyrunner v<version> · startup doctor ────────────────────────────────────────────────────────────────┐
+  │  DOCTOR  startup checks                                                                                │
+  │ ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰  4 / 4 checks   ✓ 3   ! 0   ✗ 1   – 0    · slowest .NET SDK 0.4 s            │
+  │                                                                                                        │
+  │  ENVIRONMENT ───────────────────────────────────────────────────────────────────────────────── ✓ 0.5 s │
+  │   ✓ git                2.50                                                             0.1 s ▋        │
+  │   ✓ .NET SDK           10.0.100                                                         0.4 s ██       │
+  │  PROJECT ───────────────────────────────────────────────────────────────────────────────────── ✗ 0.0 s │
+  │   ✓ Profile            Shop from this repo's lazyrunner.json                            0.0 s ▏        │
+  │ ▌ ✗ Ports              47201 reserved by Windows (47200-47299) - net stop winnat, then            FIX  │
+  │                                                                                                        │
+  │  ✓ passed   ! warning   ✗ blocked   – skipped                                                          │
+  │                                                                                                        │
+  │  j k move · n N problems · f fix · a fix all safe · i ignore · r retry · c ⧉ report · Enter continues  │
+  │ 1 to look at - any key continues (8 s) · r retries Ports                                               │
+  └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00 ✗ Ports: 47201 reserved by Windows (47200-47299) - net stop winnat, then net start winnat, in an ele

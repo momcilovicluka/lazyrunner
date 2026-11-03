@@ -1,5 +1,5 @@
-//! The startup checklist's checks: the tools, the ports, the database server, the frontend packages, the project
-//! and the branch. Each check runs on its own (each in a thread of its own, side by side) and says ok, warn, fail
+//! The startup checklist's checks: lazyrunner's version and update, the tools, the ports, the database server, the
+//! frontend packages, the profile and the branch. Each check runs on its own (each in a thread of its own, side by side) and says ok, warn, fail
 //! or skip, with a detail.
 
 use std::io::Read;
@@ -47,6 +47,8 @@ pub struct Check {
 /// What a check looks at: where the checklist groups it, and what fixes what it finds.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
+    /// The lazyrunner that runs.
+    Version,
     Update,
     Tool,
     Ports,
@@ -62,21 +64,33 @@ pub enum Kind {
 pub enum Group {
     Environment,
     Project,
-    Ports,
     Database,
     Packages,
-    Updates,
+    Update,
 }
 
 impl Kind {
     pub fn group(&self) -> Group {
         match self {
-            Self::Tool => Group::Environment,
-            Self::Project | Self::Branch => Group::Project,
-            Self::Ports => Group::Ports,
+            Self::Version | Self::Tool => Group::Environment,
+            Self::Project | Self::Ports | Self::Branch => Group::Project,
             Self::Database => Group::Database,
             Self::Packages(_) => Group::Packages,
-            Self::Update => Group::Updates,
+            Self::Update => Group::Update,
+        }
+    }
+
+    /// Where it comes in its group: lazyrunner before the tools, the profile before the ports and the branch.
+    pub fn rank(&self) -> u8 {
+        match self {
+            Self::Version => 0,
+            Self::Tool => 1,
+            Self::Project => 2,
+            Self::Ports => 3,
+            Self::Branch => 4,
+            Self::Database => 5,
+            Self::Packages(_) => 6,
+            Self::Update => 7,
         }
     }
 }
@@ -86,10 +100,9 @@ impl Group {
         match self {
             Self::Environment => "Environment",
             Self::Project => "Project",
-            Self::Ports => "Ports",
             Self::Database => "Database",
             Self::Packages => "Packages",
-            Self::Updates => "Updates",
+            Self::Update => "Update",
         }
     }
 }
@@ -154,7 +167,8 @@ pub fn tool_versions() -> Vec<(&'static str, Option<String>)> {
 
 /// The checks for this project, ready to run.
 pub fn checks(controller: &Controller) -> Vec<Check> {
-    let mut checks = Vec::new();
+    let mut checks =
+        vec![check(Kind::Version, "lazyrunner", || (Status::Ok, format!("v{}", crate::changelog::VERSION)))];
     let config = controller.config.clone();
     let state_dir = controller.paths().state_dir.clone();
     checks.push(Check {
@@ -324,7 +338,7 @@ fn project_check(controller: &Controller) -> Check {
         format!("{} profile {}", project.source.name(), project.path.display())
     };
     let (name, changed) = (project.name.clone(), controller.profile_changed);
-    check(Kind::Project, "Project", move || {
+    check(Kind::Project, "Profile", move || {
         if changed {
             (Status::Warn, format!("{name} from {file} - this branch changed it (, then p reloads)"))
         } else {

@@ -1,6 +1,7 @@
 //! The mouse (`, m` turns it off, so the terminal selects text again): a click focuses a column (a double click on
 //! its title zooms it), the wheel scrolls the output under the pointer, a click picks a list item and a double click
-//! runs it, a click outside a box closes it, and a setting in the panel toggles on a click.
+//! runs it, a click outside a box closes it, a click on a check's `FIX` tag in the startup doctor runs its fix, and a
+//! setting in the panel toggles on a click.
 //!
 //! What is where comes from the last frame: segments carry a `Target`, and drawing records where each one landed
 //! (`Hit`). Clicks go through the keys' own paths (arrows, Enter, Esc, the actions), so they do what the keys do.
@@ -29,6 +30,8 @@ pub enum Target {
     Output(usize),
     /// An item of the open list (menu, palette, database or theme picker), by its index in that list.
     Item(usize),
+    /// A check's `FIX` tag in the startup doctor, by the check's index: a click runs its fix.
+    Fix(usize),
     /// The rest of an open box: a click there keeps it open.
     Box,
     /// A link in a column's output: the column, and the link (in `Ui::links`).
@@ -138,7 +141,17 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
     }
     match &mut ui.overlay {
         Some(Overlay::Checklist(list)) => {
-            list.skip = true; // as any key
+            match target {
+                // Once the checks are done a click picks one, and a click on its `FIX` tag runs the fix too.
+                Some(Target::Item(index) | Target::Fix(index)) if list.is_holding() => {
+                    list.selected = index;
+                    if target == Some(Target::Fix(index)) {
+                        keys::fix_check(list, controller, index, &mut ui.replay, ui.clipboard);
+                    }
+                }
+                Some(Target::Box) if list.is_holding() => {}
+                _ => list.skip = true, // as any key
+            }
             return;
         }
         Some(Overlay::Help) => {

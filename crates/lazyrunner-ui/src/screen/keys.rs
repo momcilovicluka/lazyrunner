@@ -1,7 +1,7 @@
 //! Keys: vim-style navigation and search, the panel keys (from the action list), the overlays, the database
 //! picker, and what each action does.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lazyrunner_core::changelog;
@@ -14,7 +14,7 @@ use serde_json::{Map, Value, json};
 use super::actions::{self, Action, Run};
 use super::checklist::{Checklist, Fix, WINNAT};
 use super::columns;
-use super::motion::Spot;
+use super::motion::{Motion, Spot};
 use super::overlays::menu_items;
 use super::{Exit, Overlay, Picker, Search, Ui};
 
@@ -111,7 +111,9 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         return;
     }
     if let Some(Overlay::Checklist(list)) = &mut ui.overlay {
-        if list.is_holding() && checklist_key(list, controller, &name, &mut ui.replay, ui.clipboard) {
+        if list.is_holding()
+            && checklist_key(list, controller, &name, &mut ui.replay, ui.clipboard, &mut ui.motion, ui.now)
+        {
             return;
         }
         if name == "r" {
@@ -180,35 +182,58 @@ fn copy_checklist(ui: &mut Ui, controller: &mut Controller) {
     }
 }
 
-/// The startup doctor's keys while the checklist holds: `j` `k` pick a check, `f` fixes it, `a` fixes the safe ones,
-/// `Esc` holds the countdown to the start. False for any other key: it continues, as before.
+/// The startup doctor's keys while the checklist holds: `j` `k` pick a check (the bar flashes going round the end),
+/// `f` fixes it, `a` fixes the safe ones, `Esc` holds the countdown to the start. False for any other key: it
+/// continues, as before.
 fn checklist_key(
     list: &mut Checklist,
     controller: &mut Controller,
     name: &str,
     replay: &mut Option<KeyEvent>,
     clipboard: fn(&str) -> Result<(), String>,
+    motion: &mut Motion,
+    now: Instant,
 ) -> bool {
     match name {
-        "j" | "DownArrow" => list.select(1),
-        "k" | "UpArrow" => list.select(-1),
+        "j" | "DownArrow" | "k" | "UpArrow" => {
+            if list.select(if matches!(name, "j" | "DownArrow") { 1 } else { -1 }) {
+                motion.flash(Spot::Wrapped, now);
+            }
+        }
         "a" => list.fix_safe(controller),
+        "n" | "N" => {
+            list.next_problem(name == "n");
+        }
+        "i" => list.ignore(),
         "f" => {
-            let index = list.selected;
-            match list.fix_of(index) {
-                Some(Fix::Database) => {
-                    list.skip = true;
-                    *replay = Some(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)); // the picker, once closed
-                }
-                Some(Fix::Winnat) => list.copied(index, clipboard(WINNAT)),
-                Some(fix) => list.start_fix(controller, index, fix),
-                None => {}
+            if let Some(index) = list.fix_target() {
+                fix_check(list, controller, index, replay, clipboard);
             }
         }
         "Escape" => return list.hold(),
         _ => return false,
     }
     true
+}
+
+/// Runs check `index`'s fix (`f`, or a click on its `FIX` tag): the database picker once the checklist closes, the
+/// copied commands that free reserved ports, or the fix itself.
+pub(super) fn fix_check(
+    list: &mut Checklist,
+    controller: &mut Controller,
+    index: usize,
+    replay: &mut Option<KeyEvent>,
+    clipboard: fn(&str) -> Result<(), String>,
+) {
+    match list.fix_of(index) {
+        Some(Fix::Database) => {
+            list.skip = true;
+            *replay = Some(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)); // the picker, once closed
+        }
+        Some(Fix::Winnat) => list.copied(index, clipboard(WINNAT)),
+        Some(fix) => list.start_fix(controller, index, fix),
+        None => {}
+    }
 }
 
 /// A key a view (tests, requests) doesn't use, run as on the columns; what it opens (settings, the key reference,
