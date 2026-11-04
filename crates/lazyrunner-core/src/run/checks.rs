@@ -50,6 +50,8 @@ pub enum Kind {
     /// The lazyrunner that runs.
     Version,
     Update,
+    /// The audit view's last scans: the packages with known vulnerabilities.
+    Audit,
     Tool,
     Ports,
     Database,
@@ -75,7 +77,7 @@ impl Kind {
             Self::Version | Self::Tool => Group::Environment,
             Self::Project | Self::Ports | Self::Branch => Group::Project,
             Self::Database => Group::Database,
-            Self::Packages(_) => Group::Packages,
+            Self::Packages(_) | Self::Audit => Group::Packages,
             Self::Update => Group::Update,
         }
     }
@@ -90,6 +92,7 @@ impl Kind {
             Self::Branch => 4,
             Self::Database => 5,
             Self::Packages(_) => 6,
+            Self::Audit => 7,
             Self::Update => 7,
         }
     }
@@ -209,6 +212,9 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
     for app in controller.apps.iter().filter(|app| app.traits().installs) {
         checks.push(packages_check(controller, &app.key));
     }
+    if controller.apps.iter().any(|app| app.traits().builds || app.traits().installs) {
+        checks.push(audit_check(controller));
+    }
     checks.push(project_check(controller));
     let mut branch = controller.branch.clone();
     for app in controller.apps.iter().filter(|app| app.traits().variants) {
@@ -301,6 +307,36 @@ fn database_check(controller: &Controller) -> Check {
             (Status::Warn, format!("{} · nothing answers on port {port}", active.label))
         }
     })
+}
+
+/// What the audit view's last scans found (no network: it scans only when asked): a warning while an app has a high
+/// or critical advisory.
+fn audit_check(controller: &Controller) -> Check {
+    let scans: Vec<(String, crate::run::audit::AppAudit)> = controller
+        .apps
+        .iter()
+        .filter_map(|app| Some((app.name.clone(), controller.audits().get(&app.key)?.clone())))
+        .collect();
+    check(Kind::Audit, "Vulnerabilities", move || audit_report(&scans))
+}
+
+fn audit_report(scans: &[(String, crate::run::audit::AppAudit)]) -> Outcome {
+    use crate::run::audit::{Severity, age};
+    let Some(oldest) = scans.iter().map(|(_, scan)| scan.at).min() else {
+        return (Status::Skip, "not scanned - O, then R scans every app's packages".into());
+    };
+    let bad: Vec<String> = scans
+        .iter()
+        .filter_map(|(name, scan)| {
+            let worst = scan.worst().filter(|worst| *worst >= Severity::High)?;
+            Some(format!("{name}: {} {}", scan.count(worst), worst.name()))
+        })
+        .collect();
+    if bad.is_empty() {
+        (Status::Ok, format!("nothing high or critical (scanned {})", age(oldest)))
+    } else {
+        (Status::Warn, format!("{} - O shows them", bad.join(" · ")))
+    }
 }
 
 fn packages_check(controller: &Controller, key: &str) -> Check {

@@ -1,0 +1,33 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ◈ AUDIT   Sample  1 high  3 packages · last scan just now
+ j k · y copy the fix · i install it · Enter advisory · / filter · v only vulnerable · r rescan · h apps · Esc
+ APPS                       │  PACKAGES · BILLING
+   ◆ Orders   ↑ 1 outdated  │   Package                  Current     Latest       Severity         Type
+ ▸ ■ Billing        1 high  │   Example.Json             12.0.1      13.0.4       HIGH             direct
+   ■ Shop      not scanned  │   Example.Old              1.0.0       1.2.0        ↑ outdated only  direct
+   ■ Docs      not scanned  │ ────────────────────────────────────────────────────────────────────────────────
+   ■ Console   not scanned  │  DETAILS
+                            │  Example.Json 12.0.1
+                            │  HIGH  GHSA-aaaa-bbbb-cccc · direct dependency of Billing
+                            │
+                            │  ADVISORY
+                            │  fixed in
+                            │  13.0.4
+                            │  link
+                            │  github.com/advisories/GHSA-aaaa-bbbb-cccc (Enter opens)
+                            │
+                            │  WHAT `i` WILL RUN
+                            │  dotnet add Billing.csproj package Example.Json --version 13.0.4
+                            │  in services/Billing · y copies it
+                            │  a new major version: check what changed first
+                            │
+                            │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00 Audit: Orders - 1 outdated
+ 12:00:00 Audit: Billing - 1 high · 1 outdated

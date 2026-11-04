@@ -61,6 +61,7 @@ pub fn prompt(ui: &Ui) -> bool {
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Sheet { typing: Some(_), .. }))
+        || matches!(&ui.overlay, Some(Overlay::Audit { typing: true, .. }))
         || matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.typing)
         || matches!(&ui.overlay, Some(Overlay::Timeline(view)) if view.typing)
         || (ui.tests_typing && matches!(ui.overlay, Some(Overlay::Tests { .. })))
@@ -232,6 +233,10 @@ pub(super) fn fix_check(
             *replay = Some(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)); // the picker, once closed
         }
         Some(Fix::Winnat) => list.copied(index, clipboard(WINNAT)),
+        Some(Fix::Audit) => {
+            list.skip = true;
+            *replay = Some(KeyEvent::new(KeyCode::Char('O'), KeyModifiers::NONE)); // the audit view, once closed
+        }
         Some(fix) => list.start_fix(controller, index, fix),
         None => {}
     }
@@ -531,6 +536,11 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Audit { .. }) => {
+            if !super::audit::key(ui, controller, name, key) {
+                from_view(ui, controller, name);
+            }
+        }
         Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
@@ -719,6 +729,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Tests => super::seen::open(ui, controller, super::jumps::View::Tests),
         Run::Requests => super::seen::open(ui, controller, super::jumps::View::Requests),
         Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),
+        Run::Audit => super::audit::open(ui, controller),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => {

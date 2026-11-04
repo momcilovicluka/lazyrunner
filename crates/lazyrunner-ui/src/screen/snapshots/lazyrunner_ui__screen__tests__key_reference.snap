@@ -2,7 +2,6 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
   │ Run                                                                             Ctrl+O      Jump back  │
   │   Space       Start / stop the focused app                                      Alt+→       Jump forw… │
@@ -24,12 +23,13 @@ expression: screen.frame()
   │   D           Durations                                                         ?           Key refer… │
   │   H           Requests: what the .NET apps served                               , A z       Diagnosti… │
   │   M           Migrations: what's applied to the database                        :           Command p… │
-  │   T           Tests: run the project's test suites                            Navigate                 │
-  │   L           lazygit: git without leaving lazyrunner                           h l Tab     focus ano… │
-  │   x           Menu for the focused app                                          1-5         jump to a… │
-  │   F           Follow the agent                                                  j k ↑ ↓     scroll a … │
-  │ View                                                                            ^u ^d ^b ^f half page… │
-  │   /           Search the focused app's output                                   gg G < >    oldest / … │
-  │   z           Zoom the focused column                                           n N Esc     search: o… │
+  │   O           Audit: outdated and vulnerable packages                         Navigate                 │
+  │   T           Tests: run the project's test suites                              h l Tab     focus ano… │
+  │   L           lazygit: git without leaving lazyrunner                           1-5         jump to a… │
+  │   x           Menu for the focused app                                          j k ↑ ↓     scroll a … │
+  │   F           Follow the agent                                                  ^u ^d ^b ^f half page… │
+  │ View                                                                            gg G < >    oldest / … │
+  │   /           Search the focused app's output                                   n N Esc     search: o… │
+  │   z           Zoom the focused column                                                                  │
   │ any key closes · : searches every command · lowercase = focused app, uppercase = all                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

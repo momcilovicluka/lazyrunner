@@ -377,10 +377,11 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         entries.push(vec![seg(group, C::Cyan)]);
         for action in all.iter().filter(|action| action.group == group) {
             let key = action.key.as_str();
-            // A focused-app key and its uppercase twin for every app, in the same group, share a line (u U); other
-            // keys stand alone (d D, m M).
+            // A focused-app key and its uppercase twin for every app - in the same group, the same verb - share a line
+            // (u U); other keys stand alone (d D, m M, o O).
             let is_upper = key.len() == 1 && key.chars().all(|c| c.is_ascii_uppercase());
-            let twinned = |other: &Action| other.group == action.group;
+            let verb = |label: &str| label.split_whitespace().next().unwrap_or_default().to_string();
+            let twinned = |other: &Action| other.group == action.group && verb(&other.label) == verb(&action.label);
             if is_upper && all.iter().any(|other| twinned(other) && other.focused && other.key == key.to_lowercase()) {
                 continue;
             }

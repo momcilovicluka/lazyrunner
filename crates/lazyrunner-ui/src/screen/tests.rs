@@ -2925,6 +2925,72 @@ async fn the_rail_maps_where_the_errors_are_and_a_click_jumps_there() {
 }
 
 #[tokio::test]
+async fn the_audit_view_opens_on_the_worst_app_lists_its_packages_and_copies_the_fix() {
+    use lazyrunner_core::run::audit::{Advisory, Fix, Package, Severity};
+    let mut screen = screen("audit", json!({}));
+    let package = |name: &str, current: &str, latest: &str, severity: Option<Severity>| Package {
+        name: name.into(),
+        current: current.into(),
+        wanted: Some(current.into()),
+        latest: Some(latest.into()),
+        direct: true,
+        severity,
+        advisories: Vec::new(),
+        fix: None,
+        via: Vec::new(),
+    };
+    let mut json_lib = package("Example.Json", "12.0.1", "13.0.4", Some(Severity::High));
+    json_lib.advisories = vec![Advisory {
+        id: "GHSA-aaaa-bbbb-cccc".into(),
+        url: "https://github.com/advisories/GHSA-aaaa-bbbb-cccc".into(),
+        title: String::new(),
+        severity: Severity::High,
+        range: String::new(),
+    }];
+    json_lib.fix = Some(Fix { package: "Example.Json".into(), version: "13.0.4".into(), major: true });
+    let old = package("Example.Old", "1.0.0", "1.2.0", None);
+    let (first, second) = (screen.controller.apps[0].key.clone(), screen.controller.apps[1].key.clone());
+    screen.controller.handle(Event::Audit { key: first, result: Ok(vec![old.clone()]) });
+    screen.controller.handle(Event::Audit { key: second, result: Ok(vec![json_lib, old]) });
+    assert!(screen.frame().contains("! 1 high"), "the column's title says so: {}", screen.frame());
+    screen.press("O");
+    let Some(Overlay::Audit { app, .. }) = &screen.ui.overlay else { panic!("the audit view is open") };
+    assert_eq!(*app, 1, "it opens on the app with the worst finding");
+    screen.press("l");
+    let frame = screen.frame();
+    assert!(frame.contains("AUDIT") && frame.contains("1 high") && frame.contains("Example.Json"), "{frame}");
+    assert!(frame.contains(" HIGH ") && frame.contains("↑ outdated only"), "severities in capitals: {frame}");
+    assert!(frame.contains("GHSA-aaaa-bbbb-cccc · direct dependency of Billing"), "{frame}");
+    insta::assert_snapshot!(frame);
+    screen.press("y");
+    let copied = copied();
+    assert!(copied.last().is_some_and(|text| text.contains("package Example.Json --version 13.0.4")), "{copied:?}");
+    screen.press("i");
+    assert!(screen.frame().contains("y installs · n doesn't"), "i asks first: {}", screen.frame());
+    screen.press("n");
+    assert!(!screen.frame().contains("y installs"), "n doesn't install");
+    let key = screen.controller.apps[1].key.clone();
+    screen.controller.handle(Event::Audit { key, result: Ok(vec![package("Example.Old", "1.0.0", "1.2.0", None)]) });
+    let frame = screen.frame();
+    assert!(frame.contains("Example.Json") && frame.contains("resolved ✓"), "what it fixed stays as a row: {frame}");
+    screen.press("/");
+    for c in "json".chars() {
+        keys::press(&mut screen.ui, &mut screen.controller, KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    screen.press("Enter");
+    let frame = screen.frame();
+    assert!(frame.contains("/ json") && frame.contains("no package named"), "/ filters by name: {frame}");
+    screen.press("Esc");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Audit { packages: false, .. })), "Esc goes back to the apps");
+    screen.press("Esc");
+    assert!(screen.frame().contains("Example.Old"), "then Esc drops the filter: {}", screen.frame());
+    screen.press("v");
+    assert!(!screen.frame().contains("Example.Old"), "v: only the vulnerable");
+    screen.press("Esc");
+    assert!(screen.ui.overlay.is_none(), "then Esc closes it");
+}
+
+#[tokio::test]
 async fn the_start_sheet_shows_what_an_app_is_started_with_and_copies_it() {
     let mut screen = screen("sheet", json!({}));
     screen.press("x e");

@@ -54,6 +54,8 @@ pub enum Fix {
     Database,
     /// Copy the commands that free ports Windows reserved.
     Winnat,
+    /// The audit view (O), once the checklist closes.
+    Audit,
 }
 
 impl Fix {
@@ -70,6 +72,7 @@ impl Fix {
             Self::Retry => "check again (`r`)".into(),
             Self::Database => "pick another database (`d`)".into(),
             Self::Winnat => format!("`{WINNAT}` in an elevated terminal"),
+            Self::Audit => "see them and fix them in the audit view (`O`)".into(),
         }
     }
 
@@ -81,6 +84,7 @@ impl Fix {
             Self::Retry => "f checks again",
             Self::Database => "f picks a database",
             Self::Winnat => "f copies the fix",
+            Self::Audit => "f opens the audit",
         }
     }
 }
@@ -376,6 +380,7 @@ impl Checklist {
             (Kind::Ports, Status::Warn) => Some(Fix::FreePorts),
             (Kind::Database, Status::Warn) if item.detail.contains("nothing answers") => Some(Fix::Database),
             (Kind::Update, Status::Warn | Status::Fail) => Some(Fix::Retry),
+            (Kind::Audit, Status::Warn) => Some(Fix::Audit),
             _ => None,
         }
     }
@@ -401,7 +406,7 @@ impl Checklist {
                 self.rows[index].fixing = Some(fix);
                 self.check_again(controller, &[index]);
             }
-            Fix::Database | Fix::Winnat => {}
+            Fix::Database | Fix::Winnat | Fix::Audit => {}
         }
     }
 
@@ -812,6 +817,7 @@ impl Checklist {
             Kind::Ports => "the apps whose ports are taken: they can't listen on them",
             Kind::Database => "the APIs' database calls, and the migrations (M)",
             Kind::Packages(_) => "the app's start, and its tests",
+            Kind::Audit => "nothing - the apps run, with packages that have known vulnerabilities",
             Kind::Tool if item.name == "git" => {
                 "the branch, the source checks that skip builds, the test history's code"
             }

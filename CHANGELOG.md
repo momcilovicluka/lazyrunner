@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.68.0] - 2026-11-04
+
+### Added
+- `O` opens the audit view: each app's outdated and vulnerable packages, the worst first, with their advisories and the command that fixes each (`y` copies it, `i` installs it after a yes, `o` opens the advisory). `r` scans the selected app, `R` every app - `dotnet list package` for a .NET app, `npm audit` and `npm outdated` for an npm one - in the background, and only when asked; the last scan is kept and the view opens on it, says what it fixed since the one before and marks what's `new` (#79)
+- A column's title says `⚠ 2 high` while its app's last audit found something high or critical, the startup checklist has a Vulnerabilities row from the kept scans (`f` opens `O`), and the MCP's `get_audit` gives an agent the scans with their fixes (#79)
+
 ## [1.67.2] - 2026-11-03
 
 ### Changed

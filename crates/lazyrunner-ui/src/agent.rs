@@ -61,6 +61,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "errors" => errors(controller, args),
         "tests" => tests(controller, args),
         "migrations" => Ok(migrations(controller)),
+        "audit" => Ok(audit(controller)),
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
         "actions" => Ok(drive::actions(ui, controller)),
@@ -468,6 +469,62 @@ fn find_suite<'a>(suites: &'a [Suite], wanted: &str) -> Result<&'a Suite, Refusa
 
 /// The DbContexts as the migrations view has them - found the first time, never checked from here: each one's last
 /// check, the pending migrations.
+/// The audit view's last scans, per app: what each found, and the command that fixes each package.
+fn audit(controller: &Controller) -> Value {
+    use lazyrunner_core::run::audit::{self, Severity};
+    let apps: Vec<Value> = controller
+        .apps
+        .iter()
+        .map(|app| {
+            let scan = controller.audits().get(&app.key);
+            let folder = audit::folder(&controller.root, app).display().to_string();
+            let packages: Vec<Value> = scan.map_or_else(Vec::new, |scan| {
+                scan.packages
+                    .iter()
+                    .map(|package| {
+                        let advisories: Vec<Value> = package
+                            .advisories
+                            .iter()
+                            .map(|advisory| {
+                                let severity = advisory.severity.name();
+                                json!({ "id": advisory.id, "title": advisory.title, "severity": severity, "url": advisory.url })
+                            })
+                            .collect();
+                        json!({
+                            "name": package.name,
+                            "current": package.current,
+                            "latest": package.latest,
+                            "direct": package.direct,
+                            "severity": package.severity.map(Severity::name),
+                            "new": scan.new.contains(&package.name),
+                            "advisories": advisories,
+                            "fix": audit::command(app, package),
+                            "in": folder,
+                        })
+                    })
+                    .collect()
+            });
+            json!({
+                "app": app.key,
+                "name": app.name,
+                "scanned": scan.map(|scan| audit::age(scan.at)),
+                "error": scan.and_then(|scan| scan.error.clone()),
+                "summary": scan.map(|scan| audit::summary(&scan.packages)),
+                "fixed": scan.map(|scan| scan.fixed.iter().map(|fixed| fixed.name.clone()).collect::<Vec<_>>()),
+                "packages": packages,
+            })
+        })
+        .collect();
+    let installing = controller.audit_installing().map(|(_, command)| command);
+    let mut answer = json!({ "apps": apps, "scanning": controller.auditing(), "installing": installing });
+    if controller.audits().is_empty() {
+        answer["hint"] = json!(
+            "Nothing is scanned yet: the scans ask the package feeds, so they run when the user asks (O, then R)."
+        );
+    }
+    answer
+}
+
 fn migrations(controller: &mut Controller) -> Value {
     if !controller.find_migrations() {
         return json!({ "contexts": [], "hint": NO_MIGRATIONS });

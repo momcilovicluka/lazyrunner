@@ -8,6 +8,7 @@ use lazyrunner_core::links;
 use lazyrunner_core::output::{Hue, Level, LevelFilter, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
+use lazyrunner_core::run::audit::Severity;
 use lazyrunner_core::run::format_duration;
 use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
@@ -266,6 +267,13 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let mut segs = vec![on(format!(" {marker}{icon} {name} "), chip_fg, chip_bg)];
     if super::diff::is_on(ui, &app.key) {
         segs.push(seg(format!(" {}", icons::icon(ui.nerd, Icon::Diff)), C::Cyan));
+    }
+    if let Some(scan) = controller.audits().get(&app.key)
+        && let Some(worst) = scan.worst().filter(|worst| *worst >= Severity::High)
+    {
+        // Its last audit found a high or critical advisory (O shows it).
+        let chip = format!(" {} {} {}", icons::icon(ui.nerd, Icon::Warn), scan.count(worst), worst.name());
+        segs.push(seg(chip, C::Red));
     }
     segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
     segs.extend(status(ui, controller, index));
