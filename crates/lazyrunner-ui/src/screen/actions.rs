@@ -33,6 +33,8 @@ pub enum Run {
     Tests,
     Requests,
     Migrations,
+    /// O: outdated and vulnerable packages.
+    Audit,
     GitTool,
     Menu,
     Search,
@@ -191,6 +193,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Migrations: what's applied to the database",
             "EF Core, per DbContext; apply or roll back",
             Run::Migrations,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "O",
+            "Audit: outdated and vulnerable packages",
+            "npm audit, dotnet list package - per app, when asked",
+            Run::Audit,
         )
         .safe(),
         action(

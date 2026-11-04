@@ -3,6 +3,7 @@
 //! [`Event`]s; `tick` does the timed things. Nothing here blocks for long: builds, probes and port snapshots run
 //! in tasks of their own, so keys and output keep flowing during a build.
 
+mod audit;
 mod builds;
 mod handover;
 mod hooks;
@@ -203,6 +204,13 @@ pub struct Controller {
     tests_started: Option<Instant>,
     run_keys: Vec<String>,
     finding_suites: bool,
+    /// The apps' last package scans (the audit view, O), the one scanning now, and those waiting.
+    audits: crate::run::audit::Audits,
+    auditing: Option<String>,
+    audit_queue: Vec<String>,
+    /// The fix being installed from the audit view, and when each app's scan landed.
+    audit_installing: Option<audit::Installing>,
+    audit_landed: HashMap<String, Instant>,
     probes: HashMap<String, Probe>,
     listening_due: Option<Instant>,
     listening_in_flight: bool,
@@ -248,6 +256,7 @@ impl Controller {
         let mut states: Vec<AppState> = apps.iter().map(|app| AppState::new(&app.key)).collect();
         let mut log_problems = Vec::new();
         let mut runs = diff::load(&state_dir);
+        let audits = crate::run::audit::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
             state.previous = runs.remove(&state.key);
@@ -276,6 +285,11 @@ impl Controller {
             tests_started: None,
             run_keys: Vec::new(),
             finding_suites: false,
+            audits,
+            auditing: None,
+            audit_queue: Vec::new(),
+            audit_installing: None,
+            audit_landed: HashMap::new(),
             project,
             apps,
             states,
@@ -530,6 +544,8 @@ impl Controller {
             }
             Event::TestFileChanged(path) => self.test_file_saved(&path, false, now),
             Event::Suites(found) => self.suites_found(found),
+            Event::Audit { key, result } => self.audit_done(key, result),
+            Event::AuditInstalled { key, result } => self.audit_installed(key, result),
             Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),
         }
     }

@@ -38,6 +38,8 @@ pub enum Target {
     Link { column: usize, link: usize },
     /// A test of the suite picked in the tests view, by its place in that list.
     Test(usize),
+    /// A package in the audit view's table, by its place in it.
+    Package(usize),
     /// The tests' summary on the panel's status line: a click opens the tests view.
     Tests,
     /// A view's chip of news on the panel's status line: a click opens the view on the first new thing.
@@ -168,7 +170,9 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         }
         return;
     }
-    if super::suites::click(ui, controller, target, double) || super::migrations::click(ui, controller, target, double)
+    if super::suites::click(ui, controller, target, double)
+        || super::migrations::click(ui, controller, target, double)
+        || super::audit::click(ui, target)
     {
         return;
     }

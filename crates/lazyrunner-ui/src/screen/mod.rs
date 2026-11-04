@@ -4,6 +4,7 @@
 
 pub mod about;
 pub mod actions;
+pub mod audit;
 pub mod bundle;
 pub mod checklist;
 pub mod columns;
@@ -168,6 +169,19 @@ pub enum Overlay {
         only: bool,
         saved: Option<(String, Instant)>,
     },
+    /// `O`: outdated and vulnerable packages; the selected app, the picked package, whether the packages have the
+    /// keys, whether only the vulnerable ones show, whether it asks before `i` installs a fix, what `/` filters the
+    /// packages' names by (and whether it's being typed), and when it opened (its rows come in one after another).
+    Audit {
+        app: usize,
+        index: usize,
+        packages: bool,
+        only: bool,
+        confirm: bool,
+        filter: String,
+        typing: bool,
+        opened: Instant,
+    },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {
         index: usize,
@@ -222,6 +236,7 @@ impl Overlay {
             Self::Requests(_) => "requests",
             Self::Install { .. } => "install",
             Self::Copy { .. } => "copy",
+            Self::Audit { .. } => "audit",
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
@@ -546,6 +561,9 @@ impl Ui {
             || !self.marquees.borrow().is_empty()
             || self.motion.active(self.now)
             || sheet::animating(self)
+            || controller.auditing().is_some()
+            || controller.audit_installing().is_some()
+            || audit::animating(self, controller)
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)
@@ -684,6 +702,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),
         Some(Overlay::Copy { .. }) => return overlays::copy(ui, controller, width, rows),
         Some(Overlay::Migrations { .. }) => return migrations::rows(ui, controller, width, rows),
+        Some(Overlay::Audit { .. }) => return audit::rows(ui, controller, width, rows),
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),

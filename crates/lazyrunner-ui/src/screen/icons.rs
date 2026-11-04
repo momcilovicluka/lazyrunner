@@ -65,6 +65,8 @@ pub enum Icon {
     /// A secret's key, and a variable overridden on this machine (the start sheet).
     Lock,
     Pencil,
+    /// The audit view's title.
+    Shield,
     Keyboard,
     Package,
     Clipboard,
@@ -180,6 +182,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Lock, true) => "\u{f023}", // lock
         (Icon::Pencil, false) => "✎",
         (Icon::Pencil, true) => "\u{f040}", // pencil
+        (Icon::Shield, false) => "◈",
+        (Icon::Shield, true) => "\u{f132}", // shield
         (Icon::Keyboard, false) => "?",
         (Icon::Keyboard, true) => "\u{f11c}", // keyboard
         (Icon::Package, false) => "▣",
@@ -235,6 +239,7 @@ pub fn check(name: &str) -> Option<Icon> {
         "Ports" => Some(Icon::Plug),
         "Database" => Some(Icon::Database),
         "Profile" => Some(Icon::Folder),
+        "Vulnerabilities" => Some(Icon::Shield),
         _ if name.ends_with(" packages") => Some(Icon::Package),
         _ => None,
     }
@@ -311,6 +316,7 @@ mod tests {
             Icon::Bookmark,
             Icon::Lock,
             Icon::Pencil,
+            Icon::Shield,
             Icon::Keyboard,
             Icon::Package,
             Icon::Clipboard,

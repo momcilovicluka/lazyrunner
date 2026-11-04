@@ -239,6 +239,15 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "get_audit",
+            "Each app's outdated and vulnerable packages as last scanned (the audit view, O): their severity, \
+             advisories, current and latest versions, and the command that fixes each (and where to run it). It \
+             doesn't scan: the scans ask the package feeds, so the user starts them (O, then R).",
+            json!({}),
+            &[],
+            true,
+        ),
+        tool(
             "check_migrations",
             "Checks one DbContext against the database (`context`), or finds them again and checks them all. \
              Then wait for migrations_checked.",

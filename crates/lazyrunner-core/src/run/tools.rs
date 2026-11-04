@@ -167,7 +167,7 @@ pub fn npm_ci_command(dir: &Path) -> Result<Spec> {
     Ok(Spec { program, args, dir: dir.to_path_buf(), env: Vec::new() })
 }
 
-fn dotnet() -> PathBuf {
+pub(crate) fn dotnet() -> PathBuf {
     find_on_path("dotnet").unwrap_or_else(|| "dotnet".into())
 }
 

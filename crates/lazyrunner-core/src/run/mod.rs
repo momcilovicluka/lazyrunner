@@ -4,6 +4,7 @@
 //! comes back to it as an [`Event`].
 
 pub mod app;
+pub mod audit;
 pub mod build;
 pub mod checks;
 pub mod child;
@@ -82,6 +83,16 @@ pub enum Event {
     TestFileChanged(PathBuf),
     /// The test suites found (T), with their last results.
     Suites(Vec<suites::Suite>),
+    /// An app's packages scanned for the audit view (#79), or why they couldn't be.
+    Audit {
+        key: String,
+        result: Result<Vec<audit::Package>, String>,
+    },
+    /// A fix from the audit view installed, or why it couldn't be.
+    AuditInstalled {
+        key: String,
+        result: Result<(), String>,
+    },
     /// A hook that didn't go well: its event, its command, and what went wrong.
     HookFailed {
         event: String,
