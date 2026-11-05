@@ -211,6 +211,10 @@ pub struct Controller {
     /// The fix being installed from the audit view, and when each app's scan landed.
     audit_installing: Option<audit::Installing>,
     audit_landed: HashMap<String, Instant>,
+    /// The scans asked for together (R): when they began and how many; and the last fix that failed to install (its
+    /// app, its command, when).
+    audit_batch: Option<(Instant, usize)>,
+    audit_install_failed: Option<(String, String, Instant)>,
     probes: HashMap<String, Probe>,
     listening_due: Option<Instant>,
     listening_in_flight: bool,
@@ -290,6 +294,8 @@ impl Controller {
             audit_queue: Vec::new(),
             audit_installing: None,
             audit_landed: HashMap::new(),
+            audit_batch: None,
+            audit_install_failed: None,
             project,
             apps,
             states,

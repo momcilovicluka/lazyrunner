@@ -840,7 +840,7 @@ fn details(ui: &Ui, list: &Checklist, index: usize, width: usize, inline: bool) 
 }
 
 /// `text` wrapped at its spaces into lines of `cells` at most (a word longer than that is cut).
-fn words(text: &str, cells: usize) -> Vec<String> {
+pub(super) fn words(text: &str, cells: usize) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     let mut line = String::new();
     for word in text.split_whitespace() {

@@ -2959,9 +2959,12 @@ async fn the_audit_view_opens_on_the_worst_app_lists_its_packages_and_copies_the
     screen.press("l");
     let frame = screen.frame();
     assert!(frame.contains("AUDIT") && frame.contains("1 high") && frame.contains("Example.Json"), "{frame}");
-    assert!(frame.contains(" HIGH ") && frame.contains("↑ outdated only"), "severities in capitals: {frame}");
+    assert!(frame.contains("▕HIGH▏") && frame.contains("↑ outdated only"), "severities in capitals: {frame}");
     assert!(frame.contains("GHSA-aaaa-bbbb-cccc · direct dependency of Billing"), "{frame}");
     insta::assert_snapshot!(frame);
+    let wide = screen.render(150, 40);
+    assert!(wide.contains("check what changed") && wide.contains("first"), "beside the table it wraps: {wide}");
+    assert!(wide.contains("y copies it"), "the folder's row wraps too: {wide}");
     screen.press("y");
     let copied = copied();
     assert!(copied.last().is_some_and(|text| text.contains("package Example.Json --version 13.0.4")), "{copied:?}");

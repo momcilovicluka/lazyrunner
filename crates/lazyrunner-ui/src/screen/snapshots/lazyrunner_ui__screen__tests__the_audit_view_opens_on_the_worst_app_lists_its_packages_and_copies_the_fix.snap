@@ -4,16 +4,16 @@ expression: frame
 ---
  ◈ AUDIT   Sample  1 high  3 packages · last scan just now
  j k · y copy the fix · i install it · Enter advisory · / filter · v only vulnerable · r rescan · h apps · Esc
- APPS                       │  PACKAGES · BILLING
+ APPS                       │  PACKAGES · BILLING   / filter
    ◆ Orders   ↑ 1 outdated  │   Package                  Current     Latest       Severity         Type
- ▸ ■ Billing        1 high  │   Example.Json             12.0.1      13.0.4       HIGH             direct
+ ▸ ■ Billing        1 high  │ ▌ Example.Json             12.0.1      13.0.4      ▕HIGH▏            direct
    ■ Shop      not scanned  │   Example.Old              1.0.0       1.2.0        ↑ outdated only  direct
    ■ Docs      not scanned  │ ────────────────────────────────────────────────────────────────────────────────
    ■ Console   not scanned  │  DETAILS
                             │  Example.Json 12.0.1
-                            │  HIGH  GHSA-aaaa-bbbb-cccc · direct dependency of Billing
-                            │
-                            │  ADVISORY
+ counting a package once    │  ▕HIGH▏ GHSA-aaaa-bbbb-cccc · direct dependency of Billing
+ per app that owns or       │
+ references it              │  ADVISORY
                             │  fixed in
                             │  13.0.4
                             │  link

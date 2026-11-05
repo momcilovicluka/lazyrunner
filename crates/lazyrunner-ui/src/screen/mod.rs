@@ -171,7 +171,8 @@ pub enum Overlay {
     },
     /// `O`: outdated and vulnerable packages; the selected app, the picked package, whether the packages have the
     /// keys, whether only the vulnerable ones show, whether it asks before `i` installs a fix, what `/` filters the
-    /// packages' names by (and whether it's being typed), and when it opened (its rows come in one after another).
+    /// packages' names by (and whether it's being typed), when it opened (its rows come in one after another), and
+    /// when `y` last copied a fix (the command lights up).
     Audit {
         app: usize,
         index: usize,
@@ -181,6 +182,7 @@ pub enum Overlay {
         filter: String,
         typing: bool,
         opened: Instant,
+        copied: Option<Instant>,
     },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {

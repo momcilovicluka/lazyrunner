@@ -460,6 +460,12 @@ vulnerable ones; `y` (or `u`) copies the picked package's fix, `Enter` (or `o`) 
 the fix after a yes (`y` or `Enter`; `n` or `Esc` doesn't) - the app stops first if it runs and starts again after,
 then it's scanned again. `Esc` goes back out of the packages, then drops the filter, then closes (`q` and `O` too).
 
+Each vulnerable row has an edge in its severity's colour and its severity framed (`▕HIGH▏`); an outdated-only row is
+dimmed, the red meaning advisories. `/` lights the part of each name it matches. While `R` scans, the header counts the
+apps off (`3 of 5` and a bar), and when it's done the log says it in one line: `▸ Audit finished in 3.8s · 12 packages
+· 3 high · 1 critical`. The header's last scan is green today, amber after a week and red after a month (`R rescans`).
+A fix being installed spins in its own row, and one that failed pulses the row red; `y` lights the command it copied.
+
 A column's title says `⚠ 2 high` while its app's last scan found something high or critical, and the startup
 checklist's Vulnerabilities row says the same from the kept scans - it never scans itself - with `f` opening `O`. It
 moves (not with reduced motion): its rows come in one after another as it opens, the table dims while its app is
