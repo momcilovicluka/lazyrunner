@@ -30,9 +30,10 @@ impl Controller {
         &self.auditing
     }
 
-    /// How many apps are scanned at once: `"auditParallelism"`, 3 when it's missing (1 to 8).
+    /// How many apps are scanned at once: `"auditParallelism"`, 2 when it's missing (1 to 8) - a .NET app's scan
+    /// keeps every core busy for a while.
     pub fn audit_parallelism(&self) -> usize {
-        parallel::at_once(&self.config["auditParallelism"])
+        parallel::at_once(&self.config["auditParallelism"], 2)
     }
 
     /// `+` and `-` in the audit view: how many apps are scanned at once, saved; the waiting scans go so.
@@ -311,7 +312,7 @@ mod tests {
         controller.handle(Event::Audit { key: first.clone(), result: Err("429 Too Many Requests".into()) });
         let failed = controller.audits().get(&first).and_then(|scan| scan.error.clone());
         assert_eq!(failed.as_deref(), Some("429 Too Many Requests"), "alone, it fails for good");
-        assert_eq!(controller.audit_parallelism(), 3, "three at once when it isn't set");
+        assert_eq!(controller.audit_parallelism(), 2, "two at once when it isn't set");
         controller.set_audit_parallelism(20);
         assert_eq!(controller.audit_parallelism(), 8, "eight at most");
     }

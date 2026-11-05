@@ -26,6 +26,7 @@ pub mod mouse;
 pub mod overlays;
 pub mod palette;
 pub mod panel;
+pub mod phases;
 pub mod ports;
 pub mod rail;
 pub mod rail_density;
@@ -342,6 +343,10 @@ pub struct Ui {
     pub tests_typing: bool,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
+    /// Each app's state as its title last showed it, and its last change (the title's motion).
+    pub phases: phases::Phases,
+    /// The panel's newest log line, and when it came (it slides in).
+    pub log_newest: Option<(String, Instant)>,
     /// Requests sent again (p in the requests view): how each went, once it has.
     pub replays: Vec<std::sync::mpsc::Receiver<(lazyrunner_core::output::Hue, String)>>,
     /// `L` was pressed: the loop opens the git tool.
@@ -435,6 +440,8 @@ impl Ui {
             tests_query: String::new(),
             tests_typing: false,
             seen: seen::Seen::default(),
+            phases: phases::Phases::default(),
+            log_newest: None,
             replays: Vec::new(),
             git_tool_wanted: false,
             mark_at: None,
@@ -587,6 +594,8 @@ impl Ui {
             || audit::animating(self, controller)
             || ports::animating(self, controller)
             || durations::animating(self)
+            || phases::animating(self)
+            || panel::sliding(self)
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)

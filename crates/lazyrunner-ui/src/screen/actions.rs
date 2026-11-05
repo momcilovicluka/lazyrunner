@@ -320,33 +320,50 @@ pub(crate) struct MenuToggle {
     pub label: &'static str,
 }
 
+/// The , menu's toggles, by their group ([`setting_group`]).
 const MENU_TOGGLES: [MenuToggle; 13] = [
-    MenuToggle { letter: "a", toggle: Toggle::AutoRestartOnBranchChange, label: "Auto-restart on branch change" },
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
-    MenuToggle { letter: "s", toggle: Toggle::StopFrontendOnStop, label: "Stop/Restart all include the frontend" },
-    MenuToggle { letter: "e", toggle: Toggle::RestartOnCodeChange, label: "Restart the APIs when code changes" },
     MenuToggle { letter: "w", toggle: Toggle::StartupChecklist, label: "Startup checklist when lazyrunner opens" },
     MenuToggle { letter: "v", toggle: Toggle::AutoUpdate, label: "Auto-update lazyrunner when it opens" },
-    MenuToggle { letter: "m", toggle: Toggle::Mouse, label: "Mouse: click and scroll (off: select text)" },
-    MenuToggle { letter: "f", toggle: Toggle::ReducedMotion, label: "Reduced motion: no blinking, spinners or fades" },
-    MenuToggle {
-        letter: "g",
-        toggle: Toggle::GitBeside,
-        label: "L opens the git tool beside lazyrunner (Windows Terminal)",
-    },
-    MenuToggle {
-        letter: "i",
-        toggle: Toggle::NerdIcons,
-        label: "Nerd Font icons (the terminal's font a Nerd Font Mono)",
-    },
     MenuToggle {
         letter: "o",
         toggle: Toggle::CheckMigrationsOnOpen,
         label: "Check the migrations against the database when M opens",
     },
+    MenuToggle { letter: "a", toggle: Toggle::AutoRestartOnBranchChange, label: "Auto-restart on branch change" },
+    MenuToggle { letter: "s", toggle: Toggle::StopFrontendOnStop, label: "Stop/Restart all include the frontend" },
+    MenuToggle { letter: "e", toggle: Toggle::RestartOnCodeChange, label: "Restart the APIs when code changes" },
+    MenuToggle { letter: "m", toggle: Toggle::Mouse, label: "Mouse: click and scroll (off: select text)" },
+    MenuToggle { letter: "f", toggle: Toggle::ReducedMotion, label: "Reduced motion: no blinking, spinners or fades" },
+    MenuToggle {
+        letter: "i",
+        toggle: Toggle::NerdIcons,
+        label: "Nerd Font icons (the terminal's font a Nerd Font Mono)",
+    },
     MenuToggle { letter: "l", toggle: Toggle::LinksOnAltClick, label: "Links open on Alt+click (off: on a click)" },
+    MenuToggle {
+        letter: "g",
+        toggle: Toggle::GitBeside,
+        label: "L opens the git tool beside lazyrunner (Windows Terminal)",
+    },
     MenuToggle { letter: "F", toggle: Toggle::FollowAgent, label: "Follow an agent when it calls (F: your keys back)" },
 ];
+
+/// A setting's group in the , menu.
+pub fn setting_group(toggle: Toggle) -> &'static str {
+    match toggle {
+        Toggle::AutoStartOnOpen | Toggle::StartupChecklist | Toggle::AutoUpdate | Toggle::CheckMigrationsOnOpen => {
+            "Startup"
+        }
+        Toggle::AutoRestartOnBranchChange
+        | Toggle::StopFrontendOnStop
+        | Toggle::RestartOnCodeChange
+        | Toggle::SkipUnchangedBuilds
+        | Toggle::Notifications => "Running",
+        Toggle::Mouse | Toggle::ReducedMotion | Toggle::NerdIcons | Toggle::LinksOnAltClick => "Display",
+        Toggle::GitBeside | Toggle::FollowAgent => "Integrations",
+    }
+}
 
 /// The , menu's toggles that apply here (whether Stop/Restart all include the frontend only with one).
 pub(crate) fn menu_toggles(controller: &Controller) -> impl Iterator<Item = &'static MenuToggle> {

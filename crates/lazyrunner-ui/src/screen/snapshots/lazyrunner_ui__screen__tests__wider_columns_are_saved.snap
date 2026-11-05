@@ -12,11 +12,11 @@ expression: screen.frame()
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
+      not started yet       ┃                   │                   │                   │
                             ┃                   │                   │                   │
-        u starts it         ┃                   │                   │                   │
-        b builds it         ┃                   │                   │                   │
-        U starts all        ┃                   │                   │                   │
-                            ┃                   │                   │                   │
+      u starts it           ┃  not started yet  │  not started yet  │  not started yet  │   not started yet
+      b builds it           ┃                   │                   │                   │
+      U starts all          ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │

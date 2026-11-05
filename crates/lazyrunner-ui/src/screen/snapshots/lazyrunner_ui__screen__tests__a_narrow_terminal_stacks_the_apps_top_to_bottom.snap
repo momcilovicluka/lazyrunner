@@ -15,19 +15,19 @@ Building...
 error: Billing.cs(3,1): something is off
  ■ Shop  :47301  ○ stopped ───────────────────────────────────────────────────────────────────────────────────
    dev server · dev
-
+                                               not started yet
 
  ■ Docs   ○ stopped ──────────────────────────────────────────────────────────────────────────────────────────
    watch build · watch
-
+                                               not started yet
 
  ■ Console  :47303  ○ stopped ────────────────────────────────────────────────────────────────────────────────
    live · dev
-
+                                               not started yet
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all     :  commands   x  menu   ?  keys   ,  settings
 
- 12:00:00 Starting Orders + Billing
+ 12:00:00   Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

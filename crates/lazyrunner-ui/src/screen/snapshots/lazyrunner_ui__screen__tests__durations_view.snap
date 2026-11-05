@@ -29,4 +29,4 @@ npm ci                        runs      last    usual           │        █
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
 
- 12:00:00 No durations yet: they're recorded from the next build, start or npm ci.
+ 12:00:00   No durations yet: they're recorded from the next build, start or npm ci.

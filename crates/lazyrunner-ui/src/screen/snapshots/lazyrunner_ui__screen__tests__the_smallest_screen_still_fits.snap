@@ -5,12 +5,12 @@ expression: "screen.render(60, 15)"
  ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop   ○ ┬ ■ Docs   ○ ┬ ■ Conso
             ┃            │   dev serve│   watch bui│   live
 ed once     ┃error: Billi│            │            │
-info: Applic┃ng.cs(3,1): │            │            │
+info: Applic┃ng.cs(3,1): │not started │not started │not star
 ation starte┃ something  │            │            │
 d.          ┃is off      │            │            │
 ────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ l
   r  restart   s  stop   w  open               :  commands
 
- 12:00:00 Starting Orders + Billing
+ 12:00:00   Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

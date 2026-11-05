@@ -30,19 +30,40 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>>
         .as_u64()
         .map_or(DEFAULT_LOG_LINES, |n| usize::try_from(n).unwrap_or(MAX_LOG_LINES).min(MAX_LOG_LINES));
     let entries: Vec<_> = controller.log.iter().rev().take(count).collect();
-    for entry in entries.iter().rev() {
+    let newest = entries.first().map(|entry| format!("{} {}", entry.time, entry.text));
+    if newest != ui.log_newest.as_ref().map(|(text, _)| text.clone()) {
+        // The first line lazyrunner shows was there already: only a new one slides in.
+        let at = if ui.log_newest.is_none() { ui.now.checked_sub(SLIDE).unwrap_or(ui.now) } else { ui.now };
+        ui.log_newest = newest.map(|text| (text, at));
+    }
+    let slid = sliding(ui).then(|| ui.log_newest.as_ref().map(|(_, at)| ui.now.saturating_duration_since(*at)));
+    for (at, entry) in entries.iter().enumerate().rev() {
         let mut row = vec![seg(format!(" {} ", entry.time), C::DarkGray)];
+        if at == 0
+            && let Some(Some(since)) = slid
+        {
+            let left = 1.0 - since.as_secs_f64() / SLIDE.as_secs_f64();
+            row.push(seg(" ".repeat((left * SLIDE_CELLS as f64).round() as usize), C::Gray));
+        }
         let color = hue_color(entry.hue);
-        match bundle::written(&entry.text) {
+        let (mark, text) = marked(&entry.text, color);
+        row.push(mark);
+        // A line that doesn't fit scrolls sideways; its time and mark stay.
+        let keep = row.len();
+        match bundle::written(text) {
             Some(zip) => {
+                // The zip's path is a link: its line doesn't scroll, which would merge it away.
                 ui.links.push(links::Target::File { path: zip.into(), line: None, column: None });
                 let mut path = seg(zip, color).at(Target::Reveal(ui.links.len() - 1));
                 path.underline = true;
                 row.extend([seg(bundle::WRITTEN, color), path, seg(bundle::SHARE, color)]);
+                rows.push(row);
             }
-            None => row.push(seg(entry.text.clone(), color)),
+            None => {
+                row.push(seg(text.to_string(), color));
+                rows.push(ui.scrolling_row(row, keep, cells));
+            }
         }
-        rows.push(row);
     }
     for _ in entries.len()..count {
         rows.push(Vec::new());
@@ -116,6 +137,29 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     }
     segs.push(seg(format!("   {}", controller.root.display()), C::DarkGray));
     segs
+}
+
+/// A new log line slides in from the right over this long, from this far.
+const SLIDE: std::time::Duration = std::time::Duration::from_millis(200);
+const SLIDE_CELLS: usize = 24;
+
+/// The marks a log line can start with, and their colours: they get a column of their own.
+const MARKS: [(&str, C); 6] =
+    [("✓", C::Green), ("✗", C::Red), ("×", C::Red), ("!", C::Yellow), ("▸", C::Cyan), ("■", C::DarkGray)];
+
+/// A log line's mark in its own column (blank when it has none), and the rest of it.
+fn marked(text: &str, color: C) -> (Seg, &str) {
+    let found = text.split_once(' ').and_then(|(mark, rest)| {
+        let (_, mark_color) = MARKS.iter().find(|(known, _)| *known == mark)?;
+        Some((seg(format!("{mark} "), *mark_color), rest))
+    });
+    found.unwrap_or_else(|| (seg("  ", color), text))
+}
+
+/// Whether the newest log line is sliding in.
+pub fn sliding(ui: &Ui) -> bool {
+    let moving = ui.motion.enabled && !ui.reduced_motion;
+    moving && ui.log_newest.as_ref().is_some_and(|(_, at)| ui.now.saturating_duration_since(*at) < SLIDE)
 }
 
 /// The keys that matter now, as keycaps: on the left the alerts and what the focused app can do as it is, on the

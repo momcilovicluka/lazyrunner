@@ -168,6 +168,8 @@ fn item(
     let paint = |text: String, color: C| Seg { text, fg: color, bg, style: None, target: None, underline: false };
     let icon = match controller.apps.get(ui.focus).filter(|_| action.focused) {
         Some(app) => icons::app(ui.nerd, app, controller.framework(&app.key)).to_string(),
+        // The , menu's entry is filed under Help, but it's the settings.
+        None if action.run == super::actions::Run::Settings => icons::icon(ui.nerd, Icon::Settings).to_string(),
         None => icons::icon(ui.nerd, group_icon(action.group)).to_string(),
     };
     // A keycap stands out on the bar, and shows pressed (the bar's colours: sunk into it) for a frame after Enter.

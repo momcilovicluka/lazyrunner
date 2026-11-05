@@ -3,6 +3,18 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.72.0] - 2026-11-05
+
+### Fixed
+- The audit view's scans no longer slow the whole machine down. Each `dotnet list package` starts an MSBuild worker per core, and with several apps and both commands at once they took every core and gigabytes of memory - their workers lingering for minutes after. Now the scans run below normal priority (what they start inherits it), MSBuild's workers end with them, a .NET app's two commands run one after the other, and two apps are scanned at once by default instead of three (`+` raises it) (#79)
+
+### Changed
+- A column's title moves as its app changes state (not with reduced motion): coming up fills its chip green from the left, stopping drains the colour it had from the right, a crash pulses it twice
+- An empty column says what its app is - `not started yet`, `stopped · started 10:42`, `exited · code 1`, `couldn't start` - and the focused one what starts it, as before
+- The panel's log keeps each line's mark (`✓` `×` `!` `▸`) in a column of its own, the newest line slides in from the right, and a line too long for the panel scrolls sideways instead of being cut
+- The settings (`,`) are switches - a green `●` on, a dim `○` off - grouped under Startup, Running, Display and Integrations when the terminal has room
+- The palette's Settings entry has the settings icon (it had Help's `?`)
+
 ## [1.71.0] - 2026-11-05
 
 ### Added

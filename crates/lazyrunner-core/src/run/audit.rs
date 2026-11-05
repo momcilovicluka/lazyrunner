@@ -227,13 +227,12 @@ pub fn scan(root: &Path, app: &App) -> Result<Vec<Package>> {
             let run = |extra: &[&str]| {
                 let mut command = Command::new(tools::dotnet());
                 command.arg("list").arg(&path).arg("package").args(extra).args(["--format", "json"]);
-                output(command)
+                output(gently(command))
             };
-            let (vulnerable, outdated) = both(
-                || run(&["--vulnerable", "--include-transitive"]),
-                || run(&["--outdated", "--include-transitive"]),
-            );
-            dotnet(&vulnerable?, &outdated?)
+            // One after the other: each dotnet starts an MSBuild worker per core to read the projects.
+            let vulnerable = run(&["--vulnerable", "--include-transitive"])?;
+            let outdated = run(&["--outdated", "--include-transitive"])?;
+            dotnet(&vulnerable, &outdated)
         }
         AppKind::Npm { dir, .. } => {
             let folder = root.join(dir);
@@ -244,12 +243,26 @@ pub fn scan(root: &Path, app: &App) -> Result<Vec<Package>> {
             let run = |args: &[&str]| {
                 let mut command = Command::new(&program);
                 command.args(&launcher).args(args).current_dir(&folder);
-                output(command)
+                output(gently(command))
             };
             let (audit, outdated) = both(|| run(&["audit", "--json"]), || run(&["outdated", "--json"]));
             npm(&audit?, &outdated?, |name| installed(&folder, name))
         }
     }
+}
+
+/// `command`, to run in the background without weighing on the machine: below normal priority on Windows (what it
+/// starts inherits it - MSBuild's workers, one per core), so the apps and lazyrunner stay responsive; and without
+/// MSBuild keeping its workers alive after it, which would hold gigabytes for minutes.
+fn gently(mut command: Command) -> Command {
+    command.env("MSBUILDDISABLENODEREUSE", "1");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+        command.creation_flags(BELOW_NORMAL_PRIORITY_CLASS);
+    }
+    command
 }
 
 /// Runs `first` and `second` side by side (they wait on the package feeds), and waits for both.
@@ -520,7 +533,8 @@ fn run(root: &Path, app: &App, dotnet: bool, args: &[String]) -> Result<()> {
         command.args(launcher);
         command
     };
-    let done = command.args(args).current_dir(folder(root, app)).stdin(Stdio::null()).output()?;
+    command.args(args).current_dir(folder(root, app)).stdin(Stdio::null());
+    let done = gently(command).output()?;
     if done.status.success() {
         return Ok(());
     }
