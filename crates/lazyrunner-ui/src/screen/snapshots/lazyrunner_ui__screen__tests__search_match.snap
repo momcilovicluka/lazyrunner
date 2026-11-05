@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders  :47201  ┳ ■ Billing  :47202  ○┬ ■ Shop  :47301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :47303  ○
+ ▸ ◆ Orders   ● check┳ ■ Billing   ○ starti┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
                      ┃                     │   dev server · dev  │   watch build · watc│   live · dev
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
@@ -16,15 +16,15 @@ expression: screen.frame()
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
-info: Microsoft.Hosti┃                     │                     │                     │
-ng.Lifetime[14]      ┃                     │                     │                     │
-      Now listening o┃                     │                     │                     │
-n: http://localhost:4┃                     │                     │                     │
-7201                 ┃                     │                     │                     │
-warn: an error happen┃                     │                     │                     │
-ed once              ┃Building...          │                     │                     │
-info: Application sta┃error: Billing.cs(3,1│                     │                     │
-rted.                ┃): something is off  │                     │                     │
+info: Microsoft.     ┃                     │                     │                     │
+Hosting.Lifetime[14] ┃                     │                     │                     │
+      Now listening  ┃                     │                     │                     │
+on: http://localhost:┃                     │                     │                     │
+47201                ┃                     │                     │                     │
+warn: an error       ┃                     │                     │                     │
+happened once        ┃Building...          │                     │                     │
+info: Application    ┃error: Billing.cs(3, │                     │                     │
+started.             ┃1): something is off │                     │                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all     :  commands   x  menu   ?  keys   ,  settings

@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders  :47201  ┳ ■ Billing  :47202  ○┬ ■ Shop  :47301  ○ st┬ ■ Docs   ○ stopped ─┬ ■ Console  :47303  ○
+ ▸ ◆ Orders   ● check┳ ■ Billing   ○ starti┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
  ⏸ ↑60 · G follows   ┃                     │   dev server · dev  │   watch build · watc│   live · dev
 orders line 39      █┃                     │                     │                     │
 orders line 40      ⡯┃                     │                     │                     │
@@ -23,8 +23,8 @@ orders line 54      ⣏┃                     │                     │      
 orders line 55      ⣗┃                     │                     │                     │
 orders line 56      ⣗┃                     │                     │                     │
 orders line 57      ⣗┃Building...          │                     │                     │
-orders line 58      ⣗┃error: Billing.cs(3,1│                     │                     │
-orders line 59      ⡗┃): something is off  │                     │                     │
+orders line 58      ⣗┃error: Billing.cs(3, │                     │                     │
+orders line 59      ⡗┃1): something is off │                     │                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all     :  commands   x  menu   ?  keys   ,  settings

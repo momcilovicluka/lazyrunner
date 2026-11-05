@@ -45,6 +45,7 @@ pub mod theme;
 pub mod theme_picker;
 pub mod timeline;
 pub mod timeline_strip;
+pub mod viewbar;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -144,8 +145,10 @@ pub enum Overlay {
         top: usize,
     },
     /// `D`: how long builds, starts and npm ci took over their last runs.
+    /// `D`: the durations; the picked item, and when it was picked (its chart grows in).
     Durations {
-        top: usize,
+        index: usize,
+        picked: Instant,
     },
     /// `'`: every column's marks; the selected one.
     Marks {
@@ -182,6 +185,8 @@ pub enum Overlay {
         confirm: bool,
         /// `I` asks which of the app's fixes to install together.
         batch: bool,
+        /// `e`: each vulnerable package's advisory on a line under it.
+        expanded: bool,
         filter: String,
         typing: bool,
         opened: Instant,
@@ -581,6 +586,7 @@ impl Ui {
             || controller.audit_installing().is_some()
             || audit::animating(self, controller)
             || ports::animating(self, controller)
+            || durations::animating(self)
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)

@@ -472,10 +472,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Sheet { .. }) => super::sheet::key(ui, controller, name, key),
         Some(Overlay::Launch { .. }) => super::launch::key(ui, controller, name),
         Some(Overlay::Timeline(_)) => super::timeline::key(ui, controller, name, key),
-        Some(Overlay::Durations { top }) => match name {
-            "Escape" | "q" | "D" => ui.overlay = None,
-            _ => scroll_box(top, name),
-        },
+        Some(Overlay::Durations { .. }) => super::durations::key(ui, controller, name),
         // The views' own keys first; the rest do what they do on the columns (, settings, d database, ...).
         Some(Overlay::Tests { .. }) => {
             if !super::suites::typing_key(ui, name, key) && !super::suites::key(ui, controller, name) {
@@ -734,7 +731,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Tests => super::seen::open(ui, controller, super::jumps::View::Tests),
         Run::Requests => super::seen::open(ui, controller, super::jumps::View::Requests),
         Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),
-        Run::Audit => super::audit::open(ui, controller),
+        Run::Audit => super::seen::open(ui, controller, super::jumps::View::Audit),
         Run::Ports => super::ports::open(ui, controller, None),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),

@@ -312,10 +312,10 @@ async fn reduced_motion_keeps_a_search_cursor_and_starting_status_static() {
     let second = screen.frame();
     assert!(first.contains("/e▏"), "{}", first);
     assert!(second.contains("/e▏"), "{}", second);
-    assert!(first.contains(" :47202  ●"), "{}", first);
-    assert!(second.contains(" :47202  ●"), "{}", second);
-    assert!(!first.contains(" :47202  ○"), "{}", first);
-    assert!(!second.contains(" :47202  ○"), "{}", second);
+    assert!(first.contains("Billing   ●"), "{}", first);
+    assert!(second.contains("Billing   ●"), "{}", second);
+    assert!(!first.contains("Billing   ○"), "{}", first);
+    assert!(!second.contains("Billing   ○"), "{}", second);
 }
 
 #[tokio::test]
@@ -626,8 +626,14 @@ async fn durations_view() {
     }
     durations.add(Kind::NpmCi, "shop", "A shop frontend with a very long name indeed", 61.0, true);
     screen.press("D");
-    insta::assert_snapshot!(screen.frame());
-    insta::assert_snapshot!("durations_view_80_columns", screen.render(80, 24));
+    // The runs' times are the clock's: masked.
+    let times = regex::Regex::new(r"\d\d [A-Z][a-z]{2} \d\d:\d\d").unwrap();
+    let masked = |frame: String| times.replace_all(&frame, "dd Mon hh:mm").into_owned();
+    insta::assert_snapshot!(masked(screen.frame()));
+    screen.press("j");
+    let frame = masked(screen.frame());
+    assert!(frame.contains("ORDERS · Builds") && frame.contains("RUNS"), "j picks the next item: {frame}");
+    insta::assert_snapshot!("durations_view_80_columns", masked(screen.render(80, 24)));
     screen.press("D");
     assert!(screen.ui.overlay.is_none());
 }
@@ -2962,6 +2968,11 @@ async fn the_audit_view_opens_on_the_worst_app_lists_its_packages_and_copies_the
     assert!(frame.contains("▕HIGH▏") && frame.contains("↑ outdated only"), "severities in capitals: {frame}");
     assert!(frame.contains("GHSA-aaaa-bbbb-cccc · direct dependency of Billing"), "{frame}");
     insta::assert_snapshot!(frame);
+    screen.press("e");
+    let frame = screen.frame();
+    assert!(frame.contains("└ GHSA-aaaa-bbbb-cccc · fixed in 13.0.4"), "e: each finding's advisory under it: {frame}");
+    screen.press("e");
+    assert!(!screen.frame().contains("└ GHSA"), "e again hides them");
     let wide = screen.render(150, 40);
     assert!(wide.contains("check what changed") && wide.contains("first"), "beside the table it wraps: {wide}");
     assert!(wide.contains("y copies it"), "the folder's row wraps too: {wide}");
@@ -3497,8 +3508,11 @@ async fn the_audit_view_cuts_a_long_name_before_its_new_chip_and_asks_before_ins
     let key = screen.controller.apps[1].key.clone();
     let short = package("Short", Severity::High);
     screen.controller.handle(Event::Audit { key: key.clone(), result: Ok(vec![short.clone()]) });
+    screen.frame();
     let long = package("Example.A.Very.Long.Package.Name.That.Will.Not.Fit", Severity::Moderate);
     screen.controller.handle(Event::Audit { key, result: Ok(vec![short, long]) });
+    let frame = screen.frame();
+    assert!(frame.contains(" A ") && frame.contains("1 new finding"), "the panel says a scan found more: {frame}");
     screen.press("A");
     screen.press("l");
     let frame = screen.frame();

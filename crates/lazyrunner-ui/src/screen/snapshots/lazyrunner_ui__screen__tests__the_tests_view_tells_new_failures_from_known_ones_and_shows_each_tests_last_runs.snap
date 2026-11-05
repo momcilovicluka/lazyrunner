@@ -2,19 +2,19 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
- ⚗ Tests   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky
+ ⚗ TESTS   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky
  j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its tests
  Backend · dotnet test             1 failed │ Orders.Tests   .NET · dotnet test
- 1 Orders                          1 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   ↻ 1 flaky   · last run 0
-   ▸ ✗ Orders.Tests        ✓1 ×1 ≈1  1 new  │ 9:41:07 · 6s
+ 1 Orders                          1 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   ↻ 1 flaky   · last run
+   ▸ ✗ Orders.Tests        ✓1 ×1 ≈1  1 new  │ 09:41:07 · 6s
  2 Billing                         1 passed │
      ✓ Billing.Tests                     ✓1 │ runs   ················████   [ picks a run
  Frontend · vitest · nx test        not run │
  3 Shop                             not run │ FAILURES 1   NEW 1
      · Shop                         not run │         ▌▌  NEW  ✗ Orders.Tests.CartTests.Totals(2, 3) (41 ms)
      1 project without test files           │     Expected 5 but was 6
-                                            │     at Orders.Tests.CartTests.Totals() in C:\work\Orders.Tests\C
-                                            │     artTests.cs:line 42
+                                            │     at Orders.Tests.CartTests.Totals() in C:\work\Orders.Tests\
+                                            │     CartTests.cs:line 42
                                             │
                                             │ Flaky (1):
                                             │         ▌▌ ↻ Orders.Tests.CartTests.Adds (12 ms)

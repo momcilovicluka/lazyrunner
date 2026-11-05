@@ -176,6 +176,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         || super::migrations::click(ui, controller, target, double)
         || super::audit::click(ui, target)
         || super::ports::click(ui, controller, target, double)
+        || super::durations::click(ui, target)
     {
         return;
     }
@@ -246,7 +247,7 @@ fn link_click(ui: &mut Ui, controller: &mut Controller, modified: bool) -> bool 
 fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direction: isize) {
     let arrow = if direction > 0 { KeyCode::Up } else { KeyCode::Down };
     match &ui.overlay {
-        Some(Overlay::Changelog { .. } | Overlay::Durations { .. }) => {
+        Some(Overlay::Changelog { .. }) => {
             for _ in 0..WHEEL_LINES {
                 press(ui, controller, arrow);
             }

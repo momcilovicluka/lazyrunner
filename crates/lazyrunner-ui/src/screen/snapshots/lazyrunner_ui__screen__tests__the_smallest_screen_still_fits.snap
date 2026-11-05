@@ -2,12 +2,12 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: "screen.render(60, 15)"
 ---
- ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop  :47┬ ■ Docs   ○ ┬ ■ Conso
+ ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop   ○ ┬ ■ Docs   ○ ┬ ■ Conso
             ┃            │   dev serve│   watch bui│   live
-once        ┃error: Billi│            │            │
+ed once     ┃error: Billi│            │            │
 info: Applic┃ng.cs(3,1): │            │            │
-ation starte┃something is│            │            │
-d.          ┃ off        │            │            │
+ation starte┃ something  │            │            │
+d.          ┃is off      │            │            │
 ────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ l
   r  restart   s  stop   w  open               :  commands
