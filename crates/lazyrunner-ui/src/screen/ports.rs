@@ -1,9 +1,9 @@
 //! P (or `!` while no port is in the way): the port map (#81), full screen - every port the apps want and who really
-//! holds it, read from the system. Its header counts the conflicts; an occupancy strip gives every port at a glance, a
-//! cell each in the table's order; then the table - port, app, the process holding it (PID and command line), its
-//! state (`●` free, `◐` its own app, `×` something else, `∅` a range Windows reserved), for how long, who held it over
-//! the last minute (with room), and what to do about it - the conflicts first. The ranges Windows reserved are listed
-//! under it, a status line says what's wrong, and the keys come last.
+//! holds it, read from the system. Its header counts the conflicts and the keys follow it, as in the other views; an
+//! occupancy strip gives every port at a glance, a cell each in the table's order, and a status line says what's
+//! wrong; then the table - port, app, the process holding it (PID and command line), its state (`●` free, `◐` its own
+//! app, `×` something else, `∅` a range Windows reserved), for how long, who held it over the last minute (with room),
+//! and what to do about it - the conflicts first. The ranges Windows reserved are listed under it.
 //!
 //! `!` stops what holds the picked port (after a yes) - the row dims and a spinner runs until the port is free - `Enter`
 //! goes to its app's column, `w` opens it in the browser, `r` reads the ports again and `y` copies what frees the
@@ -537,24 +537,25 @@ fn bands(controller: &Controller, room: usize) -> Vec<Vec<Seg>> {
     out
 }
 
-/// The line over the keys: the question before `!` stops what holds the picked port, what `y` copied, the first
-/// conflict, or that all is well.
-fn status(ui: &Ui, controller: &Controller, state: &View, picked: Option<&Port>) -> Vec<Seg> {
+/// The keys, under the header as in the other views - or, while `!` asks, the question: the keys first.
+fn keys(state: &View, picked: Option<&Port>, cells: usize) -> Vec<Seg> {
+    let Some(row) = picked.filter(|row| state.confirm && row.holding == Holding::Other) else {
+        let keys = " j k move · ! stops the holder · Enter its column · w opens it · r reads again · y copies the fix · \
+                    Esc closes";
+        return vec![seg(keys, C::DarkGray)];
+    };
+    let who = row
+        .holder
+        .as_ref()
+        .map_or("what holds it".to_string(), |holder| format!("{} (PID {})", holder.name, holder.pid));
+    let text = format!(" y stops {who}, which holds {} · n doesn't ", row.port);
+    vec![on(pad(&text, cells), C::Black, C::Yellow)]
+}
+
+/// The line under the strip: what `y` copied, the first conflict, or that all is well.
+fn status(ui: &Ui, controller: &Controller, state: &View) -> Vec<Seg> {
     let map = controller.port_map();
     let mut line = vec![seg(format!(" {}  ", clock(ui, ui.now)), C::DarkGray)];
-    if let Some(row) = picked.filter(|row| state.confirm && row.holding == Holding::Other) {
-        let who = row
-            .holder
-            .as_ref()
-            .map_or("what holds it".to_string(), |holder| format!("{} (PID {})", holder.name, holder.pid));
-        line.extend([
-            on(" y ", C::Black, C::Yellow),
-            seg(format!(" stops {who}, which holds {} · ", row.port), C::Yellow),
-            on(" n ", C::Black, C::DarkGray),
-            seg(" doesn't", C::Gray),
-        ]);
-        return line;
-    }
     if within(ui, state.copied, COPY_FLASH).is_some() {
         line.push(on(format!(" copied {WINNAT} - paste it into an elevated terminal "), C::Black, C::Cyan));
         return line;
@@ -582,8 +583,8 @@ fn across(line: Vec<Seg>, cells: usize) -> Vec<Seg> {
     aim(fit(line, cells), target)
 }
 
-/// The view: its header, the counts and the occupancy strip, the table (the picked row lit, the bar gliding to it,
-/// the rows coming in as it opens), the reserved ranges, then at the bottom the status line and the keys.
+/// The view: its header and the keys (or the question before `!`), the counts, the occupancy strip and the status
+/// line, the table (the picked row lit, the bar gliding to it, the rows coming in as it opens), the reserved ranges.
 pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some(state) = view(ui) else { return Vec::new() };
     let map = controller.port_map();
@@ -591,9 +592,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let index = state.index.min(list.len().saturating_sub(1));
     let bar = ui.motion.bar(index, ui.now);
     let columns = columns(cells);
-    let mut lines = vec![header(ui, controller), Vec::new()];
+    let mut lines = vec![header(ui, controller), keys(&state, list.get(index).copied(), cells), Vec::new()];
     lines.extend(overview(ui, map, state.opened));
-    lines.extend([Vec::new(), titles(&columns)]);
+    lines.extend([status(ui, controller, &state), Vec::new(), titles(&columns)]);
     if list.is_empty() {
         lines.push(vec![seg("  no app has a port in this checkout", C::Gray)]);
     }
@@ -604,16 +605,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         }
         lines.push(line);
     }
-    let footer = [
-        status(ui, controller, &state, list.get(index).copied()),
-        vec![seg(
-            " j k move · ! stops the holder · Enter its column · w opens it · r reads again · y copies the fix · Esc closes",
-            C::DarkGray,
-        )],
-    ];
-    lines.extend(bands(controller, rows.saturating_sub(lines.len() + footer.len())));
-    lines.resize(rows.saturating_sub(footer.len()), Vec::new());
-    lines.extend(footer);
+    lines.extend(bands(controller, rows.saturating_sub(lines.len())));
+    lines.resize(rows, Vec::new());
     lines.into_iter().map(|line| across(line, cells)).collect()
 }
 

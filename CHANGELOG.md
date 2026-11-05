@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.69.2] - 2026-11-05
+
+### Changed
+- The port map (`P`) shows its keys under its header, as the other views do, and its status line under the occupancy strip; `!`'s question takes the keys' row while it asks (#81)
+
 ## [1.69.1] - 2026-11-05
 
 ### Fixed
