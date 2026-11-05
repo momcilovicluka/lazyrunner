@@ -95,6 +95,11 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(on(format!(" {key} "), C::Black, C::Red).at(target));
         segs.push(seg(format!(" {label}"), C::Red).at(target));
     }
+    if let Some((chip, popping)) = super::ports::chip(ui, controller) {
+        segs.push(seg("   ", C::Gray));
+        let chip = if popping { on(format!(" {chip} "), C::Black, C::Red) } else { seg(chip, C::Red) };
+        segs.push(chip.at(Target::Ports)); // a click opens P on it
+    }
     segs.extend([
         seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta),
         seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),

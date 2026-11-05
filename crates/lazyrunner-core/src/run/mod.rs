@@ -15,6 +15,7 @@ pub mod history;
 pub mod hooks;
 pub mod migrations;
 pub mod net;
+pub mod ports;
 pub mod requests;
 pub mod secrets;
 pub mod suites;

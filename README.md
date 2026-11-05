@@ -200,7 +200,7 @@ at once while the palette wipes away.
 | `s` / `S` | Stop the focused app (or cancel its build or `npm ci`) / stop everything, cancelling a running build - `S` also cancels it from inside the `,` and `x` menus, which stay open |
 | `r` / `R` | Restart the focused app / everything (rebuild if anything changed) |
 | `b` / `B` | Build the focused app / every app that builds (but the ones `S` leaves running): a full build, never skipped, that leaves them **stopped** (a running one is stopped first - it locks its build output). `u` / `U` then start them without building again. npm apps have no separate build step |
-| `!` | Kill whatever holds a port the apps need (offered when a port is taken) |
+| `!` | Kill whatever holds a port the apps need (offered when a port is taken); with no port in the way, the port map (`P`) |
 | `q` / `Ctrl+C` | Quit: stop everything, back to the prompt |
 
 **Tools**
@@ -216,7 +216,8 @@ at once while the palette wipes away.
 | `y` | Copy from the focused app's output - it asks what: `y` the last error with its stack trace (a failed build's errors with full paths), `e` every error, `w` every warning, `a` both in order (repeats once), `s` the search match, `o` all of it |
 | `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |
 | `M` | **Migrations**: the EF Core migrations, applied and pending, per DbContext; apply or roll back (below) |
-| `O` | **Audit**: outdated and vulnerable packages, per app, and what fixes each (below) |
+| `A` | **Audit**: outdated and vulnerable packages, per app, and what fixes each (below) |
+| `P` | **Ports**: every port the apps want, who holds it, and what to do (below) |
 | `H` | **Requests**: the HTTP requests the .NET apps served, per endpoint too (below) |
 | `T` | **Tests**: the project's test suites - run them in the background, see what failed, run one test (below) |
 | `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
@@ -435,9 +436,9 @@ says why, the rest of the way to the target left cracked (`⠅`). A history the 
 dashed, with `◌` nodes and no bead. With reduced motion the bead steps and nothing flows. Outside `M`, the status
 bar shows `○ 3` beside the database while migrations are pending on it.
 
-## Audit (`O`)
+## Audit (`A`)
 
-`O` shows each app's packages that need a look, in three titled panes. **Apps**: each with its worst finding (`2 high`,
+`A` shows each app's packages that need a look, in three titled panes. **Apps**: each with its worst finding (`2 high`,
 a filled capsule for a critical one, `↑ 3 outdated`, `up to date`). **Packages**: the selected app's - the vulnerable
 first, the worst first, then the outdated, a new major version first - with their current and latest versions, their
 severity in capitals (`CRITICAL` filled red, `HIGH`, `MODERATE`, `LOW`) or `↑ outdated only`, what a transitive one
@@ -452,13 +453,17 @@ one.
 `r` scans the selected app, `R` every app: `dotnet list package --vulnerable --include-transitive` and `--outdated`
 for a .NET app (it needs a restore - a build does it), `npm audit` and `npm outdated` for an npm one (it needs a
 `package-lock.json`). They ask the package feeds, so nothing is scanned until you ask: in the background, one app at a
-time, the header saying which. Each scan is kept in the state folder (`audit.json`), so `O` opens on the last one and
+time, the header saying which. Each scan is kept in the state folder (`audit.json`), so `A` opens on the last one and
 says how old it is; a scan that fails keeps the one before and says why.
 
 `l` (or `Enter`) goes into the packages and `h` back to the apps; `/` filters the packages by name, `v` shows only the
 vulnerable ones; `y` (or `u`) copies the picked package's fix, `Enter` (or `o`) opens its advisory, and `i` installs
 the fix after a yes (`y` or `Enter`; `n` or `Esc` doesn't) - the app stops first if it runs and starts again after,
-then it's scanned again. `Esc` goes back out of the packages, then drops the filter, then closes (`q` and `O` too).
+then it's scanned again. `I` installs many fixes together, after asking which: `c` the critical ones, `h` high and
+up, `m` moderate and up, `a` all of them (`n` none) - the question says how many each takes and how many are a new
+major. The app stops once, an npm app's fixes go in one `npm install`, a .NET app's one `dotnet add package` after
+another, each package once. `Esc` goes back out of the packages, then drops the filter, then closes (`q` and `A` too).
+A name too long for its column ends in `…`, before its `new` chip.
 
 Each vulnerable row has an edge in its severity's colour and its severity framed (`▕HIGH▏`); an outdated-only row is
 dimmed, the red meaning advisories. `/` lights the part of each name it matches. While `R` scans, the header counts the
@@ -467,10 +472,42 @@ apps off (`3 of 5` and a bar), and when it's done the log says it in one line: `
 A fix being installed spins in its own row, and one that failed pulses the row red; `y` lights the command it copied.
 
 A column's title says `⚠ 2 high` while its app's last scan found something high or critical, and the startup
-checklist's Vulnerabilities row says the same from the kept scans - it never scans itself - with `f` opening `O`. It
+checklist's Vulnerabilities row says the same from the kept scans - it never scans itself - with `f` opening `A`. It
 moves (not with reduced motion): its rows come in one after another as it opens, the table dims while its app is
 scanned, the rows that changed light up as the scan lands, what it fixed flashes green, and a new high or critical
 finding pulses once; with reduced motion a changed row keeps an accent edge instead.
+
+## Ports (`P`)
+
+`P` shows every port the apps want (their launch profiles' URLs, the npm dev servers' ports) and who really holds
+each, read from the system. The header counts the conflicts, and an occupancy strip gives every port at a glance - a
+cell each, in the table's order: green free, blue its own app, red something else, hatched reserved. Then the table,
+the conflicts first:
+
+| Column | |
+|--------|---|
+| **port**, **app** | `47202  Billing` |
+| **holder** | the process, its PID and command line: `node.exe (PID 4120) · node vite --port 5173` (the picked row's scrolls when it's long) |
+| **state** | `●` free · `◐` its app, running here · `×` held by other · `∅` reserved by Windows - no app can listen there |
+| **for** | how long it's been so |
+| **the last minute** | who held it, a cell every two seconds - whose process keeps grabbing it (on a wide terminal) |
+| **action** | what to do: `! stop it · since 09:39:58`, `Enter its column · w opens`, `its next start lands here` |
+
+The ranges Windows reserved are listed under it, the apps' ports in them marked, and a status line at the bottom says
+what's wrong: `▲ 47202 conflict since 09:39:58 · node.exe holds Billing's port - ! stops it`.
+
+`!` stops what holds the picked port (after a yes; never the app itself): its row dims and spins until the port is
+free. `Enter` goes to its app's column, `w` opens the port in the browser, `r` reads the ports again and `y` copies
+what frees the reserved ranges (`net stop winnat; net start winnat`, in an elevated terminal). `Esc`, `q` or `P`
+closes it. The ports come from the snapshots lazyrunner takes anyway, once a second; nothing else is sampled. With no
+port in the way, `!` anywhere opens it too.
+
+While it's closed, a stopped app's port that something else has held for a few seconds puts a chip in the panel's
+header - `! 5001 taken`, lighting up once as it appears - so the clash is known before the next start; a click opens
+`P` there. It moves (not with reduced motion): the strip fills left to right and the rows come in one after another as
+it opens; a port that changes flashes its state and its cells; a new conflict slides in with a red edge that pulses
+twice, and pulses while `!` asks about it; a freed port wipes out what held it while `● freed` draws in, then flashes
+green.
 
 ## Requests (`H`)
 
@@ -612,6 +649,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results; run all, a suite, its failed tests or one test |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
+| `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
 | `list_actions` | Everything lazyrunner can do: every action as the palette lists it (its key, whether it runs while an app builds, whether it needs `confirm`) and every setting with its state |
 | `run_action` | Any action by its key, on an app, as your key would |
 | `press_keys` | Keys as the key reference names them (`"g g"`, `"Ctrl+o"`, `"Esc"`), for what no tool covers; answers with the screen after. It waits while you type in a prompt |
@@ -637,7 +675,8 @@ doesn't let an agent that isn't elevated drive a lazyrunner opened with "Run as 
 allow `mcp__lazyrunner__get_status`, `mcp__lazyrunner__get_logs`, `mcp__lazyrunner__get_errors`,
 `mcp__lazyrunner__get_screen`, `mcp__lazyrunner__get_requests`, `mcp__lazyrunner__get_request`,
 `mcp__lazyrunner__list_tests`, `mcp__lazyrunner__get_test_results`,
-`mcp__lazyrunner__get_migrations`, `mcp__lazyrunner__get_audit` and `mcp__lazyrunner__wait` in its permissions.
+`mcp__lazyrunner__get_migrations`, `mcp__lazyrunner__get_audit`, `mcp__lazyrunner__get_ports` and
+`mcp__lazyrunner__wait` in its permissions.
 
 ## npm apps
 

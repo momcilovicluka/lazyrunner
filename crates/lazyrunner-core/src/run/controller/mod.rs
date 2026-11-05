@@ -35,6 +35,7 @@ use super::child::{Child, Guard};
 use super::diff;
 use super::history::{Durations, Kind};
 use super::net::{Listening, ProbeResult};
+use super::ports::Ports;
 use super::watcher::CodeWatcher;
 use super::{Event, Tag};
 use crate::apptypes::{self, Framework, Mode};
@@ -204,7 +205,7 @@ pub struct Controller {
     tests_started: Option<Instant>,
     run_keys: Vec<String>,
     finding_suites: bool,
-    /// The apps' last package scans (the audit view, O), the one scanning now, and those waiting.
+    /// The apps' last package scans (the audit view, A), the one scanning now, and those waiting.
     audits: crate::run::audit::Audits,
     auditing: Option<String>,
     audit_queue: Vec<String>,
@@ -214,7 +215,9 @@ pub struct Controller {
     /// The scans asked for together (R): when they began and how many; and the last fix that failed to install (its
     /// app, its command, when).
     audit_batch: Option<(Instant, usize)>,
-    audit_install_failed: Option<(String, String, Instant)>,
+    audit_install_failed: Option<(String, String, Vec<String>, Instant)>,
+    /// The port map (P): each app's port, who holds it and who held it over the last minute.
+    port_map: Ports,
     probes: HashMap<String, Probe>,
     listening_due: Option<Instant>,
     listening_in_flight: bool,
@@ -242,7 +245,7 @@ pub struct Controller {
     pub(crate) commands: Arc<dyn super::tools::Commands>,
     pub(crate) now: fn() -> Instant,
     /// The ports Windows reserved (`net::reserved_ranges`; the tests set their own).
-    pub(crate) reserved: fn() -> Vec<super::net::PortRange>,
+    pub reserved: fn() -> Vec<super::net::PortRange>,
 }
 
 impl Controller {
@@ -296,6 +299,7 @@ impl Controller {
             audit_landed: HashMap::new(),
             audit_batch: None,
             audit_install_failed: None,
+            port_map: Ports::default(),
             project,
             apps,
             states,
@@ -438,6 +442,22 @@ impl Controller {
         self.ports.get(key).copied().flatten()
     }
 
+    /// The port map (P): each app's port and who holds it, as the last snapshot had it.
+    pub fn port_map(&self) -> &Ports {
+        &self.port_map
+    }
+
+    /// Reads the ranges Windows reserved again, for the port map (netsh; kept a minute).
+    pub fn read_reserved(&mut self) {
+        self.port_map.reserved = (self.reserved)();
+    }
+
+    /// The port map's `r` (and its opening): the reserved ranges and the listening ports read again, now.
+    pub fn rescan_ports(&mut self) {
+        self.read_reserved();
+        self.request_listening(true);
+    }
+
     /// The apps a start is waiting for to answer ("Ready in ..." once they all do).
     pub fn getting_ready(&self) -> &[String] {
         &self.ready_pending
@@ -538,6 +558,12 @@ impl Controller {
                     self.add_log(text, Hue::Yellow);
                 }
                 self.listening = listening;
+                let wanted: Vec<(String, u16, bool)> = self
+                    .apps
+                    .iter()
+                    .filter_map(|app| Some((app.key.clone(), self.port(&app.key)?, self.is_running(&app.key))))
+                    .collect();
+                self.port_map.update(&wanted, &self.listening, now);
                 self.listening_in_flight = false;
                 self.listening_at = self.listening_asked_at;
                 self.watch_states();

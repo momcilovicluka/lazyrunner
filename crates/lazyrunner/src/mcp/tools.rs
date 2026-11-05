@@ -240,9 +240,18 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "get_audit",
-            "Each app's outdated and vulnerable packages as last scanned (the audit view, O): their severity, \
+            "Each app's outdated and vulnerable packages as last scanned (the audit view, A): their severity, \
              advisories, current and latest versions, and the command that fixes each (and where to run it). It \
-             doesn't scan: the scans ask the package feeds, so the user starts them (O, then R).",
+             doesn't scan: the scans ask the package feeds, so the user starts them (A, then R).",
+            json!({}),
+            &[],
+            true,
+        ),
+        tool(
+            "get_ports",
+            "The port map (P): each app's port and who holds it - free, its own app running here, something else \
+             (its PID, name and command line) or a range Windows reserved - for how long, and who held it over the \
+             last minute. kill_port_holder stops what holds one.",
             json!({}),
             &[],
             true,

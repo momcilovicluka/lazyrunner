@@ -438,7 +438,7 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         })
         .collect();
     let inner = widths.iter().sum::<usize>().saturating_sub(4);
-    let footer = "any key closes · : searches every command · lowercase = focused app, uppercase = all";
+    let footer = "any key closes · : searches every command · lowercase = focused app, uppercase = all apps or a tool";
     boxed(
         &icons::titled(ui.nerd, Icon::Keyboard, &format!("Keys · lazyrunner v{VERSION}")),
         lines,

@@ -409,18 +409,63 @@ fn installed(folder: &Path, name: &str) -> Option<String> {
 /// What fixes `package` in `app`, run in [`folder`]: its fix, else an upgrade to its latest version.
 pub fn command(app: &App, package: &Package) -> Option<String> {
     let (dotnet, args) = fix_args(app, package)?;
+    Some(shown(dotnet, &args))
+}
+
+/// A command as it's run: the program, then its arguments (quoted when they hold a space).
+fn shown(dotnet: bool, args: &[String]) -> String {
     let args: Vec<String> =
-        args.into_iter().map(|arg| if arg.contains(' ') { format!("\"{arg}\"") } else { arg }).collect();
-    Some(format!("{} {}", if dotnet { "dotnet" } else { "npm" }, args.join(" ")))
+        args.iter().map(|arg| if arg.contains(' ') { format!("\"{arg}\"") } else { arg.clone() }).collect();
+    format!("{} {}", if dotnet { "dotnet" } else { "npm" }, args.join(" "))
+}
+
+/// The package and version that fix `package`: its fix's, else its latest when it's outdated.
+fn target(package: &Package) -> Option<(&str, &str)> {
+    match (&package.fix, &package.latest) {
+        (Some(fix), _) => Some((fix.package.as_str(), fix.version.as_str())),
+        (None, Some(latest)) if package.outdated() => Some((package.name.as_str(), latest.as_str())),
+        _ => None,
+    }
+}
+
+/// The fixes of `packages` as they run, one after another: an npm app's in one `npm install` (and one `npm audit
+/// fix` for those with no fixed version known), a .NET app's a `dotnet add package` each - each package once, the
+/// first (the worst) one's version.
+pub fn fixes(app: &App, packages: &[Package]) -> Vec<(bool, Vec<String>)> {
+    let mut seen: Vec<&str> = Vec::new();
+    let mut each = Vec::new();
+    for package in packages {
+        let Some((name, _)) = target(package) else { continue };
+        if seen.contains(&name) {
+            continue;
+        }
+        seen.push(name);
+        each.extend(fix_args(app, package));
+    }
+    if !matches!(app.kind, AppKind::Npm { .. }) {
+        return each;
+    }
+    let (fix, install): (Vec<_>, Vec<_>) = each.into_iter().partition(|(_, args)| args[0] == "audit");
+    let mut out = Vec::new();
+    if !install.is_empty() {
+        let mut args = vec!["install".to_string()];
+        args.extend(install.into_iter().filter_map(|(_, args)| args.into_iter().nth(1)));
+        out.push((false, args));
+    }
+    if !fix.is_empty() {
+        out.push((false, vec!["audit".into(), "fix".into()]));
+    }
+    out
+}
+
+/// The commands [`fixes`] runs, as they read.
+pub fn commands(app: &App, packages: &[Package]) -> Vec<String> {
+    fixes(app, packages).iter().map(|(dotnet, args)| shown(*dotnet, args)).collect()
 }
 
 /// What runs `package`'s fix: dotnet (true) or npm, with these arguments.
 fn fix_args(app: &App, package: &Package) -> Option<(bool, Vec<String>)> {
-    let (name, version) = match (&package.fix, &package.latest) {
-        (Some(fix), _) => (fix.package.as_str(), fix.version.as_str()),
-        (None, Some(latest)) if package.outdated() => (package.name.as_str(), latest.as_str()),
-        _ => return None,
-    };
+    let (name, version) = target(package)?;
     Some(match &app.kind {
         AppKind::Dotnet { project, .. } => {
             let file =
@@ -432,9 +477,26 @@ fn fix_args(app: &App, package: &Package) -> Option<(bool, Vec<String>)> {
     })
 }
 
-/// Runs `package`'s fix in its app's folder, and waits; what it said went wrong when it didn't work.
-pub fn install(root: &Path, app: &App, package: &Package) -> Result<()> {
-    let Some((dotnet, args)) = fix_args(app, package) else { bail!("{} has nothing to install", package.name) };
+/// Runs the fixes of `packages` in their app's folder, one after another ([`fixes`]), and waits; what went wrong when
+/// one didn't work (and how many didn't).
+pub fn install(root: &Path, app: &App, packages: &[Package]) -> Result<()> {
+    let each = fixes(app, packages);
+    if each.is_empty() {
+        bail!("there's nothing to install");
+    }
+    let failed: Vec<String> = each
+        .iter()
+        .filter_map(|(dotnet, args)| run(root, app, *dotnet, args).err().map(|error| error.to_string()))
+        .collect();
+    match failed.first() {
+        None => Ok(()),
+        Some(error) if each.len() == 1 => bail!("{error}"),
+        Some(error) => bail!("{} of {} failed - {error}", failed.len(), each.len()),
+    }
+}
+
+/// Runs one fix in its app's folder, and waits; what it said went wrong when it didn't work.
+fn run(root: &Path, app: &App, dotnet: bool, args: &[String]) -> Result<()> {
     let mut command = if dotnet {
         Command::new(tools::dotnet())
     } else {
@@ -443,7 +505,7 @@ pub fn install(root: &Path, app: &App, package: &Package) -> Result<()> {
         command.args(launcher);
         command
     };
-    let done = command.args(&args).current_dir(folder(root, app)).stdin(Stdio::null()).output()?;
+    let done = command.args(args).current_dir(folder(root, app)).stdin(Stdio::null()).output()?;
     if done.status.success() {
         return Ok(());
     }
@@ -558,6 +620,8 @@ mod tests {
         let app = dotnet_app();
         assert_eq!(command(&app, &found[0]).unwrap(), "dotnet add Orders.csproj package Example.Json --version 13.0.4");
         assert_eq!(command(&app, &found[2]).unwrap(), "dotnet add Orders.csproj package Example.Old --version 1.2.0");
+        let twice = [found[0].clone(), found[0].clone(), found[2].clone()];
+        assert_eq!(commands(&app, &twice).len(), 2, "a .NET app's fixes run one by one, each package once");
         assert!(folder(Path::new("repo"), &app).ends_with("services/Orders"));
         assert_eq!(summary(&found), "2 high · 1 outdated");
         let failed = json!({ "version": 1, "problems": [{ "level": "error", "text": "No assets file was found" }] });
@@ -587,6 +651,11 @@ mod tests {
         assert_eq!(command(&app, &found[0]).unwrap(), "npm install lodash@4.18.1");
         assert_eq!(command(&app, &found[1]).unwrap(), "npm audit fix", "fixable, no version given");
         assert_eq!(command(&app, &found[2]).unwrap(), "npm install left-pad@1.3.0");
+        assert_eq!(
+            commands(&app, &found),
+            ["npm install lodash@4.18.1 left-pad@1.3.0", "npm audit fix"],
+            "many fixes: one install, and one audit fix for those with no version"
+        );
         let failed =
             json!({ "error": { "code": "ENOLOCK", "summary": "This command requires an existing lockfile." } });
         assert!(npm(&failed.to_string(), "{}", |_| None).unwrap_err().to_string().contains("existing lockfile"));

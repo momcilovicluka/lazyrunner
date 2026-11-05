@@ -235,7 +235,7 @@ pub(super) fn fix_check(
         Some(Fix::Winnat) => list.copied(index, clipboard(WINNAT)),
         Some(Fix::Audit) => {
             list.skip = true;
-            *replay = Some(KeyEvent::new(KeyCode::Char('O'), KeyModifiers::NONE)); // the audit view, once closed
+            *replay = Some(KeyEvent::new(KeyCode::Char('A'), KeyModifiers::NONE)); // the audit view, once closed
         }
         Some(fix) => list.start_fix(controller, index, fix),
         None => {}
@@ -541,6 +541,11 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Ports { .. }) => {
+            if !super::ports::key(ui, controller, name) {
+                from_view(ui, controller, name);
+            }
+        }
         Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
@@ -730,6 +735,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Requests => super::seen::open(ui, controller, super::jumps::View::Requests),
         Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),
         Run::Audit => super::audit::open(ui, controller),
+        Run::Ports => super::ports::open(ui, controller, None),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => {

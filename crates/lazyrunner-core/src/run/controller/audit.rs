@@ -8,12 +8,13 @@ use crate::output::Hue;
 use crate::run::Event;
 use crate::run::audit::{self, AppAudit, Audits, Package, Severity};
 
-/// A fix being installed from the audit view: its app, the command, and whether the app was running (it starts
-/// again after).
+/// The fixes being installed from the audit view: their app, the commands, whether the app was running (it starts
+/// again after), and the packages they fix.
 pub(super) struct Installing {
     key: String,
     command: String,
     restart: bool,
+    names: Vec<String>,
 }
 
 impl Controller {
@@ -45,26 +46,45 @@ impl Controller {
     /// `i` in the audit view, after a yes: installs `package`'s fix in its app's folder, in the background - the app
     /// stops first and starts again after - then scans the app again.
     pub fn audit_install(&mut self, key: &str, package: &Package) {
+        self.audit_install_all(key, vec![package.clone()]);
+    }
+
+    /// `I` in the audit view, after a yes: installs the fixes of `packages` together - the app stops once, an npm
+    /// app's go in one `npm install` - then the app starts again and is scanned again.
+    pub fn audit_install_all(&mut self, key: &str, packages: Vec<Package>) {
         if let Some((_, command)) = self.audit_installing() {
             self.add_log(format!("Still installing ({command})"), Hue::Gray);
             return;
         }
         let Some(app) = self.app(key).cloned() else { return };
-        let Some(command) = audit::command(&app, package) else {
-            self.add_log(format!("{}: nothing to install", package.name), Hue::DarkGray);
+        let commands = audit::commands(&app, &packages);
+        if commands.is_empty() {
+            let what = match packages.as_slice() {
+                [package] => package.name.clone(),
+                _ => app.name.clone(),
+            };
+            self.add_log(format!("{what}: nothing to install"), Hue::DarkGray);
             return;
-        };
+        }
+        let command = commands.join(" && ");
         let restart = self.is_running(key);
         if restart {
             self.stop(Some(&[key.to_string()]), true);
         }
-        self.add_log(format!("Installing for {}: {command}…", app.name), Hue::Cyan);
-        self.audit_installing = Some(Installing { key: key.to_string(), command, restart });
-        let (root, events, package, key) = (self.root.clone(), self.events.clone(), package.clone(), key.to_string());
+        let what = if packages.len() > 1 { format!("{} fixes", packages.len()) } else { "the fix".into() };
+        self.add_log(format!("Installing {what} for {}: {command}…", app.name), Hue::Cyan);
+        let names = packages.iter().map(|package| package.name.clone()).collect();
+        self.audit_installing = Some(Installing { key: key.to_string(), command, restart, names });
+        let (root, events, key) = (self.root.clone(), self.events.clone(), key.to_string());
         tokio::task::spawn_blocking(move || {
-            let result = audit::install(&root, &app, &package).map_err(|error| error.to_string());
+            let result = audit::install(&root, &app, &packages).map_err(|error| error.to_string());
             let _ = events.send(Event::AuditInstalled { key, result });
         });
+    }
+
+    /// The packages whose fixes are being installed.
+    pub fn audit_installing_names(&self) -> &[String] {
+        self.audit_installing.as_ref().map_or(&[], |installing| installing.names.as_slice())
     }
 
     /// A fix was installed (or wasn't): said in the log, the app started again if it ran, and scanned again.
@@ -78,7 +98,8 @@ impl Controller {
             }
             Err(error) => {
                 self.add_log(format!("✗ {name}: {} failed - {error}", installing.command), Hue::Red);
-                self.audit_install_failed = Some((key.clone(), installing.command, (self.now)()));
+                let failed = (key.clone(), installing.command, installing.names, (self.now)());
+                self.audit_install_failed = Some(failed);
             }
         }
         if installing.restart {
@@ -112,10 +133,10 @@ impl Controller {
         Some((total.saturating_sub(left), total))
     }
 
-    /// The last fix that failed to install: its app, its command, and when.
-    pub fn audit_install_failed(&self) -> Option<(&str, &str, Instant)> {
-        let (key, command, at) = self.audit_install_failed.as_ref()?;
-        Some((key.as_str(), command.as_str(), *at))
+    /// The last fixes that failed to install: their app, the commands, the packages, and when.
+    pub fn audit_install_failed(&self) -> Option<(&str, &str, &[String], Instant)> {
+        let (key, command, names, at) = self.audit_install_failed.as_ref()?;
+        Some((key.as_str(), command.as_str(), names.as_slice(), *at))
     }
 
     fn next_audit(&mut self) {

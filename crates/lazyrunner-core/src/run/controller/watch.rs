@@ -120,8 +120,18 @@ impl Controller {
         self.listening_asked_at = Some(at);
         self.listening_due = Some(at + LISTENING_EVERY);
         let events = self.events.clone();
+        let wanted: Vec<u16> = self.apps.iter().filter_map(|app| self.port(&app.key)).collect();
+        let known = self.port_map.known();
         tokio::task::spawn_blocking(move || {
-            let _ = events.send(Event::Listening(Listening::now()));
+            let mut listening = Listening::now();
+            // The port map shows who holds an app's port: their command lines, read once per process.
+            let pids: Vec<u32> = wanted
+                .iter()
+                .filter_map(|port| listening.ports.get(port).map(|owner| owner.pid))
+                .filter(|pid| *pid > 4 && !known.contains(pid))
+                .collect();
+            listening.commands = net::command_lines(&pids);
+            let _ = events.send(Event::Listening(listening));
         });
     }
 

@@ -3,7 +3,7 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
  ◈ AUDIT   Sample  1 high  3 packages · last scan just now
- j k · y copy the fix · i install it · Enter advisory · / filter · v only vulnerable · r rescan · h apps · Esc
+ i install · I install many · y copy · Enter advisory · / filter · v vulnerable · r rescan · h apps · Esc
  APPS                       │  PACKAGES · BILLING   / filter
    ◆ Orders   ↑ 1 outdated  │   Package                  Current     Latest       Severity         Type
  ▸ ■ Billing        1 high  │ ▌ Example.Json             12.0.1      13.0.4      ▕HIGH▏            direct

@@ -33,8 +33,10 @@ pub enum Run {
     Tests,
     Requests,
     Migrations,
-    /// O: outdated and vulnerable packages.
+    /// A: outdated and vulnerable packages.
     Audit,
+    /// P: the port map.
+    Ports,
     GitTool,
     Menu,
     Search,
@@ -197,10 +199,18 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         .safe(),
         action(
             "Tools",
-            "O",
+            "A",
             "Audit: outdated and vulnerable packages",
             "npm audit, dotnet list package - per app, when asked",
             Run::Audit,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "P",
+            "Ports: who holds each app's port",
+            "free, its app, something else, reserved by Windows - and the last minute",
+            Run::Ports,
         )
         .safe(),
         action(
@@ -295,6 +305,11 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Help", ", A z", "Diagnostics zip to attach", "", Run::Diagnostics).safe(),
         action("Help", ":", "Command palette", "also Ctrl+P", Run::Palette).safe().alt(&["Ctrl+P"]),
     ]);
+    if controller.conflicts.is_empty()
+        && let Some(ports) = list.iter_mut().find(|action| action.run == Run::Ports)
+    {
+        ports.alt.push("!"); // with no port in the way, ! shows who holds them
+    }
     list
 }
 

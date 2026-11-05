@@ -3,6 +3,24 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.69.0] - 2026-11-05
+
+### Added
+- `P` opens the port map, full screen: every port the apps want and who really holds it. Its header counts the conflicts, an occupancy strip gives every port at a glance, and the table - the conflicts first - has the port, its app, the process holding it (PID and command line), its state (`●` free, `◐` its app, `×` held by other, `∅` reserved by Windows), for how long, who held it over the last minute (on a wide terminal) and what to do (`! stop it · since 09:39:58`). The ranges Windows reserved are listed under it, and a status line says what's wrong (#81)
+- In it `!` stops what holds the picked port (after a yes; its row dims and spins until the port is free), `Enter` goes to its app's column, `w` opens it, `r` reads the ports again and `y` copies what frees the reserved ranges (#81)
+- While it's closed, a stopped app's port that something else has taken puts `! 5001 taken` in the panel's header, lighting up once; a click opens `P` on it (#81)
+- It moves (not with reduced motion): the strip fills and the rows come in as it opens, a port that changes flashes, a new conflict slides in with a red edge that pulses twice (and while `!` asks about it), and a freed port wipes out what held it while `● freed` draws in, then flashes green (#81)
+- The MCP's `get_ports` gives an agent the same table (#81)
+- `I` in the audit view installs many fixes together, after asking which - `c` the critical ones, `h` high and up, `m` moderate and up, `a` all; the question says how many each takes and how many are a new major. The app stops once, an npm app's fixes go in one `npm install` (#79)
+
+### Changed
+- The audit view moved from `O` to `A`, for Audit (#81)
+- With no port in the way, `!` opens the port map instead of doing nothing (#81)
+- The key reference says what capitals are: all apps, or a tool (#81)
+
+### Fixed
+- In the audit view a long package name no longer runs under its `new` chip or into its version: it ends in `…` before them (#79)
+
 ## [1.68.1] - 2026-11-05
 
 ### Changed

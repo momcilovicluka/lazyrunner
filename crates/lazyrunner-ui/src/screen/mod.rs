@@ -26,6 +26,7 @@ pub mod mouse;
 pub mod overlays;
 pub mod palette;
 pub mod panel;
+pub mod ports;
 pub mod rail;
 pub mod rail_density;
 pub mod rail_motion;
@@ -169,7 +170,7 @@ pub enum Overlay {
         only: bool,
         saved: Option<(String, Instant)>,
     },
-    /// `O`: outdated and vulnerable packages; the selected app, the picked package, whether the packages have the
+    /// `A`: outdated and vulnerable packages; the selected app, the picked package, whether the packages have the
     /// keys, whether only the vulnerable ones show, whether it asks before `i` installs a fix, what `/` filters the
     /// packages' names by (and whether it's being typed), when it opened (its rows come in one after another), and
     /// when `y` last copied a fix (the command lights up).
@@ -179,10 +180,22 @@ pub enum Overlay {
         packages: bool,
         only: bool,
         confirm: bool,
+        /// `I` asks which of the app's fixes to install together.
+        batch: bool,
         filter: String,
         typing: bool,
         opened: Instant,
         copied: Option<Instant>,
+    },
+    /// `P`: the port map; the picked port, whether `!` asks before stopping what holds it, when `y` last copied what
+    /// frees the reserved ranges, when it opened (the strip fills, the rows come in), and the app whose port is being
+    /// freed, since when.
+    Ports {
+        index: usize,
+        confirm: bool,
+        copied: Option<Instant>,
+        opened: Instant,
+        stopping: Option<(String, Instant)>,
     },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {
@@ -239,6 +252,7 @@ impl Overlay {
             Self::Install { .. } => "install",
             Self::Copy { .. } => "copy",
             Self::Audit { .. } => "audit",
+            Self::Ports { .. } => "ports",
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
@@ -566,6 +580,7 @@ impl Ui {
             || controller.auditing().is_some()
             || controller.audit_installing().is_some()
             || audit::animating(self, controller)
+            || ports::animating(self, controller)
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
             || rail_motion::animating(self)
@@ -705,6 +720,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Copy { .. }) => return overlays::copy(ui, controller, width, rows),
         Some(Overlay::Migrations { .. }) => return migrations::rows(ui, controller, width, rows),
         Some(Overlay::Audit { .. }) => return audit::rows(ui, controller, width, rows),
+        Some(Overlay::Ports { .. }) => return ports::rows(ui, controller, width, rows),
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
