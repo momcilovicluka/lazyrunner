@@ -494,8 +494,9 @@ the conflicts first:
 | **the last minute** | who held it, a cell every two seconds - whose process keeps grabbing it (on a wide terminal) |
 | **action** | what to do: `! stop it · since 09:39:58`, `Enter its column · w opens`, `its next start lands here` |
 
-The ranges Windows reserved are listed under it, the apps' ports in them marked, and a status line at the bottom says
-what's wrong: `▲ 47202 conflict since 09:39:58 · node.exe holds Billing's port - ! stops it`.
+The keys sit under the header, as in the other views, and a status line under the strip says what's wrong:
+`▲ 47202 conflict since 09:39:58 · node.exe holds Billing's port - ! stops it`. The ranges Windows reserved are listed
+under the table, the apps' ports in them marked.
 
 `!` stops what holds the picked port (after a yes; never the app itself): its row dims and spins until the port is
 free. `Enter` goes to its app's column, `w` opens the port in the browser, `r` reads the ports again and `y` copies

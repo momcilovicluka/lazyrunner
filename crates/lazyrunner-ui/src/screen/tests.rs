@@ -3434,6 +3434,7 @@ async fn the_port_map_shows_who_holds_each_port_and_stops_what_took_one() {
     let frame = screen.render(150, 40);
     assert!(frame.contains("PORTS") && frame.contains("1 conflict") && frame.contains("0 reserved"), "{frame}");
     assert!(frame.contains("occupancy") && frame.contains("a cell per port"), "the strip: {frame}");
+    assert!(frame.lines().nth(1).is_some_and(|keys| keys.contains("j k move")), "the keys under the header: {frame}");
     assert!(frame.contains("node.exe (PID 4120) · node vite"), "who holds it: {frame}");
     assert!(frame.contains("× held by other") && frame.contains("! stop it · since"), "{frame}");
     assert!(frame.contains(&format!("▲ {taken} conflict since")), "the status line: {frame}");
