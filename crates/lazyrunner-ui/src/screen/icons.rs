@@ -121,7 +121,7 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Skip, false) => "–",
         (Icon::Skip, true) => "\u{f068}", // minus
         (Icon::Queued, false) => "◌",
-        (Icon::Queued, true) => "\u{f017}", // clock
+        (Icon::Queued, true) => "\u{f43a}", // clock (Octicons': Font Awesome's is a solid disc in Cascadia NF)
         (Icon::Cancelled, false) => "■",
         (Icon::Cancelled, true) => "\u{f04d}", // stop
         (Icon::Reload, false) => "↻",

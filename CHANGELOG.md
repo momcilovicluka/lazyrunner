@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.72.1] - 2026-11-05
+
+### Fixed
+- The clock that marks what's queued (tests, migrations) showed as a solid disc in Cascadia Code NF and Cascadia Mono NF, whose Font Awesome clock is drawn filled: it's the Octicons clock now, which both Nerd Fonts draw as a clock
+
 ## [1.72.0] - 2026-11-05
 
 ### Fixed
