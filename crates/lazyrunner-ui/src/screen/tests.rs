@@ -293,6 +293,8 @@ async fn settings_toggle_and_say_so() {
     let mut screen = screen("snap-settings", json!({}));
     screen.press(",");
     insta::assert_snapshot!(screen.frame());
+    let tall = screen.render(110, 45);
+    assert!(tall.contains("STARTUP") && tall.contains("DISPLAY") && tall.contains("MORE"), "grouped with room: {tall}");
     screen.press("a");
     assert_eq!(screen.last_log(), "Auto-restart on branch change: on (saved)");
     assert!(screen.controller.setting(Toggle::AutoRestartOnBranchChange));
@@ -1940,9 +1942,10 @@ async fn in_a_menu_a_click_picks_an_item_a_double_click_runs_it_and_a_click_outs
     let mut screen = screen("mouse-menu", json!({}));
     screen.press(",");
     screen.click(Target::Item(1));
-    assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { index: 1 })), "picked, not run");
+    screen.click(Target::Item(0));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Settings { index: 0 })), "picked, not run");
     assert!(screen.controller.setting(Toggle::AutoStartOnOpen), "still on");
-    screen.click(Target::Item(1));
+    screen.click(Target::Item(0));
     assert!(!screen.controller.setting(Toggle::AutoStartOnOpen), "a double click runs it: auto-start toggled");
     screen.press("Esc ,");
     let (_, y) = screen.spot(Target::Item(0));
@@ -3527,8 +3530,29 @@ async fn the_audit_view_cuts_a_long_name_before_its_new_chip_and_asks_before_ins
     screen.press("I n");
     assert!(!screen.frame().contains("moderate and up"), "n installs none");
     screen.press("+");
-    assert!(screen.controller.audit_parallelism() == 4 && screen.frame().contains("4 at once (+ -)"));
+    assert!(screen.controller.audit_parallelism() == 3 && screen.frame().contains("3 at once (+ -)"));
     screen.press("- - - - -");
     assert_eq!(screen.controller.audit_parallelism(), 1, "one at a time at least");
     assert!(screen.controller.audit_installing().is_none());
+}
+
+#[tokio::test]
+async fn a_title_fills_green_as_its_app_comes_up_and_drains_as_it_stops() {
+    use super::phases::{Phase, chip, note};
+    use super::theme::C;
+    let mut screen = screen("phases", json!({}));
+    screen.ui.motion.enabled = true;
+    note(&mut screen.ui, "orders", Phase::Starting);
+    note(&mut screen.ui, "orders", Phase::Up);
+    screen.ui.now += Duration::from_millis(200);
+    let half = chip(&screen.ui, "orders", " Orders ".into(), C::Black, C::Green);
+    assert_eq!(half.len(), 2, "half filled: {half:?}");
+    assert_eq!((half[0].bg, half[1].bg), (Some(C::Green), Some(C::Yellow)), "green from the left, yellow left");
+    screen.ui.now += Duration::from_millis(400);
+    assert_eq!(chip(&screen.ui, "orders", " Orders ".into(), C::Black, C::Green).len(), 1, "then it's as it is");
+    note(&mut screen.ui, "orders", Phase::Stopped);
+    let draining = chip(&screen.ui, "orders", " Orders ".into(), C::White, C::DarkGray);
+    assert_eq!(draining[0].bg, Some(C::Green), "the colour it had drains from the right");
+    screen.ui.motion.enabled = false;
+    assert_eq!(chip(&screen.ui, "orders", " Orders ".into(), C::White, C::DarkGray).len(), 1, "not with motion off");
 }

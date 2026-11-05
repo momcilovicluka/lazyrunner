@@ -105,6 +105,11 @@ fn draining_box(
     (0..rows).map(|row| row.checked_sub(top).and_then(|index| boxed.get(index).cloned()).unwrap_or_default()).collect()
 }
 
+/// A setting's label as a switch: whether it's on, and the rest.
+fn switch(label: &str) -> Option<(bool, &str)> {
+    label.strip_prefix("[x] ").map(|rest| (true, rest)).or_else(|| label.strip_prefix("[ ] ").map(|rest| (false, rest)))
+}
+
 /// A selected item: the whole line in the highlight colours.
 fn selected(text: &str, inner: usize) -> Vec<Seg> {
     vec![on(pad(text, inner), C::Black, C::Cyan)]
@@ -225,26 +230,47 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         }
         _ => 0,
     };
-    let lines: Vec<Vec<Seg>> = items
-        .iter()
-        .enumerate()
-        .map(|(i, item)| {
-            let key = pad(&format!(" {}", item.key), 8);
-            let hint = if item.hint.is_empty() { String::new() } else { format!("  {}", item.hint) };
-            let flipped = matches!(&item.run, actions::Run::Setting { toggle, .. }
-                if ui.motion.lit(&super::motion::Spot::Setting(*toggle), ui.now).is_some());
-            if flipped {
-                let line = pad(&format!("{key}{}{hint}", item.label), inner);
-                return aim(vec![on(line, C::Black, C::Green)], Target::Item(i));
-            }
-            if i == index {
-                let label = if item.hint.is_empty() { item.label.clone() } else { format!("{}  ", item.label) };
-                return aim(selected_parts(ui, &[&key, &label, &item.hint], inner), Target::Item(i));
-            }
-            let label_color = if item.label.starts_with("[x]") { C::Green } else { C::White };
-            aim(vec![seg(key, C::Cyan), seg(item.label.clone(), label_color), seg(hint, C::DarkGray)], Target::Item(i))
-        })
-        .collect();
+    let row = |i: usize, item: &Action| {
+        let key = pad(&format!(" {}", item.key), 8);
+        let hint = if item.hint.is_empty() { String::new() } else { format!("  {}", item.hint) };
+        // A setting's [x] / [ ] is a switch: a green ● on, a dim ○ off.
+        let switch = switch(&item.label);
+        let label =
+            switch.map_or_else(|| item.label.clone(), |(on, rest)| format!("{} {rest}", if on { "●" } else { "○" }));
+        let flipped = matches!(&item.run, actions::Run::Setting { toggle, .. }
+            if ui.motion.lit(&super::motion::Spot::Setting(*toggle), ui.now).is_some());
+        if flipped {
+            let line = pad(&format!("{key}{label}{hint}"), inner);
+            return aim(vec![on(line, C::Black, C::Green)], Target::Item(i));
+        }
+        if i == index {
+            let label = if item.hint.is_empty() { label } else { format!("{label}  ") };
+            return aim(selected_parts(ui, &[&key, &label, &item.hint], inner), Target::Item(i));
+        }
+        let mut segs = vec![seg(key, C::Cyan)];
+        match switch {
+            Some((true, rest)) => segs.extend([seg("● ", C::Green), seg(rest.to_string(), C::White)]),
+            Some((false, rest)) => segs.extend([seg("○ ", C::DarkGray), seg(rest.to_string(), C::Gray)]),
+            None => segs.push(seg(item.label.clone(), C::White)),
+        }
+        segs.push(seg(hint, C::DarkGray));
+        aim(segs, Target::Item(i))
+    };
+    // The settings by group, a title over each, when there's room for them.
+    let group = |item: &Action| match &item.run {
+        actions::Run::Setting { toggle, .. } => actions::setting_group(*toggle),
+        _ => "More",
+    };
+    let settings = matches!(ui.overlay, Some(Overlay::Settings { .. }));
+    let groups = items.iter().map(group).collect::<std::collections::BTreeSet<_>>().len();
+    let titled = settings && items.len() + groups + 3 <= rows;
+    let mut lines: Vec<Vec<Seg>> = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        if titled && (i == 0 || group(item) != group(&items[i - 1])) {
+            lines.push(vec![seg(format!(" {}", group(item).to_uppercase()), C::DarkCyan)]);
+        }
+        lines.push(row(i, item));
+    }
     if matches!(ui.overlay, Some(Overlay::Menu { .. })) {
         let name = controller.apps.get(ui.focus).map_or(String::new(), |app| app.name.clone());
         boxed(&name, lines, "press a key, or j k + Enter · Esc / x close", cells, rows, inner)

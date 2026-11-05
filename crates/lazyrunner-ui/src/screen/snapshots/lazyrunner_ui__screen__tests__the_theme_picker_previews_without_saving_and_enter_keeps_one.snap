@@ -12,11 +12,11 @@ expression: screen.frame()
              ┃             │             │             │                 ┃    Dark                  ■■■■■■
              ┃             │             │             │                 ┃    Dracula               ■■■■■■
              ┃             │             │             │                 ┃    Evangelion            ■■■■■■
-             ┃             │             │             │                 ┃    Everforest            ■■■■■■
-u starts it  ┃             │             │             │                 ┃    GitHub Dark           ■■■■■■
-b builds it  ┃             │             │             │                 ┃    Gruvbox               ■■■■■■
-U starts all ┃             │             │             │                 ┃    Hatsune Miku          ■■■■■■
-             ┃             │             │             │                 ┃    High Contrast         ■■■■■■
+not started y┃             │             │             │                 ┃    Everforest            ■■■■■■
+             ┃             │             │             │                 ┃    GitHub Dark           ■■■■■■
+u starts it  ┃not started y│not started y│not started y│ not started yet ┃    Gruvbox               ■■■■■■
+b builds it  ┃             │             │             │                 ┃    Hatsune Miku          ■■■■■■
+U starts all ┃             │             │             │                 ┃    High Contrast         ■■■■■■
              ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
              ┃             │             │             │                 ┃    Monokai Pro           ■■■■■■
              ┃             │             │             │                 ┃    Night Owl             ■■■■■■

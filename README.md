@@ -311,6 +311,14 @@ a selected row is still too long for the terminal its hint scrolls sideways to s
 put. `, f` (reduced motion) turns it all
 off.
 
+A column's title moves as its app changes: coming up fills its chip green from the left, stopping drains the colour it
+had from the right, and a crash pulses it twice - a glance across the titles says what just happened where. An empty
+column says what its app is (`not started yet`, `stopped · started 10:42`, `exited · code 1`), the focused one what
+starts it too. The panel's log keeps each line's mark (`✓` `×` `!` `▸`) in a column of its own, the newest line slides
+in from the right, and a line too long for the panel scrolls sideways, its time and mark staying put. The settings
+(`,`) show as switches - a green `●` on, a dim `○` off - grouped under Startup, Running, Display and Integrations when
+there's room.
+
 ### During a build
 
 .NET builds run one at a time; `R`, `B`, `r`, `b`, `U` and `!` wait for the current one (`S` cancels it). Everything
@@ -459,8 +467,10 @@ one.
 
 `r` scans the selected app, `R` every app: `dotnet list package --vulnerable --include-transitive` and `--outdated`
 for a .NET app (it needs a restore - a build does it), `npm audit` and `npm outdated` for an npm one (it needs a
-`package-lock.json`). They ask the package feeds, so nothing is scanned until you ask: in the background, three apps at
-once (an app's two commands side by side), the header saying which. `+` and `-` change how many (1 to 8, saved as
+`package-lock.json`). They ask the package feeds, so nothing is scanned until you ask: in the background, two apps at
+once, the header saying which. They run below normal priority and MSBuild's workers don't outlive them, so a scan
+never weighs on the apps or lazyrunner - each `dotnet list package` keeps an MSBuild worker per core busy, so a .NET
+app's two run one after the other (an npm app's side by side). `+` and `-` change how many apps (1 to 8, saved as
 `auditParallelism`) - fewer when a feed refuses a burst of requests. A scan that fails beside others is scanned again on
 its own once the rest are done; only then does it count. Each scan is kept in the state folder (`audit.json`), so `A`
 opens on the last one and says how old it is; a scan that fails keeps the one before, and its time, and says why.
@@ -777,7 +787,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `spinner` | lazyrunner's | What spins while something runs, as lazygit's `gui.spinner`: `{ "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` - texts of up to 8 cells, and milliseconds a frame (16 to 2000; 100 left out) |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
-| `auditParallelism` | `3` | How many apps the audit view (`A`) scans at once, 1 to 8 (`+` / `-` there) |
+| `auditParallelism` | `2` | How many apps the audit view (`A`) scans at once, 1 to 8 (`+` / `-` there) |
 | `migrationParallelism` | `3` | How many DbContexts the migrations view (`M`) checks at once, 1 to 8 (`+` / `-` there); a migration runs alone |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
 | `hooks` | | Your own commands, run when something happens - see Hooks below |

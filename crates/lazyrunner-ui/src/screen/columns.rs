@@ -264,7 +264,15 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     if !controller.env_overrides(&app.key).is_empty() {
         name.push_str(" · env*"); // what it gets on this machine differs (the start sheet)
     }
-    let mut segs = vec![on(format!(" {marker}{icon} {name} "), chip_fg, chip_bg)];
+    super::phases::note(ui, &app.key, super::phases::Phase::of(&controller.states[index]));
+    let text = format!(" {marker}{icon} {name} ");
+    // An action's flash wins; else the chip moves as the app changes state.
+    let mut segs = if ui.motion.title_lit(index, ui.now) {
+        vec![on(text, chip_fg, chip_bg)]
+    } else {
+        super::phases::chip(ui, &app.key, text, chip_fg, chip_bg)
+    };
+    let chip_parts = segs.len();
     if super::diff::is_on(ui, &app.key) {
         segs.push(seg(format!(" {}", icons::icon(ui.nerd, Icon::Diff)), C::Cyan));
     }
@@ -281,13 +289,13 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let fits = width(&segs) + port.text.width() + width(&status) <= cells;
     segs.push(if fits { port } else { seg("  ", C::DarkGray) });
     segs.extend(status);
-    let mut segs = ui.scrolling_row(segs, 2, cells);
+    let mut segs = ui.scrolling_row(segs, chip_parts + 1, cells);
     let used = width(&segs);
     let rule = if focused { "━" } else { "─" };
     segs.push(seg(format!(" {}", rule.repeat(cells.saturating_sub(used + 1))), border(controller, index)));
     if focused {
         // The focused pane's whole title bar takes the theme's focus colours (the state chip keeps its own).
-        for seg in segs.iter_mut().skip(1) {
+        for seg in segs.iter_mut().skip(chip_parts) {
             seg.fg = C::FocusText;
             seg.bg = Some(C::FocusBack);
         }
@@ -538,10 +546,22 @@ fn bright(color: C) -> C {
 fn empty_hint(controller: &Controller, index: usize, focused: bool, search: Option<&super::Search>) -> Vec<String> {
     let state = &controller.states[index];
     if state.output.is_empty() {
+        // What the app is, in an empty column; the focused one's says what starts it too.
+        let line = match &state.status {
+            Status::Stopped => match state.started_wall {
+                None => "not started yet".to_string(),
+                Some(at) => {
+                    format!("stopped · started {}", chrono::DateTime::<chrono::Local>::from(at).format("%H:%M"))
+                }
+            },
+            Status::Exited(code) => format!("exited · code {}", code.map_or("?".into(), |code| code.to_string())),
+            Status::Error(_) => "couldn't start".to_string(),
+            Status::Running => return Vec::new(),
+        };
         if !focused || !matches!(state.status, Status::Stopped) {
-            return Vec::new();
+            return vec![line];
         }
-        let mut hint = vec!["u starts it".to_string()];
+        let mut hint = vec![line, String::new(), "u starts it".to_string()];
         if controller.apps[index].traits().builds {
             hint.push("b builds it".into());
         }

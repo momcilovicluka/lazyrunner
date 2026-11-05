@@ -13,7 +13,7 @@ expression: screen.frame()
   │  ≡  [ ] Restart the APIs when code changes                                                     ,   e   │
   │  ✱  Requests: what the .NET apps served  newest or slowest, per endpoint; filter, copy, open       H   │
   │  ≡  Run the startup checklist now (and check for an update)                                    ,   r   │
-  │  ?  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklist…                   ,   │
+  │  ≡  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklist…                   ,   │
   │  ✱  Tests: run the project's test suites  dotnet test, jest, vitest - several at once in the bac…  T   │
   │  ◧  Marks: every column's, to jump to                                                              '   │
   │  ≡  [x] Startup checklist when lazyrunner opens                                                ,   w   │

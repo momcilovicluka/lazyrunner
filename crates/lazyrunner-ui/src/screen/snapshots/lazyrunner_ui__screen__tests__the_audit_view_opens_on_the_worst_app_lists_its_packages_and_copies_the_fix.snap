@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
- ◈ AUDIT   Sample  1 high  3 packages · last scan just now · 3 at once (+ -)
+ ◈ AUDIT   Sample  1 high  3 packages · last scan just now · 2 at once (+ -)
  i install · I install many · y copy · Enter advisory · e details · / filter · v vulnerable · r rescan · h app
  APPS                       │  PACKAGES · BILLING   / filter
    ◆ Orders   ↑ 1 outdated  │   Package                  Current     Latest       Severity         Type
@@ -29,5 +29,5 @@ expression: frame
  lazyrunner   ○ stopped   ↶ 1/1   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
 
- 12:00:00 Audit: Orders - 1 outdated
- 12:00:00 Audit: Billing - 1 high · 1 outdated
+ 12:00:00   Audit: Orders - 1 outdated
+ 12:00:00   Audit: Billing - 1 high · 1 outdated

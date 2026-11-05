@@ -6,13 +6,12 @@ use std::collections::{HashSet, VecDeque};
 
 use serde_json::Value;
 
-/// How many at once: at least one, at most `MOST`, `USUAL` when the setting is missing.
+/// How many at once: at least one, at most `MOST`.
 pub const MOST: usize = 8;
-const USUAL: usize = 3;
 
-/// A setting's number of things at once.
-pub fn at_once(value: &Value) -> usize {
-    value.as_u64().map_or(USUAL, |count| (count as usize).clamp(1, MOST))
+/// A setting's number of things at once, `usual` when it's missing.
+pub fn at_once(value: &Value, usual: usize) -> usize {
+    value.as_u64().map_or(usual, |count| (count as usize).clamp(1, MOST))
 }
 
 /// What ran beside other work, what was tried again already, and what waits to be tried again on its own.
@@ -86,11 +85,11 @@ mod tests {
 
     #[test]
     fn the_setting_says_how_many_at_once_within_bounds() {
-        assert_eq!(at_once(&Value::Null), 3);
-        assert_eq!(at_once(&json!(1)), 1);
-        assert_eq!(at_once(&json!(0)), 1, "never none");
-        assert_eq!(at_once(&json!(50)), MOST);
-        assert_eq!(at_once(&json!("lots")), 3);
+        assert_eq!(at_once(&Value::Null, 2), 2);
+        assert_eq!(at_once(&json!(1), 2), 1);
+        assert_eq!(at_once(&json!(0), 2), 1, "never none");
+        assert_eq!(at_once(&json!(50), 2), MOST);
+        assert_eq!(at_once(&json!("lots"), 3), 3);
     }
 
     #[test]

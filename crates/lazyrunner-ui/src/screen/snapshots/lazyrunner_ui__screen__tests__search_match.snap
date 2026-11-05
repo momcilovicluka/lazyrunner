@@ -14,7 +14,7 @@ expression: screen.frame()
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
-                     ┃                     │                     │                     │
+                     ┃                     │   not started yet   │   not started yet   │   not started yet
                      ┃                     │                     │                     │
 info: Microsoft.     ┃                     │                     │                     │
 Hosting.Lifetime[14] ┃                     │                     │                     │
@@ -29,5 +29,5 @@ started.             ┃1): something is off │                     │        
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all     :  commands   x  menu   ?  keys   ,  settings
  /error   match 1 of 1 (1 = newest) · n older · N newer · Esc clears
- 12:00:00 Starting Orders + Billing
+ 12:00:00   Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

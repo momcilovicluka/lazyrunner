@@ -14,7 +14,7 @@ orders line 45      ⣗┃                     │                     │      
 orders line 46      ⣗┃                     │                     │                     │
 orders line 47      ▐┃                     │                     │                     │
 orders line 48      ▐┃                     │                     │                     │
-orders line 49      ▐┃                     │                     │                     │
+orders line 49      ▐┃                     │   not started yet   │   not started yet   │   not started yet
 orders line 50      ⡯┃                     │                     │                     │
 orders line 51      ⡯┃                     │                     │                     │
 orders line 52      ⡯┃                     │                     │                     │
@@ -29,5 +29,5 @@ orders line 59      ⡗┃1): something is off │                     │      
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all     :  commands   x  menu   ?  keys   ,  settings
 
- 12:00:00 Starting Orders + Billing
+ 12:00:00   Starting Orders + Billing
  12:00:00 ✓ Orders is up (3.2 s)

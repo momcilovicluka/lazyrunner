@@ -238,7 +238,7 @@ impl Controller {
     /// How many contexts are checked at once: `"migrationParallelism"`, 3 when it's missing (1 to 8); an update runs
     /// alone.
     pub fn migration_parallelism(&self) -> usize {
-        parallel::at_once(&self.config["migrationParallelism"])
+        parallel::at_once(&self.config["migrationParallelism"], 3)
     }
 
     /// `+` and `-` in the migrations view: how many contexts are checked at once, saved; the waiting checks go so.
