@@ -3502,7 +3502,8 @@ async fn the_audit_view_cuts_a_long_name_before_its_new_chip_and_asks_before_ins
     screen.press("l");
     let frame = screen.frame();
     let row = frame.lines().find(|line| line.contains("Example.A.Very")).unwrap_or_default();
-    assert!(row.contains("\u{2026} new  1.0.0"), "the name is cut before its chip, a gap before the version: {row}");
+    assert!(row.contains("\u{2026} 1.0.0"), "a long name is cut, a gap before its version: {row}");
+    assert!(row.contains("\u{258f}  new "), "its new chip follows its severity, off the name: {row}");
     screen.press("I");
     let frame = screen.frame();
     assert!(frame.contains("c critical (0) · h high and up (1) · m moderate and up (2) · a all (2)"), "{frame}");

@@ -463,7 +463,8 @@ then it's scanned again. `I` installs many fixes together, after asking which: `
 up, `m` moderate and up, `a` all of them (`n` none) - the question says how many each takes and how many are a new
 major. The app stops once, an npm app's fixes go in one `npm install`, a .NET app's one `dotnet add package` after
 another, each package once. `Esc` goes back out of the packages, then drops the filter, then closes (`q` and `A` too).
-A name too long for its column ends in `…`, before its `new` chip.
+A name too long for its column ends in `…`; a finding the last scan added has its `new` chip after its
+severity, where it hides nothing.
 
 Each vulnerable row has an edge in its severity's colour and its severity framed (`▕HIGH▏`); an outdated-only row is
 dimmed, the red meaning advisories. `/` lights the part of each name it matches. While `R` scans, the header counts the

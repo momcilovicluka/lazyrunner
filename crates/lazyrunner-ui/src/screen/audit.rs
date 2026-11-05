@@ -609,14 +609,9 @@ fn table_rows(
             let more = if package.via.len() > 1 { format!(" +{}", package.via.len() - 1) } else { String::new() };
             name.push(seg(format!(" via {first}{more}"), C::DarkGray));
         }
-        // The name, cut with … where it doesn't fit, then its `new` chip and a gap before the versions.
-        let chip = if changed { NEW.len() } else { 0 };
+        // The name, cut with … where it doesn't fit, and a gap before the versions.
         let mut row = vec![edge(package, changed && look.edge)];
-        row.extend(cut(name, name_cells.saturating_sub(2 + chip)));
-        if changed {
-            let blink_off = landing.is_some_and(|since| since >= BLINK && since < BLINK * 2);
-            row.push(if blink_off { seg(NEW, C::Yellow) } else { on(NEW, C::Black, C::Yellow) });
-        }
+        row.extend(cut(name, name_cells.saturating_sub(2)));
         row.push(seg(" ", C::Gray));
         let latest = package.latest.clone().filter(|_| package.outdated()).unwrap_or_default();
         let latest_color = match () {
@@ -629,11 +624,17 @@ fn table_rows(
             seg(pad(&package.current, VERSION_CELLS), current_color),
             seg(pad(&latest, VERSION_CELLS), latest_color),
         ]);
-        let severity = match package.severity {
+        let mut severity = match package.severity {
             _ if installing => vec![seg(format!(" {} installing", look.spin), C::Yellow)],
             Some(severity) => vec![pill(severity)],
             None => vec![seg(" ↑ outdated only", C::DarkGray)],
         };
+        // A finding the last scan added: its `new` chip after the severity, where it hides nothing.
+        if changed && !installing {
+            let blink_off = landing.is_some_and(|since| since >= BLINK && since < BLINK * 2);
+            severity.push(seg(" ", C::Gray));
+            severity.push(if blink_off { seg(NEW, C::Yellow) } else { on(NEW, C::Black, C::Yellow) });
+        }
         row.extend(fit(severity, SEVERITY_CELLS));
         row.push(seg(pad(if package.direct { "direct" } else { "transitive" }, KIND_CELLS), C::DarkGray));
         let red = failed.is_some_and(|since| (since.as_millis() / (FAILED.as_millis() / 4)).is_multiple_of(2));

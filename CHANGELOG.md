@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.69.1] - 2026-11-05
+
+### Fixed
+- The audit view's `new` chip sits after a finding's severity now (`▕HIGH▏ new`), so a package's name keeps its whole column instead of losing it to the chip (#79)
+
 ## [1.69.0] - 2026-11-05
 
 ### Added
