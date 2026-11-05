@@ -577,7 +577,7 @@ impl Ui {
             || !self.marquees.borrow().is_empty()
             || self.motion.active(self.now)
             || sheet::animating(self)
-            || controller.auditing().is_some()
+            || !controller.auditing().is_empty()
             || controller.audit_installing().is_some()
             || audit::animating(self, controller)
             || ports::animating(self, controller)

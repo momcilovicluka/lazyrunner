@@ -1,6 +1,7 @@
-//! Running dotnet ef for the migrations view (M): one job at a time in the background - finding an app's contexts,
-//! listing a context's migrations, moving a context to a migration - waiting while an app builds (dotnet ef
-//! --no-build loads the build it would be rewriting).
+//! Running dotnet ef for the migrations view (M) in the background - finding an app's contexts and listing a
+//! context's migrations, `"migrationParallelism"` at once; moving a context to a migration alone - waiting while an app
+//! builds (dotnet ef --no-build loads the build it would be rewriting). A check that failed beside others is checked
+//! once more on its own.
 
 use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -8,7 +9,7 @@ use std::time::Instant;
 
 use serde_json::{Value, json};
 
-use super::Controller;
+use super::{Controller, parallel};
 use crate::config::Toggle;
 use crate::output::{Hue, strip_ansi};
 use crate::profile::{App, AppKind};
@@ -31,7 +32,17 @@ pub enum Work {
     Update { context: String, target: Option<String>, what: String },
 }
 
-/// The job dotnet ef runs now.
+impl Work {
+    /// The app or the context it's for.
+    fn key(&self) -> &str {
+        match self {
+            Self::Find { app } => app,
+            Self::List { context } | Self::Update { context, .. } => context,
+        }
+    }
+}
+
+/// A job dotnet ef runs now.
 pub struct EfJob {
     pub id: u64,
     pub work: Work,
@@ -193,6 +204,7 @@ impl Controller {
 
     /// r: checks the contexts' migrations again (`only` one).
     pub fn list_migrations(&mut self, only: Option<&str>) {
+        self.migration_retry.reset();
         let keys: Vec<String> = self
             .contexts
             .iter()
@@ -220,7 +232,22 @@ impl Controller {
 
     /// Whether dotnet ef is running or waiting.
     pub fn migrations_active(&self) -> bool {
-        self.migration_job.is_some() || !self.migration_queue.is_empty()
+        !self.migration_jobs.is_empty() || !self.migration_queue.is_empty()
+    }
+
+    /// How many contexts are checked at once: `"migrationParallelism"`, 3 when it's missing (1 to 8); an update runs
+    /// alone.
+    pub fn migration_parallelism(&self) -> usize {
+        parallel::at_once(&self.config["migrationParallelism"])
+    }
+
+    /// `+` and `-` in the migrations view: how many contexts are checked at once, saved; the waiting checks go so.
+    pub fn set_migration_parallelism(&mut self, count: usize) {
+        let count = count.clamp(1, parallel::MOST);
+        self.set_setting("migrationParallelism", json!(count));
+        let plural = if count == 1 { "" } else { "s" };
+        self.add_log(format!("Migrations: {count} context{plural} checked at once"), Hue::Gray);
+        self.pump_migrations();
     }
 
     /// The jobs waiting, for the view.
@@ -243,12 +270,33 @@ impl Controller {
         }
     }
 
-    /// Starts the next job, unless one runs or an app builds.
+    /// Starts what may start now: nothing while an app builds; up to `"migrationParallelism"` jobs at once, but an
+    /// update alone and nothing beside one, and a check tried again alone.
     pub(super) fn pump_migrations(&mut self) {
-        if self.migration_job.is_some() || self.building.is_some() {
-            return;
+        while let Some(work) = self.next_migration() {
+            self.start_migration(work);
         }
-        let Some(work) = self.migration_queue.pop_front() else { return };
+    }
+
+    /// The next job, when it may start now.
+    fn next_migration(&mut self) -> Option<Work> {
+        let alone = match self.migration_queue.front()? {
+            Work::Update { .. } => true,
+            Work::List { context } => self.migration_retry.waits(context),
+            Work::Find { .. } => false,
+        };
+        let updating = self.migration_jobs.iter().any(|job| matches!(job.work, Work::Update { .. }));
+        let full = self.migration_jobs.len() >= self.migration_parallelism();
+        if self.building.is_some() || updating || full || (alone && !self.migration_jobs.is_empty()) {
+            return None;
+        }
+        let work = self.migration_queue.pop_front()?;
+        self.migration_retry.take(work.key());
+        Some(work)
+    }
+
+    /// Starts `work`'s dotnet ef in the background.
+    fn start_migration(&mut self, work: Work) {
         let (app, context, project, startup) = match &work {
             Work::Find { app } => {
                 let Some((project, startup)) = self.ef_projects(app) else {
@@ -260,7 +308,7 @@ impl Controller {
                 Some(found) => {
                     (found.app.clone(), Some(found.name.clone()), found.project.clone(), found.startup.clone())
                 }
-                None => return self.pump_migrations(),
+                None => return,
             },
         };
         let name = self.app(&app).map(|app| app.name.clone()).unwrap_or_default();
@@ -293,7 +341,8 @@ impl Controller {
         match Child::spawn(&spec, Tag::Migration { job: id }, self.events.clone(), self.guard.as_ref()) {
             Ok(child) => {
                 let started = (self.now)();
-                self.migration_job = Some(EfJob { id, work, started, lines: Vec::new(), child });
+                self.migration_jobs.push(EfJob { id, work, started, lines: Vec::new(), child });
+                self.migration_retry.together(self.migration_jobs.iter().map(|job| job.work.key()));
             }
             Err(error) => self.fail_migrations(&app, &format!("dotnet couldn't start ({error})")),
         }
@@ -313,12 +362,11 @@ impl Controller {
             }
         }
         self.add_log(format!("✗ Migrations: {why}"), Hue::Red);
-        self.pump_migrations();
     }
 
     pub(super) fn migration_output(&mut self, id: u64, line: &str) {
         let now = (self.now)();
-        let Some(job) = self.migration_job.as_mut().filter(|job| job.id == id) else { return };
+        let Some(job) = self.migration_jobs.iter_mut().find(|job| job.id == id) else { return };
         let text = strip_ansi(line);
         job.lines.push(text.clone());
         if let Work::List { context } | Work::Update { context, .. } = job.work.clone()
@@ -330,11 +378,23 @@ impl Controller {
     }
 
     pub(super) fn migration_exited(&mut self, id: u64, code: Option<i32>) {
-        let Some(job) = self.migration_job.take_if(|job| job.id == id) else { return };
+        let Some(at) = self.migration_jobs.iter().position(|job| job.id == id) else { return };
+        let job = self.migration_jobs.remove(at);
         let db = self.checked_database();
         match job.work {
-            Work::Find { app } => self.found_contexts(&app, &job.lines, code),
-            Work::List { context: key } => self.listed(&key, &job.lines, code, &db),
+            Work::Find { app } => {
+                self.migration_retry.done(&app);
+                self.found_contexts(&app, &job.lines, code);
+            }
+            Work::List { context: key } => {
+                let failed = code != Some(0) || migrations::parse_list(&job.lines).is_err();
+                if failed && self.migration_retry.again(&key) {
+                    self.check_again(&key, &job.lines, code);
+                } else {
+                    self.migration_retry.done(&key);
+                    self.listed(&key, &job.lines, code, &db);
+                }
+            }
             Work::Update { context: key, what, .. } => {
                 let name = self.context(&key).map(|context| context.name.clone()).unwrap_or_default();
                 if code == Some(0) {
@@ -360,6 +420,16 @@ impl Controller {
             }
         }
         self.pump_migrations();
+    }
+
+    /// A check that failed beside others: checked once more, on its own, after the rest.
+    fn check_again(&mut self, key: &str, lines: &[String], code: Option<i32>) {
+        let failure = migrations::failure(lines, code);
+        let Some(context) = self.context_mut(key) else { return };
+        context.status = Status::Queued;
+        let name = context.name.clone();
+        self.add_log(format!("! Migrations of {name}: {failure} - checking it again alone"), Hue::Yellow);
+        self.migration_queue.push_back(Work::List { context: key.to_string() });
     }
 
     /// `dotnet ef migrations list` is done.
@@ -406,28 +476,30 @@ impl Controller {
         }
     }
 
-    /// An app is about to build: dotnet ef --no-build would load what the build rewrites, so a running job stops
-    /// and runs again first after the build.
+    /// An app is about to build: dotnet ef --no-build would load what the build rewrites, so the running jobs stop
+    /// and run again first after the build.
     pub(super) fn pause_migrations(&mut self) {
-        let Some(job) = self.migration_job.take() else { return };
-        job.child.kill();
-        if let Work::List { context } | Work::Update { context, .. } = &job.work
-            && let Some(context) = self.context_mut(context)
-        {
-            context.status = Status::Queued;
-            if let Some(run) = context.run.as_mut().filter(|run| run.ended.is_none()) {
-                run.began.clear(); // it starts over after the build
+        for job in std::mem::take(&mut self.migration_jobs).into_iter().rev() {
+            job.child.kill();
+            if let Work::List { context } | Work::Update { context, .. } = &job.work
+                && let Some(context) = self.context_mut(context)
+            {
+                context.status = Status::Queued;
+                if let Some(run) = context.run.as_mut().filter(|run| run.ended.is_none()) {
+                    run.began.clear(); // it starts over after the build
+                }
             }
+            self.migration_queue.push_front(job.work);
         }
-        self.migration_queue.push_front(job.work);
     }
 
     /// Quitting: dotnet ef stops, the queue empties.
     pub(super) fn stop_migrations(&mut self) {
-        if let Some(job) = self.migration_job.take() {
+        for job in std::mem::take(&mut self.migration_jobs) {
             job.child.kill();
         }
         self.migration_queue.clear();
+        self.migration_retry.clear();
     }
 }
 
@@ -572,6 +644,29 @@ mod tests {
         let done =
             |line: &&&String| line.starts_with("✓ ShopDbContext on ") && line.ends_with("applied 1 pending migration");
         assert!(log.iter().any(|line| done(&line)), "{log:?}");
+    }
+
+    #[tokio::test]
+    async fn contexts_are_checked_several_at_once_but_a_migration_runs_alone() {
+        let temp = TempDir::new("migrations-parallel");
+        let contexts = vec!["ShopDbContext".into(), "AuditDbContext".into(), "CatalogDbContext".into()];
+        let config = json!({ "checkMigrationsOnOpen": true, "migrationParallelism": 2 });
+        let (mut sample, mut rx) = sample_with(&temp, Some(contexts), true, config);
+        assert!(sample.open_migrations());
+        assert_eq!((sample.migration_jobs.len(), sample.migration_queue().len()), (2, 1), "two at once, one waits");
+        sample.migrate("orders:ShopDbContext", None, "applied 1 pending migration".into());
+        run_until(&mut sample, &mut rx, |c| {
+            let updating = c.migration_jobs.iter().any(|job| matches!(job.work, super::Work::Update { .. }));
+            assert!(!updating || c.migration_jobs.len() == 1, "a migration runs alone");
+            !c.migrations_active()
+        })
+        .await;
+        let checked = ["ShopDbContext", "AuditDbContext", "CatalogDbContext"]
+            .map(|name| sample.context(&format!("orders:{name}")).map(|context| context.status));
+        assert_eq!(checked, [Some(Status::Ok); 3]);
+        assert!(sample.log.iter().any(|entry| entry.text.ends_with("applied 1 pending migration")));
+        sample.set_migration_parallelism(0);
+        assert_eq!(sample.migration_parallelism(), 1, "one at a time at least, saved");
     }
 
     #[tokio::test]

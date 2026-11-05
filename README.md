@@ -405,7 +405,9 @@ applied (`●`), pending (`○`), a `┼ Apr 2026` tick where each month starts 
 and each migration's day beside it, the older ones folded once they don't fit - and the database as a bead on the
 rail, **database is here**, as the database the app uses has them. `dotnet ef` (`dotnet tool install --global dotnet-ef`) runs with the app's project as the startup project,
 its Development settings - so the database you picked with `d` - and its last build (`b` rebuilds it); in the
-background, one job at a time, waiting while an app builds.
+background, waiting while an app builds. Contexts are checked three at once (`+` and `-` change it, 1 to 8, saved as
+`migrationParallelism`); a check that fails beside others is checked again on its own, and a migration that's applied
+or reverted always runs alone.
 
 ```json
 { "key": "api", "type": "dotnet", "project": "src/Api/Api.csproj", "launchProfile": "Api",
@@ -452,9 +454,11 @@ one.
 
 `r` scans the selected app, `R` every app: `dotnet list package --vulnerable --include-transitive` and `--outdated`
 for a .NET app (it needs a restore - a build does it), `npm audit` and `npm outdated` for an npm one (it needs a
-`package-lock.json`). They ask the package feeds, so nothing is scanned until you ask: in the background, one app at a
-time, the header saying which. Each scan is kept in the state folder (`audit.json`), so `A` opens on the last one and
-says how old it is; a scan that fails keeps the one before and says why.
+`package-lock.json`). They ask the package feeds, so nothing is scanned until you ask: in the background, three apps at
+once (an app's two commands side by side), the header saying which. `+` and `-` change how many (1 to 8, saved as
+`auditParallelism`) - fewer when a feed refuses a burst of requests. A scan that fails beside others is scanned again on
+its own once the rest are done; only then does it count. Each scan is kept in the state folder (`audit.json`), so `A`
+opens on the last one and says how old it is; a scan that fails keeps the one before, and its time, and says why.
 
 `l` (or `Enter`) goes into the packages and `h` back to the apps; `/` filters the packages by name, `v` shows only the
 vulnerable ones; `y` (or `u`) copies the picked package's fix, `Enter` (or `o`) opens its advisory, and `i` installs
@@ -468,7 +472,7 @@ severity, where it hides nothing.
 
 Each vulnerable row has an edge in its severity's colour and its severity framed (`▕HIGH▏`); an outdated-only row is
 dimmed, the red meaning advisories. `/` lights the part of each name it matches. While `R` scans, the header counts the
-apps off (`3 of 5` and a bar), and when it's done the log says it in one line: `▸ Audit finished in 3.8s · 12 packages
+apps off (`2 of 5 done` and a bar), and when it's done the log says it in one line: `▸ Audit finished in 3.8s · 12 packages
 · 3 high · 1 critical`. The header's last scan is green today, amber after a week and red after a month (`R rescans`).
 A fix being installed spins in its own row, and one that failed pulses the row red; `y` lights the command it copied.
 
@@ -765,6 +769,8 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `spinner` | lazyrunner's | What spins while something runs, as lazygit's `gui.spinner`: `{ "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` - texts of up to 8 cells, and milliseconds a frame (16 to 2000; 100 left out) |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
+| `auditParallelism` | `3` | How many apps the audit view (`A`) scans at once, 1 to 8 (`+` / `-` there) |
+| `migrationParallelism` | `3` | How many DbContexts the migrations view (`M`) checks at once, 1 to 8 (`+` / `-` there); a migration runs alone |
 | `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
 | `hooks` | | Your own commands, run when something happens - see Hooks below |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |

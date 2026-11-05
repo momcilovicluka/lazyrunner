@@ -103,6 +103,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             *picking = None;
             controller.reload_migrations();
         }
+        "+" => controller.set_migration_parallelism(controller.migration_parallelism() + 1),
+        "-" => controller.set_migration_parallelism(controller.migration_parallelism().saturating_sub(1)),
         "u" => {
             let keys: Vec<String> = selected.iter().map(Context::key).collect();
             apply_pending(ui, controller, &keys);
@@ -276,15 +278,17 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let list_width = (width / 3).clamp(LIST_WIDTH.0, LIST_WIDTH.1).min(width.saturating_sub(20));
     let detail_width = width.saturating_sub(list_width + 2);
     let height = rows.saturating_sub(3);
-    let working = match &controller.migration_job {
+    let jobs = &controller.migration_jobs;
+    let working = match jobs.first() {
         Some(job) => {
             let what = match &job.work {
                 Work::Find { .. } => "dbcontext list",
                 Work::List { .. } => "migrations list",
                 Work::Update { .. } => "database update",
             };
+            let count = if jobs.len() > 1 { format!(" ×{}", jobs.len()) } else { String::new() };
             let took = format_duration(now.saturating_duration_since(job.started).as_secs_f64());
-            format!("   {spin} dotnet ef {what} · {took}")
+            format!("   {spin} dotnet ef {what}{count} · {took}")
         }
         None if !controller.migration_queue().is_empty() && controller.building.is_some() => {
             "   waiting for the build".into()
@@ -297,6 +301,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         seg("   database ", C::DarkGray),
         seg(db, C::Yellow),
         seg(working, C::Yellow),
+        seg(format!("   {} at once (+ -)", controller.migration_parallelism()), C::DarkGray),
     ];
     let hint = if picking.is_some() {
         " j k choose · m migrate to it (forward or back) · u apply pending · h back · Esc back"
