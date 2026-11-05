@@ -323,7 +323,7 @@ fn audit_check(controller: &Controller) -> Check {
 fn audit_report(scans: &[(String, crate::run::audit::AppAudit)]) -> Outcome {
     use crate::run::audit::{Severity, age};
     let Some(oldest) = scans.iter().map(|(_, scan)| scan.at).min() else {
-        return (Status::Skip, "not scanned - O, then R scans every app's packages".into());
+        return (Status::Skip, "not scanned - A, then R scans every app's packages".into());
     };
     let bad: Vec<String> = scans
         .iter()

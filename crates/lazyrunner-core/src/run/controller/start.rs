@@ -341,6 +341,23 @@ impl Controller {
         self.kill_conflicts(conflicts);
     }
 
+    /// The port map's `!`: kills what holds app `key`'s port while the app isn't running (if it still holds it -
+    /// never the app itself), and starts nothing.
+    pub fn free_port(&mut self, key: &str) {
+        let Some(port) = self.port(key) else { return };
+        if self.is_running(key) {
+            let name = self.app(key).map_or_else(|| key.to_string(), |app| app.name.clone());
+            self.add_log(format!("Port {port} is {name}'s own - s stops it"), Hue::DarkGray);
+            return;
+        }
+        let Some(owner) = Listening::now().ports.get(&port).cloned() else {
+            self.add_log(format!("Port {port} is free now"), Hue::DarkGray);
+            return;
+        };
+        self.kill_conflicts(vec![Conflict { key: key.to_string(), port, pid: owner.pid, name: owner.name }]);
+        self.request_listening(true);
+    }
+
     /// Kills what holds each conflict's port - if it still does, never a reused PID nor the system.
     fn kill_conflicts(&mut self, conflicts: Vec<Conflict>) {
         let listening = Listening::now();

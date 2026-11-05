@@ -283,6 +283,7 @@ impl<C: Channel> Server<C> {
             "stop_tests" => self.agent("stop_tests", json!({})).await,
             "get_migrations" => self.agent("migrations", json!({})).await,
             "get_audit" => self.agent("audit", json!({})).await,
+            "get_ports" => self.agent("ports", json!({})).await,
             "check_migrations" => self.agent("check_migrations", args).await,
             "list_actions" => self.agent("actions", json!({})).await,
             "press_keys" => self.pressed(args).await,
@@ -590,7 +591,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 26));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 27));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);

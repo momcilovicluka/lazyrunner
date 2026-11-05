@@ -53,6 +53,8 @@ pub enum Target {
     Rail { column: usize, row: usize, scroll: usize, line: usize },
     /// A diagnostics zip's path in the log (in `Ui::links`): a click shows it in its folder.
     Reveal(usize),
+    /// The panel's chip of a stopped app's port that something else took: a click opens the port map on it.
+    Ports,
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -173,6 +175,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
     if super::suites::click(ui, controller, target, double)
         || super::migrations::click(ui, controller, target, double)
         || super::audit::click(ui, target)
+        || super::ports::click(ui, controller, target, double)
     {
         return;
     }
@@ -205,6 +208,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
         Some(Target::RunNews(index)) => super::diff::open_news(ui, controller, index),
+        Some(Target::Ports) => super::ports::open_taken(ui, controller),
         Some(Target::Reveal(link)) => {
             if link_click(ui, controller, modified) {
                 super::bundle::reveal(ui, controller, link);

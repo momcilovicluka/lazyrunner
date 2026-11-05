@@ -2953,7 +2953,7 @@ async fn the_audit_view_opens_on_the_worst_app_lists_its_packages_and_copies_the
     screen.controller.handle(Event::Audit { key: first, result: Ok(vec![old.clone()]) });
     screen.controller.handle(Event::Audit { key: second, result: Ok(vec![json_lib, old]) });
     assert!(screen.frame().contains("! 1 high"), "the column's title says so: {}", screen.frame());
-    screen.press("O");
+    screen.press("A");
     let Some(Overlay::Audit { app, .. }) = &screen.ui.overlay else { panic!("the audit view is open") };
     assert_eq!(*app, 1, "it opens on the app with the worst finding");
     screen.press("l");
@@ -3412,4 +3412,103 @@ async fn an_empty_requests_view_names_the_api_that_logs_somewhere_else() {
     let frame = screen.frame();
     assert!(frame.contains("Orders prints no ASP.NET log to the console"), "{frame}");
     assert!(frame.contains("\"args\": [\"--Seq:ApiKey=\"]"), "{frame}");
+}
+
+#[tokio::test]
+async fn the_port_map_shows_who_holds_each_port_and_stops_what_took_one() {
+    use lazyrunner_core::run::net::{Listening, Owner};
+    let mut screen = screen("ports", json!({}));
+    screen.controller.reserved = || vec![(49700, 49799)];
+    let wanted: Vec<u16> = screen.controller.apps.iter().filter_map(|app| screen.controller.port(&app.key)).collect();
+    assert!(wanted.len() >= 2, "{wanted:?}");
+    let taken = wanted[1];
+    let mut listening = Listening::default();
+    listening.ports.insert(taken, Owner { pid: 4120, name: "node.exe".into() });
+    listening.commands.insert(4120, "node vite --port 5173".into());
+    screen.controller.handle(Event::Listening(listening));
+    let frame = screen.frame();
+    assert!(frame.contains(&format!("! {taken} taken")), "the header says so while P is closed: {frame}");
+    screen.press("P");
+    let Some(Overlay::Ports { index, .. }) = &screen.ui.overlay else { panic!("the port map is open") };
+    assert_eq!(*index, 0, "the conflicts come first, and it opens on them");
+    let frame = screen.render(150, 40);
+    assert!(frame.contains("PORTS") && frame.contains("1 conflict") && frame.contains("0 reserved"), "{frame}");
+    assert!(frame.contains("occupancy") && frame.contains("a cell per port"), "the strip: {frame}");
+    assert!(frame.contains("node.exe (PID 4120) · node vite"), "who holds it: {frame}");
+    assert!(frame.contains("× held by other") && frame.contains("! stop it · since"), "{frame}");
+    assert!(frame.contains(&format!("▲ {taken} conflict since")), "the status line: {frame}");
+    assert!(frame.contains("holder") && frame.contains("the last minute") && frame.contains("action"), "{frame}");
+    assert!(frame.find("× held by other") < frame.find("● free"), "the conflict is listed first: {frame}");
+    assert!(frame.contains("RESERVED BY WINDOWS") && frame.contains("49700-49799"), "{frame}");
+    assert!(!frame.contains(&format!("! {taken} taken")), "no chip while the map is open: {frame}");
+    screen.press("!");
+    let frame = screen.render(150, 40);
+    assert!(frame.contains("stops node.exe (PID 4120), which holds"), "! asks first: {frame}");
+    assert!(frame.contains("y stops it · n doesn't"), "{frame}");
+    screen.press("n");
+    assert!(!screen.render(150, 40).contains("stops node.exe"), "n doesn't stop it");
+    let (key, now) = (screen.controller.apps[1].key.clone(), screen.ui.now);
+    if let Some(Overlay::Ports { stopping, .. }) = &mut screen.ui.overlay {
+        *stopping = Some((key, now));
+    }
+    let frame = screen.render(150, 40);
+    assert!(frame.contains("stopping it") && frame.contains("waiting for it to free up"), "{frame}");
+    screen.press("y");
+    assert!(copied().last().is_some_and(|text| text.contains("net stop winnat")), "{:?}", copied());
+    screen.press("Esc");
+    screen.render(150, 40);
+    screen.ui.motion.enabled = true;
+    screen.ui.now = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
+    screen.press("P");
+    screen.render(150, 40); // it opens a second earlier: its reveal is over
+    screen.controller.handle(Event::Listening(Listening::default()));
+    let freed = Instant::now();
+    screen.ui.now = freed;
+    let wiping = screen.render(150, 40);
+    assert!(wiping.contains("× held by other"), "a freed port wipes out what held it: {wiping}");
+    screen.ui.now = freed + Duration::from_millis(500);
+    let frame = screen.render(150, 40);
+    assert!(frame.contains("● freed") && frame.contains("no conflicts"), "then it's freed: {frame}");
+    screen.ui.motion.enabled = false;
+    screen.press("k !");
+    assert!(screen.controller.log.back().is_some_and(|entry| entry.text.contains("Nothing else holds port")));
+    screen.press("Esc");
+    assert!(screen.ui.overlay.is_none());
+    screen.press("!");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Ports { .. })), "with no port in the way, ! opens the map");
+}
+
+#[tokio::test]
+async fn the_audit_view_cuts_a_long_name_before_its_new_chip_and_asks_before_installing_many_fixes() {
+    use lazyrunner_core::run::audit::{Fix, Package, Severity};
+    let mut screen = screen("audit-many", json!({}));
+    let package = |name: &str, severity: Severity| Package {
+        name: name.into(),
+        current: "1.0.0".into(),
+        wanted: Some("1.0.0".into()),
+        latest: Some("1.1.0".into()),
+        direct: true,
+        severity: Some(severity),
+        advisories: Vec::new(),
+        fix: Some(Fix { package: name.into(), version: "1.1.0".into(), major: false }),
+        via: Vec::new(),
+    };
+    let key = screen.controller.apps[1].key.clone();
+    let short = package("Short", Severity::High);
+    screen.controller.handle(Event::Audit { key: key.clone(), result: Ok(vec![short.clone()]) });
+    let long = package("Example.A.Very.Long.Package.Name.That.Will.Not.Fit", Severity::Moderate);
+    screen.controller.handle(Event::Audit { key, result: Ok(vec![short, long]) });
+    screen.press("A");
+    screen.press("l");
+    let frame = screen.frame();
+    let row = frame.lines().find(|line| line.contains("Example.A.Very")).unwrap_or_default();
+    assert!(row.contains("\u{2026} new  1.0.0"), "the name is cut before its chip, a gap before the version: {row}");
+    screen.press("I");
+    let frame = screen.frame();
+    assert!(frame.contains("c critical (0) · h high and up (1) · m moderate and up (2) · a all (2)"), "{frame}");
+    screen.press("c");
+    assert!(screen.controller.log.back().is_some_and(|entry| entry.text.contains("no critical fix to install")));
+    screen.press("I n");
+    assert!(!screen.frame().contains("moderate and up"), "n installs none");
+    assert!(screen.controller.audit_installing().is_none());
 }

@@ -54,7 +54,7 @@ pub enum Fix {
     Database,
     /// Copy the commands that free ports Windows reserved.
     Winnat,
-    /// The audit view (O), once the checklist closes.
+    /// The audit view (A), once the checklist closes.
     Audit,
 }
 
@@ -72,7 +72,7 @@ impl Fix {
             Self::Retry => "check again (`r`)".into(),
             Self::Database => "pick another database (`d`)".into(),
             Self::Winnat => format!("`{WINNAT}` in an elevated terminal"),
-            Self::Audit => "see them and fix them in the audit view (`O`)".into(),
+            Self::Audit => "see them and fix them in the audit view (`A`)".into(),
         }
     }
 

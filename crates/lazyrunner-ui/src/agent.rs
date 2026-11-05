@@ -62,6 +62,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "tests" => tests(controller, args),
         "migrations" => Ok(migrations(controller)),
         "audit" => Ok(audit(controller)),
+        "ports" => Ok(ports(controller)),
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
         "actions" => Ok(drive::actions(ui, controller)),
@@ -469,6 +470,51 @@ fn find_suite<'a>(suites: &'a [Suite], wanted: &str) -> Result<&'a Suite, Refusa
 
 /// The DbContexts as the migrations view has them - found the first time, never checked from here: each one's last
 /// check, the pending migrations.
+/// The port map's rows: each app's port, who holds it and for how long, and who held it over the last minute (a
+/// character every two seconds, oldest first: `.` free, `o` its own app, `x` something else, `r` reserved); and the
+/// ranges Windows reserved, as last read.
+fn ports(controller: &Controller) -> Value {
+    use lazyrunner_core::run::ports::Holding;
+    let map = controller.port_map();
+    let now = std::time::Instant::now();
+    let rows: Vec<Value> = map
+        .rows
+        .iter()
+        .map(|row| {
+            let history: String = row
+                .cells
+                .iter()
+                .map(|holding| match holding {
+                    Holding::Free => '.',
+                    Holding::Own => 'o',
+                    Holding::Other => 'x',
+                    Holding::Reserved => 'r',
+                })
+                .collect();
+            let holder = row
+                .holder
+                .as_ref()
+                .map(|holder| json!({ "pid": holder.pid, "name": holder.name, "command": holder.command }));
+            json!({
+                "app": row.key,
+                "name": controller.app(&row.key).map(|app| app.name.clone()),
+                "port": row.port,
+                "state": row.holding.name(),
+                "holder": holder,
+                "forSeconds": now.saturating_duration_since(row.since).as_secs(),
+                "history": history,
+            })
+        })
+        .collect();
+    let (wanted, conflicts, reserved) = map.summary();
+    let ranges: Vec<String> = map.reserved.iter().map(|(first, last)| format!("{first}-{last}")).collect();
+    json!({
+        "ports": rows,
+        "summary": { "wanted": wanted, "conflicts": conflicts, "reserved": reserved },
+        "reservedRanges": ranges,
+    })
+}
+
 /// The audit view's last scans, per app: what each found, and the command that fixes each package.
 fn audit(controller: &Controller) -> Value {
     use lazyrunner_core::run::audit::{self, Severity};
@@ -519,7 +565,7 @@ fn audit(controller: &Controller) -> Value {
     let mut answer = json!({ "apps": apps, "scanning": controller.auditing(), "installing": installing });
     if controller.audits().is_empty() {
         answer["hint"] = json!(
-            "Nothing is scanned yet: the scans ask the package feeds, so they run when the user asks (O, then R)."
+            "Nothing is scanned yet: the scans ask the package feeds, so they run when the user asks (A, then R)."
         );
     }
     answer

@@ -21,6 +21,8 @@ pub struct Listening {
     pub ports: HashMap<u16, Owner>,
     /// Why the ports couldn't be listed (then `ports` is empty, which isn't "nothing listens").
     pub problem: Option<String>,
+    /// The command lines of some of the processes in `ports` (those the port map asked for), by PID.
+    pub commands: HashMap<u32, String>,
 }
 
 impl Listening {
@@ -28,7 +30,7 @@ impl Listening {
     pub fn now() -> Self {
         let all = match listeners::get_all() {
             Ok(all) => all,
-            Err(error) => return Self { ports: HashMap::new(), problem: Some(error.to_string()) },
+            Err(error) => return Self { problem: Some(error.to_string()), ..Self::default() },
         };
         let mut ports = HashMap::new();
         for listener in all {
@@ -36,12 +38,35 @@ impl Listening {
                 ports.insert(listener.socket.port(), Owner { pid: listener.process.pid, name: listener.process.name });
             }
         }
-        Self { ports, problem: None }
+        Self { ports, ..Self::default() }
     }
 
     pub fn contains(&self, port: u16) -> bool {
         self.ports.contains_key(&port)
     }
+}
+
+/// The command lines of processes `pids` (blocking: one look at the process table); those that can't be read
+/// (gone, another user's, the system's) are left out.
+pub fn command_lines(pids: &[u32]) -> HashMap<u32, String> {
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+    if pids.is_empty() {
+        return HashMap::new();
+    }
+    let wanted: Vec<Pid> = pids.iter().map(|pid| Pid::from_u32(*pid)).collect();
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&wanted),
+        true,
+        ProcessRefreshKind::nothing().with_cmd(UpdateKind::OnlyIfNotSet),
+    );
+    pids.iter()
+        .filter_map(|pid| {
+            let process = system.process(Pid::from_u32(*pid))?;
+            let words: Vec<String> = process.cmd().iter().map(|word| word.to_string_lossy().into_owned()).collect();
+            (!words.is_empty()).then(|| (*pid, words.join(" ")))
+        })
+        .collect()
 }
 
 /// How long the reserved ranges are kept: reading them runs netsh, and they change at boot, not by the minute.
