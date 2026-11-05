@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.70.0] - 2026-11-05
+
+### Changed
+- The audit view (`A`) scans three apps at once, and an app's two commands side by side; the header names those scanning and counts them off (`2 of 5 done`). `+` and `-` change how many (1 to 8, saved as `auditParallelism`) (#79)
+- The migrations view (`M`) checks three DbContexts at once - a migration that's applied or reverted still runs alone; `+` and `-` change how many (1 to 8, `migrationParallelism`)
+- A scan or a check that fails beside others goes again on its own once the rest are done, before it counts - a feed or a database may refuse a burst it would answer one at a time; a scan that fails for good keeps the one before, and its time
+
 ## [1.69.2] - 2026-11-05
 
 ### Changed

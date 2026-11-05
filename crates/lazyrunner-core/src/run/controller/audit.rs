@@ -3,7 +3,9 @@
 
 use std::time::Instant;
 
-use super::Controller;
+use serde_json::json;
+
+use super::{Controller, parallel};
 use crate::output::Hue;
 use crate::run::Event;
 use crate::run::audit::{self, AppAudit, Audits, Package, Severity};
@@ -23,9 +25,23 @@ impl Controller {
         &self.audits
     }
 
-    /// The app being scanned.
-    pub fn auditing(&self) -> Option<&str> {
-        self.auditing.as_deref()
+    /// The apps being scanned now.
+    pub fn auditing(&self) -> &[String] {
+        &self.auditing
+    }
+
+    /// How many apps are scanned at once: `"auditParallelism"`, 3 when it's missing (1 to 8).
+    pub fn audit_parallelism(&self) -> usize {
+        parallel::at_once(&self.config["auditParallelism"])
+    }
+
+    /// `+` and `-` in the audit view: how many apps are scanned at once, saved; the waiting scans go so.
+    pub fn set_audit_parallelism(&mut self, count: usize) {
+        let count = count.clamp(1, parallel::MOST);
+        self.set_setting("auditParallelism", json!(count));
+        let plural = if count == 1 { "" } else { "s" };
+        self.add_log(format!("Audit: {count} app{plural} scanned at once"), Hue::Gray);
+        self.next_audit();
     }
 
     /// The apps waiting to be scanned.
@@ -108,16 +124,20 @@ impl Controller {
         self.audit(Some(&[key]));
     }
 
-    /// `r` / `R` in the audit view: scans these apps (every app with none), one after another in the background.
+    /// `r` / `R` in the audit view: scans these apps (every app with none) in the background, `"auditParallelism"` at
+    /// once.
     pub fn audit(&mut self, keys: Option<&[String]>) {
         let keys = keys.map_or_else(|| self.keys(), <[String]>::to_vec);
-        let before = self.audit_queue.len() + usize::from(self.auditing.is_some());
+        let before = self.audits_left();
+        if before == 0 {
+            self.audit_retry.reset();
+        }
         for key in keys {
-            if self.auditing.as_ref() != Some(&key) && !self.audit_queue.contains(&key) {
+            if !self.auditing.contains(&key) && !self.audit_queue.contains(&key) && !self.audit_retry.waits(&key) {
                 self.audit_queue.push(key);
             }
         }
-        let added = self.audit_queue.len() + usize::from(self.auditing.is_some()) - before;
+        let added = self.audits_left() - before;
         match &mut self.audit_batch {
             Some((_, total)) if before > 0 => *total += added,
             _ if added > 0 => self.audit_batch = Some(((self.now)(), added)),
@@ -129,8 +149,12 @@ impl Controller {
     /// The scans asked for together: how many are done, of how many.
     pub fn audit_batch(&self) -> Option<(usize, usize)> {
         let (_, total) = self.audit_batch?;
-        let left = self.audit_queue.len() + usize::from(self.auditing.is_some());
-        Some((total.saturating_sub(left), total))
+        Some((total.saturating_sub(self.audits_left()), total))
+    }
+
+    /// The scans not done yet: running, waiting, or waiting to go again.
+    fn audits_left(&self) -> usize {
+        self.audit_queue.len() + self.auditing.len() + self.audit_retry.len()
     }
 
     /// The last fixes that failed to install: their app, the commands, the packages, and when.
@@ -139,26 +163,49 @@ impl Controller {
         Some((key.as_str(), command.as_str(), names.as_slice(), *at))
     }
 
+    /// Starts the waiting scans, up to `"auditParallelism"` at once; once all are done, those that failed beside
+    /// others go again, one at a time.
     fn next_audit(&mut self) {
-        while self.auditing.is_none() && !self.audit_queue.is_empty() {
+        while self.auditing.len() < self.audit_parallelism() && !self.audit_queue.is_empty() {
             let key = self.audit_queue.remove(0);
-            let Some(app) = self.app(&key).cloned() else { continue };
-            let (root, events) = (self.root.clone(), self.events.clone());
-            self.auditing = Some(key.clone());
-            tokio::task::spawn_blocking(move || {
-                let result = audit::scan(&root, &app).map_err(|error| error.to_string());
-                let _ = events.send(Event::Audit { key, result });
-            });
+            self.scan_app(key);
+        }
+        if self.auditing.is_empty()
+            && self.audit_queue.is_empty()
+            && let Some(key) = self.audit_retry.next()
+        {
+            self.scan_app(key);
         }
     }
 
-    /// An app's scan landed: kept (a failed one keeps the scan before, and says why), said in the log; the next goes.
+    /// Scans app `key` in the background.
+    fn scan_app(&mut self, key: String) {
+        let Some(app) = self.app(&key).cloned() else { return };
+        let (root, events) = (self.root.clone(), self.events.clone());
+        self.auditing.push(key.clone());
+        self.audit_retry.together(self.auditing.iter().map(String::as_str));
+        tokio::task::spawn_blocking(move || {
+            let result = audit::scan(&root, &app).map_err(|error| error.to_string());
+            let _ = events.send(Event::Audit { key, result });
+        });
+    }
+
+    /// An app's scan landed: kept (a failed one keeps the scan before, and its time, and says why), said in the log;
+    /// the next goes. One that failed beside other scans goes again on its own first, once they're done.
     pub(super) fn audit_done(&mut self, key: String, result: Result<Vec<Package>, String>) {
-        if self.auditing.as_ref() == Some(&key) {
-            self.auditing = None;
-        }
-        let at = chrono::Local::now().timestamp();
+        self.auditing.retain(|scanning| *scanning != key);
         let name = self.app(&key).map_or_else(|| key.clone(), |app| app.name.clone());
+        if let Err(error) = &result
+            && self.audit_retry.again(&key)
+        {
+            let text =
+                format!("! Audit: {name} couldn't be scanned beside the others ({error}) - scanning it again alone");
+            self.add_log(text, Hue::Yellow);
+            self.next_audit();
+            return;
+        }
+        self.audit_retry.done(&key);
+        let at = chrono::Local::now().timestamp();
         let scan = match result {
             Ok(packages) => {
                 let worst = packages.iter().filter_map(|package| package.severity).max();
@@ -180,7 +227,9 @@ impl Controller {
             }
             Err(error) => {
                 self.add_log(format!("✗ Audit: {name} couldn't be scanned - {error}"), Hue::Red);
-                let packages = self.audits.get(&key).map(|before| before.packages.clone()).unwrap_or_default();
+                let before = self.audits.get(&key);
+                let packages = before.map(|before| before.packages.clone()).unwrap_or_default();
+                let at = before.map_or(at, |before| before.at);
                 AppAudit { at, packages, error: Some(error), ..AppAudit::default() }
             }
         };
@@ -190,7 +239,7 @@ impl Controller {
             self.add_log(format!("✗ Couldn't keep the audit: {error}"), Hue::Red);
         }
         self.next_audit();
-        if self.auditing.is_none() && self.audit_queue.is_empty() {
+        if self.audits_left() == 0 {
             self.audit_finished();
         }
     }
@@ -228,9 +277,7 @@ mod tests {
     use crate::run::audit::{self, Package, Severity};
     use crate::testing::{TempDir, sample_profile, sample_repo};
 
-    #[tokio::test]
-    async fn a_scan_is_kept_and_said_and_a_failed_one_keeps_the_one_before() {
-        let temp = TempDir::new("audit-done");
+    fn controller(temp: &TempDir) -> Controller {
         let paths = Paths {
             config_file: temp.join("config.json"),
             state_dir: temp.join("state"),
@@ -244,7 +291,35 @@ mod tests {
         let project = import(&sample_profile(), &paths.profiles).unwrap();
         let (events, _rx) = mpsc::unbounded_channel();
         let root = sample_repo(&temp.join("repo"));
-        let mut controller = Controller::new(Setup { project, root, paths, events, guard: None }).unwrap();
+        Controller::new(Setup { project, root, paths, events, guard: None }).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_scan_that_failed_beside_others_goes_again_alone_before_it_counts() {
+        let temp = TempDir::new("audit-again");
+        let mut controller = controller(&temp);
+        let (first, second) = ("gone-a".to_string(), "gone-b".to_string());
+        controller.audit_batch = Some(((controller.now)(), 2));
+        controller.auditing = vec![first.clone(), second.clone()];
+        controller.audit_retry.together(["gone-a", "gone-b"]);
+        controller.handle(Event::Audit { key: first.clone(), result: Err("429 Too Many Requests".into()) });
+        let said = controller.log.back().map(|entry| entry.text.clone()).unwrap_or_default();
+        assert!(said.contains("scanning it again alone"), "{said}");
+        assert!(!controller.audits().contains_key(&first), "the failure doesn't count yet");
+        assert_eq!(controller.audit_batch(), Some((0, 2)), "it's still to be done");
+        controller.auditing.clear();
+        controller.handle(Event::Audit { key: first.clone(), result: Err("429 Too Many Requests".into()) });
+        let failed = controller.audits().get(&first).and_then(|scan| scan.error.clone());
+        assert_eq!(failed.as_deref(), Some("429 Too Many Requests"), "alone, it fails for good");
+        assert_eq!(controller.audit_parallelism(), 3, "three at once when it isn't set");
+        controller.set_audit_parallelism(20);
+        assert_eq!(controller.audit_parallelism(), 8, "eight at most");
+    }
+
+    #[tokio::test]
+    async fn a_scan_is_kept_and_said_and_a_failed_one_keeps_the_one_before() {
+        let temp = TempDir::new("audit-done");
+        let mut controller = controller(&temp);
         let key = controller.apps[0].key.clone();
         let package = Package {
             name: "Example.Json".into(),
@@ -270,7 +345,7 @@ mod tests {
         assert!(controller.audit_landed(&key).is_some());
 
         controller.audit_batch = Some(((controller.now)(), 2));
-        controller.auditing = Some(key.clone());
+        controller.auditing = vec![key.clone()];
         assert_eq!(controller.audit_batch(), Some((1, 2)), "one of two left");
         controller.handle(Event::Audit { key: key.clone(), result: Ok(vec![package.clone()]) });
         let said = controller.log.back().map(|entry| entry.text.clone()).unwrap_or_default();

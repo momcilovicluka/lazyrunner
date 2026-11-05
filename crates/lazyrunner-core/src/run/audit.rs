@@ -229,9 +229,11 @@ pub fn scan(root: &Path, app: &App) -> Result<Vec<Package>> {
                 command.arg("list").arg(&path).arg("package").args(extra).args(["--format", "json"]);
                 output(command)
             };
-            let vulnerable = run(&["--vulnerable", "--include-transitive"])?;
-            let outdated = run(&["--outdated", "--include-transitive"])?;
-            dotnet(&vulnerable, &outdated)
+            let (vulnerable, outdated) = both(
+                || run(&["--vulnerable", "--include-transitive"]),
+                || run(&["--outdated", "--include-transitive"]),
+            );
+            dotnet(&vulnerable?, &outdated?)
         }
         AppKind::Npm { dir, .. } => {
             let folder = root.join(dir);
@@ -244,9 +246,22 @@ pub fn scan(root: &Path, app: &App) -> Result<Vec<Package>> {
                 command.args(&launcher).args(args).current_dir(&folder);
                 output(command)
             };
-            npm(&run(&["audit", "--json"])?, &run(&["outdated", "--json"])?, |name| installed(&folder, name))
+            let (audit, outdated) = both(|| run(&["audit", "--json"]), || run(&["outdated", "--json"]));
+            npm(&audit?, &outdated?, |name| installed(&folder, name))
         }
     }
+}
+
+/// Runs `first` and `second` side by side (they wait on the package feeds), and waits for both.
+fn both(
+    first: impl FnOnce() -> Result<String> + Send,
+    second: impl FnOnce() -> Result<String>,
+) -> (Result<String>, Result<String>) {
+    std::thread::scope(|scope| {
+        let first = scope.spawn(first);
+        let second = second();
+        (first.join().unwrap_or_else(|_| Err(anyhow::anyhow!("it stopped unexpectedly"))), second)
+    })
 }
 
 /// What a tool printed (its JSON) whatever its exit code - npm's audit and outdated exit with 1 when they find

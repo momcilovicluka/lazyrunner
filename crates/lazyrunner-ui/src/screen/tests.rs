@@ -3512,5 +3512,9 @@ async fn the_audit_view_cuts_a_long_name_before_its_new_chip_and_asks_before_ins
     assert!(screen.controller.log.back().is_some_and(|entry| entry.text.contains("no critical fix to install")));
     screen.press("I n");
     assert!(!screen.frame().contains("moderate and up"), "n installs none");
+    screen.press("+");
+    assert!(screen.controller.audit_parallelism() == 4 && screen.frame().contains("4 at once (+ -)"));
+    screen.press("- - - - -");
+    assert_eq!(screen.controller.audit_parallelism(), 1, "one at a time at least");
     assert!(screen.controller.audit_installing().is_none());
 }

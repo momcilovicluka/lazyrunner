@@ -189,6 +189,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             }
         }
         "R" => controller.audit(None),
+        "+" => controller.set_audit_parallelism(controller.audit_parallelism() + 1),
+        "-" => controller.set_audit_parallelism(controller.audit_parallelism().saturating_sub(1)),
         "i" => match chosen.as_ref().and_then(|(app, package)| audit::command(app, package)) {
             Some(_) => *confirm = true,
             None => {
@@ -371,11 +373,15 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     }
     if let Some((_, command)) = controller.audit_installing() {
         header.push(seg(format!(" · {} installing: {command}", spin(ui)), C::Yellow));
-    } else if let Some(key) = controller.auditing() {
-        let name = controller.app(key).map_or(key, |app| app.name.as_str());
-        header.push(seg(format!(" · {} scanning {name}", spin(ui)), C::Yellow));
+    } else if !controller.auditing().is_empty() {
+        let names: Vec<&str> = controller
+            .auditing()
+            .iter()
+            .map(|key| controller.app(key).map_or(key.as_str(), |app| app.name.as_str()))
+            .collect();
+        header.push(seg(format!(" · {} scanning {}", spin(ui), names.join(", ")), C::Yellow));
         if let Some((done, total)) = controller.audit_batch().filter(|(_, total)| *total > 1) {
-            header.push(seg(format!(" · {} of {total} ", done + 1), C::Yellow));
+            header.push(seg(format!(" · {done} of {total} done "), C::Yellow));
             if total <= BATCH_BAR {
                 header.extend([seg("█".repeat(done), C::Yellow), seg("░".repeat(total - done), C::DarkGray)]);
             }
@@ -390,6 +396,7 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         };
         header.push(seg(format!(" · last scan {}{nudge}", audit::age(at)), color));
     }
+    header.push(seg(format!(" · {} at once (+ -)", controller.audit_parallelism()), C::DarkGray));
     header
 }
 
@@ -442,7 +449,7 @@ fn batch_question(controller: &Controller, app: usize, view_width: usize) -> Vec
 
 /// What an app's scan says, in a few cells; a new high or critical finding pulses once as the scan lands.
 fn state(ui: &Ui, controller: &Controller, key: &str) -> Seg {
-    if controller.auditing() == Some(key) {
+    if controller.auditing().iter().any(|scanning| scanning == key) {
         return seg(format!("{} scanning", spin(ui)), C::Yellow);
     }
     if controller.audit_queue().iter().any(|queued| queued == key) {
@@ -840,7 +847,7 @@ fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> O
     let height = rows.saturating_sub(3);
     let failed = controller.audit_install_failed().filter(|(key, ..)| *key == the_app.key);
     let look = Look {
-        dim: moving(ui) && controller.auditing() == Some(the_app.key.as_str()),
+        dim: moving(ui) && controller.auditing().contains(&the_app.key),
         landed: landed(ui, controller, &the_app.key, SWEEP.max(LAND)),
         edge: ui.reduced_motion,
         spin: spin(ui).to_string(),

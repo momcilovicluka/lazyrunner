@@ -11,6 +11,7 @@ mod launch;
 mod migrations;
 mod npm_ci;
 mod overrides;
+mod parallel;
 mod start;
 mod suites;
 mod test_watch;
@@ -183,7 +184,9 @@ pub struct Controller {
     /// The DbContexts of the apps with migrations (M), once the view opened.
     pub contexts: Option<Vec<super::migrations::Context>>,
     /// dotnet ef's job, and the ones waiting.
-    pub migration_job: Option<EfJob>,
+    /// The dotnet ef jobs running now, and the checks tried again on their own.
+    pub migration_jobs: Vec<EfJob>,
+    migration_retry: parallel::Retry,
     migration_queue: VecDeque<Work>,
     /// Whether the contexts `dotnet ef dbcontext list` finds are checked once found.
     migrations_check: bool,
@@ -207,7 +210,8 @@ pub struct Controller {
     finding_suites: bool,
     /// The apps' last package scans (the audit view, A), the one scanning now, and those waiting.
     audits: crate::run::audit::Audits,
-    auditing: Option<String>,
+    auditing: Vec<String>,
+    audit_retry: parallel::Retry,
     audit_queue: Vec<String>,
     /// The fix being installed from the audit view, and when each app's scan landed.
     audit_installing: Option<audit::Installing>,
@@ -279,7 +283,8 @@ impl Controller {
             durations: Durations::load(&state_dir),
             build_warnings: diff::load_builds(&state_dir),
             contexts: None,
-            migration_job: None,
+            migration_jobs: Vec::new(),
+            migration_retry: parallel::Retry::default(),
             migration_queue: VecDeque::new(),
             migrations_check: false,
             requests: Default::default(),
@@ -293,7 +298,8 @@ impl Controller {
             run_keys: Vec::new(),
             finding_suites: false,
             audits,
-            auditing: None,
+            auditing: Vec::new(),
+            audit_retry: parallel::Retry::default(),
             audit_queue: Vec::new(),
             audit_installing: None,
             audit_landed: HashMap::new(),

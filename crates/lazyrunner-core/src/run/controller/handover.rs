@@ -102,7 +102,7 @@ impl Controller {
         if let Some(job) = &self.npm_ci {
             return Some(format!("{} is running", job.what));
         }
-        if self.migration_job.is_some() {
+        if !self.migration_jobs.is_empty() {
             return Some("dotnet ef is running".into());
         }
         self.tests_active().then(|| "tests are running".into())
