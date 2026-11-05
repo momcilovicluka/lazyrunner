@@ -1,20 +1,24 @@
 //! O: outdated and vulnerable packages, per app (#79), in three titled panes: the apps, each with its worst finding;
-//! the selected app's packages - the vulnerable first, the worst first, their severity in capitals, what a transitive
-//! one comes in through, then the outdated ones, and what the last scan fixed as `resolved ✓`; and the picked
-//! package's details: its advisory, the versions it affects and the one that fixes it, its link (`Enter` opens it) and
-//! what `i` will run. `y` (or `u`) copies that, `i` runs it after a yes - the app stops first and starts again after,
-//! then it's scanned again. `/` filters the packages by name, `v` shows only the vulnerable ones. The details sit
-//! beside the table on a wide terminal, under it on a narrower one.
+//! the selected app's packages - the vulnerable first, the worst first, an edge and their severity in its colour
+//! (capitals, a critical one filled), what a transitive one comes in through, then the outdated ones dimmed, and what
+//! the last scan fixed as `resolved ✓`; and the picked package's details: its advisory, the versions it affects and the
+//! one that fixes it, its link (`Enter` opens it) and what `i` will run. `y` (or `u`) copies that, `i` runs it after a
+//! yes - the app stops first and starts again after, then it's scanned again. `/` filters the packages by name (the
+//! match lit), `v` shows only the vulnerable ones. The details sit beside the table on a wide terminal, under it on a
+//! narrower one.
 //!
 //! `r` scans the selected app, `R` every one: `dotnet list package` and `npm audit` / `npm outdated`, in the background,
-//! one app at a time, kept in the state folder so the view opens on the last scan. They ask the package feeds, so
-//! nothing is scanned until asked. A scan marks what's `new` since the one before.
+//! one app at a time (the header counts them off), kept in the state folder so the view opens on the last scan - its
+//! age green today, red after a month. They ask the package feeds, so nothing is scanned until asked. A scan marks
+//! what's `new` since the one before.
 //!
-//! It moves too (not with reduced motion): the rows come in one after another as it opens, the table dims while its app
-//! is scanned, the rows that changed light up as the scan lands, what it fixed flashes green, and a new high or
-//! critical finding pulses once. With reduced motion a changed row keeps an accent edge instead.
+//! It moves too (not with reduced motion): the rows come in one after another as it opens and the selection glides
+//! between them; the table dims while its app is scanned, the rows that changed light up as the scan lands (their `new`
+//! blinking once), what it fixed fills green from the left, and a new high or critical finding pulses - in the apps'
+//! list and the header's count. A fix being installed spins in its row, and one that failed pulses it red; a copied
+//! command lights up. With reduced motion a changed row keeps an accent edge instead.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
@@ -24,8 +28,9 @@ use lazyrunner_core::run::audit::{self, AppAudit, Package, Severity};
 
 use super::columns::{chunk, fit, spinner};
 use super::icons::{self, Icon};
+use super::motion::COPY_FLASH;
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, pad, seg};
+use super::seg::{Seg, aim, on, pad, seg, width};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -42,9 +47,20 @@ const NEW: &str = " new ";
 /// As the view opens its rows come in this far apart, all of them within `STAGGER_ALL`.
 const STAGGER: Duration = Duration::from_millis(15);
 const STAGGER_ALL: Duration = Duration::from_millis(200);
-/// As a scan lands: how long the rows that changed stay lit, and a new high or critical finding's pulse.
+/// As a scan lands: how long the rows that changed stay lit (their `new` blinking once, `BLINK` off), what it fixed
+/// takes to fill green, and a new high or critical finding's pulse.
 const LAND: Duration = Duration::from_millis(200);
+const BLINK: Duration = Duration::from_millis(60);
+const SWEEP: Duration = Duration::from_millis(300);
 const PULSE: Duration = Duration::from_millis(300);
+/// A fix that failed to install pulses its row red, twice, over this long.
+const FAILED: Duration = Duration::from_millis(400);
+/// The last scan's age turns amber after this many days, red after `STALE_DAYS`.
+const OLD_DAYS: i64 = 7;
+const STALE_DAYS: i64 = 30;
+/// The batch's bar in the header, up to this many apps.
+const BATCH_BAR: usize = 12;
+const FOOTNOTE: &str = "counting a package once per app that owns or references it";
 
 /// O: the audit view, on the app with the worst finding.
 pub fn open(ui: &mut Ui, controller: &Controller) {
@@ -63,6 +79,7 @@ pub fn open(ui: &mut Ui, controller: &Controller) {
         filter: String::new(),
         typing: false,
         opened,
+        copied: None,
     });
 }
 
@@ -167,13 +184,17 @@ fn picked(ui: &Ui, controller: &Controller) -> Option<(App, Package)> {
     Some((controller.apps.get(*app)?.clone(), package))
 }
 
-/// y: the picked package's fix, or the upgrade to its latest version, for its app's folder.
+/// y: the picked package's fix, or the upgrade to its latest version, for its app's folder; the command lights up.
 fn copy_fix(ui: &mut Ui, controller: &mut Controller) {
     let Some((app, package)) = picked(ui, controller) else { return };
     match audit::command(&app, &package) {
         Some(command) => {
             let what = format!("the fix for {} - run it in {}", package.name, folder(controller, &app));
             super::copy::put(ui.clipboard, controller, &command, &what);
+            let now = ui.now;
+            if let Some(Overlay::Audit { copied, .. }) = &mut ui.overlay {
+                *copied = Some(now);
+            }
         }
         None => controller.add_log(format!("{}: no fixed version is known yet", package.name), Hue::DarkGray),
     }
@@ -218,6 +239,12 @@ fn landed(ui: &Ui, controller: &Controller, key: &str, within: Duration) -> Opti
     (moving(ui) && since < within).then_some(since)
 }
 
+/// How long ago `at` was, while it's within `within` and motion runs.
+fn within(ui: &Ui, at: Option<Instant>, within: Duration) -> Option<Duration> {
+    let since = ui.now.saturating_duration_since(at?);
+    (moving(ui) && since < within).then_some(since)
+}
+
 /// How many of `count` table rows have come in since the view opened.
 fn arrived(ui: &Ui, count: usize) -> usize {
     let Some(Overlay::Audit { opened, .. }) = &ui.overlay else { return count };
@@ -229,26 +256,29 @@ fn arrived(ui: &Ui, count: usize) -> usize {
     ((since.as_millis() / step.as_millis()) as usize + 1).min(count)
 }
 
-/// Whether the view moves: its rows still coming in, or a scan just landed.
+/// Whether the view moves: its rows still coming in, a scan just landed, a command just copied, a fix just failed.
 pub fn animating(ui: &Ui, controller: &Controller) -> bool {
-    let Some(Overlay::Audit { opened, .. }) = &ui.overlay else { return false };
-    let opening = moving(ui) && ui.now.saturating_duration_since(*opened) < STAGGER_ALL;
-    opening || controller.apps.iter().any(|app| landed(ui, controller, &app.key, LAND.max(PULSE)).is_some())
+    let Some(Overlay::Audit { opened, copied, .. }) = &ui.overlay else { return false };
+    let failed = controller.audit_install_failed().map(|(_, _, at)| at);
+    within(ui, Some(*opened), STAGGER_ALL).is_some()
+        || within(ui, *copied, COPY_FLASH).is_some()
+        || within(ui, failed, FAILED).is_some()
+        || controller.apps.iter().any(|app| landed(ui, controller, &app.key, SWEEP.max(PULSE)).is_some())
 }
 
-/// A severity as the table and the details show it: in capitals, a critical one filled.
+/// A severity as the table and the details show it, in capitals: a critical one filled, the others framed.
 fn pill(severity: Severity) -> Seg {
     let name = severity.name().to_uppercase();
     match severity {
         Severity::Critical => on(format!(" {name} "), C::Black, C::Red),
-        Severity::High => seg(format!(" {name} "), C::Red),
-        Severity::Moderate => seg(format!(" {name} "), C::Yellow),
-        Severity::Low => seg(format!(" {name} "), C::DarkGray),
-        Severity::Info => seg(format!(" {name} "), C::Cyan),
+        Severity::High => seg(format!("▕{name}▏"), C::Red),
+        Severity::Moderate => seg(format!("▕{name}▏"), C::Yellow),
+        Severity::Low => seg(format!("▕{name}▏"), C::DarkGray),
+        Severity::Info => seg(format!("▕{name}▏"), C::Cyan),
     }
 }
 
-/// A severity in the apps' list: in its colour, a critical one filled.
+/// A severity in the apps' list and the header: in its colour, a critical one filled.
 fn badge(severity: Severity, text: &str) -> Seg {
     match severity {
         Severity::Critical => on(format!(" {text} "), C::Black, C::Red),
@@ -259,37 +289,67 @@ fn badge(severity: Severity, text: &str) -> Seg {
     }
 }
 
+/// A pulse: shown inverted while it's on.
+fn pulsed(mut shown: Seg, on: bool) -> Seg {
+    if on {
+        (shown.fg, shown.bg) = (C::Black, Some(C::White));
+    }
+    shown
+}
+
 fn spin(ui: &Ui) -> &str {
     if ui.reduced_motion { "●" } else { spinner(ui) }
 }
 
-/// The view's first row: the project, what the scans found, and what's scanning or installing (or when the last scan
-/// was).
+/// The view's first row: the project, what the scans found (a count pulsing as a scan adds to it), and what's
+/// installing or scanning - with the batch counted off - or when the last scan was, coloured by its age.
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let mut header = vec![
         on(format!(" {} AUDIT ", icons::icon(ui.nerd, Icon::Shield)), C::Black, C::Cyan),
         seg(format!("  {}", controller.project.name), C::White),
     ];
     let scans = controller.audits();
-    let all: Vec<Package> = scans.values().flat_map(|scan| scan.packages.iter().cloned()).collect();
-    for severity in Severity::ALL.into_iter().filter(|severity| *severity >= Severity::High) {
+    let all: Vec<&Package> = scans.values().flat_map(|scan| &scan.packages).collect();
+    let fresh: Vec<&AppAudit> = controller
+        .apps
+        .iter()
+        .filter(|app| landed(ui, controller, &app.key, PULSE).is_some())
+        .filter_map(|app| scans.get(&app.key))
+        .collect();
+    for severity in [Severity::Critical, Severity::High] {
         let count = all.iter().filter(|package| package.severity == Some(severity)).count();
-        if count > 0 {
-            header.extend([seg("  ", C::Gray), badge(severity, &format!("{count} {}", severity.name()))]);
+        if count == 0 {
+            continue;
         }
+        let added = fresh.iter().any(|scan| {
+            scan.packages.iter().any(|package| package.severity == Some(severity) && scan.new.contains(&package.name))
+        });
+        header.extend([seg("  ", C::Gray), pulsed(badge(severity, &format!("{count} {}", severity.name())), added)]);
     }
     if !scans.is_empty() {
-        header.push(seg(format!("  {} packages", all.len()), C::Gray));
+        let plural = if all.len() == 1 { "" } else { "s" };
+        header.push(seg(format!("  {} package{plural}", all.len()), C::Gray));
     }
     if let Some((_, command)) = controller.audit_installing() {
         header.push(seg(format!(" · {} installing: {command}", spin(ui)), C::Yellow));
     } else if let Some(key) = controller.auditing() {
         let name = controller.app(key).map_or(key, |app| app.name.as_str());
-        let more = controller.audit_queue().len();
-        let more = if more > 0 { format!(" · {more} more") } else { String::new() };
-        header.push(seg(format!(" · {} scanning {name}{more}", spin(ui)), C::Yellow));
+        header.push(seg(format!(" · {} scanning {name}", spin(ui)), C::Yellow));
+        if let Some((done, total)) = controller.audit_batch().filter(|(_, total)| *total > 1) {
+            header.push(seg(format!(" · {} of {total} ", done + 1), C::Yellow));
+            if total <= BATCH_BAR {
+                header.extend([seg("█".repeat(done), C::Yellow), seg("░".repeat(total - done), C::DarkGray)]);
+            }
+        }
     } else if let Some(at) = scans.values().map(|scan| scan.at).max() {
-        header.push(seg(format!(" · last scan {}", audit::age(at)), C::DarkGray));
+        let days = (chrono::Local::now().timestamp() - at) / 86_400;
+        let (color, nudge) = match days {
+            0 => (C::Green, ""),
+            _ if days < OLD_DAYS => (C::Gray, ""),
+            _ if days < STALE_DAYS => (C::Yellow, ""),
+            _ => (C::Red, " · R rescans"),
+        };
+        header.push(seg(format!(" · last scan {}{nudge}", audit::age(at)), color));
     }
     header
 }
@@ -328,12 +388,9 @@ fn state(ui: &Ui, controller: &Controller, key: &str) -> Seg {
         return seg("✗ couldn't scan", C::Red);
     }
     if let Some(worst) = scan.worst() {
-        let mut shown = badge(worst, &format!("{} {}", scan.count(worst), worst.name()));
         let first_found = worst >= Severity::High && !scan.new_advisories.is_empty();
-        if first_found && landed(ui, controller, key, PULSE).is_some_and(|since| since < PULSE / 2) {
-            (shown.fg, shown.bg) = (C::Black, Some(C::White));
-        }
-        return shown;
+        let pulse = first_found && landed(ui, controller, key, PULSE).is_some_and(|since| since < PULSE / 2);
+        return pulsed(badge(worst, &format!("{} {}", scan.count(worst), worst.name())), pulse);
     }
     match scan.packages.iter().filter(|package| package.outdated()).count() {
         0 => seg("up to date", C::Green),
@@ -341,43 +398,116 @@ fn state(ui: &Ui, controller: &Controller, key: &str) -> Seg {
     }
 }
 
-/// The apps, each with what its scan says; the selected one lit while the apps have the keys.
+/// The apps, each with what its scan says - the selected one lit while the apps have the keys - and a note on how
+/// they're counted.
 fn app_rows(ui: &Ui, controller: &Controller, selected: usize, list_width: usize, focus: bool) -> Vec<Vec<Seg>> {
     let apps = controller.apps.iter().enumerate();
-    apps.map(|(at, app)| {
-        let state = state(ui, controller, &app.key);
-        let icon = icons::app(ui.nerd, app, controller.framework(&app.key));
-        let room = list_width.saturating_sub(state.text.chars().count() + 7).max(4);
-        let marker = if at == selected { "▸" } else { " " };
-        let mut row =
-            vec![seg(format!(" {marker} {icon} "), C::Gray), seg(pad(&app.name, room), C::White), seg(" ", C::Gray)];
-        row.push(state);
-        if at == selected && !focus {
-            for part in row.iter_mut().filter(|part| part.bg.is_none()) {
-                (part.fg, part.bg) = (C::FocusText, Some(C::FocusBack));
+    let mut rows: Vec<Vec<Seg>> = apps
+        .map(|(at, app)| {
+            let state = state(ui, controller, &app.key);
+            let icon = icons::app(ui.nerd, app, controller.framework(&app.key));
+            let room = list_width.saturating_sub(state.text.chars().count() + 7).max(4);
+            let marker = if at == selected { "▸" } else { " " };
+            let mut row = vec![
+                seg(format!(" {marker} {icon} "), C::Gray),
+                seg(pad(&app.name, room), C::White),
+                seg(" ", C::Gray),
+            ];
+            row.push(state);
+            if at == selected && !focus {
+                for part in row.iter_mut().filter(|part| part.bg.is_none()) {
+                    (part.fg, part.bg) = (C::FocusText, Some(C::FocusBack));
+                }
             }
+            aim(row, Target::Item(at))
+        })
+        .collect();
+    rows.push(Vec::new());
+    let note = super::overlays::words(FOOTNOTE, list_width.saturating_sub(2));
+    rows.extend(note.into_iter().map(|piece| vec![seg(format!(" {piece}"), C::DarkGray)]));
+    rows
+}
+
+/// A package row's left edge: its severity's colour (none for an outdated one), or the accent on a changed row with
+/// reduced motion, which doesn't light it up.
+fn edge(package: &Package, accent: bool) -> Seg {
+    let color = match package.severity {
+        _ if accent => C::Cyan,
+        Some(Severity::Critical | Severity::High) => C::Red,
+        Some(Severity::Moderate) => C::Yellow,
+        Some(Severity::Low | Severity::Info) => C::DarkGray,
+        None => return seg(" ", C::Gray),
+    };
+    seg("▌", color)
+}
+
+/// `name` with what `/` typed lit in it.
+fn highlighted(name: &str, filter: &str, color: C) -> Vec<Seg> {
+    let (lower, wanted) = (name.to_lowercase(), filter.to_lowercase());
+    let found = (!filter.is_empty() && lower.len() == name.len()).then(|| lower.find(&wanted)).flatten();
+    let bounds = found.map(|at| (at, at + wanted.len()));
+    match bounds.filter(|(at, end)| name.is_char_boundary(*at) && name.is_char_boundary(*end)) {
+        Some((at, end)) => {
+            vec![seg(&name[..at], color), on(name[at..end].to_string(), C::Black, C::Yellow), seg(&name[end..], color)]
         }
-        aim(row, Target::Item(at))
-    })
-    .collect()
+        None => vec![seg(name, color)],
+    }
 }
 
-/// How the table looks right now: dimmed while its app is scanned, its changed rows lit as the scan lands, and with
-/// reduced motion an accent edge on them instead.
+/// `row` with its first `cells` cells in `fg` on `back` - a fill sweeping left to right.
+fn swept(row: Vec<Seg>, cells: usize, fg: C, back: C) -> Vec<Seg> {
+    let mut left = cells;
+    let mut out = Vec::new();
+    for part in row {
+        let count = part.text.chars().count();
+        if left == 0 {
+            out.push(part);
+        } else if count <= left {
+            left -= count;
+            out.push(Seg { fg, bg: Some(back), ..part });
+        } else {
+            let head: String = part.text.chars().take(left).collect();
+            let tail: String = part.text.chars().skip(left).collect();
+            out.push(Seg { text: head, fg, bg: Some(back), ..part.clone() });
+            out.push(Seg { text: tail, ..part });
+            left = 0;
+        }
+    }
+    out
+}
+
+/// The picked row lit across (but its edge), as the selection bar is.
+fn light(row: &mut [Seg]) {
+    for part in row.iter_mut().skip(1).filter(|part| part.bg.is_none()) {
+        part.bg = Some(C::FocusBack);
+        if matches!(part.fg, C::Gray | C::DarkGray | C::White) {
+            part.fg = C::FocusText;
+        }
+    }
+}
+
+/// How the table looks right now.
 struct Look {
+    /// Dimmed: its app is being scanned.
     dim: bool,
-    landing: bool,
+    /// How long ago its app's scan landed, while that moves.
+    landed: Option<Duration>,
+    /// Reduced motion: a changed row keeps an accent edge.
     edge: bool,
+    spin: String,
+    /// The fix being installed (its command), and one that just failed (its command, how long ago).
+    installing: Option<String>,
+    failed: Option<(String, Duration)>,
 }
 
-/// The table: its column titles, then a package a row - its name with what it comes in through and `new` when the
-/// scan before didn't have it, its versions, its severity (or `↑ outdated only`) and whether the app references it
-/// itself - and what the last scan fixed, as `resolved ✓`; the picked one lit while the packages have the keys.
+/// The table: its column titles, then a package a row - an edge in its severity's colour, its name (what `/` typed
+/// lit) with what it comes in through and `new` when the scan before didn't have it, its versions, its severity framed
+/// (or `↑ outdated only`, the row dimmed; or a spinner while its fix installs) and whether the app references it itself
+/// - and what the last scan fixed, as `resolved ✓`.
 fn table_rows(
     list: &[&Package],
-    scan: Option<&AppAudit>,
+    (scan, app): (Option<&AppAudit>, &App),
     filter: &str,
-    (index, focus): (usize, bool),
     look: &Look,
     table_width: usize,
 ) -> Vec<Vec<Seg>> {
@@ -392,36 +522,51 @@ fn table_rows(
     );
     let mut rows = vec![vec![seg(titles, C::DarkGray)]];
     let new = scan.map_or(&[][..], |scan| &scan.new);
+    let landing = look.landed.filter(|since| *since < LAND);
     for (at, package) in list.iter().enumerate() {
         let changed = new.contains(&package.name);
-        let edge = if changed && look.edge { seg("▌", C::Cyan) } else { seg(" ", C::Gray) };
-        let mut name = vec![seg(format!(" {}", package.name), C::White)];
+        let command = audit::command(app, package);
+        let installing = command.is_some() && look.installing == command;
+        let failed =
+            look.failed.as_ref().filter(|(failed, _)| command.as_ref() == Some(failed)).map(|(_, since)| *since);
+        let vulnerable = package.severity.is_some();
+        let mut name = vec![seg(" ", C::Gray)];
+        name.extend(highlighted(&package.name, filter, if vulnerable { C::White } else { C::DarkGray }));
         if let Some(first) = package.via.first() {
             let more = if package.via.len() > 1 { format!(" +{}", package.via.len() - 1) } else { String::new() };
             name.push(seg(format!(" via {first}{more}"), C::DarkGray));
         }
         let chip = if changed { NEW.len() } else { 0 };
-        let mut row = vec![edge];
+        let mut row = vec![edge(package, changed && look.edge)];
         row.extend(fit(name, name_cells - 1 - chip));
         if changed {
-            row.push(on(NEW, C::Black, C::Yellow));
+            let blink_off = landing.is_some_and(|since| since >= BLINK && since < BLINK * 2);
+            row.push(if blink_off { seg(NEW, C::Yellow) } else { on(NEW, C::Black, C::Yellow) });
         }
         let latest = package.latest.clone().filter(|_| package.outdated()).unwrap_or_default();
-        let latest_color = if package.major_behind() { C::Yellow } else { C::Gray };
+        let latest_color = match () {
+            _ if package.major_behind() => C::Yellow,
+            _ if vulnerable => C::Gray,
+            _ => C::DarkGray,
+        };
+        let current_color = if vulnerable { C::Gray } else { C::DarkGray };
         row.extend([
-            seg(pad(&package.current, VERSION_CELLS), C::Gray),
+            seg(pad(&package.current, VERSION_CELLS), current_color),
             seg(pad(&latest, VERSION_CELLS), latest_color),
         ]);
         let severity = match package.severity {
+            _ if installing => vec![seg(format!(" {} installing", look.spin), C::Yellow)],
             Some(severity) => vec![pill(severity)],
             None => vec![seg(" ↑ outdated only", C::DarkGray)],
         };
         row.extend(fit(severity, SEVERITY_CELLS));
         row.push(seg(pad(if package.direct { "direct" } else { "transitive" }, KIND_CELLS), C::DarkGray));
-        let lit = (at == index && focus).then_some(C::FocusBack).or((changed && look.landing).then_some(C::DarkCyan));
+        let red = failed.is_some_and(|since| (since.as_millis() / (FAILED.as_millis() / 4)).is_multiple_of(2));
         for part in row.iter_mut().skip(1).filter(|part| part.bg.is_none()) {
-            if let Some(back) = lit {
-                part.bg = Some(back);
+            if red {
+                (part.fg, part.bg) = (C::Black, Some(C::Red));
+            } else if changed && landing.is_some() {
+                part.bg = Some(C::DarkCyan);
                 if matches!(part.fg, C::Gray | C::DarkGray | C::White) {
                     part.fg = C::FocusText;
                 }
@@ -433,19 +578,20 @@ fn table_rows(
     }
     let resolved = scan.into_iter().flat_map(|scan| &scan.fixed).filter(|fixed| named(&fixed.name, filter));
     for fixed in resolved {
-        let mut row = vec![
+        let row = vec![
             seg(" ", C::Gray),
             seg(pad(&format!(" {}", fixed.name), name_cells - 1), C::Gray),
             seg(pad(&fixed.from, VERSION_CELLS), C::DarkGray),
             seg(pad(fixed.to.as_deref().unwrap_or(""), VERSION_CELLS), C::Gray),
             seg(pad(" resolved ✓", SEVERITY_CELLS), C::Green),
         ];
-        if look.landing {
-            for part in row.iter_mut().skip(1) {
-                (part.fg, part.bg) = (C::Black, Some(C::Green));
+        rows.push(match look.landed.filter(|since| *since < SWEEP) {
+            Some(since) => {
+                let filled = (since.as_secs_f64() / SWEEP.as_secs_f64() * table_width as f64).round() as usize;
+                swept(row, filled, C::Black, C::Green)
             }
-        }
-        rows.push(row);
+            None => row,
+        });
     }
     rows
 }
@@ -469,8 +615,14 @@ fn empty(controller: &Controller, app: &App, only: bool, filter: &str) -> Vec<Ve
 
 /// The picked package's details, as the concept has them: its name and version, its severity, advisory id and how
 /// the app gets it; its advisory with the versions it affects, the one that fixes it and its link; the others; and
-/// what `i` will run.
-fn details(controller: &Controller, app: &App, package: Option<&Package>, detail_width: usize) -> Vec<Vec<Seg>> {
+/// what `i` will run (lit up just after `y` copied it). What's longer than the pane wraps at its words.
+fn details(
+    controller: &Controller,
+    app: &App,
+    package: Option<&Package>,
+    detail_width: usize,
+    copied: bool,
+) -> Vec<Vec<Seg>> {
     let Some(package) = package else { return Vec::new() };
     let new = controller.audits().get(&app.key).map_or(&[][..], |scan| &scan.new_advisories);
     let room = detail_width.saturating_sub(2).max(10);
@@ -486,9 +638,9 @@ fn details(controller: &Controller, app: &App, package: Option<&Package>, detail
     };
     out.push(match (package.severity, first) {
         (Some(severity), Some(advisory)) => {
-            vec![pill(severity), seg(format!(" {} · {how}", advisory.id), C::DarkGray)]
+            vec![seg(" ", C::Gray), pill(severity), seg(format!(" {} · {how}", advisory.id), C::DarkGray)]
         }
-        (Some(severity), None) => vec![pill(severity), seg(format!(" {how}"), C::DarkGray)],
+        (Some(severity), None) => vec![seg(" ", C::Gray), pill(severity), seg(format!(" {how}"), C::DarkGray)],
         (None, _) => vec![seg(" ↑ outdated only", C::Gray), seg(format!(" · {how}"), C::DarkGray)],
     });
     let title =
@@ -496,6 +648,9 @@ fn details(controller: &Controller, app: &App, package: Option<&Package>, detail
     let label = |out: &mut Vec<Vec<Seg>>, text: &str| out.push(vec![seg(format!(" {text}"), C::DarkGray)]);
     let value = |out: &mut Vec<Vec<Seg>>, text: &str, color: C| {
         out.extend(chunk(text, room).into_iter().map(|piece| vec![seg(format!(" {piece}"), color)]));
+    };
+    let wrapped = |out: &mut Vec<Vec<Seg>>, text: &str, color: C| {
+        out.extend(super::overlays::words(text, room).into_iter().map(|piece| vec![seg(format!(" {piece}"), color)]));
     };
     if let Some(advisory) = first {
         let mut heading = vec![seg(" ADVISORY", C::DarkCyan)];
@@ -522,21 +677,34 @@ fn details(controller: &Controller, app: &App, package: Option<&Package>, detail
         title(&mut out, &format!("ALSO ({})", others.len()));
         for advisory in others {
             let text = if advisory.title.is_empty() { advisory.id.clone() } else { advisory.title.clone() };
-            let mut line = vec![seg(" ", C::Gray), pill(advisory.severity)];
-            line.push(seg(format!(" {text}"), C::Gray));
-            if new.contains(&advisory.id) {
-                line.push(on(NEW, C::Black, C::Yellow));
+            let tag = pill(advisory.severity);
+            let indent = 1 + width(std::slice::from_ref(&tag));
+            let pieces = super::overlays::words(&text, room.saturating_sub(indent).max(10));
+            for (at, piece) in pieces.into_iter().enumerate() {
+                let mut line =
+                    if at == 0 { vec![seg(" ", C::Gray), tag.clone()] } else { vec![seg(" ".repeat(indent), C::Gray)] };
+                line.push(seg(format!(" {piece}"), C::Gray));
+                out.push(line);
             }
-            out.push(line);
+            if new.contains(&advisory.id) {
+                let chip = on(NEW, C::Black, C::Yellow);
+                match out.last_mut() {
+                    Some(line) if width(line) + width(std::slice::from_ref(&chip)) <= room + 1 => line.push(chip),
+                    _ => out.push(vec![seg(" ".repeat(indent + 1), C::Gray), chip]),
+                }
+            }
         }
     }
     match audit::command(app, package) {
         Some(command) => {
             title(&mut out, "WHAT `i` WILL RUN");
-            value(&mut out, &command, C::Cyan);
-            label(&mut out, &format!("in {} · y copies it", folder(controller, app)));
+            for piece in chunk(&command, room) {
+                let text = format!(" {piece}");
+                out.push(vec![if copied { on(text, C::Black, C::Cyan) } else { seg(text, C::Cyan) }]);
+            }
+            wrapped(&mut out, &format!("in {} · y copies it", folder(controller, app)), C::DarkGray);
             if package.fix.as_ref().is_some_and(|fix| fix.major) || (package.fix.is_none() && package.major_behind()) {
-                out.push(vec![seg(" a new major version: check what changed first", C::Yellow)]);
+                wrapped(&mut out, "a new major version: check what changed first", C::Yellow);
             }
         }
         None if package.severity.is_some() => {
@@ -548,14 +716,42 @@ fn details(controller: &Controller, app: &App, package: Option<&Package>, detail
     out
 }
 
+/// What the view draws: its rows but the selection bar, and on which row of the table it goes.
+struct Layout {
+    header: Vec<Seg>,
+    keys: Vec<Seg>,
+    titles: Vec<Seg>,
+    left: Vec<Vec<Seg>>,
+    /// The table as it shows, cut to its room.
+    table: Vec<Vec<Seg>>,
+    details: Vec<Vec<Seg>>,
+    /// The picked package's row in `table`, while the packages have the keys.
+    picked: Option<usize>,
+    beside: bool,
+    list_width: usize,
+    right: usize,
+    table_width: usize,
+    height: usize,
+}
+
 /// The whole view: the header, the keys (or the question before an install, or the filter being typed), the panes'
 /// titles, then the apps beside the table and the picked package's details (beside the table when there's room,
-/// under it when not).
-pub fn rows(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let Some(Overlay::Audit { app, index, packages, only, confirm, filter, typing, .. }) = &ui.overlay else {
-        return Vec::new();
+/// under it when not), the selection bar gliding to the picked row.
+pub fn rows(ui: &mut Ui, controller: &Controller, view_width: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let target = layout(ui, controller, view_width, rows).and_then(|drawn| drawn.picked);
+    let bar = target.map(|line| ui.motion.bar(line, ui.now));
+    let Some(mut drawn) = layout(ui, controller, view_width, rows) else { return Vec::new() };
+    if let Some(row) = bar.and_then(|line| drawn.table.get_mut(line)) {
+        light(row);
+    }
+    compose(drawn, view_width)
+}
+
+fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> Option<Layout> {
+    let Some(Overlay::Audit { app, index, packages, only, confirm, filter, typing, copied, .. }) = &ui.overlay else {
+        return None;
     };
-    let Some(app_at) = controller.apps.len().checked_sub(1).map(|last| (*app).min(last)) else { return Vec::new() };
+    let app_at = controller.apps.len().checked_sub(1).map(|last| (*app).min(last))?;
     let the_app = &controller.apps[app_at];
     let scan = scan_of(controller, app_at);
     let list = shown(controller, app_at, *only, filter);
@@ -565,26 +761,41 @@ pub fn rows(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) ->
     let beside = right >= BESIDE_FROM;
     let table_width = if beside { right.saturating_sub(DETAIL_WIDTH + 3) } else { right };
     let height = rows.saturating_sub(3);
+    let failed = controller.audit_install_failed().filter(|(key, ..)| *key == the_app.key);
     let look = Look {
         dim: moving(ui) && controller.auditing() == Some(the_app.key.as_str()),
-        landing: landed(ui, controller, &the_app.key, LAND).is_some(),
+        landed: landed(ui, controller, &the_app.key, SWEEP.max(LAND)),
         edge: ui.reduced_motion,
+        spin: spin(ui).to_string(),
+        installing: controller.audit_installing().filter(|(key, _)| *key == the_app.key).map(|(_, run)| run.into()),
+        failed: failed.and_then(|(_, run, at)| Some((run.to_string(), within(ui, Some(at), FAILED)?))),
     };
-    let mut table = table_rows(&list, scan, filter, (index, *packages), &look, table_width);
-    let arrived = arrived(ui, table.len());
-    table.truncate(arrived.max(1));
+    let mut table = table_rows(&list, (scan, the_app), filter, &look, table_width);
+    table.truncate(arrived(ui, table.len()).max(1));
     if let Some(error) = scan.and_then(|scan| scan.error.as_ref()) {
         table.insert(0, vec![seg(format!("  ✗ the last scan failed: {error} - r tries again"), C::Red)]);
     }
     if list.is_empty() {
         table.extend(empty(controller, the_app, *only, filter));
     }
-    let details = details(controller, the_app, list.get(index).copied(), if beside { DETAIL_WIDTH } else { right });
+    let copied = within(ui, *copied, COPY_FLASH).is_some();
+    let detail_width = if beside { DETAIL_WIDTH } else { right };
+    let details = details(controller, the_app, list.get(index).copied(), detail_width, copied);
+    let room = if beside {
+        height
+    } else {
+        // The table takes the rows it needs (up to what leaves the details half), the details the rest.
+        let most = height.saturating_sub(details.len().min(height / 2) + 2).max(3);
+        table.len().clamp(3, most)
+    };
+    let table = window(&table, index + 1, room);
+    let mark = Some(Target::Package(index));
+    let picked = if *packages { table.iter().position(|row| row.iter().any(|part| part.target == mark)) } else { None };
     let mut packages_title = vec![seg(format!(" PACKAGES · {}", the_app.name.to_uppercase()), C::DarkCyan)];
-    if *typing || !filter.is_empty() {
-        let cursor = if *typing { ui.cursor() } else { "" };
-        packages_title.push(seg(format!("   / {filter}{cursor}"), C::Yellow));
-    }
+    packages_title.push(match (*typing, filter.is_empty()) {
+        (false, true) => seg("   / filter", C::DarkGray),
+        (typing, _) => seg(format!("   / {filter}{}", if typing { ui.cursor() } else { "" }), C::Yellow),
+    });
     let titles = if beside {
         let mut line = fit(packages_title, table_width);
         line.extend([seg(" │ ", C::DarkGray), seg(" DETAILS", C::DarkCyan)]);
@@ -592,8 +803,31 @@ pub fn rows(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) ->
     } else {
         packages_title
     };
-    let right_rows = if beside {
-        let table = window(&table, index + 1, height);
+    let keys = if *confirm {
+        question(controller, app_at, list.get(index).copied(), view_width)
+    } else {
+        vec![seg(hint(*packages, *only, *typing), C::DarkGray)]
+    };
+    Some(Layout {
+        header: header(ui, controller),
+        keys,
+        titles,
+        left: app_rows(ui, controller, app_at, list_width, *packages),
+        table,
+        details,
+        picked,
+        beside,
+        list_width,
+        right,
+        table_width,
+        height,
+    })
+}
+
+fn compose(drawn: Layout, view_width: usize) -> Vec<Vec<Seg>> {
+    let Layout { header, keys, titles, left, table, details, beside, list_width, right, table_width, height, .. } =
+        drawn;
+    let right_rows: Vec<Vec<Seg>> = if beside {
         (0..height)
             .map(|row| {
                 let mut line = fit(table.get(row).cloned().unwrap_or_default(), table_width);
@@ -603,26 +837,15 @@ pub fn rows(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) ->
             })
             .collect()
     } else {
-        // The table takes the rows it needs (up to what leaves the details half), the details the rest.
-        let most = height.saturating_sub(details.len().min(height / 2) + 2).max(3);
-        let table_room = table.len().clamp(3, most);
-        let mut stacked = window(&table, index + 1, table_room);
-        stacked.resize(table_room, Vec::new());
-        stacked.push(vec![seg("─".repeat(right), C::DarkGray)]);
-        stacked.push(vec![seg(" DETAILS", C::DarkCyan)]);
+        let mut stacked = table;
+        stacked.extend([vec![seg("─".repeat(right), C::DarkGray)], vec![seg(" DETAILS", C::DarkCyan)]]);
         stacked.extend(details);
         stacked
-    };
-    let left = app_rows(ui, controller, app_at, list_width, *packages);
-    let keys = if *confirm {
-        question(controller, app_at, list.get(index).copied(), view_width)
-    } else {
-        vec![seg(hint(*packages, *only, *typing), C::DarkGray)]
     };
     let mut pane_titles = fit(vec![seg(" APPS", C::DarkCyan)], list_width);
     pane_titles.push(seg(" │ ", C::DarkGray));
     pane_titles.extend(titles);
-    let mut out = vec![fit(header(ui, controller), view_width), fit(keys, view_width), fit(pane_titles, view_width)];
+    let mut out = vec![fit(header, view_width), fit(keys, view_width), fit(pane_titles, view_width)];
     for row in 0..height {
         let mut line = fit(left.get(row).cloned().unwrap_or_default(), list_width);
         line.push(seg(" │ ", C::DarkGray));
@@ -646,6 +869,10 @@ fn window(rows: &[Vec<Seg>], selected: usize, room: usize) -> Vec<Vec<Seg>> {
 mod tests {
     use super::*;
 
+    fn texts(row: &[Seg]) -> Vec<&str> {
+        row.iter().map(|part| part.text.as_str()).collect()
+    }
+
     #[test]
     fn a_long_table_keeps_its_titles_and_the_picked_row_in_view() {
         let rows: Vec<Vec<Seg>> = (0..20).map(|at| vec![seg(at.to_string(), C::Gray)]).collect();
@@ -655,5 +882,16 @@ mod tests {
         assert_eq!(shown(12), ["0", "10", "11", "12", "13"], "the titles stay, the picked one in the middle");
         assert_eq!(shown(19), ["0", "16", "17", "18", "19"]);
         assert!(named("Newtonsoft.Json", "json") && !named("lodash", "json") && named("x", ""));
+    }
+
+    #[test]
+    fn the_filter_lights_its_match_and_a_fill_sweeps_from_the_left() {
+        assert_eq!(texts(&highlighted("Newtonsoft.Json", "JSON", C::White)), ["Newtonsoft.", "Json", ""]);
+        assert_eq!(texts(&highlighted("lodash", "", C::White)), ["lodash"]);
+        let row = vec![seg("ab", C::Gray), seg("cdef", C::Gray)];
+        let filled = swept(row, 3, C::Black, C::Green);
+        assert_eq!(texts(&filled), ["ab", "c", "def"]);
+        let lit: Vec<bool> = filled.iter().map(|part| part.bg == Some(C::Green)).collect();
+        assert_eq!(lit, [true, true, false], "the first three cells");
     }
 }

@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.68.1] - 2026-11-05
+
+### Changed
+- The audit view (`O`) follows its concept more closely: a vulnerable row has an edge in its severity's colour and its severity framed (`▕HIGH▏`), an outdated-only row is dimmed, the packages' title says `/ filter`, the apps' list notes how packages are counted, and a `R` that scanned several apps ends with one line in the log - `▸ Audit finished in 3.8s · 12 packages · 3 high · 1 critical` (#79)
+- And it moves more (not with reduced motion): the selection glides between the packages, the header counts the apps off while `R` scans (and pulses a count a scan adds to), a resolved row fills green from the left, a `new` chip blinks once, a fix being installed spins in its row and one that failed pulses it red, `y` lights the command it copied, `/` lights what it matched, and the last scan's age turns amber after a week and red after a month (#79)
+
+### Fixed
+- The audit view's details no longer cut off a long row beside the table - the folder `i` runs in, the major-version warning, another advisory's title: they wrap at their words (#79)
+
 ## [1.68.0] - 2026-11-04
 
 ### Added

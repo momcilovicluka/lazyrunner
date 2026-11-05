@@ -72,8 +72,14 @@ impl Controller {
         let Some(installing) = self.audit_installing.take().filter(|installing| installing.key == key) else { return };
         let name = self.app(&key).map_or_else(|| key.clone(), |app| app.name.clone());
         match result {
-            Ok(()) => self.add_log(format!("✓ {name}: {} - scanning it again", installing.command), Hue::Green),
-            Err(error) => self.add_log(format!("✗ {name}: {} failed - {error}", installing.command), Hue::Red),
+            Ok(()) => {
+                self.audit_install_failed = None;
+                self.add_log(format!("✓ {name}: {} - scanning it again", installing.command), Hue::Green);
+            }
+            Err(error) => {
+                self.add_log(format!("✗ {name}: {} failed - {error}", installing.command), Hue::Red);
+                self.audit_install_failed = Some((key.clone(), installing.command, (self.now)()));
+            }
         }
         if installing.restart {
             self.start(Some(std::slice::from_ref(&key)), false);
@@ -84,12 +90,32 @@ impl Controller {
     /// `r` / `R` in the audit view: scans these apps (every app with none), one after another in the background.
     pub fn audit(&mut self, keys: Option<&[String]>) {
         let keys = keys.map_or_else(|| self.keys(), <[String]>::to_vec);
+        let before = self.audit_queue.len() + usize::from(self.auditing.is_some());
         for key in keys {
             if self.auditing.as_ref() != Some(&key) && !self.audit_queue.contains(&key) {
                 self.audit_queue.push(key);
             }
         }
+        let added = self.audit_queue.len() + usize::from(self.auditing.is_some()) - before;
+        match &mut self.audit_batch {
+            Some((_, total)) if before > 0 => *total += added,
+            _ if added > 0 => self.audit_batch = Some(((self.now)(), added)),
+            _ => {}
+        }
         self.next_audit();
+    }
+
+    /// The scans asked for together: how many are done, of how many.
+    pub fn audit_batch(&self) -> Option<(usize, usize)> {
+        let (_, total) = self.audit_batch?;
+        let left = self.audit_queue.len() + usize::from(self.auditing.is_some());
+        Some((total.saturating_sub(left), total))
+    }
+
+    /// The last fix that failed to install: its app, its command, and when.
+    pub fn audit_install_failed(&self) -> Option<(&str, &str, Instant)> {
+        let (key, command, at) = self.audit_install_failed.as_ref()?;
+        Some((key.as_str(), command.as_str(), *at))
     }
 
     fn next_audit(&mut self) {
@@ -143,6 +169,29 @@ impl Controller {
             self.add_log(format!("✗ Couldn't keep the audit: {error}"), Hue::Red);
         }
         self.next_audit();
+        if self.auditing.is_none() && self.audit_queue.is_empty() {
+            self.audit_finished();
+        }
+    }
+
+    /// The scans asked for together are all done: one line for them all (`▸ Audit finished in 3.8s · 12 packages · 3
+    /// high · 1 critical`), when there were several.
+    fn audit_finished(&mut self) {
+        let Some((started, total)) = self.audit_batch.take() else { return };
+        if total < 2 {
+            return;
+        }
+        let took = (self.now)().saturating_duration_since(started).as_secs_f64();
+        let all: Vec<Package> = self.audits.values().flat_map(|scan| scan.packages.iter().cloned()).collect();
+        let worst = all.iter().filter_map(|package| package.severity).max();
+        let hue = match worst {
+            Some(severity) if severity >= Severity::High => Hue::Red,
+            Some(_) => Hue::Yellow,
+            None => Hue::Green,
+        };
+        let plural = if all.len() == 1 { "" } else { "s" };
+        let found = audit::summary(&all);
+        self.add_log(format!("▸ Audit finished in {took:.1}s · {} package{plural} · {found}", all.len()), hue);
     }
 }
 
@@ -198,5 +247,13 @@ mod tests {
         let said = controller.log.back().map(|entry| entry.text.clone()).unwrap_or_default();
         assert!(said.ends_with("up to date · 1 fixed since the last scan"), "{said}");
         assert!(controller.audit_landed(&key).is_some());
+
+        controller.audit_batch = Some(((controller.now)(), 2));
+        controller.auditing = Some(key.clone());
+        assert_eq!(controller.audit_batch(), Some((1, 2)), "one of two left");
+        controller.handle(Event::Audit { key: key.clone(), result: Ok(vec![package.clone()]) });
+        let said = controller.log.back().map(|entry| entry.text.clone()).unwrap_or_default();
+        assert!(said.starts_with("▸ Audit finished in") && said.ends_with("· 1 package · 1 high"), "{said}");
+        assert_eq!(controller.audit_batch(), None);
     }
 }
