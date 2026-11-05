@@ -1,22 +1,22 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
-expression: "screen.render(80, 24)"
+expression: "masked(screen.render(80, 24))"
 ---
+ ⧗ DURATIONS   5 items · slowed down most: Api ▲ +1150%
+ j k choose · g G first / last · Esc closes · usual = median of the earlier succ
 
+Builds                      last 14 runs       last    usual
+  Api                       ▁▁▁▇              2m05s      10s  ▲ +1150%    4 runs
+  Orders                    ▆▅▅▇▆▇              55s      39s  ▲ +41%      6 runs
+Starts                      last 14 runs       last    usual
+  Orders                    ▇▆▇▇                 9s       9s  ≈           4 runs
+  Shop                      ▇▇▇▂                 2s      10s              4 runs
+────────────────────────────────────────────────────────────────────────────────
+ ORDERS · Builds
+ last 55s · usual 39s · ▲ +41% · 6 runs
 
-  ┌─ Durations ──────────────────────────────────────────────────────────────┐
-  │ Builds                      runs       last    usual                     │
-  │   Api                       ▁▁▁▇      2m05s      10s  ▲ +1150%    4 runs │
-  │   Orders                    ▆▅▅▇▆▇      55s      39s  ▲ +41%      6 runs │
-  │ Starts                      runs       last    usual                     │
-  │   Orders                    ▇▆▇▇         9s       9s  ≈           4 runs │
-  │   Shop                      ▇▇▇▂         2s      10s              4 runs │
-  │ npm ci                      runs       last    usual                     │
-  │   A shop frontend with a v… ▇         1m01s        –              1 run  │
-  │ Esc closes · usual = median of the earlier successful runs · red = faile │
-  └──────────────────────────────────────────────────────────────────────────┘
-
-
+ 55s the slowest
+ ▄ ▃ ▂ ▇ ▄ █
 ────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all           :  commands   x  menu   ?  keys

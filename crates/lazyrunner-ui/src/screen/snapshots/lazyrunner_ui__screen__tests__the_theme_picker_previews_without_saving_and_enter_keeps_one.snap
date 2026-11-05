@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders  ┳ ■ Billing  :┬ ■ Shop  :473┬ ■ Docs   ○ s┬ ■ Console  :4730┃ Themes   26 of 26
+ ▸ ◆ Orders  ┳ ■ Billing   ┬ ■ Shop   ○ s┬ ■ Docs   ○ s┬ ■ Console   ○ st┃ Themes   26 of 26
              ┃             │   dev server│   watch buil│   live · dev    ┃ › ▏
              ┃             │             │             │                 ┃────────────────────────────────────
              ┃             │             │             │                 ┃  • Default               ■■■■■■

@@ -275,8 +275,12 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         let chip = format!(" {} {} {}", icons::icon(ui.nerd, Icon::Warn), scan.count(worst), worst.name());
         segs.push(seg(chip, C::Red));
     }
-    segs.push(seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray));
-    segs.extend(status(ui, controller, index));
+    let port = seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray);
+    let status = status(ui, controller, index);
+    // A title that doesn't fit drops its port before its state is cut.
+    let fits = width(&segs) + port.text.width() + width(&status) <= cells;
+    segs.push(if fits { port } else { seg("  ", C::DarkGray) });
+    segs.extend(status);
     let mut segs = ui.scrolling_row(segs, 2, cells);
     let used = width(&segs);
     let rule = if focused { "━" } else { "─" };
@@ -838,8 +842,10 @@ pub(super) fn linked(
     segs
 }
 
-/// Cuts text into pieces of `cells` cells.
+/// Cuts text into pieces of `cells` cells at most, which join back into it: a piece ends after a space or punctuation
+/// when one is in its last third, so words stay whole, else where it's full.
 pub fn chunk(text: &str, cells: usize) -> Vec<String> {
+    let cells = cells.max(1);
     if text.width() <= cells {
         return vec![text.to_string()];
     }
@@ -848,15 +854,41 @@ pub fn chunk(text: &str, cells: usize) -> Vec<String> {
     let mut used = 0;
     for c in text.graphemes(true) {
         let w = c.width();
-        if used + w > cells.max(1) {
-            chunks.push(std::mem::take(&mut current));
-            used = 0;
+        if used + w > cells && !current.is_empty() {
+            // Break after the last space or punctuation in the piece's last third, else where it's full.
+            match last_break(&current).filter(|(_, before)| used - before <= cells / 3) {
+                Some((at, before)) => {
+                    let rest = current.split_off(at);
+                    chunks.push(std::mem::replace(&mut current, rest));
+                    used -= before;
+                }
+                None => {
+                    chunks.push(std::mem::take(&mut current));
+                    used = 0;
+                }
+            }
         }
         current.push_str(c);
         used += w;
     }
     chunks.push(current);
     chunks
+}
+
+/// Where a wrapped line may break: after one of these.
+const BREAKS: &str = " \t/\\.,;:-_)]}>|=&?";
+
+/// The last place `piece` may break: the byte after its last space or punctuation, and the cells before it.
+fn last_break(piece: &str) -> Option<(usize, usize)> {
+    let mut cells = 0;
+    let mut found = None;
+    for (at, grapheme) in piece.grapheme_indices(true) {
+        cells += grapheme.width();
+        if grapheme.len() == 1 && BREAKS.contains(grapheme) && at + 1 < piece.len() {
+            found = Some((at + 1, cells));
+        }
+    }
+    found
 }
 
 pub fn contains_ignore_case(text: &str, query: &str) -> bool {
@@ -871,6 +903,14 @@ mod tests {
     fn sparklines_and_chunks() {
         assert_eq!(sparkline([0.0f32, 50.0, 100.0].iter(), 1.0), "▁▄█");
         assert_eq!(chunk("abcdefg", 3), ["abc", "def", "g"]);
+        let line = "info: Microsoft.Hosting.Lifetime[14]";
+        assert_eq!(chunk(line, 20), ["info: Microsoft.", "Hosting.Lifetime[14]"], "at a word, when one is near");
+        assert_eq!(chunk(line, 20).concat(), line, "the pieces join back into the line");
+        assert_eq!(
+            chunk("aaaa bbbbbbbbbbbbbbbbbbbb", 10),
+            ["aaaa bbbbb", "bbbbbbbbbb", "bbbbb"],
+            "else where it's full"
+        );
         assert_eq!(trim_number(1.25), "1.3/s");
         assert_eq!(trim_number(2.0), "2/s");
     }

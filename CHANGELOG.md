@@ -3,6 +3,21 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.71.0] - 2026-11-05
+
+### Added
+- The panel's header has an `A` chip for what an audit scan found since the audit view was last open (`A 3 new findings · 1 critical`), and while the audit or the migrations view is closed, a chip for what it does in the background (`A ⠋ scanning 2 of 5`, `M ⠋ checking · 2 left`); a click opens the view
+- `e` in the audit view puts each vulnerable package's advisory on a line under it: `└ title · fixed in 13.0.4 · +2 more`
+
+### Changed
+- Durations (`D`) is full screen like the other views: `j` `k` pick an item, and its details show its runs as a taller chart that grows in as it's picked and each run listed - when, how long, failed or not; the header names the item that slowed down most
+- Every full-screen view starts the same way: its name in a chip, its keys on the row under it - the timeline's keys moved up from the bottom - and keys that don't fit scroll sideways instead of being cut off at the edge
+- A column's title that doesn't fit leaves out the app's port before its state is cut
+- A long output line wraps at a space or punctuation when one is near the edge, so words and paths stay whole
+
+### Fixed
+- The requests view's header said `1 errors`
+
 ## [1.70.0] - 2026-11-05
 
 ### Changed

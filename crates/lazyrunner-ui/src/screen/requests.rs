@@ -557,6 +557,8 @@ fn cut(text: &str, cells: usize) -> String {
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let (cursor, nerd) = (ui.cursor(), ui.nerd);
+    let Some(Overlay::Requests(view)) = &ui.overlay else { return Vec::new() };
+    let keys = super::viewbar::keys(ui, &hint(view, controller), width);
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return Vec::new() };
     let list = shown(view, controller);
     if !view.follow && view.selected != 0 {
@@ -566,7 +568,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         }
     }
     let height = rows.saturating_sub(4);
-    let mut out = vec![header(view, controller, &list, width, cursor, nerd), hint(view, controller, width)];
+    let mut out = vec![header(view, controller, &list, width, cursor, nerd), keys];
     let least = if view.tab == Tab::Requests { REQUEST_FIXED } else { ENDPOINT_FIXED } + LIST_PATH;
     let side_width = (width * LIST_SHARE / 20).max(least);
     let side = view.details && width >= side_width + 2 + PANEL_MIN;
@@ -917,13 +919,13 @@ fn header(view: &View, controller: &Controller, list: &[&Request], width: usize,
     if let Some((app, method, endpoint)) = &view.endpoint {
         filters.push(format!("{method} {endpoint} · {}", app_name(controller, app)));
     }
-    let chip = format!(" {} Requests ", icons::icon(nerd, Icon::Requests));
-    let mut segs = vec![on(chip, C::Black, C::Cyan), seg("  ", C::Gray)];
+    let mut segs = vec![super::viewbar::chip(nerd, Icon::Requests, "Requests"), seg("  ", C::Gray)];
     for (tab, label) in [(Tab::Requests, " requests "), (Tab::Endpoints, " endpoints ")] {
         segs.push(if view.tab == tab { on(label, C::FocusText, C::FocusBack) } else { seg(label, C::DarkGray) });
     }
     segs.push(seg(format!("   {} shown · ", list.len()), C::DarkGray));
-    segs.push(seg(format!("{errors} errors"), if errors > 0 { C::Red } else { C::DarkGray }));
+    let plural = if errors == 1 { "" } else { "s" };
+    segs.push(seg(format!("{errors} error{plural}"), if errors > 0 { C::Red } else { C::DarkGray }));
     segs.push(seg(format!(" · avg {} ms", ms(avg)), C::DarkGray));
     if !filters.is_empty() {
         segs.push(seg(format!("   [{}]", filters.join(" · ")), C::Yellow));
@@ -931,15 +933,15 @@ fn header(view: &View, controller: &Controller, list: &[&Request], width: usize,
     fit(segs, width)
 }
 
-fn hint(view: &View, controller: &Controller, width: usize) -> Vec<Seg> {
+fn hint(view: &View, controller: &Controller) -> String {
     if !controller.apps.iter().any(|app| app.traits().counts_requests) {
-        return fit(vec![seg(" No .NET app here: the requests come from ASP.NET's log.", C::DarkGray)], width);
+        return " No .NET app here: the requests come from ASP.NET's log.".into();
     }
     let sort = match view.tab {
         Tab::Requests => SORTS[view.sort],
         Tab::Endpoints => ENDPOINT_SORTS[view.endpoint_sort],
     };
-    let text = match (view.tab, view.endpoint.is_some()) {
+    match (view.tab, view.endpoint.is_some()) {
         (Tab::Endpoints, _) => format!(
             " Tab requests/endpoints · j k choose · l its requests · Enter details · e errors only · a app · \
              s sort ({sort}) · / filter · y copy · o log · c clear · Esc back"
@@ -949,8 +951,7 @@ fn hint(view: &View, controller: &Controller, width: usize) -> Vec<Seg> {
              p send again · w open · o log · c clear · Esc back",
             if filtered { "h endpoints" } else { "Tab requests/endpoints" }
         ),
-    };
-    fit(vec![seg(text, C::DarkGray)], width)
+    }
 }
 
 /// The requests list; those an agent just read (`looked`) outlined.

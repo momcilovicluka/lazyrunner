@@ -238,7 +238,7 @@ at once while the palette wipes away.
 | `z` | Zoom: only the focused column |
 | `~` | The timeline: every app's output in one list, in the order it came - each line tagged with its app and coloured by its level, a quiet stretch of more than 3 s as a dim `· 4.2 s ·` row. `j` `k` scroll (the bottom row is the picked one), `G` follows new output, `Enter` jumps to the picked line in its own column. `/` narrows it to lines holding some words, `app:orders` to an app's lines, `level:warn` to warnings and up; `f` cycles the levels as in the columns; `Esc` shows every line again. A request's lines are bracketed by a faint rule with its method, path and status. A strip down the right edge has a lane per app over the whole stretch kept, shaded by how busy it was, red where it logged an error, with an edge beside the time on screen |
 | the rail | A column with more lines than rows has a rail at its right edge in place of a scrollbar: a map of all its lines - errors red, warnings yellow, search matches cyan, marks magenta, the rest dim ticks - with a bracket on the lines on screen (`▼` while it follows new output). The rest is dotted by how fast the app logged it: a dotted line at its usual pace, fuller where it logged faster, brighter where a burst came. A click on the rail jumps there, a drag along it scrolls, and the pointer on a row previews the line it jumps to, over the column. A new error that lands off-screen sends an ember down the rail to its mark, which waits for it and then settles in; `G` sends a shimmer down the map from where the view was, then down the bracket to its `▼`, a search's jump pulses its row, and the rail's top end dims while the oldest lines drop out of the buffer (not with reduced motion) |
-| `H` `T` `M` chips | What's new since a view was last open, in the panel's header: `H 3 new errors` (requests that failed since), `T 2 suites done · 1 red`, `M 1 pending` (a migration that appeared). The view's key or a click on the chip opens it on the first new thing; having it open clears the chip |
+| `H` `T` `M` `A` chips | What's new since a view was last open, in the panel's header: `H 3 new errors` (requests that failed since), `T 2 suites done · 1 red`, `M 1 pending` (a migration that appeared), `A 3 new findings · 1 critical` (what an audit scan found). The view's key or a click on the chip opens it on the first new thing; having it open clears the chip. While the audit or the migrations view is closed, what it does in the background has a chip too: `A ⠋ scanning 2 of 5`, `M ⠋ checking · 2 left` |
 | `,` `A` then `z` | **Diagnostics zip**, in the About box under Report a bug: what to attach to a bug report - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`diagnostics`); the log says where, and Alt+click on its path there (a click with `l` off) shows it in its folder. Look over its logs before you share it |
 | `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`; marks and their notes go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
@@ -281,6 +281,11 @@ feature request or the source, or checks for an
 update right there (`u`: what the check is doing, then how it ended, under its link; an update it finds is installed,
 as the startup checklist does). Its logo shimmers in rainbow colours over a flowing rule (still with reduced motion), with Nerd Font icons
 when they're on.
+
+Every full-screen view - requests, tests, migrations, audit, ports, the timeline, durations - starts the same way: its
+name in a chip, then its keys on the row under it; keys that don't fit scroll sideways rather than being cut off. A
+column's title that doesn't fit leaves out the app's port before its state, and a long output line wraps at a space or
+punctuation when one is near the edge, so words and paths stay whole.
 
 ### Mouse
 
@@ -461,7 +466,7 @@ its own once the rest are done; only then does it count. Each scan is kept in th
 opens on the last one and says how old it is; a scan that fails keeps the one before, and its time, and says why.
 
 `l` (or `Enter`) goes into the packages and `h` back to the apps; `/` filters the packages by name, `v` shows only the
-vulnerable ones; `y` (or `u`) copies the picked package's fix, `Enter` (or `o`) opens its advisory, and `i` installs
+vulnerable ones, `e` puts each vulnerable package's advisory on a line under it (`└ title · fixed in 13.0.4 · +2 more`); `y` (or `u`) copies the picked package's fix, `Enter` (or `o`) opens its advisory, and `i` installs
 the fix after a yes (`y` or `Enter`; `n` or `Esc` doesn't) - the app stops first if it runs and starts again after,
 then it's scanned again. `I` installs many fixes together, after asking which: `c` the critical ones, `h` high and
 up, `m` moderate and up, `a` all of them (`n` none) - the question says how many each takes and how many are a new
@@ -618,7 +623,7 @@ click on it opens `T`.
 ## Durations (`D`)
 
 Every build, app start, `npm ci` and test suite is timed and kept (the last 40 of each) in `history.json` in the project's state
-folder. `D` shows them in a box, grouped:
+folder. `D` shows them full screen, grouped:
 
 | Column | Meaning |
 |---|---|
@@ -630,7 +635,10 @@ folder. `D` shows them in a box, grouped:
 When a run finishes notably off its usual, its log line says so, e.g.
 `✓ Orders built in 52s (41 projects) · 37% slower than usual (38s)`. A cancelled build or `npm ci` isn't recorded; an
 unreadable `history.json` is kept as `history.json.bad` and a new one starts.
-`j` `k` scroll, `Esc` / `q` / `D` close.
+`j` `k` pick an item (`g` `G` the first and the last, a click too), `Esc` / `q` / `D` close. The picked item's details
+sit beside the table (under it on a narrow terminal): its last and usual, its runs as a taller chart that grows in as
+it's picked - the last run bright, a failed one red - and each run listed, newest first: when, how long, and whether it
+failed. The header names the item that slowed down most.
 
 ## Agents (MCP)
 

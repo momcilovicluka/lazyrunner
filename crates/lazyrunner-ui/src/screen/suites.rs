@@ -535,7 +535,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         }
         _ => 0,
     };
-    let hint = hint(width, picking.is_some());
+    let hint = hint(ui, width, picking.is_some());
     let mut out = vec![aim(header(ui, controller, width), Target::Box), aim(hint, Target::Box)];
     for row in 0..height {
         let left = list.get(list_top + row).cloned().unwrap_or_default();
@@ -573,7 +573,7 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
         ("not run yet".to_string(), C::DarkGray)
     };
     let mut segs = vec![
-        on(format!(" {} Tests ", icons::icon(ui.nerd, Icon::Tests)), C::FocusText, C::FocusBack),
+        super::viewbar::chip(ui.nerd, Icon::Tests, "Tests"),
         seg(format!("  {count} suite{} · ", if count == 1 { "" } else { "s" }), C::DarkGray),
         seg(summary, color),
         seg("   ", C::Gray),
@@ -632,14 +632,14 @@ pub fn sweeping(ui: &Ui, controller: &Controller) -> bool {
     controller.test_watch.suites.iter().any(|key| sweep(ui, controller, key).is_some())
 }
 
-fn hint(width: usize, picking: bool) -> Vec<Seg> {
+fn hint(ui: &Ui, width: usize, picking: bool) -> Vec<Seg> {
     let text = if picking {
         " j k choose a test · r run it · a watch only it · y copy it · f failed again · s stop · h back to the suites"
     } else {
         " j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its \
          tests · f / F failed again · Alt+f flaky again · [ ] a run · a / A watch · v all / failed / flaky · / filter · s stop · o log · y copy failures · Esc back"
     };
-    fit(vec![seg(text, C::DarkGray)], width)
+    super::viewbar::keys(ui, text, width)
 }
 
 /// Picking a test: the suite's tests on top (around the picked one), the picked test's message and stack below.

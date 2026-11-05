@@ -1,5 +1,6 @@
 //! What's new since you last looked: chips in the panel's header - `H 3 new errors`, `T 2 suites done · 1 red`,
-//! `M 1 pending` - for what happened in a view since it was last open. Its key or a click on the chip opens the view
+//! `M 1 pending`, `A 3 new findings · 1 critical` - for what happened in a view since it was last open; and, while a
+//! view is closed, what it's busy with in the background (`A ⠋ scanning 2 of 5`, `M ⠋ checking · 2 left`). Its key or a click on the chip opens the view
 //! on the first new thing, and having it open clears the chip. Each view keeps a mark of what it had when it was last
 //! open - the newest request's number, each suite's last finished run, the pending migrations - and until it has
 //! been open, of what was there when lazyrunner first knew it.
@@ -8,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Local};
 use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::audit::Severity;
 use lazyrunner_core::run::requests::Request;
 use lazyrunner_core::run::suites::{Status, Suite};
 
@@ -15,7 +17,7 @@ use super::jumps::View;
 use super::motion::Spot;
 use super::suites::Row;
 use super::theme::C;
-use super::{Overlay, Ui, migrations, requests, suites};
+use super::{Overlay, Ui, audit, migrations, requests, suites};
 
 #[derive(Debug, Default)]
 pub struct Seen {
@@ -25,6 +27,8 @@ pub struct Seen {
     suites: Option<HashMap<String, Option<DateTime<Local>>>>,
     /// The pending migrations then: their context's key and their id.
     pending: Option<HashSet<(String, String)>>,
+    /// The audit's findings then: each vulnerable package's app and name.
+    findings: Option<HashSet<(String, String)>>,
     /// The chips shown last frame: a new one pops in.
     shown: Vec<&'static str>,
 }
@@ -43,8 +47,19 @@ fn open_view(ui: &Ui) -> Option<View> {
         Overlay::Requests(_) => Some(View::Requests),
         Overlay::Tests { .. } => Some(View::Tests),
         Overlay::Migrations { .. } => Some(View::Migrations),
+        Overlay::Audit { .. } => Some(View::Audit),
         _ => None,
     })
+}
+
+fn findings(controller: &Controller) -> HashSet<(String, String)> {
+    let scans = controller.audits().iter();
+    scans
+        .flat_map(|(app, scan)| {
+            let vulnerable = scan.packages.iter().filter(|package| package.severity.is_some());
+            vulnerable.map(move |package| (app.clone(), package.name.clone()))
+        })
+        .collect()
 }
 
 fn finished(controller: &Controller) -> HashMap<String, Option<DateTime<Local>>> {
@@ -70,6 +85,9 @@ pub fn update(ui: &mut Ui, controller: &Controller) {
     }
     if controller.contexts.is_some() && (seen.pending.is_none() || open == Some(View::Migrations)) {
         seen.pending = Some(pending(controller));
+    }
+    if seen.findings.is_none() || open == Some(View::Audit) {
+        seen.findings = Some(findings(controller));
     }
     let keys: Vec<&'static str> = chips(ui, controller).iter().map(|chip| chip.key).collect();
     for key in keys.iter().filter(|key| !ui.seen.shown.contains(key)) {
@@ -111,6 +129,21 @@ fn new_pending(ui: &Ui, controller: &Controller) -> Vec<(String, String)> {
     news
 }
 
+/// The audit's findings since, the worst first: their app, package and severity.
+fn new_findings(ui: &Ui, controller: &Controller) -> Vec<(String, String, Severity)> {
+    let Some(seen) = &ui.seen.findings else { return Vec::new() };
+    let mut news: Vec<(String, String, Severity)> = controller
+        .audits()
+        .iter()
+        .flat_map(|(app, scan)| {
+            scan.packages.iter().filter_map(move |package| Some((app.clone(), package.name.clone(), package.severity?)))
+        })
+        .filter(|(app, name, _)| !seen.contains(&(app.clone(), name.clone())))
+        .collect();
+    news.sort_by_key(|(_, name, severity)| (std::cmp::Reverse(*severity), name.clone()));
+    news
+}
+
 fn plural(count: usize) -> &'static str {
     if count == 1 { "" } else { "s" }
 }
@@ -138,6 +171,38 @@ pub fn chips(ui: &Ui, controller: &Controller) -> Vec<Chip> {
     let pending = new_pending(ui, controller).len();
     if pending > 0 {
         chips.push(Chip { key: "M", label: format!("{pending} pending"), color: C::Yellow, view: View::Migrations });
+    }
+    let found = new_findings(ui, controller);
+    if let Some((_, _, worst)) = found.first() {
+        let critical = found.iter().filter(|(.., severity)| *severity == Severity::Critical).count();
+        let critical = if critical > 0 { format!(" · {critical} critical") } else { String::new() };
+        let label = format!("{} new finding{}{critical}", found.len(), plural(found.len()));
+        let color = if *worst >= Severity::High { C::Red } else { C::Yellow };
+        chips.push(Chip { key: "A", label, color, view: View::Audit });
+    }
+    chips
+}
+
+/// What the closed views do in the background, a chip each: the audit's scans, the migrations' checks.
+pub fn busy(ui: &Ui, controller: &Controller) -> Vec<Chip> {
+    let open = open_view(ui);
+    let spin = super::columns::spinner(ui);
+    let mut chips = Vec::new();
+    let scanning = controller.auditing();
+    if !scanning.is_empty() && open != Some(View::Audit) {
+        let label = match controller.audit_batch().filter(|(_, total)| *total > 1) {
+            Some((done, total)) => format!("{spin} scanning {done} of {total}"),
+            None => {
+                let key = &scanning[0];
+                format!("{spin} scanning {}", controller.app(key).map_or(key.as_str(), |app| app.name.as_str()))
+            }
+        };
+        chips.push(Chip { key: "A", label, color: C::Yellow, view: View::Audit });
+    }
+    let left = controller.migration_jobs.len() + controller.migration_queue().len();
+    if left > 0 && open != Some(View::Migrations) {
+        let label = format!("{spin} checking · {left} left");
+        chips.push(Chip { key: "M", label, color: C::Yellow, view: View::Migrations });
     }
     chips
 }
@@ -171,6 +236,14 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, view: View) {
             let at = first.and_then(|key| all.iter().position(|context| context.key() == key));
             if let (Some(at), Some(Overlay::Migrations { index, .. })) = (at, &mut ui.overlay) {
                 *index = at;
+            }
+        }
+        View::Audit => {
+            let first = new_findings(ui, controller).into_iter().next().map(|(app, ..)| app);
+            audit::open(ui, controller);
+            let at = first.and_then(|key| controller.apps.iter().position(|app| app.key == key));
+            if let (Some(at), Some(Overlay::Audit { app, .. })) = (at, &mut ui.overlay) {
+                *app = at;
             }
         }
     }

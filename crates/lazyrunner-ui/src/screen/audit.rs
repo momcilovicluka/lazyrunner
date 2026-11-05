@@ -77,6 +77,7 @@ pub fn open(ui: &mut Ui, controller: &Controller) {
         only: false,
         confirm: false,
         batch: false,
+        expanded: false,
         filter: String::new(),
         typing: false,
         opened,
@@ -107,7 +108,8 @@ fn shown<'a>(controller: &'a Controller, app: usize, only: bool, filter: &str) -
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) -> bool {
     let chosen = picked(ui, controller);
     let apps = controller.apps.len();
-    let Some(Overlay::Audit { app, index, packages, only, confirm, batch, filter, typing, .. }) = &mut ui.overlay
+    let Some(Overlay::Audit { app, index, packages, only, confirm, batch, expanded, filter, typing, .. }) =
+        &mut ui.overlay
     else {
         return false;
     };
@@ -183,6 +185,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "Tab" => *packages = !*packages && count > 0,
         "/" => (*typing, *index) = (true, 0),
         "v" => (*only, *index) = (!*only, 0),
+        "e" => *expanded = !*expanded,
         "r" => {
             if let Some(key) = controller.apps.get(*app).map(|app| app.key.clone()) {
                 controller.audit(Some(&[key]));
@@ -346,7 +349,7 @@ fn spin(ui: &Ui) -> &str {
 /// installing or scanning - with the batch counted off - or when the last scan was, coloured by its age.
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let mut header = vec![
-        on(format!(" {} AUDIT ", icons::icon(ui.nerd, Icon::Shield)), C::Black, C::Cyan),
+        super::viewbar::chip(ui.nerd, Icon::Shield, "Audit"),
         seg(format!("  {}", controller.project.name), C::White),
     ];
     let scans = controller.audits();
@@ -406,7 +409,9 @@ fn hint(packages: bool, only: bool, typing: bool) -> String {
     }
     let only = if only { "v everything" } else { "v vulnerable" };
     if packages {
-        format!(" i install · I install many · y copy · Enter advisory · / filter · {only} · r rescan · h apps · Esc")
+        format!(
+            " i install · I install many · y copy · Enter advisory · e details · / filter · {only} · r rescan · h apps ·              Esc"
+        )
     } else {
         format!(" j k choose · l its packages · I install many · r scan it · R scan all · / filter · {only} · Esc back")
     }
@@ -580,6 +585,8 @@ struct Look {
     /// The packages whose fixes are being installed, and those whose fixes just failed (and how long ago).
     installing: Vec<String>,
     failed: Option<(Vec<String>, Duration)>,
+    /// `e`: each vulnerable package's advisory on a line under it.
+    expanded: bool,
 }
 
 /// The table: its column titles, then a package a row - an edge in its severity's colour, its name (what `/` typed
@@ -658,6 +665,19 @@ fn table_rows(
             }
         }
         rows.push(aim(row, Target::Package(at)));
+        if look.expanded
+            && let Some(advisory) = package.advisories.first()
+        {
+            let what = if advisory.title.is_empty() { advisory.id.clone() } else { advisory.title.clone() };
+            let fix = package.fix.as_ref().filter(|fix| !fix.version.is_empty());
+            let fix = fix.map_or(String::new(), |fix| format!(" · fixed in {}", fix.version));
+            let more = match package.advisories.len() {
+                1 => String::new(),
+                count => format!(" · +{} more", count - 1),
+            };
+            let line = vec![seg("    └ ", C::DarkGray), seg(format!("{what}{fix}{more}"), C::DarkGray)];
+            rows.push(aim(line, Target::Package(at)));
+        }
     }
     let resolved = scan.into_iter().flat_map(|scan| &scan.fixed).filter(|fixed| named(&fixed.name, filter));
     for fixed in resolved {
@@ -831,7 +851,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, view_width: usize, rows: usize
 }
 
 fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> Option<Layout> {
-    let Some(Overlay::Audit { app, index, packages, only, confirm, batch, filter, typing, copied, .. }) = &ui.overlay
+    let Some(Overlay::Audit { app, index, packages, only, confirm, batch, expanded, filter, typing, copied, .. }) =
+        &ui.overlay
     else {
         return None;
     };
@@ -856,6 +877,7 @@ fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> O
             _ => Vec::new(),
         },
         failed: failed.and_then(|(.., names, at)| Some((names.to_vec(), within(ui, Some(at), FAILED)?))),
+        expanded: *expanded,
     };
     let mut table = table_rows(&list, scan, filter, &look, table_width);
     table.truncate(arrived(ui, table.len()).max(1));
@@ -875,7 +897,10 @@ fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> O
         let most = height.saturating_sub(details.len().min(height / 2) + 2).max(3);
         table.len().clamp(3, most)
     };
-    let table = window(&table, index + 1, room);
+    // The picked package's row, wherever the details lines put it.
+    let mark = Some(Target::Package(index));
+    let at = table.iter().position(|row| row.iter().any(|part| part.target == mark)).unwrap_or(index + 1);
+    let table = window(&table, at, room);
     let mark = Some(Target::Package(index));
     let picked = if *packages { table.iter().position(|row| row.iter().any(|part| part.target == mark)) } else { None };
     let mut packages_title = vec![seg(format!(" PACKAGES · {}", the_app.name.to_uppercase()), C::DarkCyan)];
@@ -895,7 +920,7 @@ fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> O
     } else if *confirm {
         question(controller, app_at, list.get(index).copied(), view_width)
     } else {
-        vec![seg(hint(*packages, *only, *typing), C::DarkGray)]
+        super::viewbar::keys(ui, &hint(*packages, *only, *typing), view_width)
     };
     Some(Layout {
         header: header(ui, controller),

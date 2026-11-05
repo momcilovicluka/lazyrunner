@@ -72,6 +72,8 @@ pub enum Icon {
     Clipboard,
     Copy,
     Hourglass,
+    /// The timeline (`~`).
+    Timeline,
     Brush,
     /// A project's own theme.
     Pin,
@@ -194,6 +196,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Copy, true) => "\u{f0c5}", // copy
         (Icon::Hourglass, false) => "⧗",
         (Icon::Hourglass, true) => "\u{f252}", // hourglass
+        (Icon::Timeline, false) => "~",
+        (Icon::Timeline, true) => "\u{f1da}", // history
         (Icon::Brush, false) => "◐",
         (Icon::Brush, true) => "\u{f1fc}", // paint brush
         (Icon::Pin, false) => "◆",
@@ -324,6 +328,7 @@ mod tests {
             Icon::Hourglass,
             Icon::Brush,
             Icon::Pin,
+            Icon::Timeline,
             Icon::Sun,
             Icon::Moon,
             Icon::Globe,

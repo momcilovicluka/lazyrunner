@@ -243,7 +243,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
 }
 
 fn header(ui: &Ui, controller: &Controller, view: &View, shown: usize, cells: usize) -> Vec<Seg> {
-    let mut segs = vec![on(" ~ Timeline ", C::FocusText, C::FocusBack)];
+    let mut segs = vec![super::viewbar::chip(ui.nerd, super::icons::Icon::Timeline, "Timeline")];
     if view.narrowed() || view.typing {
         let total: usize = controller.states.iter().map(|state| state.output.len()).sum();
         segs.push(seg(format!("  {shown} of {total} lines"), C::DarkGray));
@@ -345,12 +345,11 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, height: usize) -> Ve
         });
     }
     drawn.resize_with(body, || fit(Vec::new(), inner));
-    let mut out = vec![header(ui, controller, view, lines.len(), cells)];
+    let mut out = vec![header(ui, controller, view, lines.len(), cells), super::viewbar::keys(ui, hint(view), cells)];
     out.extend(drawn.into_iter().enumerate().map(|(at, row)| match &strip {
         Some(strip) => row.into_iter().chain(strip.get(at).into_iter().flatten().cloned()).collect(),
         None => row,
     }));
-    out.push(fit(vec![seg(hint(view), C::DarkGray)], cells));
     out.truncate(height);
     out
 }

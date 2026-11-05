@@ -471,7 +471,7 @@ fn conflicts(others: usize) -> String {
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let (wanted, others, _) = controller.port_map().summary();
     vec![
-        on(format!(" {} PORTS ", icons::icon(ui.nerd, Icon::Plug)), C::Black, C::Yellow),
+        super::viewbar::chip(ui.nerd, Icon::Plug, "Ports"),
         seg(format!("  {}", controller.project.name), C::White),
         if others > 0 { seg(format!("  {}", conflicts(others)), C::Red) } else { seg("  no conflicts", C::Green) },
         seg(format!("  {wanted} tracked · who really holds each port"), C::DarkGray),
@@ -538,11 +538,11 @@ fn bands(controller: &Controller, room: usize) -> Vec<Vec<Seg>> {
 }
 
 /// The keys, under the header as in the other views - or, while `!` asks, the question: the keys first.
-fn keys(state: &View, picked: Option<&Port>, cells: usize) -> Vec<Seg> {
+fn keys(ui: &Ui, state: &View, picked: Option<&Port>, cells: usize) -> Vec<Seg> {
     let Some(row) = picked.filter(|row| state.confirm && row.holding == Holding::Other) else {
         let keys = " j k move · ! stops the holder · Enter its column · w opens it · r reads again · y copies the fix · \
                     Esc closes";
-        return vec![seg(keys, C::DarkGray)];
+        return super::viewbar::keys(ui, keys, cells);
     };
     let who = row
         .holder
@@ -592,7 +592,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let index = state.index.min(list.len().saturating_sub(1));
     let bar = ui.motion.bar(index, ui.now);
     let columns = columns(cells);
-    let mut lines = vec![header(ui, controller), keys(&state, list.get(index).copied(), cells), Vec::new()];
+    let mut lines = vec![header(ui, controller), keys(ui, &state, list.get(index).copied(), cells), Vec::new()];
     lines.extend(overview(ui, map, state.opened));
     lines.extend([status(ui, controller, &state), Vec::new(), titles(&columns)]);
     if list.is_empty() {

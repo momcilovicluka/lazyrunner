@@ -1,30 +1,30 @@
 ---
 source: crates/lazyrunner-ui/src/screen/tests.rs
-expression: screen.frame()
+expression: masked(screen.frame())
 ---
+ ⧗ DURATIONS   5 items · slowed down most: Api ▲ +1150%
+ j k choose · g G first / last · Esc closes · usual = median of the earlier successful runs · red = failed
 
-
-
-
-
-
-   ┌─ Durations ──────────────────────────────────────────────────────────────────────────────────────────┐
-   │ Builds                                    last 20 runs             last    usual                     │
-   │   Api                                     ▁▁▁▇                    2m05s      10s  ▲ +1150%    4 runs │
-   │   Orders                                  ▆▅▅▇▆▇                    55s      39s  ▲ +41%      6 runs │
-   │ Starts                                    last 20 runs             last    usual                     │
-   │   Orders                                  ▇▆▇▇                       9s       9s  ≈           4 runs │
-   │   Shop                                    ▇▇▇▂                       2s      10s              4 runs │
-   │ npm ci                                    last 20 runs             last    usual                     │
-   │   A shop frontend with a very long name … ▇                       1m01s        –              1 run  │
-   │ Esc closes · usual = median of the earlier successful runs · red = failed                            │
-   └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-
-
-
-
+Builds                        runs      last    usual           │  API · Builds
+  Api                         ▁▁▁▇     2m05s      10s  ▲ +1150% │  last 2m05s · usual 10s · ▲ +1150% · 4 runs
+  Orders                      ▅▅▇▆▇      55s      39s  ▲ +41%   │
+Starts                        runs      last    usual           │  2m05s the slowest
+  Orders                      ▇▆▇▇        9s       9s  ≈        │        █
+  Shop                        ▇▇▇▂        2s      10s           │        █
+npm ci                        runs      last    usual           │        █
+  A shop frontend with a ver… ▇        1m01s        –           │        █
+                                                                │        █
+                                                                │  ▄ ▄ ▄ █
+                                                                │  oldest … newest
+                                                                │
+                                                                │  RUNS
+                                                                │  dd Mon hh:mm    2m05s  ✓
+                                                                │  dd Mon hh:mm      10s  ✓
+                                                                │  dd Mon hh:mm      10s  ✓
+                                                                │  dd Mon hh:mm      10s  ✓
+                                                                │
+                                                                │
+                                                                │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

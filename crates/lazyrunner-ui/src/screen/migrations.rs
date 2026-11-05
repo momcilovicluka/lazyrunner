@@ -297,7 +297,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     };
     let db = controller.db_label.clone().unwrap_or_else(|| "n/a".into());
     let header = vec![
-        on(format!(" {} Migrations ", icons::icon(nerd, Icon::Migrations)), C::Black, C::Cyan),
+        super::viewbar::chip(nerd, Icon::Migrations, "Migrations"),
         seg("   database ", C::DarkGray),
         seg(db, C::Yellow),
         seg(working, C::Yellow),
@@ -311,7 +311,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let note =
         " dotnet ef uses each app's last build (b rebuilds it) and its Development settings - the database d picks";
     let mut out =
-        vec![fit(header, width), fit(vec![seg(hint, C::DarkGray)], width), fit(vec![seg(note, C::DarkGray)], width)];
+        vec![fit(header, width), super::viewbar::keys(ui, hint, width), fit(vec![seg(note, C::DarkGray)], width)];
     let several_apps = all.iter().any(|context| all.first().is_some_and(|first| first.app != context.app));
     let list: Vec<Vec<Seg>> = all
         .iter()
