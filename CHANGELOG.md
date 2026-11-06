@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.73.1] - 2026-11-06
+
+### Fixed
+- Picking a test in the tests view (`l`): a test name too long for the list scrolls sideways instead of losing its start to `…`, and so does the line above it (the suite's name and how many tests it has) when the pane is narrow
+
 ## [1.73.0] - 2026-11-06
 
 ### Added
