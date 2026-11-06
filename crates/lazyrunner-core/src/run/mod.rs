@@ -13,6 +13,7 @@ pub mod controller;
 pub mod diff;
 pub mod history;
 pub mod hooks;
+pub mod impact;
 pub mod migrations;
 pub mod net;
 pub mod ports;
@@ -84,6 +85,8 @@ pub enum Event {
     TestFileChanged(PathBuf),
     /// The test suites found (T), with their last results.
     Suites(Vec<suites::Suite>),
+    /// What changes affect, each suite's, looked at in the background (#78).
+    Impact(std::collections::HashMap<String, impact::Impact>),
     /// An app's packages scanned for the audit view (#79), or why they couldn't be.
     Audit {
         key: String,

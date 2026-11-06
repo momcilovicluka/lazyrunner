@@ -33,6 +33,9 @@ pub struct SuiteHistory {
     /// the front.
     #[serde(default)]
     pub at: Vec<String>,
+    /// What its last whole run ran on: what changed since is what affects it (#78).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<super::impact::Baseline>,
 }
 
 /// What a test's history says about it now.
@@ -181,6 +184,11 @@ impl TestHistory {
 
     pub fn record(&mut self, key: &str, code: Option<&str>, results: &[TestResult]) {
         self.0.entry(key.to_string()).or_default().record(code, results);
+    }
+
+    /// What a suite's whole run ran on (none outside git).
+    pub fn set_base(&mut self, key: &str, base: Option<super::impact::Baseline>) {
+        self.0.entry(key.to_string()).or_default().base = base;
     }
 }
 

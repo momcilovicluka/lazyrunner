@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ⚗ TESTS   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky  affected 2 of 3
+ j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · Alt+r run t
+ Backend · dotnet test             1 failed │ Orders.Tests   .NET · dotnet test
+ 1 Orders                          1 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   · last run 09:41:07 · 6s
+   ▸ ✗ Orders.Tests                 ✓1 ×1  ●│
+ 2 Billing                         1 passed │ AFFECTED BECAUSE
+     ✓ Billing.Tests                   ✓1   │   Orders.Tests ← Orders.Api ← Orders.Core  +1 more
+ Frontend · vitest · nx test        not run │     ← src/Orders.Core/Pricing.cs
+ 3 Shop                             not run │
+     · Shop                       not run  ?│ FAILURES 1
+     1 project without test files           │ ✗ Orders.Tests.CartTests.Totals(2, 3) (41 ms)
+                                            │     Expected 5 but was 6
+                                            │     at Orders.Tests.CartTests.Totals() in C:\work\Orders.Tests\
+                                            │     CartTests.cs:line 42
+                                            │
+                                            │ Skipped (1):
+                                            │   – Orders.Tests.CartTests.Later
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+                                            │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ↶ 1/1   ⚗ ✓2 ✗1   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

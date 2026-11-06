@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.73.0] - 2026-11-06
+
+### Added
+- Run what a change affects. Every whole run of a suite keeps what it ran on, so the tests view can tell which suites what changed since affects: a .NET suite through its own project and the ones it references, directly or not (a build file no project owns, such as `Directory.Build.props`, affects all of them), an npm or Nx suite through its own folder. `v` has a fourth list, affected, that keeps every suite but dims the others, ends each affected row with a `●` (an amber `?` where it can't be told, which runs with them), and says `affected 2 of 6` or `nothing changed since the last runs`; `Alt+r` runs the affected suites. A suite's details say why under its run cells - `AFFECTED BECAUSE`, `Orders.Tests ← Orders.Api ← Orders.Core`, then the changed file, a link - and the MCP's `list_tests` marks `affected` with its why, `run_tests` takes `affected: true`. With motion on, the why assembles hop by hop, the left-out rows fade as the list switches, and a suite that becomes affected while the view is open gets a sweep before its `●` lands (#78)
+
 ## [1.72.1] - 2026-11-05
 
 ### Fixed

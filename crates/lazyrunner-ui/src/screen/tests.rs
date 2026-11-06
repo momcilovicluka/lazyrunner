@@ -1626,7 +1626,47 @@ async fn the_tests_view_tells_new_failures_from_known_ones_and_shows_each_tests_
     screen.press("v");
     assert!(screen.frame().contains("Orders.Tests"), "flaky only: {}", screen.frame());
     screen.press("v");
-    assert!(screen.frame().contains("Billing.Tests"), "all again: {}", screen.frame());
+    assert!(screen.frame().contains("Billing.Tests"), "the affected ones, the others dimmed: {}", screen.frame());
+    screen.press("v");
+    assert!(screen.frame().contains(" all  failed  flaky  affected"), "all again: {}", screen.frame());
+}
+
+#[tokio::test]
+async fn v_marks_the_suites_a_change_affects_and_the_details_say_why() {
+    use lazyrunner_core::run::impact::{Impact, Why};
+    let mut screen = screen("snap-tests-affected", json!({}));
+    with_suites(&mut screen);
+    screen.press("T");
+    let why = Why {
+        chain: vec!["Orders.Tests".into(), "Orders.Api".into(), "Orders.Core".into()],
+        files: vec!["src/Orders.Core/Pricing.cs".into(), "src/Orders.Core/Tax.cs".into()],
+    };
+    let never = "it hasn't run whole since lazyrunner keeps what a run ran on";
+    screen.controller.set_impacts(std::collections::HashMap::from([
+        ("dotnet:orders".to_string(), Impact::Affected(vec![why])),
+        ("dotnet:billing".to_string(), Impact::Unchanged),
+        ("npm:shop".to_string(), Impact::Unknown(never.into())),
+    ]));
+    screen.press("v v v");
+    let frame = screen.frame();
+    assert!(frame.contains(" affected 2 of 3"), "{frame}");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 2, .. })), "on the first affected suite");
+    assert!(frame.contains("AFFECTED BECAUSE") && !frame.contains("Orders.Api ←"), "the first hop only: {frame}");
+    screen.ui.now += Duration::from_secs(1);
+    let frame = screen.frame();
+    assert!(frame.contains("Orders.Tests ← Orders.Api ← Orders.Core  +1 more"), "every hop: {frame}");
+    assert!(frame.contains("← src/Orders.Core/Pricing.cs"), "{frame}");
+    insta::assert_snapshot!(frame);
+    screen.press("j j");
+    assert!(screen.frame().contains("Nothing it depends on changed since its last run."), "{}", screen.frame());
+    screen.press("k k");
+    let orders = ("dotnet:orders".to_string(), Impact::Unknown(never.into()));
+    screen.controller.set_impacts(std::collections::HashMap::from([orders]));
+    assert!(screen.frame().contains("? can't tell: it hasn't run whole"), "{}", screen.frame());
+
+    let unchanged = ["dotnet:orders", "dotnet:billing", "npm:shop"].map(|key| (key.to_string(), Impact::Unchanged));
+    screen.controller.set_impacts(unchanged.into_iter().collect());
+    assert!(screen.frame().contains(" nothing changed since the last"), "{}", screen.frame());
 }
 
 #[tokio::test]

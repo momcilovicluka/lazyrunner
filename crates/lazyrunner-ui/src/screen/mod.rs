@@ -38,6 +38,7 @@ pub mod seg;
 pub mod sheet;
 pub mod spinner;
 pub mod status;
+pub mod suite_impact;
 pub mod suite_runs;
 pub mod suites;
 #[cfg(test)]
@@ -341,6 +342,8 @@ pub struct Ui {
     /// The tests view's filter by name (`/`), and whether it's being typed.
     pub tests_query: String,
     pub tests_typing: bool,
+    /// What the tests view saw of what changes affect (#78).
+    pub tests_impact: suite_impact::Seen,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
@@ -439,6 +442,7 @@ impl Ui {
             tests_run: None,
             tests_query: String::new(),
             tests_typing: false,
+            tests_impact: suite_impact::Seen::default(),
             seen: seen::Seen::default(),
             phases: phases::Phases::default(),
             log_newest: None,
@@ -598,6 +602,7 @@ impl Ui {
             || panel::sliding(self)
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
+            || suite_impact::animating(self)
             || rail_motion::animating(self)
             || diff::animating(self)
             || suite_runs::animating(self, controller)

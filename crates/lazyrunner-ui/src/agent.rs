@@ -9,6 +9,7 @@ use std::path::Path;
 use lazyrunner_core::changelog::VERSION;
 use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::Hue;
+use lazyrunner_core::run::impact::Impact;
 use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
 use lazyrunner_core::run::suites::{Outcome, Suite};
 use lazyrunner_core::run::{Command, Controller, Origin};
@@ -409,11 +410,15 @@ fn find_suites(controller: &mut Controller) {
 /// The suites, or one suite's results with its failures.
 fn tests(controller: &mut Controller, args: &Value) -> Answer {
     find_suites(controller);
+    if controller.suites.is_some() {
+        controller.assess_now();
+    }
     let Some(suites) = &controller.suites else {
         return Ok(json!({ "finding": true, "hint": "lazyrunner is finding the test suites - ask again in a moment" }));
     };
     let Some(wanted) = args["suite"].as_str() else {
-        return Ok(json!({ "suites": suites.iter().map(suite_summary).collect::<Vec<_>>() }));
+        let summaries: Vec<Value> = suites.iter().map(|suite| suite_summary(controller, suite)).collect();
+        return Ok(json!({ "suites": summaries }));
     };
     let suite = find_suite(suites, wanted)?;
     let history = controller.test_history.suite(&suite.key);
@@ -437,7 +442,7 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
         })
         .collect();
     let tally = history.map(|history| history.tally(&suite.tests)).unwrap_or_default();
-    let mut summary = suite_summary(suite);
+    let mut summary = suite_summary(controller, suite);
     summary["failures"] = json!(failures);
     summary["new_failures"] = json!(tally.new);
     summary["flaky"] = json!(tally.flaky);
@@ -445,7 +450,8 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
     Ok(summary)
 }
 
-fn suite_summary(suite: &Suite) -> Value {
+fn suite_summary(controller: &Controller, suite: &Suite) -> Value {
+    let (affected, why) = affected(controller, &suite.key);
     json!({
         "key": suite.key,
         "name": suite.name,
@@ -459,7 +465,33 @@ fn suite_summary(suite: &Suite) -> Value {
         "untested": suite.untested,
         "needs_packages": suite.needs_packages,
         "note": suite.note,
+        "affected": affected,
+        "affected_why": why,
     })
+}
+
+/// Whether what changed since a suite's last whole run affects it (#78), and why: each reason as
+/// "Orders.Tests ← Orders.Core ← src/Orders.Core/OrderService.cs (+2 more)", or why it can't be told (it runs with
+/// the affected ones).
+fn affected(controller: &Controller, key: &str) -> (bool, Vec<String>) {
+    match controller.impact(key) {
+        None | Some(Impact::Unchanged) => (false, Vec::new()),
+        Some(Impact::Unknown(reason)) => (true, vec![format!("can't tell: {reason}")]),
+        Some(Impact::Affected(whys)) => {
+            let told = whys
+                .iter()
+                .map(|why| {
+                    let mut hops =
+                        if why.chain.is_empty() { vec!["every .NET suite".to_string()] } else { why.chain.clone() };
+                    hops.extend(why.files.first().cloned());
+                    let more =
+                        if why.files.len() > 1 { format!(" (+{} more)", why.files.len() - 1) } else { String::new() };
+                    format!("{}{more}", hops.join(" ← "))
+                })
+                .collect();
+            (true, told)
+        }
+    }
 }
 
 fn find_suite<'a>(suites: &'a [Suite], wanted: &str) -> Result<&'a Suite, Refusal> {
@@ -678,6 +710,13 @@ fn run_tests(controller: &mut Controller, args: &Value) -> Result<String, Refusa
     };
     if controller.tests_active() {
         return Err(("busy", "tests are running - wait for tests_done, or stop_tests".into()));
+    }
+    if args["affected"].as_bool().unwrap_or(false) {
+        controller.run_affected();
+        if !controller.tests_active() {
+            return Err(("nothing_to_run", "nothing changed since the suites' last runs - list_tests says why".into()));
+        }
+        return Ok(format!("run the affected suites: {}", controller.affected().join(", ")));
     }
     let failed_only = args["failed_only"].as_bool().unwrap_or(false);
     let picked: Vec<String> = match args["suite"].as_str() {

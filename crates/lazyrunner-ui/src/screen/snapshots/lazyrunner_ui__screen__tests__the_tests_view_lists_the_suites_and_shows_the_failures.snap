@@ -2,8 +2,8 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ⚗ TESTS   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky
- j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its tests
+ ⚗ TESTS   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky  affected
+ j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · Alt+r run t
  Backend · dotnet test             1 failed │ Orders.Tests   .NET · dotnet test
  1 Orders                          1 failed │ ✓ 1 passed   ✗ 1 failed   – 1 skipped   · last run 09:41:07 · 6s
    ▸ ✗ Orders.Tests                   ✓1 ×1 │

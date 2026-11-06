@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use super::Controller;
 use crate::output::Hue;
+use crate::run::impact::owning_project;
 use crate::run::suites::{Outcome, Runner};
 use crate::run::watcher::{self, CodeWatcher};
 
@@ -375,17 +376,6 @@ impl Controller {
         }
         keys.iter().filter_map(|key| self.suite(key).map(|suite| suite.name.clone())).collect::<Vec<_>>().join(" + ")
     }
-}
-
-/// The project a saved file belongs to: the nearest .csproj in its folder or one above it, inside the repo.
-fn owning_project(path: &Path, root: &Path) -> Option<PathBuf> {
-    path.ancestors().skip(1).take_while(|dir| dir.starts_with(root)).find_map(|dir| {
-        std::fs::read_dir(dir)
-            .ok()?
-            .flatten()
-            .map(|entry| entry.path())
-            .find(|file| file.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("csproj")))
-    })
 }
 
 /// Whether test project `tests` runs for a change to project `changed`: it is that project (`""`), or references
