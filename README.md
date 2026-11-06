@@ -606,8 +606,8 @@ that passes after failing the run before is **fixed**. The list says `✓214 ✗
 `3 new` badge; a suite's counts split its failures `(3 new · 10 known)`, the new ones come first with a `NEW` badge,
 and each test shows its last runs as a strip - two runs a cell, the newest on the right, green passed, red failed - so
 a test that fails every time and one that fails now and then look different. A flaky test says how often it failed;
-the fixed and the flaky ones are listed after the failures. `v` lists all the suites, those with failures, or those
-with flaky tests (the chips in the header). The panel's chip says `1 suite done · 1 red · 3 new failures`, and the
+the fixed and the flaky ones are listed after the failures. `v` lists all the suites, those with failures, those
+with flaky tests, or the affected ones (the chips in the header). The panel's chip says `1 suite done · 1 red · 3 new failures`, and the
 MCP's `get_test_results` marks each failure `new` and `flaky`.
 
 Each suite's row in the list ends with its last time and a small line of its last times. Its details start with its
@@ -620,6 +620,18 @@ that broke shows as a red streak and a flaky one as scattered red. Under the lis
 test run's time, how many passed and failed, how long it took (`tests/test-runs.json`). `/` narrows the list to the
 suites whose names hold what you type (Enter keeps it, Esc drops it), `Alt+f` runs the flaky tests again, and a run
 just finished glints in.
+
+**What a change affects:** every whole run of a suite keeps what it ran on - the commit, and the files changed on top
+of it - so lazyrunner can tell what changed since: git's diff from that commit, and whatever differs in the working
+tree now. A .NET suite is affected by a changed source of its own project or of one it references, directly or not
+(`<ProjectReference>`), and by a build file no project owns (`Directory.Build.props`, `global.json`); an npm or Nx
+suite by a changed source in its own folder. `v`'s fourth list, affected, keeps every suite but dims the ones nothing
+changed for, and ends each affected row with a `●` - an amber `?` where it can't be told (it hasn't run whole since
+lazyrunner keeps this, or the commit it ran on is gone), which runs with them; the chip says `affected 2 of 6`, or
+`nothing changed since the last runs`. `Alt+r` runs the affected suites (`R` still runs all of them). A suite's details
+say why under its run cells - `AFFECTED BECAUSE`, then `Orders.Tests ← Orders.Api ← Orders.Core  +2 more` and the
+changed file, a link. It's looked at again a moment after a save, after a run, and every 10 s while the view is open.
+The MCP's `list_tests` marks each suite `affected` with its `affected_why`, and `run_tests` takes `affected: true`.
 
 **Test watch:** `a` watches the selected suites (a side or an app: all of its), `A` all of them; again unwatches. A watched suite (`◉`) runs again when its code is saved, once saving has been quiet for 400 ms: a green one whole, a red one its failed tests, then, if they pass, whole. .NET suites follow the profile's watch folder - only those a save affects: the saved file's project is theirs or one they reference (`<ProjectReference>`, directly or not), and the log says why (`Orders.Tests (references Orders.Core, which changed)`); a file no project owns, such as `Directory.Build.props`, runs them all. npm and Nx suites follow their own folder. A running suite is never cancelled - a save during its run runs it again after - and a suite runs at most every 1.5 s. The header and the panel show `◉ WATCH 2`, and while a save waits a capsule (`▰▰▰▱▱▱▱▱`) that drains over the 400 ms (`rerun in 0.3s` with reduced motion); a suite the watch queues gets one sweep across its row; `s` drops what a save was about to run but keeps the watch. For this session only: lazyrunner never runs tests by itself when it opens. For a new test, `l`, pick it, `a`: the suite watches only that test - a save runs just it - and its row says `pinned: <test>`; `a` on it again stops, `a` on the suite (or `A`) watches all of it again. A pinned test that's gone after a rename stops being watched, with a line in the log. A watched suite (or its pinned test) that turns red or green again gets a desktop notification - the change is what's worth one; a run that stays the same colour notifies nothing.
 
@@ -670,7 +682,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_screen` | The screen as you see it, as text |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
-| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results; run all, a suite, its failed tests or one test |
+| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, and what a change affects; run all, a suite, its failed tests, one test or the affected suites |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |

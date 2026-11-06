@@ -257,6 +257,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             }
             _ = tick.tick() => {
                 ui.now = Instant::now();
+                screen::suite_impact::keep_fresh(&ui, &mut controller);
                 controller.tick();
                 update_checklist(&mut ui, &mut controller, &mut still_checking);
                 poll_quiet_update(&mut quiet, &mut ui, &mut controller);

@@ -7,6 +7,7 @@ mod audit;
 mod builds;
 mod handover;
 mod hooks;
+mod impact;
 mod launch;
 mod migrations;
 mod npm_ci;
@@ -200,6 +201,10 @@ pub struct Controller {
     pub test_runs: super::test_history::TestRuns,
     /// The code this test run runs on, worked out when its first suite starts.
     tests_code: Option<Option<String>>,
+    /// What this test run runs on, for what a change affects (#78).
+    tests_base: Option<Option<super::impact::Baseline>>,
+    /// What changes affect (#78).
+    impacts: impact::Impacts,
     /// The queued .NET suites' projects building, in one MSBuild run.
     pub test_build: Option<TestBuild>,
     /// The suites waiting to run, in order.
@@ -292,6 +297,8 @@ impl Controller {
             test_history: super::test_history::TestHistory::load(&state_dir.join("tests")),
             test_runs: super::test_history::TestRuns::load(&state_dir.join("tests")),
             tests_code: None,
+            tests_base: None,
+            impacts: impact::Impacts::default(),
             test_build: None,
             test_queue: Vec::new(),
             tests_started: None,
@@ -578,9 +585,14 @@ impl Controller {
             Event::Metrics(samples) => self.metrics(samples),
             Event::FileChanged(path) => {
                 self.test_file_saved(&path, true, now);
+                self.impact_soon(now);
                 self.code.changed(path, now);
             }
-            Event::TestFileChanged(path) => self.test_file_saved(&path, false, now),
+            Event::TestFileChanged(path) => {
+                self.test_file_saved(&path, false, now);
+                self.impact_soon(now);
+            }
+            Event::Impact(found) => self.impact_done(found),
             Event::Suites(found) => self.suites_found(found),
             Event::Audit { key, result } => self.audit_done(key, result),
             Event::AuditInstalled { key, result } => self.audit_installed(key, result),

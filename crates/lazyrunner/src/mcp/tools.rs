@@ -122,7 +122,9 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "list_tests",
-            "The test suites (.NET test projects, npm and Nx test targets) with their last results.",
+            "The test suites (.NET test projects, npm and Nx test targets) with their last results, and whether \
+             what changed since each one's last whole run affects it (affected, affected_why: the projects from \
+             the suite to the changed file).",
             json!({}),
             &[],
             true,
@@ -136,12 +138,13 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "run_tests",
-            "Runs every suite, one suite, its failed tests only, or one test of a suite. Then wait for \
-             tests_done.",
+            "Runs every suite, one suite, its failed tests only, one test of a suite, or the suites what changed \
+             affects (affected). Then wait for tests_done.",
             json!({
                 "suite": { "type": "string", "description": "A suite's key or name (list_tests); every suite without it" },
                 "failed_only": { "type": "boolean" },
                 "test": { "type": "string", "description": "One test's full name; needs its suite" },
+                "affected": { "type": "boolean", "description": "Only the suites what changed since their last runs affects (list_tests says why)" },
             }),
             &[],
             false,

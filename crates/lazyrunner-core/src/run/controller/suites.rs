@@ -324,6 +324,7 @@ impl Controller {
         self.run_keys.clear();
         self.tests_started = None;
         self.tests_code = None;
+        self.tests_base = None;
         if quiet || (stopped.is_empty() && !queued) {
             return;
         }
@@ -443,8 +444,10 @@ impl Controller {
         }
         let code =
             self.tests_code.get_or_insert_with(|| build::fingerprint(&self.root, &self.project.source_dir)).clone();
+        let base = self.tests_base.get_or_insert_with(|| crate::run::impact::baseline(&self.root)).clone();
         let Some(suite) = self.suite_mut(key) else { return };
         suite.code = code;
+        suite.base = base;
         suite.output.clear();
         suite.lines.clear();
         suite.done = 0;
@@ -522,6 +525,7 @@ impl Controller {
         let ran_now: Vec<suites::TestResult> =
             tests.iter().filter(|test| !failed_only || requested.contains(&test.name)).cloned().collect();
         let code = suite.code.take();
+        let base = suite.base.take();
         let ran = if failed_only {
             suite.merge(tests, &requested)
         } else {
@@ -531,6 +535,10 @@ impl Controller {
         suite.status = if suite.failed > 0 { Status::Failed } else { Status::Passed };
         let (passed, failed, skipped) = (suite.passed, suite.failed, suite.skipped);
         self.test_history.record(key, code.as_deref(), &ran_now);
+        if !failed_only {
+            self.test_history.set_base(key, base);
+            self.impact_soon(now);
+        }
         if let Err(error) = self.test_history.save(&dir) {
             self.add_log(format!("! The tests' history isn't saved ({error})"), Hue::Yellow);
         }
@@ -554,6 +562,7 @@ impl Controller {
     /// Every suite of the run is done: one line, and a notification when something failed.
     fn tests_done(&mut self) {
         self.tests_code = None;
+        self.tests_base = None;
         let Some(started) = self.tests_started.take() else { return };
         let seconds = (self.now)().saturating_duration_since(started).as_secs_f64();
         let took = format_duration(seconds);
@@ -940,6 +949,33 @@ mod tests {
         let saved = sample.suite_log("npm:cart").map(|file| std::fs::read_to_string(file).unwrap());
         assert!(saved.is_some_and(|text| text.contains("PASS a.spec.ts")));
         assert_eq!(sample.durations.item(Kind::Test, "npm:cart").map(|item| item.runs.len()), Some(1));
+    }
+
+    #[tokio::test]
+    async fn the_affected_suites_are_those_what_changed_since_their_last_whole_run_affects() {
+        let temp = TempDir::new("suites-run-affected");
+        let (mut sample, mut events) = controller(&temp);
+        let shop = temp.join("repo").join("web").join("shop");
+        let mut suites = sample.suites.take().unwrap_or_default();
+        suites.push(Suite::new("npm:shop", "shop", Runner::Npm { dir: shop.clone(), vitest: false }));
+        sample.suites = Some(suites);
+        sample.run_affected();
+        assert!(sample.tests_active(), "never run whole: it can't be told, so they all run");
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        let base = sample.test_history.suite("npm:shop").and_then(|history| history.base.as_ref());
+        assert!(base.is_some(), "a whole run keeps what it ran on");
+
+        sample.run_affected();
+        assert!(!sample.tests_active());
+        assert_eq!(log(&sample).lines().last(), Some("Nothing changed since the last runs."));
+
+        crate::testing::write(shop.join("src").join("cart.ts"), "export const total = 2;");
+        sample.run_affected();
+        assert_eq!(sample.suite("npm:shop").map(|suite| suite.status), Some(Status::Running), "its folder changed");
+        assert!(!sample.suite("npm:cart").is_some_and(Suite::is_active), "outside the repo: nothing changed for it");
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        sample.run_affected();
+        assert!(!sample.tests_active(), "it ran on that change");
     }
 
     #[tokio::test]

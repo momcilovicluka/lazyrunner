@@ -106,22 +106,28 @@ pub fn project_count(project: &Path) -> usize {
 
 /// The projects a build compiles: the project and everything it references, directly or not, nearest first.
 pub fn projects(project: &Path) -> Vec<PathBuf> {
-    static REFERENCE: LazyLock<Regex> = LazyLock::new(|| pattern(r#"(?i)<ProjectReference\s+Include="([^"$]+)""#));
     let mut seen: HashSet<String> = HashSet::new();
     let mut found = Vec::new();
     let mut queue = VecDeque::from([project.to_path_buf()]);
     while let Some(path) = queue.pop_front() {
-        let Ok(text) = json::read_text(&path) else { continue };
-        if !seen.insert(path.display().to_string().to_lowercase()) {
+        if !path.is_file() || !seen.insert(path.display().to_string().to_lowercase()) {
             continue;
         }
-        let dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
-        for reference in REFERENCE.captures_iter(&text) {
-            queue.push_back(normalize(&dir.join(crate::profile::native(&reference[1]))));
-        }
+        queue.extend(references(&path));
         found.push(path);
     }
     found
+}
+
+/// The projects a project references directly.
+pub fn references(project: &Path) -> Vec<PathBuf> {
+    static REFERENCE: LazyLock<Regex> = LazyLock::new(|| pattern(r#"(?i)<ProjectReference\s+Include="([^"$]+)""#));
+    let Ok(text) = json::read_text(project) else { return Vec::new() };
+    let dir = project.parent().map(Path::to_path_buf).unwrap_or_default();
+    REFERENCE
+        .captures_iter(&text)
+        .map(|reference| normalize(&dir.join(crate::profile::native(&reference[1]))))
+        .collect()
 }
 
 /// A path with `.` and `..` resolved (without touching the disk).

@@ -57,7 +57,9 @@ const FRAMEWORK: [&str; 7] =
 /// T: opens the view and looks for the suites (again, to find new ones).
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
     controller.find_suites();
+    controller.want_impact();
     (ui.tests_only, ui.tests_run, ui.tests_typing) = (Only::All, None, false);
+    ui.tests_impact = super::suite_impact::Seen::default();
     ui.tests_query.clear();
     ui.overlay = Some(Overlay::Tests { index: FIRST_SUITE, scroll: 0, picking: None });
 }
@@ -65,23 +67,26 @@ pub fn open(ui: &mut Ui, controller: &mut Controller) {
 /// The selection when the view opens: the first suite (once there is a list).
 pub(super) const FIRST_SUITE: usize = usize::MAX;
 
-/// Which suites the list shows (`v`): all, those with failures, those with flaky tests.
+/// Which suites the list shows (`v`): all, those with failures, those with flaky tests, or all with those a change
+/// affects marked and the others dimmed (#78).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Only {
     #[default]
     All,
     Failed,
     Flaky,
+    Affected,
 }
 
 impl Only {
-    const EACH: [Only; 3] = [Only::All, Only::Failed, Only::Flaky];
+    const EACH: [Only; 4] = [Only::All, Only::Failed, Only::Flaky, Only::Affected];
 
     fn next(self) -> Self {
         match self {
             Self::All => Self::Failed,
             Self::Failed => Self::Flaky,
-            Self::Flaky => Self::All,
+            Self::Flaky => Self::Affected,
+            Self::Affected => Self::All,
         }
     }
 
@@ -90,12 +95,18 @@ impl Only {
             Self::All => "all",
             Self::Failed => "failed",
             Self::Flaky => "flaky",
+            Self::Affected => "affected",
         }
+    }
+
+    /// Whether it leaves suites out (the affected list only dims them).
+    fn narrows(self) -> bool {
+        matches!(self, Self::Failed | Self::Flaky)
     }
 
     fn admits(self, controller: &Controller, suite: &Suite) -> bool {
         match self {
-            Self::All => true,
+            Self::All | Self::Affected => true,
             Self::Failed => suite.failed > 0 || suite.status == Status::Error,
             Self::Flaky => tally(controller, suite).flaky > 0,
         }
@@ -157,7 +168,7 @@ pub fn list_rows(controller: &Controller) -> Vec<Row> {
 /// The list as `v` and `/` narrow it: the suites they admit, under the sides and apps that still have one.
 fn shown_rows(controller: &Controller, only: Only, query: &str) -> Vec<Row> {
     let rows = list_rows(controller);
-    if only == Only::All && query.is_empty() {
+    if !only.narrows() && query.is_empty() {
         return rows;
     }
     let suites = controller.suites.as_deref().unwrap_or_default();
@@ -287,7 +298,11 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "v" => {
             (ui.tests_only, ui.tests_run) = (ui.tests_only.next(), None);
             (*index, *scroll, *picking) = (FIRST_SUITE, 0, None);
+            if ui.tests_only == Only::Affected {
+                super::suite_impact::switched(ui);
+            }
         }
+        "Alt+r" => controller.run_affected(),
         "[" if a_suite => {
             let runs = selected.first().and_then(|key| controller.test_history.suite(key)).map_or(0, |h| h.runs.len());
             if runs > 0 {
@@ -494,7 +509,18 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let only = ui.tests_only;
     let query = ui.tests_query.clone();
     let list_rows = shown_rows(controller, only, &query);
+    super::suite_impact::track(ui, controller);
     let Some(Overlay::Tests { index, picking, .. }) = &mut ui.overlay else { return Vec::new() };
+    if ui.tests_impact.seek && only == Only::Affected && controller.impacts_known() {
+        ui.tests_impact.seek = false;
+        let affected = |row: &Row| match row {
+            Row::Suite(at) => suites.get(*at).is_some_and(|suite| super::suite_impact::runs(controller, &suite.key)),
+            _ => false,
+        };
+        if let Some(first) = list_rows.iter().position(affected) {
+            *index = first;
+        }
+    }
     let selected = chosen(index, &list_rows);
     let suite = match list_rows.get(selected) {
         Some(Row::Suite(at)) => suites.get(*at),
@@ -521,7 +547,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         (None, _) if list_rows.is_empty() && !query.is_empty() => {
             (vec![vec![seg(format!("No suites match /{query} - Esc shows them all."), C::DarkGray)]], false)
         }
-        (None, _) if list_rows.is_empty() && only != Only::All => {
+        (None, _) if list_rows.is_empty() && only.narrows() => {
             (vec![vec![seg(format!("No {} suites - v shows them all.", only.label()), C::DarkGray)]], false)
         }
         (None, _) if list_rows.is_empty() => (vec![vec![seg("No test suites in this project.", C::DarkGray)]], false),
@@ -579,7 +605,11 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
         seg("   ", C::Gray),
     ];
     for only in Only::EACH {
-        let chip = format!(" {} ", only.label());
+        let label = match only {
+            Only::Affected if ui.tests_only == only => super::suite_impact::chip(controller),
+            _ => only.label().to_string(),
+        };
+        let chip = format!(" {label} ");
         segs.push(if only == ui.tests_only { on(chip, C::FocusText, C::FocusBack) } else { seg(chip, C::DarkGray) });
     }
     if ui.tests_typing || !ui.tests_query.is_empty() {
@@ -636,8 +666,9 @@ fn hint(ui: &Ui, width: usize, picking: bool) -> Vec<Seg> {
     let text = if picking {
         " j k choose a test · r run it · a watch only it · y copy it · f failed again · s stop · h back to the suites"
     } else {
-        " j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · l its \
-         tests · f / F failed again · Alt+f flaky again · [ ] a run · a / A watch · v all / failed / flaky · / filter · s stop · o log · y copy failures · Esc back"
+        " j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · Alt+r \
+         run the affected · l its tests · f / F failed again · Alt+f flaky again · [ ] a run · a / A watch · v all / \
+         failed / flaky / affected · / filter · s stop · o log · y copy failures · Esc back"
     };
     super::viewbar::keys(ui, text, width)
 }
@@ -734,6 +765,8 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let news = tally(controller, suite).new;
                 let badge = if news > 0 { format!(" {news} new ") } else { String::new() };
                 let beside = if badge.is_empty() { 0 } else { badge.chars().count() + 1 };
+                let marked = ui.tests_only == Only::Affected;
+                let width = if marked { width.saturating_sub(super::suite_impact::MARK_CELLS) } else { width };
                 // Its time and a line of its last times, as long as the name keeps some room.
                 let roomy = width.saturating_sub(summary.chars().count() + beside + 9);
                 let timed = super::suite_runs::list_line(controller, &suite.key, LIST_LINE_CELLS)
@@ -774,7 +807,19 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                     }
                     row
                 };
-                swept(ui, controller, &suite.key, row, width)
+                if !marked {
+                    swept(ui, controller, &suite.key, row, width)
+                } else {
+                    let affected = super::suite_impact::runs(controller, &suite.key);
+                    let mut row = fit(row, width);
+                    if !affected && index != selected {
+                        row = super::suite_impact::dimmed(ui, row);
+                    }
+                    row.extend(super::suite_impact::mark(ui, controller, &suite.key, index == selected));
+                    let full = width + super::suite_impact::MARK_CELLS;
+                    let row = super::suite_impact::swept(ui, &suite.key, row, full);
+                    swept(ui, controller, &suite.key, row, full)
+                }
             }
             Row::Untested { .. } => {
                 let text = format!("     {}", title(controller, row));
@@ -1027,6 +1072,11 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
     let runs = super::suite_runs::rows(out.ui, controller, suite);
     if !runs.is_empty() {
         out.lines.extend(runs);
+        out.blank();
+    }
+    let why = super::suite_impact::why(out.ui, controller, suite, out.width);
+    if !why.is_empty() {
+        out.lines.extend(why);
         out.blank();
     }
     let glint = super::suite_runs::fresh(out.ui, suite);
