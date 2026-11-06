@@ -1810,6 +1810,30 @@ async fn l_picks_a_test_of_the_suite_and_shows_its_message_and_stack() {
 }
 
 #[tokio::test]
+async fn a_test_name_too_long_for_the_picker_scrolls_instead_of_being_cut() {
+    let mut screen = screen("tests-pick-scroll", json!({}));
+    with_suites(&mut screen);
+    let long = "Orders.Tests.CartTests.Totals_when_the_cart_has_a_discount_a_coupon_and_free_shipping(2, 3)";
+    let suites = screen.controller.suites.as_mut().expect("the sample's suites");
+    for test in suites[0].tests.iter_mut().filter(|test| test.name.starts_with("Orders.Tests.CartTests.Totals")) {
+        test.name = long.into();
+    }
+    screen.press("T l");
+    let row = |frame: &str| frame.lines().find(|line| line.contains("41 ms")).unwrap_or_default().to_string();
+    let first = row(&screen.frame());
+    assert!(
+        first.contains("✗ Orders.Tests.CartTests.Totals_when") && !first.contains('…'),
+        "its start, whole: {first}"
+    );
+    let mut seen_end = false;
+    for _ in 0..60 {
+        screen.ui.now += Duration::from_millis(500);
+        seen_end |= row(&screen.frame()).contains("free_shipping(2, 3)");
+    }
+    assert!(seen_end, "it scrolls to its end");
+}
+
+#[tokio::test]
 async fn in_the_tests_view_a_click_picks_a_suite_and_a_link_in_a_stack_opens() {
     let mut screen = screen("tests-mouse", json!({ "editor": "myeditor {file}:{line}" }));
     with_suites(&mut screen);

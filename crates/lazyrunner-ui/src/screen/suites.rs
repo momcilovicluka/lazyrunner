@@ -679,18 +679,22 @@ fn pick(ui: &mut Ui, controller: &Controller, suite: &Suite, at: usize, width: u
     let history = controller.test_history.suite(&suite.key);
     let (strip_cells, gap) = history.map_or((0, ""), |_| (PICK_STRIP_CELLS + 1, " "));
     let running = if suite.status == Status::Running { "   running…" } else { "" };
-    let mut lines = vec![vec![
+    let title = vec![
         seg(suite.name.clone(), C::White),
         seg(format!("   {} tests · r runs the picked one", list.len()), C::DarkGray),
         seg(running, C::Yellow),
-    ]];
+    ];
+    // The name stays while the rest scrolls; a name too long for that scrolls with it.
+    let kept = ui.scrolling_row(title.clone(), 1, width);
+    let title = if super::seg::width(&kept) > width { ui.scrolling_row(title, 0, width) } else { kept };
+    let mut lines = vec![title];
     let room = (height.saturating_sub(2) * 11 / 20).max(3);
     let top = at.saturating_sub(room / 2).min(list.len().saturating_sub(room));
     for (index, test) in list.iter().enumerate().skip(top).take(room) {
         let (icon, color) = outcome_mark(ui.nerd, test.outcome);
         let ms = if test.ms > 0.0 { format!("{:>7} ms", test.ms.round()) } else { String::new() };
         let room = width.saturating_sub(ms.chars().count() + 4 + strip_cells).max(8);
-        let name = pad(&end_of(&test.name, room), room);
+        let name = ui.scrolling(&test.name, room);
         let marks = history.map_or_else(Vec::new, |history| strip(history.line(&test.name), PICK_STRIP_CELLS, false));
         let row = if index == at {
             let mut row = vec![on(format!(" {icon} "), C::FocusText, C::FocusBack)];
