@@ -394,6 +394,7 @@ mod tests {
             tests: Vec::new(),
             migrations: None,
             env: Vec::new(),
+            depends_on: Vec::new(),
         };
         let write = |dir: &str, package: &str| {
             std::fs::create_dir_all(temp.join(dir)).unwrap();

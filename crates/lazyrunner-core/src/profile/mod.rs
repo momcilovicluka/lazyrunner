@@ -97,6 +97,8 @@ pub struct App {
     pub migrations: Option<Migrations>,
     /// Variables the app gets on top of lazyrunner's own (`"env"`).
     pub env: Vec<(String, String)>,
+    /// The apps it calls (`"dependsOn"`), by key: the stack map draws them before a call is seen.
+    pub depends_on: Vec<String>,
 }
 
 /// Where a .NET app's EF Core migrations are: the project with them (the app's own when `None`) and its DbContexts

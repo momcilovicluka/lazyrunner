@@ -12,6 +12,7 @@ pub mod copy;
 pub mod diff;
 pub mod durations;
 pub mod follow;
+pub mod graph;
 pub mod held;
 pub mod icons;
 pub mod jumps;
@@ -37,6 +38,7 @@ pub mod seen;
 pub mod seg;
 pub mod sheet;
 pub mod spinner;
+pub mod stack;
 pub mod status;
 pub mod suite_cause;
 pub mod suite_impact;
@@ -205,6 +207,11 @@ pub enum Overlay {
         opened: Instant,
         stopping: Option<(String, Instant)>,
     },
+    /// `K`: the stack map; the picked box, and when it opened (the edges draw in).
+    Stack {
+        index: usize,
+        opened: Instant,
+    },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {
         index: usize,
@@ -261,6 +268,7 @@ impl Overlay {
             Self::Copy { .. } => "copy",
             Self::Audit { .. } => "audit",
             Self::Ports { .. } => "ports",
+            Self::Stack { .. } => "stack",
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
@@ -345,6 +353,8 @@ pub struct Ui {
     pub tests_typing: bool,
     /// What the tests view saw of what changes affect (#78).
     pub tests_impact: suite_impact::Seen,
+    /// Where the stack map's dots are along their edges (K, #51).
+    pub stack_dots: stack::Dots,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
@@ -444,6 +454,7 @@ impl Ui {
             tests_query: String::new(),
             tests_typing: false,
             tests_impact: suite_impact::Seen::default(),
+            stack_dots: stack::Dots::default(),
             seen: seen::Seen::default(),
             phases: phases::Phases::default(),
             log_newest: None,
@@ -598,6 +609,7 @@ impl Ui {
             || controller.audit_installing().is_some()
             || audit::animating(self, controller)
             || ports::animating(self, controller)
+            || stack::animating(self, controller)
             || durations::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
@@ -742,6 +754,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Migrations { .. }) => return migrations::rows(ui, controller, width, rows),
         Some(Overlay::Audit { .. }) => return audit::rows(ui, controller, width, rows),
         Some(Overlay::Ports { .. }) => return ports::rows(ui, controller, width, rows),
+        Some(Overlay::Stack { .. }) => return stack::rows(ui, controller, width, rows),
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),

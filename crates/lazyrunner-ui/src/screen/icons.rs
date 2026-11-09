@@ -67,6 +67,8 @@ pub enum Icon {
     Pencil,
     /// The audit view's title.
     Shield,
+    /// The stack map's title.
+    Stack,
     Keyboard,
     Package,
     Clipboard,
@@ -186,6 +188,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Pencil, true) => "\u{f040}", // pencil
         (Icon::Shield, false) => "◈",
         (Icon::Shield, true) => "\u{f132}", // shield
+        (Icon::Stack, false) => "⋈",
+        (Icon::Stack, true) => "\u{f1e0}", // share-alt: three linked nodes
         (Icon::Keyboard, false) => "?",
         (Icon::Keyboard, true) => "\u{f11c}", // keyboard
         (Icon::Package, false) => "▣",
@@ -321,6 +325,7 @@ mod tests {
             Icon::Lock,
             Icon::Pencil,
             Icon::Shield,
+            Icon::Stack,
             Icon::Keyboard,
             Icon::Package,
             Icon::Clipboard,

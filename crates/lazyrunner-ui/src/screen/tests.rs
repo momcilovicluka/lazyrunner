@@ -1810,6 +1810,62 @@ async fn l_picks_a_test_of_the_suite_and_shows_its_message_and_stack() {
 }
 
 #[tokio::test]
+async fn k_maps_which_app_calls_which_with_the_last_minutes_figures() {
+    use lazyrunner_core::run::calls::Call;
+    let mut screen = screen("snap-stack", json!({}));
+    let now = Instant::now();
+    let call = |path: &str, ms: Option<f64>, status: Option<u16>| Call {
+        from: "orders".into(),
+        method: "GET".into(),
+        url: format!("http://localhost:47202{path}"),
+        at: now,
+        ms,
+        status,
+    };
+    let calls = vec![
+        call("/api/invoices", Some(12.0), Some(200)),
+        call("/api/invoices", Some(48.0), Some(200)),
+        call("/api/tax", None, None),
+    ];
+    screen.controller.calls.add(calls, now);
+    let shop = screen.controller.apps.iter().position(|app| app.key == "shop").expect("the sample's shop");
+    screen.controller.apps[shop].depends_on = vec!["orders".into()];
+    screen.press("K");
+    let frame = screen.frame();
+    assert!(frame.contains("STACK") && frame.contains("1 failing"), "{frame}");
+    assert!(frame.contains("Orders → Billing") && frame.contains("p95 48 ms") && frame.contains("1 failed"), "{frame}");
+    assert!(frame.contains("Shop → Orders") && frame.contains("dependsOn · no call seen yet"), "{frame}");
+    assert!(frame.contains("───3/min───▶"), "the edge's label: {frame}");
+    insta::assert_snapshot!(frame);
+    let wide = screen.render(170, 44);
+    assert!(wide.contains("not running") && wide.contains("no requests (1 min)"), "roomy: {wide}");
+    assert!(wide.contains("│  ◆ Orders"), "room around its lines: {wide}");
+    insta::assert_snapshot!("k_roomy", wide);
+    screen.controller.build_queue.push("billing".into());
+    assert!(screen.frame().contains("◌ waiting to build"), "its build, not 'stopped': {}", screen.frame());
+    screen.controller.build_queue.clear();
+
+    let answer = agent(&mut screen, "stack", json!({}), None);
+    let edges = answer["result"]["edges"].as_array().cloned().unwrap_or_default();
+    let called = edges.iter().find(|edge| edge["from"] == "orders" && edge["to"] == "billing").cloned();
+    let called = called.unwrap_or_else(|| panic!("orders calls billing: {answer}"));
+    assert_eq!((called["callsLastMinute"].as_u64(), called["failedLastMinute"].as_u64()), (Some(3), Some(1)));
+    assert_eq!(called["p95Ms"], 48.0, "{called}");
+    assert!(edges.iter().any(|edge| edge["from"] == "shop" && edge["declaredIn"] == "dependsOn" && edge["seen"] == 0));
+    let failed = &answer["result"]["failedCalls"][0];
+    assert_eq!(
+        (failed["url"].as_str(), failed["noAnswer"].as_bool()),
+        (Some("http://localhost:47202/api/tax"), Some(true))
+    );
+
+    screen.press("l");
+    let billing = screen.controller.apps.iter().position(|app| app.key == "billing");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Stack { index, .. }) if Some(index) == billing), "what it calls");
+    screen.press("Enter");
+    assert!(screen.ui.overlay.is_none() && Some(screen.ui.focus) == billing, "on its column");
+}
+
+#[tokio::test]
 async fn a_failure_says_its_likely_cause_and_y_copies_it() {
     use lazyrunner_core::run::cause::{Cause, Lead};
     use lazyrunner_core::run::controller::LikelyCause;

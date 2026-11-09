@@ -14,6 +14,7 @@ mod migrations;
 mod npm_ci;
 mod overrides;
 mod parallel;
+mod stack;
 mod start;
 mod suites;
 mod test_watch;
@@ -52,6 +53,7 @@ pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_h
 pub use launch::Choice;
 pub use migrations::{EfJob, Work};
 pub use overrides::Override;
+pub use stack::{Database, Minute};
 pub use suites::{TestBuild, Totals};
 pub use test_watch::TestWatch;
 
@@ -195,6 +197,12 @@ pub struct Controller {
     migrations_check: bool,
     /// The HTTP requests the .NET apps served (H).
     pub requests: super::requests::Requests,
+    /// The calls the apps made to each other (#51).
+    pub calls: super::calls::Calls,
+    /// Where each app's config says its calls go: the caller, the app called, the file (#51).
+    configured_calls: Vec<(String, String, String)>,
+    /// The .NET apps whose projects reference a database's packages (EF Core, a SQL client) (#51).
+    database_apps: Vec<String>,
     /// The test suites (T), found the first time the tests view opens.
     pub suites: Option<Vec<super::suites::Suite>>,
     /// Each suite's last runs, test by test (tests/test-history.json).
@@ -297,6 +305,9 @@ impl Controller {
             migration_queue: VecDeque::new(),
             migrations_check: false,
             requests: Default::default(),
+            calls: Default::default(),
+            configured_calls: Vec::new(),
+            database_apps: Vec::new(),
             suites: None,
             test_history: super::test_history::TestHistory::load(&state_dir.join("tests")),
             test_runs: super::test_history::TestRuns::load(&state_dir.join("tests")),
@@ -551,6 +562,10 @@ impl Controller {
                 if self.states[index].generation == generation {
                     let app = self.apps[index].clone();
                     let request = self.states[index].receive(&app, &line, now);
+                    let calls = self.states[index].outgoing.take();
+                    if !calls.is_empty() {
+                        self.calls.add(calls, now);
+                    }
                     // lazyrunner's own probe of the app isn't one of its requests.
                     if let Some(request) = request.filter(|request| request.path != watch::probe_path(&app)) {
                         self.states[index].requests += 1;

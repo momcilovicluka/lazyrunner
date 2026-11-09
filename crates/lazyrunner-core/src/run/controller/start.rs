@@ -224,7 +224,9 @@ impl Controller {
     /// What app `key` is started with now: its command line, folder and variables.
     pub fn server_command(&self, key: &str) -> anyhow::Result<super::super::tools::ServerCommand> {
         let app = self.app(key).ok_or_else(|| anyhow::anyhow!("no app '{key}'"))?;
-        self.commands.server(&self.root, app, &self.apps).map(|command| self.with_overrides(key, command))
+        self.commands
+            .server(&self.root, app, &self.apps)
+            .map(|command| self.with_call_hook(key, self.with_overrides(key, command)))
     }
 
     /// Starts one app's server.
@@ -238,8 +240,10 @@ impl Controller {
         self.remember_run(index);
         self.states[index].reset_for_start();
         let app = self.apps[index].clone();
-        let command =
-            self.commands.server(&self.root, &app, &self.apps).map(|command| self.with_overrides(key, command));
+        let command = self
+            .commands
+            .server(&self.root, &app, &self.apps)
+            .map(|command| self.with_call_hook(key, self.with_overrides(key, command)));
         let overrides: Vec<(String, String)> =
             self.env_overrides(key).iter().map(|found| (found.name.clone(), found.value.clone())).collect();
         let generation = self.states[index].generation;

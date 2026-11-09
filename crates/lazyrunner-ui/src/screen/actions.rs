@@ -37,6 +37,8 @@ pub enum Run {
     Audit,
     /// P: the port map.
     Ports,
+    /// K: the stack map.
+    Stack,
     GitTool,
     Menu,
     Search,
@@ -211,6 +213,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Ports: who holds each app's port",
             "free, its app, something else, reserved by Windows - and the last minute",
             Run::Ports,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "K",
+            "Stack: which app calls which",
+            "from the calls they make and dependsOn - calls a second, p95, failures",
+            Run::Stack,
         )
         .safe(),
         action(

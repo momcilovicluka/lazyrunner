@@ -108,6 +108,7 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
                 "--",
                 super::requests::LOG_REQUESTS,
                 super::requests::LOG_SCOPES,
+                super::calls::LOG_CALLS,
             ]
             .map(OsString::from)
             .to_vec();
@@ -395,6 +396,7 @@ mod tests {
             tests: Vec::new(),
             migrations: None,
             env: Vec::new(),
+            depends_on: Vec::new(),
             kind: AppKind::Dotnet {
                 project: crate::profile::native("services/Orders/Orders.csproj"),
                 launch_profile: "Orders".into(),
@@ -406,10 +408,10 @@ mod tests {
         let command = server_command(root, &app, &[]).unwrap();
         assert_eq!(command.label, "dotnet run --launch-profile Orders");
         assert_eq!(command.spec.dir, root.join("services").join("Orders"));
-        let logs = crate::run::requests::LOG_REQUESTS;
+        let (logs, scopes) = (crate::run::requests::LOG_REQUESTS, crate::run::requests::LOG_SCOPES);
         assert_eq!(
             command.spec.args,
-            ["run", "--no-build", "--launch-profile", "Orders", "--", logs, crate::run::requests::LOG_SCOPES]
+            ["run", "--no-build", "--launch-profile", "Orders", "--", logs, scopes, crate::run::calls::LOG_CALLS]
                 .map(OsString::from)
         );
         if let AppKind::Dotnet { args, .. } = &mut app.kind {

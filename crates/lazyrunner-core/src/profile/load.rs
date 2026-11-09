@@ -219,6 +219,7 @@ fn to_app(app: &Value) -> App {
         AppKind::Npm { dir: native(&text(field(app, "dir"))), variants }
     };
     let tests = list(field(app, "tests")).into_iter().map(text).collect();
+    let depends_on = list(field(app, "dependsOn")).into_iter().map(text).collect();
     let env = field(app, "env")
         .as_object()
         .map(|vars| vars.iter().filter_map(|(name, value)| Some((name.clone(), value.as_str()?.to_string()))).collect())
@@ -237,6 +238,7 @@ fn to_app(app: &Value) -> App {
         tests,
         migrations,
         env,
+        depends_on,
     }
 }
 
