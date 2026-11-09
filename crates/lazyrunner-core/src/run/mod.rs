@@ -10,6 +10,8 @@ pub mod calls;
 pub mod cause;
 pub mod checks;
 pub mod child;
+pub mod code;
+mod code_ts;
 pub mod command;
 pub mod controller;
 pub mod diff;
@@ -89,6 +91,13 @@ pub enum Event {
     Suites(Vec<suites::Suite>),
     /// What changes affect, each suite's, looked at in the background (#78).
     Impact(std::collections::HashMap<String, impact::Impact>),
+    /// The code map, read in the background (#89).
+    Code {
+        map: Box<code::CodeMap>,
+        cache: Option<Box<code::FileCache>>,
+        /// Nx has been asked for its implicit dependencies too.
+        done: bool,
+    },
     /// A suite's failures' likely causes, worked out in the background for its history then (#34).
     Causes {
         key: String,

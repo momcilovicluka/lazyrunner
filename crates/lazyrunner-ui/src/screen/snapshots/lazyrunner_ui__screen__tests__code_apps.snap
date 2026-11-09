@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ⋈ STACK    Map  Code    2 apps
+ h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom · r
+
+  ╭─────────────────────────╮               ╭─────────────────────────╮
+  │  ■ Orders               │               │  ▲ Shop                 │
+  │  app · .NET             │               │  app · npm              │
+  │  12 files · 3 projects  │┄┄┄1 shared┄┄┄▶│  12 files · 3 projects  │
+  │  uses 0 · used by 0     │               │  uses 0 · used by 0     │
+  ╰─────────────────────────╯               ╰─────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+ Orders   app · depends on 0 (0 in all) · used by 0 (0 in all)
+ a change here affects 0 apps · orders
+   shares 1 projects with Shop
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

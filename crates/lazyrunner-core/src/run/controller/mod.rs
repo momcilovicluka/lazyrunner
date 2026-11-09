@@ -6,6 +6,7 @@
 mod audit;
 mod builds;
 mod causes;
+mod code_map;
 mod handover;
 mod hooks;
 mod impact;
@@ -217,6 +218,8 @@ pub struct Controller {
     impacts: impact::Impacts,
     /// Failures' likely causes (#34).
     causes: causes::Causes,
+    /// The code map (#89).
+    code_map: code_map::CodeMapJob,
     /// The queued .NET suites' projects building, in one MSBuild run.
     pub test_build: Option<TestBuild>,
     /// The suites waiting to run, in order.
@@ -315,6 +318,7 @@ impl Controller {
             tests_base: None,
             impacts: impact::Impacts::default(),
             causes: causes::Causes::default(),
+            code_map: code_map::CodeMapJob::default(),
             test_build: None,
             test_queue: Vec::new(),
             tests_started: None,
@@ -606,14 +610,17 @@ impl Controller {
             Event::FileChanged(path) => {
                 self.test_file_saved(&path, true, now);
                 self.impact_soon(now);
+                self.code_soon(now);
                 self.code.changed(path, now);
             }
             Event::TestFileChanged(path) => {
                 self.test_file_saved(&path, false, now);
                 self.impact_soon(now);
+                self.code_soon(now);
             }
             Event::Impact(found) => self.impact_done(found),
             Event::Causes { key, stamp, found } => self.causes_done(key, stamp, found),
+            Event::Code { map, cache, done } => self.code_arrived(*map, cache.map(|cache| *cache), done),
             Event::Suites(found) => self.suites_found(found),
             Event::Audit { key, result } => self.audit_done(key, result),
             Event::AuditInstalled { key, result } => self.audit_installed(key, result),

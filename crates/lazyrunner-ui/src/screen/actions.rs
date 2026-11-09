@@ -39,6 +39,8 @@ pub enum Run {
     Ports,
     /// K: the stack map.
     Stack,
+    /// K, then Tab: the code map.
+    Code,
     GitTool,
     Menu,
     Search,
@@ -221,6 +223,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Stack: which app calls which",
             "from the calls they make and dependsOn - calls a second, p95, failures",
             Run::Stack,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "K Tab",
+            "Code map: what depends on what in the code",
+            ".NET projects and namespaces, TypeScript projects and folders - references and imports, cycles",
+            Run::Code,
         )
         .safe(),
         action(

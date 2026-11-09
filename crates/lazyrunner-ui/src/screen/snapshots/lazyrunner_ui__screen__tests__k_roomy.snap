@@ -2,8 +2,8 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: wide
 ---
- ⋈ STACK   5 apps · 2 edges · 0.1 calls/s · 1 failing
- h j k l choose an app · Enter its column · Esc back
+ ⋈ STACK    Map  Code    5 apps · 2 edges · 0.1 calls/s · 1 failing
+ h j k l choose an app · Enter its column · c its code · Tab the code map · Esc back
 
   ╭──────────────────────╮       ╭───────────────────────╮            ╭───────────────────────╮
   │  ■ Shop              │       │  ◆ Orders             │            │  ■ Billing            │

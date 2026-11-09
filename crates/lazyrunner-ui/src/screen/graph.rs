@@ -21,22 +21,26 @@ const ROW_GAP: usize = 1;
 const GAP: usize = 4;
 
 /// A box: its lines, the cells between them and its border, its border's colour, dashed or not, and what a click on
-/// it means.
+/// it means; `bare`, just its lines, no border.
 pub struct Node {
     pub lines: Vec<Vec<Seg>>,
     pub pad: usize,
     pub border: C,
     pub dashed: bool,
     pub target: Option<Target>,
+    pub bare: bool,
 }
 
-/// A line from one box to another, with a label on its last stretch when there's room.
+/// A line from one box to another, with a label on its last stretch when there's room; `quiet`, laid out but not
+/// drawn (so showing it doesn't move anything), `top`, drawn over the others.
 pub struct Edge {
     pub from: usize,
     pub to: usize,
     pub color: C,
     pub dashed: bool,
     pub label: String,
+    pub quiet: bool,
+    pub top: bool,
 }
 
 /// How an edge is drawn this frame: how much of it is in (0 to 1), a dot of a colour that has moved this many cells
@@ -62,10 +66,12 @@ pub struct Rect {
     pub h: usize,
 }
 
+/// A cell of the map: what's on it, the lines through it (and the ends of the edge last through it), their look.
 #[derive(Clone, Debug)]
 struct Cell {
     text: Option<String>,
     mask: u8,
+    ends: Option<(usize, usize)>,
     dashed: bool,
     color: C,
     bg: Option<C>,
@@ -74,7 +80,7 @@ struct Cell {
 
 impl Default for Cell {
     fn default() -> Self {
-        Self { text: None, mask: 0, dashed: false, color: C::Gray, bg: None, target: None }
+        Self { text: None, mask: 0, ends: None, dashed: false, color: C::Gray, bg: None, target: None }
     }
 }
 
@@ -170,7 +176,7 @@ pub fn layout(nodes: &[Node], edges: &[Edge]) -> Layout {
         .iter()
         .map(|node| {
             let widest = node.lines.iter().map(|line| line_width(line)).max().unwrap_or(0);
-            (widest + 2 + 2 * node.pad, node.lines.len() + 2)
+            if node.bare { (widest, node.lines.len()) } else { (widest + 2 + 2 * node.pad, node.lines.len() + 2) }
         })
         .collect();
     let mut widths = vec![0; count];
@@ -220,7 +226,8 @@ fn ways(
     };
     let mut taken = vec![0; count + 1];
     let mut labels = vec![0; count + 1];
-    let mut buses = 0;
+    // The rows under the boxes, each with the gaps its edges span: edges whose spans don't meet share one.
+    let mut buses: Vec<Vec<(usize, usize)>> = Vec::new();
     let mut lane = |gap: usize| {
         taken[gap] += 1;
         (gap, taken[gap] - 1)
@@ -240,18 +247,24 @@ fn ways(
             Way { first: Some(lane(from + 1)), ..Way::default() }
         } else {
             labels[to] = labels[to].max(label);
-            buses += 1;
-            Way { first: Some(lane(from + 1)), last: Some(lane(to)), bus: Some(buses - 1) }
+            let span = ((from + 1).min(to), (from + 1).max(to));
+            let apart = |spans: &Vec<(usize, usize)>| spans.iter().all(|&(a, b)| b < span.0 || span.1 < a);
+            let bus = buses.iter().position(apart).unwrap_or(buses.len());
+            if bus == buses.len() {
+                buses.push(Vec::new());
+            }
+            buses[bus].push(span);
+            Way { first: Some(lane(from + 1)), last: Some(lane(to)), bus: Some(bus) }
         };
     }
-    (ways, taken, labels, buses)
+    (ways, taken, labels, buses.len())
 }
 
 /// The `at`th of `count` edges on a side of a box `height` rows tall: spread over the rows inside it, the middle for
 /// one.
 fn slot(at: usize, count: usize, height: usize) -> usize {
     let inside = height.saturating_sub(2).max(1);
-    if count <= 1 { height / 2 } else { 1 + (at * inside / count).min(inside - 1) }
+    if count <= 1 || height < 3 { height / 2 } else { 1 + (at * inside / count).min(inside - 1) }
 }
 
 /// Each edge's row on its source and its target: the edges leaving a box, and those entering one, each a row of
@@ -303,6 +316,28 @@ fn rows(columns: &[usize], sizes: &[(usize, usize)], pairs: &[(usize, usize)], c
         }
     }
     ys
+}
+
+/// h j k l in a map: the node to go to from `picked` - down and up its columns in order, right and left to
+/// the nearest in the next column.
+pub fn step(layout: &Layout, picked: usize, name: &str) -> usize {
+    let mut order: Vec<usize> = (0..layout.boxes.len()).collect();
+    order.sort_by_key(|&node| (layout.columns[node], layout.boxes[node].y));
+    let at = order.iter().position(|&node| node == picked).unwrap_or(0);
+    let column = layout.columns.get(picked).copied().unwrap_or(0);
+    let y = layout.boxes.get(picked).map_or(0, |found| found.y);
+    let nearest = |wanted: usize| {
+        (0..layout.boxes.len())
+            .filter(|&node| layout.columns[node] == wanted)
+            .min_by_key(|&node| layout.boxes[node].y.abs_diff(y))
+    };
+    match name {
+        "j" | "DownArrow" => order[(at + 1) % order.len()],
+        "k" | "UpArrow" => order[(at + order.len() - 1) % order.len()],
+        "l" | "RightArrow" => nearest(column + 1).unwrap_or(picked),
+        "h" | "LeftArrow" => column.checked_sub(1).and_then(nearest).unwrap_or(picked),
+        _ => picked,
+    }
 }
 
 /// An edge's cells, in order from its source to its target, the side its first cell touches the source from, and
@@ -357,6 +392,14 @@ fn toward(from: (usize, usize), to: (usize, usize)) -> u8 {
     }
 }
 
+/// A cell's lines once an edge passes through it: across another edge's straight line it hops it - the later one
+/// on top, so a crossing doesn't look like a junction; lines of edges sharing an end join.
+fn merged((mask, ends): (u8, Option<(usize, usize)>), adding: u8, (from, to): (usize, usize)) -> u8 {
+    let straight = |mask: u8| mask == N | S || mask == E | W;
+    let other = ends.is_some_and(|(was_from, was_to)| was_from != from && was_to != to);
+    if other && straight(mask) && straight(adding) && mask & adding == 0 { adding } else { mask | adding }
+}
+
 fn glyph(mask: u8, dashed: bool) -> &'static str {
     match mask {
         0 => " ",
@@ -377,12 +420,14 @@ fn glyph(mask: u8, dashed: bool) -> &'static str {
 }
 
 impl Map {
-    /// The graph: the edges (each with its motion), then the boxes over them.
+    /// The graph: the edges (each with its motion, the top ones last), then the boxes over them.
     pub fn draw(nodes: &[Node], edges: &[Edge], motion: &[Motion]) -> Self {
         let layout = layout(nodes, edges);
         let mut map = Self { cells: vec![vec![Cell::default(); layout.width + 2]; layout.height + 2], layout };
-        for (at, edge) in edges.iter().enumerate() {
-            map.edge(edge, at, motion.get(at).copied().unwrap_or_default());
+        for top in [false, true] {
+            for (at, edge) in edges.iter().enumerate().filter(|(_, edge)| !edge.quiet && edge.top == top) {
+                map.edge(edge, at, motion.get(at).copied().unwrap_or_default());
+            }
         }
         for (at, node) in nodes.iter().enumerate() {
             map.node(node, map.layout.boxes[at]);
@@ -405,7 +450,8 @@ impl Map {
             }
             let last = i + 1 == path.len();
             let Some(cell) = self.cell(path[i].0, path[i].1) else { continue };
-            cell.mask |= mask;
+            cell.mask = merged((cell.mask, cell.ends), mask, (edge.from, edge.to));
+            cell.ends = Some((edge.from, edge.to));
             cell.dashed = edge.dashed;
             cell.color = color;
             if last {
@@ -447,11 +493,31 @@ impl Map {
 
     fn put(&mut self, x: usize, y: usize, text: &str, color: C, bg: Option<C>, target: Option<Target>) {
         if let Some(cell) = self.cell(x, y) {
-            *cell = Cell { text: Some(text.into()), mask: 0, dashed: false, color, bg, target };
+            *cell = Cell { text: Some(text.into()), mask: 0, ends: None, dashed: false, color, bg, target };
+        }
+    }
+
+    fn line(&mut self, parts: &[Seg], (x, y): (usize, usize), target: Option<Target>) {
+        let mut x = x;
+        for part in parts {
+            for grapheme in part.text.graphemes(true) {
+                self.put(x, y, grapheme, part.fg, part.bg, target);
+                let wide = grapheme.width();
+                for extra in 1..wide {
+                    self.put(x + extra, y, "", part.fg, part.bg, target);
+                }
+                x += wide.max(1);
+            }
         }
     }
 
     fn node(&mut self, node: &Node, at: Rect) {
+        if node.bare {
+            for (row, parts) in node.lines.iter().enumerate() {
+                self.line(parts, (at.x, at.y + row), node.target);
+            }
+            return;
+        }
         let (side, line) = if node.dashed { ("┆", "┄") } else { ("│", "─") };
         let last = at.y + at.h - 1;
         for x in at.x..at.x + at.w {
@@ -471,17 +537,7 @@ impl Map {
             }
         }
         for (row, parts) in node.lines.iter().enumerate() {
-            let mut x = at.x + 1 + node.pad;
-            for part in parts {
-                for grapheme in part.text.graphemes(true) {
-                    self.put(x, at.y + 1 + row, grapheme, part.fg, part.bg, node.target);
-                    let wide = grapheme.width();
-                    for extra in 1..wide {
-                        self.put(x + extra, at.y + 1 + row, "", part.fg, part.bg, node.target);
-                    }
-                    x += wide.max(1);
-                }
-            }
+            self.line(parts, (at.x + 1 + node.pad, at.y + 1 + row), node.target);
         }
     }
 
@@ -524,11 +580,18 @@ mod tests {
     use super::*;
 
     fn node(name: &str) -> Node {
-        Node { lines: vec![vec![seg(name, C::White)]], pad: 1, border: C::Gray, dashed: false, target: None }
+        Node {
+            lines: vec![vec![seg(name, C::White)]],
+            pad: 1,
+            border: C::Gray,
+            dashed: false,
+            target: None,
+            bare: false,
+        }
     }
 
     fn edge(from: usize, to: usize, label: &str) -> Edge {
-        Edge { from, to, color: C::Cyan, dashed: false, label: label.into() }
+        Edge { from, to, color: C::Cyan, dashed: false, label: label.into(), quiet: false, top: false }
     }
 
     fn text(map: &Map) -> String {
@@ -585,6 +648,7 @@ mod tests {
             border: C::Gray,
             dashed: false,
             target: None,
+            bare: false,
         };
         let nodes = [tall("Admin"), tall("Frontend"), tall("WebAPI")];
         let drawn = text(&Map::draw(&nodes, &[edge(0, 2, ""), edge(1, 2, "")], &[]));
@@ -618,6 +682,7 @@ mod tests {
             border: C::Gray,
             dashed: false,
             target: None,
+            bare: false,
         };
         let nodes = [tall("WebAPI"), tall("Admin"), tall("Frontend"), tall("db")];
         let drawn = text(&Map::draw(&nodes, &[edge(2, 0, ""), edge(0, 3, ""), edge(1, 3, "")], &[]));
@@ -634,6 +699,36 @@ mod tests {
         ];
         let why = "Admin to db straight over WebAPI's column, the edges into db in their order, none crossing";
         assert_eq!(drawn.trim_end(), expected.join("\n"), "{why}");
+    }
+
+    #[test]
+    fn a_line_across_another_edges_line_hops_it_and_lines_sharing_an_end_join() {
+        let (across, down) = (E | W, N | S);
+        assert_eq!(merged((across, Some((0, 1))), down, (2, 3)), down, "another edge's: the later on top");
+        assert_eq!(merged((across, Some((0, 1))), down, (0, 3)), across | down, "the same source's: a junction");
+        assert_eq!(merged((W | S, Some((0, 1))), across, (2, 3)), W | S | across, "a turn isn't hopped");
+    }
+
+    #[test]
+    fn long_edges_whose_spans_dont_meet_share_a_row_under_the_boxes_and_bare_nodes_are_their_lines() {
+        let nodes = [node("A"), node("B"), node("C"), node("D"), node("E")];
+        let chain = [edge(0, 1, ""), edge(1, 2, ""), edge(2, 3, ""), edge(3, 4, "")];
+        let back = [edge(1, 0, ""), edge(4, 3, "")];
+        let edges: Vec<Edge> = chain.into_iter().chain(back).collect();
+        let map = Map::draw(&nodes, &edges, &[]);
+        assert_eq!(map.layout.height, map.layout.below + 2, "one row for both: \n{}", text(&map));
+        let bare = Node { bare: true, ..node("A") };
+        let drawn = Map::draw(&[bare, node("B")], &[edge(0, 1, "")], &[]);
+        assert_eq!(drawn.layout.boxes[0].h, 1, "\n{}", text(&drawn));
+        assert!(text(&drawn).starts_with("A──"), "\n{}", text(&drawn));
+    }
+
+    #[test]
+    fn a_quiet_edge_is_laid_out_but_not_drawn() {
+        let nodes = [node("A"), node("B")];
+        let quiet = Map::draw(&nodes, &[Edge { quiet: true, ..edge(0, 1, "") }], &[]);
+        assert_eq!(quiet.layout.columns, [0, 1]);
+        assert!(!text(&quiet).contains('▶'), "\n{}", text(&quiet));
     }
 
     #[test]

@@ -109,6 +109,14 @@ pub struct Migrations {
     pub contexts: Vec<String>,
 }
 
+/// A rule for the code map (`"layers"`): the projects whose name `parts` matches (`*` for anything) must not
+/// reference those `must_not_reference` names.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Layer {
+    pub parts: String,
+    pub must_not_reference: Vec<String>,
+}
+
 /// A loaded profile: checked and turned into what lazyrunner runs. Paths use this OS's separators.
 #[derive(Clone, Debug)]
 pub struct Project {
@@ -119,6 +127,8 @@ pub struct Project {
     pub source_dir: String,
     /// In column order.
     pub apps: Vec<App>,
+    /// The code map's rules (`"layers"`).
+    pub layers: Vec<Layer>,
     pub root: Option<PathBuf>,
     pub source: Source,
     /// What trust is given to: the file as written.

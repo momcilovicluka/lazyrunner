@@ -198,11 +198,24 @@ fn to_project(data: &Value, path: &Path) -> Project {
         repo_marker: native(&list(field(field(data, "detect"), "anyFile")).first().map_or(String::new(), |m| text(m))),
         source_dir: native(&list(field(data, "watch")).first().map_or(String::new(), |w| text(w))),
         apps,
+        layers: to_layers(field(data, "layers")),
         root: None,
         source: Source::Given,
         file_hash: String::new(),
         hash: String::new(),
     }
+}
+
+/// `"layers": { "Orders.Core": { "mustNotReference": ["Orders.Api"] } }`.
+fn to_layers(layers: &Value) -> Vec<super::Layer> {
+    let Some(layers) = layers.as_object() else { return Vec::new() };
+    layers
+        .iter()
+        .map(|(parts, rule)| super::Layer {
+            parts: parts.clone(),
+            must_not_reference: list(field(rule, "mustNotReference")).into_iter().map(text).collect(),
+        })
+        .collect()
 }
 
 fn to_app(app: &Value) -> App {

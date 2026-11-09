@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ⋈ STACK    Map  Code    4 .NET · 3 TypeScript projects · 1 cycle · 1 rule break
+ h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom · r
+ 2 implied edges hidden (r)
+  ╭──────────────╮
+  │ ■ Orders.Api │────╮
+  ╰──────────────╯    │          ╭───────────────╮
+                      ╰─┬───────▶│ ■ Orders.Core │──╮
+  ╭┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╮    │        ╰───────────────╯  │
+  ┆ ■ Orders.Tests ┆────╯                           │         ╭─────────────────╮
+  ╰┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯                                ╰───✗────▶│ ■ Shared.Kernel │
+                                                        │     ╰─────────────────╯
+  ╭────────╮                     ╭────────╮             │
+  │ ▲ shop │┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┬───▶│ ▲ data │───────────┬─╯     ╭──────╮
+  ╰────────╯                │    ╰────────╯           ╰──────▶│ ▲ ui │─────────────╮
+                            │                                 ╰──────╯             │
+                            │                                                      │
+                            ╰──────────────────────────────────────────────────────╯
+
+
+
+ Orders.Api   app · depends on 2 (2 in all) · used by 0 (0 in all)
+ a change here affects 0 projects, 0 test projects · src/Orders.Api/Orders.Api.csproj
+ → uses Orders.Core, Shared.Kernel
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

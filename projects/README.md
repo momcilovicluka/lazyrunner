@@ -93,6 +93,7 @@ What a project is for lazyrunner: the file that marks its repo, the folder whose
 | `detect.anyFile` | array of paths | yes | A file only this project's repo has, relative to its root. lazyrunner looks for it upward from the current folder. One file for now. Example: `["Shop.sln"]`. |
 | `watch` | array of paths | yes | The folder whose changes need a rebuild of the .NET apps (unchanged builds are skipped; restart on code change). One folder for now. Example: `["services"]`. |
 | `apps` | array | yes | The apps lazyrunner runs, left to right as its columns: .NET apps and npm apps (the tables below). |
+| `layers` | object |  | Optional. Rules for the code map (K, then Tab): each key a project's name (* for anything, e.g. *.Api), and the projects it must not reference - a link that does is marked as a rule break. Nx's module boundaries (.eslintrc.json's depConstraints) are read as well. Example: `{"Orders.Core":{"mustNotReference":["Orders.Api"]}}`. |
 
 #### A .NET app ("type": "dotnet")
 

@@ -218,7 +218,7 @@ at once while the palette wipes away.
 | `M` | **Migrations**: the EF Core migrations, applied and pending, per DbContext; apply or roll back (below) |
 | `A` | **Audit**: outdated and vulnerable packages, per app, and what fixes each (below) |
 | `P` | **Ports**: every port the apps want, who holds it, and what to do (below) |
-| `K` | **Stack**: which app calls which, and how those calls go (below) |
+| `K` | **Stack**: which app calls which, and how those calls go; `Tab` the **code map**: what depends on what in the code (below) |
 | `H` | **Requests**: the HTTP requests the .NET apps served, per endpoint too (below) |
 | `T` | **Tests**: the project's test suites - run them in the background, see what failed, run one test (below) |
 | `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
@@ -570,6 +570,57 @@ anything - faster the more it carries; white, yellow on a failing edge, cyan to 
 failure pulses it twice. The MCP's `get_stack` gives an agent the same
 map, with the newest failed calls (url, status, or no answer).
 
+### Code map (`K` then `Tab`)
+
+The stack view's Code tab maps what depends on what in the code itself - both sides of the stack, read in the
+background as it opens (and again a moment after a save while it's open), with patterns, no compiler. Each file is
+read again only when it changed: what was read is kept in the state folder, so the map comes back quickly next time.
+
+- **Apps:** it opens on the profile's apps, one linked to another when its code uses the other's projects, and two
+  that share projects dashed with how many (`35 shared`); each says its files and projects. `Enter` shows an app's
+  projects alone - its own and all they depend on - and `a` all of them.
+- **.NET:** every `.csproj` under the root (and those the apps reference), linked by their `<ProjectReference>`s; each
+  says what it is (app, library, tests - a library with its tests inside, that others reference, stays a library),
+  its target framework, files and packages.
+- **TypeScript:** in each npm app's folder its projects - an Nx workspace's (each folder with a `project.json`, with its
+  tags), or the app itself - linked by their imports, through the `tsconfig` `paths` aliases or a relative path into
+  another project; a dynamic `import()` (a lazy route) is dashed. Each says its files and its NgModules and components.
+  In an Nx workspace, `nx graph` is asked too (after the map shows, in the background): the dependencies only Nx
+  knows of - `implicitDependencies`, a plugin's - join the map dashed in blue.
+
+`Enter` goes inside a project - a .NET project's namespaces linked by their `using`s, a TypeScript project's source
+folders linked by their imports - and inside a folder, to its NgModules and components, linked by their
+`imports: [...]`; what a level uses from elsewhere is dashed and dim, with where it is (`in @focus/components`).
+`Backspace` goes back out. A cycle is red, its boxes too; `c` steps through them. A link a rule doesn't allow is yellow,
+with a `✗` on it, and the header counts them: the profile's `layers`
+(`"layers": { "*.Api": { "mustNotReference": ["Orders.Data"] } }` - a project's name, `*` for anything, and what it
+must not reference) and an Nx workspace's module boundaries (`.eslintrc.json`'s `depConstraints`, by the projects'
+tags).
+
+**Finding your way in a big map:**
+
+- **`/` searches** every level - apps, projects, namespaces, folders, modules, components - and the source files, by
+  name (the name itself first, then one it starts, then one it holds); `↑` `↓` choose, and `Enter` goes to it and
+  shows **its graph**: it, all it depends on and all that depends on it, nothing else (a file's is its namespace's, or
+  the module or component declared in it; a module's goes through the modules that import it in any folder or
+  project). `g` shows the picked box's graph the same way; `g`, `Esc` or `Backspace` leave it.
+- **Implied edges are hidden:** when A uses B and B uses C, A's own line to C says nothing new, so it's left out (the
+  line under the keys says how many); `r` shows them all.
+- **`f` focus** keeps only the picked box and its neighbours, with their lines to it alone (`+` `-` how far) - on by
+  itself on a level of more than 24 boxes.
+- **`z` zooms out:** compact boxes (their names alone, long ones cut in the middle: `SettingsModu…Controllers`), then
+  an overview - just the names, with only the picked box's lines - and `Z` back in.
+- `t` hides the test projects. Lines from different boxes that cross hop each other (one runs on through), so a
+  crossing doesn't look like a junction, and the picked box's lines are drawn on top. A map bigger than the room has a
+  minimap in its corner, the part in view brighter.
+
+`o` opens a box's file, `y` copies its path, `Tab` goes back to the Map, and on the Map `c` opens the Code tab on the
+picked app's projects. Under the map, the picked box: what it depends on and what uses it (directly, and in all) and by
+name, what a change to it affects - how many projects and test projects - its tags, the rules it breaks and what only
+Nx links it to. Like the Map, the boxes say as much as fits. With motion on, a level zooms in (its boxes growing) or
+out (shrinking), its edges draw in outwards from the picked box a step at a time, and focus dims what it's about to
+hide before it goes. `using`s are matched to projects by their namespaces, not by a compiler.
+
 ## Requests (`H`)
 
 An API that logs through Serilog (or anything else that replaces ASP.NET's logging) to somewhere other than the
@@ -735,6 +786,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
 | `get_stack` | The stack map: which app calls which (seen and declared), each edge's calls, p95 and failures over the last minute, the apps that use the database, and the newest failed calls |
+| `get_dependencies` | The code map: the apps and their projects, every project with how many it depends on and how many use it, the cycles and the links a rule doesn't allow; or for one app, project, namespace, folder, module, component or source file, what it depends on and what uses it, each with its depth and the way to it, its own parts, the rules it breaks and what only Nx links it to |
 | `list_actions` | Everything lazyrunner can do: every action as the palette lists it (its key, whether it runs while an app builds, whether it needs `confirm`) and every setting with its state |
 | `run_action` | Any action by its key, on an app, as your key would |
 | `press_keys` | Keys as the key reference names them (`"g g"`, `"Ctrl+o"`, `"Esc"`), for what no tool covers; answers with the screen after. It waits while you type in a prompt |
@@ -761,7 +813,8 @@ allow `mcp__lazyrunner__get_status`, `mcp__lazyrunner__get_logs`, `mcp__lazyrunn
 `mcp__lazyrunner__get_screen`, `mcp__lazyrunner__get_requests`, `mcp__lazyrunner__get_request`,
 `mcp__lazyrunner__list_tests`, `mcp__lazyrunner__get_test_results`,
 `mcp__lazyrunner__get_migrations`, `mcp__lazyrunner__get_audit`, `mcp__lazyrunner__get_ports`,
-`mcp__lazyrunner__get_stack` and `mcp__lazyrunner__wait` in its permissions.
+`mcp__lazyrunner__get_stack`, `mcp__lazyrunner__get_dependencies` and `mcp__lazyrunner__wait` in its
+permissions.
 
 ## npm apps
 
