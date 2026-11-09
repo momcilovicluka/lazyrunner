@@ -55,12 +55,12 @@ impl Impact {
 const BUILD_FILES: [&str; 4] = ["props", "targets", "global.json", "nuget.config"];
 
 /// Where the root is in its repo (`""`, `"app/"`): git's paths are from the repo's top.
-fn prefix(root: &Path) -> Option<String> {
+pub(super) fn prefix(root: &Path) -> Option<String> {
     git(root, &["rev-parse", "--show-prefix"])
 }
 
 /// A path git gave, from the root; `None` outside it.
-fn from_root(path: &str, prefix: &str) -> Option<String> {
+pub(super) fn from_root(path: &str, prefix: &str) -> Option<String> {
     path.trim().trim_matches('"').replace('\\', "/").strip_prefix(prefix).map(str::to_string)
 }
 
@@ -211,7 +211,7 @@ fn project_in(dir: &Path) -> Option<PathBuf> {
 }
 
 /// [`owning_project`], each folder looked in once.
-fn owner(path: &Path, root: &Path, owners: &mut HashMap<PathBuf, Option<PathBuf>>) -> Option<PathBuf> {
+pub(super) fn owner(path: &Path, root: &Path, owners: &mut HashMap<PathBuf, Option<PathBuf>>) -> Option<PathBuf> {
     path.ancestors()
         .skip(1)
         .take_while(|dir| dir.starts_with(root))
@@ -224,7 +224,7 @@ fn same(path: &Path) -> String {
 }
 
 /// A test project and the projects it references, directly or not: each with the one it was first found through.
-fn references(project: &Path) -> HashMap<String, (PathBuf, Option<String>)> {
+pub(super) fn references(project: &Path) -> HashMap<String, (PathBuf, Option<String>)> {
     let mut graph = HashMap::from([(same(project), (project.to_path_buf(), None))]);
     let mut queue = VecDeque::from([project.to_path_buf()]);
     while let Some(path) = queue.pop_front() {
@@ -239,7 +239,7 @@ fn references(project: &Path) -> HashMap<String, (PathBuf, Option<String>)> {
 }
 
 /// The project names from the test project to `changed`, when it references it at all.
-fn chain(graph: &HashMap<String, (PathBuf, Option<String>)>, changed: &Path) -> Option<Vec<String>> {
+pub(super) fn chain(graph: &HashMap<String, (PathBuf, Option<String>)>, changed: &Path) -> Option<Vec<String>> {
     let mut at = same(changed);
     let mut names = Vec::new();
     loop {

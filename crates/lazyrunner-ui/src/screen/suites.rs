@@ -459,6 +459,7 @@ fn copy_test(ui: &Ui, controller: &mut Controller, key: &str, name: Option<&str>
     };
     let mut parts = vec![format!("{:?}: {}{}", test.outcome, test.name, took(test))];
     parts.extend([&test.message, &test.stack].into_iter().filter(|part| !part.is_empty()).cloned());
+    parts.extend(super::suite_cause::text(controller, key, &test.name));
     let text = parts.join(copy::NEWLINE);
     let what = format!("the test {}", test.name);
     copy::put(ui.clipboard, controller, &text, &what);
@@ -475,10 +476,13 @@ fn open_log(ui: &Ui, controller: &mut Controller, key: Option<&String>) {
 /// y: every failure of the selected suite (or of the suites under a side or an app) - name, message, stack -
 /// ready to paste.
 fn copy_failures(ui: &Ui, controller: &mut Controller, keys: &[String], label: &str) {
-    let failed: Vec<&TestResult> = keys
+    let failed: Vec<(&str, &TestResult)> = keys
         .iter()
         .filter_map(|key| controller.suite(key))
-        .flat_map(|suite| suite.tests.iter().filter(|test| test.outcome == Outcome::Failed))
+        .flat_map(|suite| {
+            let failed = suite.tests.iter().filter(|test| test.outcome == Outcome::Failed);
+            failed.map(|test| (suite.key.as_str(), test))
+        })
         .collect();
     if failed.is_empty() {
         let text = format!("Nothing to copy: no failed tests in {label}.");
@@ -487,9 +491,10 @@ fn copy_failures(ui: &Ui, controller: &mut Controller, keys: &[String], label: &
     }
     let text = failed
         .iter()
-        .map(|test| {
+        .map(|(key, test)| {
             let mut parts = vec![format!("Failed: {}{}", test.name, took(test))];
             parts.extend([&test.message, &test.stack].into_iter().filter(|part| !part.is_empty()).cloned());
+            parts.extend(super::suite_cause::text(controller, key, &test.name));
             parts.join(copy::NEWLINE)
         })
         .collect::<Vec<_>>()
@@ -732,6 +737,8 @@ fn pick(ui: &mut Ui, controller: &Controller, suite: &Suite, at: usize, width: u
     for frame in own_frames(&test.stack).into_iter().take(PICKED_STACK_LINES) {
         out.add(frame.trim(), C::DarkGray, 2);
     }
+    out.blank();
+    out.lines.extend(super::suite_cause::rows(out.ui, controller, &suite.key, &test.name, out.width));
     out.lines
 }
 
@@ -1105,6 +1112,7 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
         for frame in own_frames(&test.stack).into_iter().take(STACK_LINES) {
             out.add(frame.trim(), C::DarkGray, 4);
         }
+        out.lines.extend(super::suite_cause::rows(out.ui, controller, &suite.key, &test.name, out.width));
         out.blank();
     }
     let passed = |wanted: fn(&Story) -> bool| -> Vec<&TestResult> {

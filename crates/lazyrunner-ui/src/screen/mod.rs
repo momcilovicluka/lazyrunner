@@ -38,6 +38,7 @@ pub mod seg;
 pub mod sheet;
 pub mod spinner;
 pub mod status;
+pub mod suite_cause;
 pub mod suite_impact;
 pub mod suite_runs;
 pub mod suites;

@@ -534,7 +534,7 @@ impl Controller {
         };
         suite.status = if suite.failed > 0 { Status::Failed } else { Status::Passed };
         let (passed, failed, skipped) = (suite.passed, suite.failed, suite.skipped);
-        self.test_history.record(key, code.as_deref(), &ran_now);
+        self.test_history.record_on(key, code.as_deref(), base.as_ref(), &ran_now);
         if !failed_only {
             self.test_history.set_base(key, base);
             self.impact_soon(now);
@@ -949,6 +949,31 @@ mod tests {
         let saved = sample.suite_log("npm:cart").map(|file| std::fs::read_to_string(file).unwrap());
         assert!(saved.is_some_and(|text| text.contains("PASS a.spec.ts")));
         assert_eq!(sample.durations.item(Kind::Test, "npm:cart").map(|item| item.runs.len()), Some(1));
+    }
+
+    #[tokio::test]
+    async fn a_failures_likely_cause_is_what_changed_since_it_last_passed() {
+        use crate::run::cause::{Cause, Lead};
+        let temp = TempDir::new("suites-likely-cause");
+        let (mut sample, mut events) = controller(&temp);
+        let shop = temp.join("repo").join("web").join("shop");
+        sample.suites = Some(vec![Suite::new("npm:shop", "shop", Runner::Npm { dir: shop.clone(), vitest: false })]);
+        let key = vec!["npm:shop".to_string()];
+        sample.run_tests(&key, false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        sample.run_tests(&key, true);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert_eq!(sample.test_history.suite("npm:shop").map(|history| history.line("rounds")), Some("fp"));
+        crate::testing::write(shop.join("src").join("cart.ts"), "export const total = 2;");
+        sample.run_tests(&key, false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+
+        sample.causes_now("npm:shop");
+        let found = sample.likely_cause("npm:shop", "rounds").expect("it passed the run before");
+        let cart = Cause { file: "web/shop/src/cart.ts".into(), lead: Lead::Chain(vec!["shop".into()]) };
+        assert_eq!(found.causes, [cart], "the source changed since, in its folder");
+        assert!(found.passed_at.is_some());
+        assert!(sample.likely_cause("npm:shop", "adds").is_none(), "it passed");
     }
 
     #[tokio::test]

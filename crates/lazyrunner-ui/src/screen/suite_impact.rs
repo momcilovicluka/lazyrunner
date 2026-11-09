@@ -50,6 +50,7 @@ pub struct Seen {
 pub fn keep_fresh(ui: &Ui, controller: &mut Controller) {
     if matches!(ui.overlay, Some(Overlay::Tests { .. })) {
         controller.want_impact();
+        controller.want_causes();
     }
 }
 
