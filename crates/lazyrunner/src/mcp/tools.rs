@@ -261,6 +261,16 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "get_stack",
+            "The stack map (K): which app calls which - from the calls the .NET apps made (HttpClient's log, by the \
+             port a call went to) and the profile's dependsOn - with each edge's calls, p95 and failures over the \
+             last minute; each app's state and port; the apps that use the database; and the newest failed calls \
+             (url, status, or no answer).",
+            json!({}),
+            &[],
+            true,
+        ),
+        tool(
             "check_migrations",
             "Checks one DbContext against the database (`context`), or finds them again and checks them all. \
              Then wait for migrations_checked.",

@@ -64,6 +64,10 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "migrations" => Ok(migrations(controller)),
         "audit" => Ok(audit(controller)),
         "ports" => Ok(ports(controller)),
+        "stack" => {
+            controller.find_configured_calls();
+            Ok(stack(controller))
+        }
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
         "actions" => Ok(drive::actions(ui, controller)),
@@ -560,6 +564,79 @@ fn ports(controller: &Controller) -> Value {
         "summary": { "wanted": wanted, "conflicts": conflicts, "reserved": reserved },
         "reservedRanges": ranges,
     })
+}
+
+/// The failed calls an agent sees, the newest.
+const FAILED_CALLS_SHOWN: usize = 10;
+
+/// The stack map (K, #51): each app's state and port; who calls whom - from the calls the .NET apps made (their
+/// HttpClient log, by the port a call went to), the profile's dependsOn and the apps' own config (a dev server's proxy,
+/// an environment file) - with each edge's last minute (for a caller that can't log its calls, what the called app
+/// served); the apps that use the database and its commands; and the newest failed calls, with what came back.
+fn stack(controller: &Controller) -> Value {
+    let now = std::time::Instant::now();
+    let apps: Vec<Value> = controller
+        .apps
+        .iter()
+        .zip(&controller.states)
+        .map(|(app, state)| {
+            json!({
+                "app": app.key,
+                "name": app.name,
+                "state": state.status.name(),
+                "up": state.is_up(),
+                "port": controller.port(&app.key),
+                "dependsOn": app.depends_on,
+            })
+        })
+        .collect();
+    let edges: Vec<Value> = controller
+        .stack_edges()
+        .iter()
+        .map(|edge| {
+            json!({
+                "from": edge.from,
+                "to": edge.to,
+                "declaredIn": edge.declared_in,
+                "fromWhatItServed": edge.served,
+                "seen": edge.seen,
+                "callsLastMinute": edge.calls,
+                "perSecond": (edge.per_second * 100.0).round() / 100.0,
+                "p95Ms": edge.p95_ms.map(|ms| ms.round()),
+                "failedLastMinute": edge.failed,
+                "lastFailedSecondsAgo": edge.last_failed.map(|at| now.saturating_duration_since(at).as_secs()),
+            })
+        })
+        .collect();
+    let failed: Vec<Value> = controller
+        .calls
+        .items
+        .iter()
+        .rev()
+        .filter(|call| call.failed())
+        .take(FAILED_CALLS_SHOWN)
+        .map(|call| {
+            json!({
+                "from": call.from,
+                "method": call.method,
+                "url": call.url,
+                "status": call.status,
+                "ms": call.ms.map(|ms| ms.round()),
+                "noAnswer": call.status.is_none(),
+                "secondsAgo": now.saturating_duration_since(call.at).as_secs(),
+            })
+        })
+        .collect();
+    let users = controller.database_users();
+    let commands: Vec<Value> = users
+        .iter()
+        .map(|key| {
+            let seen = controller.database_seen(key);
+            json!({ "app": key, "commandsLastMinute": controller.database_commands(key), "commandsSeen": seen })
+        })
+        .collect();
+    let database = (!users.is_empty()).then(|| json!({ "label": controller.db_label, "usedBy": commands }));
+    json!({ "apps": apps, "edges": edges, "database": database, "failedCalls": failed })
 }
 
 /// The audit view's last scans, per app: what each found, and the command that fixes each package.

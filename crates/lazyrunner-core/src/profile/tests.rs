@@ -193,6 +193,18 @@ fn broken_profiles_get_one_clear_message_naming_the_field() {
             "servedBy 'nope' must be the key of a dotnet app",
             true,
         ),
+        (
+            "a dependsOn on no app",
+            Box::new(|d| d["apps"][0]["dependsOn"] = json!(["nope"])),
+            "orders.dependsOn: 'nope' isn't an app's key",
+            true,
+        ),
+        (
+            "a dependsOn on itself",
+            Box::new(|d| d["apps"][0]["dependsOn"] = json!(["orders"])),
+            "orders.dependsOn names the app itself",
+            true,
+        ),
     ];
     for (label, change, expect, loader_only) in cases {
         let (message, schema_rejects) = broken(change);

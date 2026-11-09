@@ -111,6 +111,7 @@ An ASP.NET (or any dotnet run) project. lazyrunner builds it with dotnet build, 
 | `args` | array of strings |  | Optional. What dotnet run passes the app besides lazyrunner's own, after --: configuration for local runs, say. An app that logs through Serilog to Seq only prints nothing for the requests view (H); an empty Seq key (--Seq:ApiKey=) brings its console log back, when its code reads it that way. Example: `["--Seq:ApiKey="]`. |
 | `env` | object |  | Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them). Example: `{"ASPNETCORE_ENVIRONMENT":"Development"}`. |
 | `tests` | array of strings |  | Optional. Test suites that belong to this app in the tests view (T), whatever lazyrunner works out: .NET test projects by path from the repo root or by name, Nx projects by name. Without it a .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in. Example: `["tests/Orders.Tests/Orders.Tests.csproj"]`. |
+| `dependsOn` | array of app keys |  | Optional. The apps it calls, by key: the stack map (K) draws these edges dashed until a call is seen (a .NET app's own calls are seen in its log without this). Example: `["billing"]`. |
 | `migrations` | object |  | Optional. Where its EF Core migrations are, for the migrations view (M), when lazyrunner shouldn't find them itself (the model snapshots in the app's project and the projects it builds). dotnet ef runs with this app's project as the startup project (its Development settings, the database picked with d) and its last build. |
 | `migrations.project` | path |  | The project with the migrations, when it isn't the app's own. Example: `"src/Shop.Data/Shop.Data.csproj"`. |
 | `migrations.contexts` | array of strings |  | Its DbContexts. Without them, those of the model snapshots in project, else what dotnet ef dbcontext list finds. Example: `["ShopDbContext"]`. |
@@ -130,6 +131,7 @@ A folder with package.json, run with npm run <script>. It needs no build from la
 | `variants` | array of objects | yes | How it runs, chosen again on every start: the first variant whose when.packageScript package.json has. One without when always applies, so only the last can leave it out. Example: `[{"script":"dev","port":5173}]`. |
 | `env` | object |  | Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them). Example: `{"VITE_API_URL":"http://localhost:5001"}`. |
 | `tests` | array of strings |  | Optional. Test suites that belong to this app in the tests view (T), whatever lazyrunner works out: .NET test projects by path from the repo root or by name, Nx projects by name. Without it a .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in. Example: `["admin","shared-ui"]`. |
+| `dependsOn` | array of app keys |  | Optional. The apps it calls, by key: the stack map (K) draws these edges dashed until a call is seen (a .NET app's own calls are seen in its log without this). Example: `["orders"]`. |
 
 #### A dev-server variant
 

@@ -543,6 +543,11 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Stack { .. }) => {
+            if !super::stack::key(ui, controller, name) {
+                from_view(ui, controller, name);
+            }
+        }
         Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
@@ -733,6 +738,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),
         Run::Audit => super::seen::open(ui, controller, super::jumps::View::Audit),
         Run::Ports => super::ports::open(ui, controller, None),
+        Run::Stack => super::stack::open(ui, controller),
         Run::GitTool => ui.git_tool_wanted = true,
         Run::Menu => ui.overlay = Some(Overlay::Menu { index: 0 }),
         Run::Search => {

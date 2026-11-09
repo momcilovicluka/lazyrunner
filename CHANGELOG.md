@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.75.0] - 2026-11-09
+
+### Added
+- A stack map (`K`): which app calls which, and how those calls go. The apps are boxes in columns by who calls whom, with the database after the apps that use it (their projects reference EF Core or a SQL client, or their requests ran commands). The edges come from the calls the .NET apps really make - lazyrunner turns on HttpClient's log for the apps it starts and maps each call's port to the app listening there - and the npm apps lazyrunner starts, through a small Node hook (`NODE_OPTIONS=--require`) that writes a line for each call their dev server's proxy makes. Until an npm app's calls are seen, its own config naming another app's port (`proxy.conf.json`, `environment.ts`, `.env`) or the profile's new `dependsOn` declares them. Each box says as much as fits - how long the app has run, its CPU and memory, its requests or proxied calls a minute with their p95 and failures, its errors and warnings, its slowest endpoint and last build or its npm script; the database its commands, the slowest and possible N+1s - and with many apps just the name and state, so nothing overlaps. A box says what its app is doing, building included. Each edge is cyan with calls, red with a failure in the last minute, and says how many it carries; under the map, every edge's calls, p95 and failures. `h` `j` `k` `l` choose an app, `Enter` goes to its column. With motion on, the edges draw in, a dot travels along each one that carries anything (yellow on a failing one, cyan to the database) and a new failure pulses its edge twice. The MCP's `get_stack` gives an agent the same map, with each edge's last minute and the newest failed calls (#51)
+
 ## [1.74.0] - 2026-11-09
 
 ### Added

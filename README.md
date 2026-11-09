@@ -218,6 +218,7 @@ at once while the palette wipes away.
 | `M` | **Migrations**: the EF Core migrations, applied and pending, per DbContext; apply or roll back (below) |
 | `A` | **Audit**: outdated and vulnerable packages, per app, and what fixes each (below) |
 | `P` | **Ports**: every port the apps want, who holds it, and what to do (below) |
+| `K` | **Stack**: which app calls which, and how those calls go (below) |
 | `H` | **Requests**: the HTTP requests the .NET apps served, per endpoint too (below) |
 | `T` | **Tests**: the project's test suites - run them in the background, see what failed, run one test (below) |
 | `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
@@ -530,6 +531,45 @@ it opens; a port that changes flashes its state and its cells; a new conflict sl
 twice, and pulses while `!` asks about it; a freed port wipes out what held it while `● freed` draws in, then flashes
 green.
 
+## Stack (`K`)
+
+`K` maps which app calls which. The apps are boxes - each with its state and port - in columns by who calls whom: a
+caller left of what it calls, level with it so the line runs straight, the apps with no edge last. The database (the
+one `d` picked) comes after the apps that use it - a project they build references EF Core or a SQL client, they
+have migrations, or their requests ran database commands - with their commands a minute on its edge, dashed until
+the first one.
+
+The edges come from what really happens: lazyrunner turns on HttpClient's log for the .NET apps it starts
+(`--Logging:LogLevel:System.Net.Http.HttpClient=Information`), and each call's url names a port, so the app that
+listens there. No setup, and it shows calls nobody wrote down. The npm apps get the same: lazyrunner starts them
+with a small Node hook (`NODE_OPTIONS=--require <state folder>/call-hook.cjs`, added to any `NODE_OPTIONS` of
+theirs) that listens on Node's own diagnostics channels and writes a line for each call to a port on this machine -
+a dev server's proxy to an API - with its status and time; lazyrunner reads it and keeps it out of the column. Until
+an npm app's calls are seen, its own config links it: a proxy file (`proxy.conf.json`), a bundler's config, an
+`environment*.ts` or a `.env` that names another app's port (`localhost:5000`), read as `K` opens; with no call seen
+at all, its edge's figures are what the called app served, marked `~`. The profile's `dependsOn` declares the rest:
+`"dependsOn": ["orders"]`. A declared edge is dashed until it carries anything.
+
+Each edge is coloured by its last minute - cyan with calls, red with a failure (a 5xx, or no answer in 30 s), grey
+once seen - with its calls on it (`3/min`, `12/s`). An edge to the next column runs between the boxes, each edge of a
+box on a row of its own, in the order of where its other end is; one blocked by a box goes around it, never behind
+it. Each box says as much as fits - the more room (fewer apps, a bigger terminal), the more, and with many apps just
+the name and state, so nothing overlaps:
+
+| Detail | .NET app | npm app | Database |
+|---|---|---|---|
+| always | name, state (building `12/41`, waiting to build, up...), port | the same | its name |
+| 1 | how long it has run, CPU and memory, requests a minute with their p95 and 5xx | the same, with the calls its proxy made a minute (the Node hook) | commands a minute and their time |
+| 2 | the errors and warnings it printed | the same | the slowest command, the requests that look like an N+1 |
+| 3 | its slowest endpoint, its last build (`built 4m ago in 22s`) | the `npm run` script and variant it runs | |
+
+A line too long for a box (an endpoint) scrolls through. Under the map, every edge's figures over the last minute: calls, p95 and
+failures, the picked app's bright. `h` `j` `k` `l` choose an app, `Enter` (or a double click) goes to its column, `Esc`
+closes. It moves (not with reduced motion): the edges draw in as it opens, a dot travels along each edge that carries
+anything - faster the more it carries; white, yellow on a failing edge, cyan to the database - and an edge's new
+failure pulses it twice. The MCP's `get_stack` gives an agent the same
+map, with the newest failed calls (url, status, or no answer).
+
 ## Requests (`H`)
 
 An API that logs through Serilog (or anything else that replaces ASP.NET's logging) to somewhere other than the
@@ -694,6 +734,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
+| `get_stack` | The stack map: which app calls which (seen and declared), each edge's calls, p95 and failures over the last minute, the apps that use the database, and the newest failed calls |
 | `list_actions` | Everything lazyrunner can do: every action as the palette lists it (its key, whether it runs while an app builds, whether it needs `confirm`) and every setting with its state |
 | `run_action` | Any action by its key, on an app, as your key would |
 | `press_keys` | Keys as the key reference names them (`"g g"`, `"Ctrl+o"`, `"Esc"`), for what no tool covers; answers with the screen after. It waits while you type in a prompt |
@@ -719,8 +760,8 @@ doesn't let an agent that isn't elevated drive a lazyrunner opened with "Run as 
 allow `mcp__lazyrunner__get_status`, `mcp__lazyrunner__get_logs`, `mcp__lazyrunner__get_errors`,
 `mcp__lazyrunner__get_screen`, `mcp__lazyrunner__get_requests`, `mcp__lazyrunner__get_request`,
 `mcp__lazyrunner__list_tests`, `mcp__lazyrunner__get_test_results`,
-`mcp__lazyrunner__get_migrations`, `mcp__lazyrunner__get_audit`, `mcp__lazyrunner__get_ports` and
-`mcp__lazyrunner__wait` in its permissions.
+`mcp__lazyrunner__get_migrations`, `mcp__lazyrunner__get_audit`, `mcp__lazyrunner__get_ports`,
+`mcp__lazyrunner__get_stack` and `mcp__lazyrunner__wait` in its permissions.
 
 ## npm apps
 

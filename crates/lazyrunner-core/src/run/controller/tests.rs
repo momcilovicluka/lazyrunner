@@ -68,6 +68,99 @@ async fn stopping_nothing_says_so_and_stop_all_names_what_it_keeps() {
 }
 
 #[tokio::test]
+async fn an_apps_calls_to_another_are_the_stack_maps_edges() {
+    let temp = TempDir::new("controller-calls");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    let generation = sample.states[0].generation;
+    let lines = [
+        "info: System.Net.Http.HttpClient.billing.LogicalHandler[100]",
+        "      => SpanId:a1 => HTTP GET http://localhost:47202/api/invoices",
+        "      Start processing HTTP request GET http://localhost:47202/api/invoices",
+        "info: System.Net.Http.HttpClient.billing.LogicalHandler[101]",
+        "      => SpanId:a1 => HTTP GET http://localhost:47202/api/invoices",
+        "      End processing HTTP request after 31.2ms - 200",
+    ];
+    for line in lines {
+        let tag = crate::run::Tag::App { key: "orders".into(), generation };
+        sample.handle(crate::run::Event::Output { tag, line: line.into() });
+    }
+    assert_eq!(sample.calls.items.len(), 1);
+    let edges = sample.stack_edges();
+    let billing =
+        edges.iter().find(|edge| edge.from == "orders" && edge.to == "billing").expect("orders calls billing");
+    assert_eq!((billing.calls, billing.p95_ms, billing.failed), (1, Some(31.2), 0));
+    let shown: Vec<String> = sample.states[0].output.newest_first(0).map(|line| line.text.clone()).collect();
+    assert!(shown.iter().any(|text| text.contains("Start processing")), "the call stays in the column: {shown:?}");
+}
+
+#[tokio::test]
+async fn an_app_whose_project_references_ef_core_uses_the_database_before_its_first_command() {
+    let temp = TempDir::new("controller-database-apps");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    assert!(sample.database_users().is_empty(), "nothing says any app uses it yet");
+    let project = sample.root.join("services/Orders/Orders.csproj");
+    let text = std::fs::read_to_string(&project).expect("the sample's project");
+    let with_ef = text.replace(
+        "</Project>",
+        r#"<ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" /></ItemGroup></Project>"#,
+    );
+    std::fs::write(&project, with_ef).expect("written");
+    sample.find_configured_calls();
+    assert_eq!(sample.database_users(), ["orders"]);
+    assert!(!sample.database_seen("orders"), "declared by its packages, no command seen yet");
+}
+
+#[tokio::test]
+async fn an_npm_app_starts_with_the_node_hook_on_top_of_its_own_node_options() {
+    let temp = TempDir::new("controller-node-hook");
+    let (sample, _rx) = controller(&temp, json!({}));
+    let shop = sample.server_command("shop").expect("the shop starts");
+    let options: Vec<String> = shop
+        .spec
+        .env
+        .iter()
+        .filter(|(name, _)| name == "NODE_OPTIONS")
+        .map(|(_, value)| value.to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(options.len(), 1, "{:?}", shop.spec.env);
+    assert!(options[0].ends_with("call-hook.cjs\""), "{}", options[0]);
+    assert!(!options[0].contains('\\'), "forward slashes: {}", options[0]);
+    let hook = sample.state_dir.join(crate::run::calls::NODE_HOOK_FILE);
+    assert_eq!(std::fs::read_to_string(hook).ok().as_deref(), Some(crate::run::calls::NODE_HOOK));
+    let orders = sample.server_command("orders").expect("orders starts");
+    assert!(orders.spec.env.iter().all(|(name, _)| name != "NODE_OPTIONS"), "a .NET app logs its calls itself");
+}
+
+#[tokio::test]
+async fn a_browser_apps_calls_are_in_its_config_and_their_figures_what_the_api_served() {
+    let temp = TempDir::new("controller-configured");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    crate::testing::write(
+        sample.root.join("web/shop/proxy.conf.json"),
+        r#"{ "/api": { "target": "http://localhost:47201" } }"#,
+    );
+    sample.find_configured_calls();
+    let edges = sample.stack_edges();
+    let shop =
+        edges.iter().find(|edge| edge.from == "shop" && edge.to == "orders").expect("its proxy names orders' port");
+    assert_eq!((shop.declared_in.as_deref(), shop.seen, shop.served), (Some("proxy.conf.json"), 0, false));
+
+    let finished = |status: u16, ms: f64| crate::run::requests::Finished {
+        method: "GET".into(),
+        path: "/api/orders".into(),
+        status,
+        ms,
+        ..Default::default()
+    };
+    sample.requests.add("orders", finished(200, 20.0), chrono::Local::now());
+    sample.requests.add("orders", finished(500, 80.0), chrono::Local::now());
+    let edges = sample.stack_edges();
+    let shop = edges.iter().find(|edge| edge.from == "shop" && edge.to == "orders").expect("still there");
+    assert!(shop.served, "a browser app can't log its calls: what orders served stands for them");
+    assert_eq!((shop.calls, shop.failed, shop.p95_ms), (2, 1, Some(80.0)));
+}
+
+#[tokio::test]
 async fn an_app_that_logs_scopes_has_each_requests_own_lines_even_when_they_overlap() {
     let temp = TempDir::new("controller-scopes");
     let (mut sample, _rx) = controller(&temp, json!({}));

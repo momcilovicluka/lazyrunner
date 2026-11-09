@@ -616,6 +616,7 @@ mod tests {
             tests: Vec::new(),
             migrations: None,
             env: Vec::new(),
+            depends_on: Vec::new(),
         }
     }
 

@@ -85,6 +85,8 @@ pub struct AppState {
     scoped: std::collections::VecDeque<(String, Vec<u64>)>,
     /// Its requests started and not finished yet.
     in_flight: requests::InFlight,
+    /// The calls it made that wait for their end, and the ones that ended (#51).
+    pub outgoing: super::calls::Outgoing,
     log: Option<BufWriter<File>>,
     /// What the log file holds (so it starts over at `LOG_CAP`).
     log_bytes: u64,
@@ -130,6 +132,7 @@ impl AppState {
             scope: None,
             scoped: std::collections::VecDeque::new(),
             in_flight: requests::InFlight::default(),
+            outgoing: super::calls::Outgoing::default(),
             log: None,
             log_bytes: 0,
             log_path: None,
@@ -228,6 +231,9 @@ impl AppState {
     /// the log file only, and a finished request comes back (for the requests view).
     pub fn receive(&mut self, app: &App, raw: &str, now: Instant) -> Option<requests::Finished> {
         let text = crate::output::strip_ansi(raw).replace('\t', "    ");
+        if self.outgoing.hook_line(&self.key, &text, now) {
+            return None; // the Node hook's line for a call: for the stack map, not the column
+        }
         if app.traits().counts_requests
             && let Some(id) = requests::scope(&text)
         {
@@ -236,6 +242,7 @@ impl AppState {
                 self.tag(id, self.output.total());
             }
             self.scope = id;
+            self.outgoing.scope_line(&text);
             self.log_line(&text);
             return None;
         }
@@ -267,6 +274,9 @@ impl AppState {
                     return Some(request);
                 }
             }
+        }
+        if app.traits().counts_requests {
+            self.outgoing.line(&self.key, &text, now);
         }
         let hue = self.hue_of(app, &text);
         let colors_errors = app.traits().colors_errors;
@@ -343,6 +353,7 @@ impl AppState {
         self.scope = None;
         self.scoped.clear();
         self.in_flight.clear();
+        self.outgoing.clear();
         self.cpu = None;
         for history in
             [&mut self.cpu_history, &mut self.memory_history, &mut self.response_history, &mut self.request_history]
@@ -419,6 +430,7 @@ mod tests {
             tests: Vec::new(),
             migrations: None,
             env: Vec::new(),
+            depends_on: Vec::new(),
         }
     }
 

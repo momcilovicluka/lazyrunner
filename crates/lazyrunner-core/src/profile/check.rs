@@ -39,8 +39,9 @@ pub const FIELDS: Fields = Fields {
         "env",
         "tests",
         "migrations",
+        "dependsOn",
     ],
-    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "env", "tests"],
+    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "env", "tests", "dependsOn"],
     variant: &["label", "when", "script", "port", "servedBy", "ready"],
     when: &["packageScript"],
     ready: &["file"],
@@ -123,7 +124,30 @@ pub fn validate(data: &Value, in_repo: bool) -> Vec<String> {
             problems.push(format!("servedBy '{served_by}' must be the key of a dotnet app"));
         }
     }
+    for app in apps.iter().filter(|app| app.is_object()) {
+        check_depends_on(app, &keys, &mut problems);
+    }
     problems
+}
+
+/// `dependsOn`: other apps' keys.
+fn check_depends_on(app: &Value, keys: &HashMap<String, &Value>, problems: &mut Vec<String>) {
+    let depends_on = field(app, "dependsOn");
+    if depends_on.is_null() {
+        return;
+    }
+    let key = text(field(app, "key"));
+    let Some(called) = depends_on.as_array().filter(|called| called.iter().all(Value::is_string)) else {
+        problems.push(format!("{key}.dependsOn must list app keys, e.g. [\"billing\"]"));
+        return;
+    };
+    for called in called.iter().map(text) {
+        if called.eq_ignore_ascii_case(&key) {
+            problems.push(format!("{key}.dependsOn names the app itself"));
+        } else if !keys.contains_key(&called.to_lowercase()) {
+            problems.push(format!("{key}.dependsOn: '{called}' isn't an app's key"));
+        }
+    }
 }
 
 fn check_detect(data: &Value, in_repo: bool, problems: &mut Vec<String>) {
