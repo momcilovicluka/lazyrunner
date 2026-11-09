@@ -7,6 +7,9 @@ pub mod actions;
 pub mod audit;
 pub mod bundle;
 pub mod checklist;
+pub mod code;
+pub mod code_draw;
+pub mod code_search;
 pub mod columns;
 pub mod copy;
 pub mod diff;
@@ -22,6 +25,7 @@ pub mod links;
 pub mod marks;
 pub mod migrations;
 pub mod migrations_rail;
+pub mod minimap;
 pub mod motion;
 pub mod mouse;
 pub mod overlays;
@@ -207,6 +211,8 @@ pub enum Overlay {
         opened: Instant,
         stopping: Option<(String, Instant)>,
     },
+    /// `K`, then Tab: the code map.
+    Code(Box<code::View>),
     /// `K`: the stack map; the picked box, and when it opened (the edges draw in).
     Stack {
         index: usize,
@@ -269,6 +275,7 @@ impl Overlay {
             Self::Audit { .. } => "audit",
             Self::Ports { .. } => "ports",
             Self::Stack { .. } => "stack",
+            Self::Code(_) => "code",
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
@@ -610,6 +617,7 @@ impl Ui {
             || audit::animating(self, controller)
             || ports::animating(self, controller)
             || stack::animating(self, controller)
+            || code::animating(self, controller)
             || durations::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
@@ -755,6 +763,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
         Some(Overlay::Audit { .. }) => return audit::rows(ui, controller, width, rows),
         Some(Overlay::Ports { .. }) => return ports::rows(ui, controller, width, rows),
         Some(Overlay::Stack { .. }) => return stack::rows(ui, controller, width, rows),
+        Some(Overlay::Code(_)) => return code::rows(ui, controller, width, rows),
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),

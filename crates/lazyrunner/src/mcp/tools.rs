@@ -271,6 +271,28 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "get_dependencies",
+            "The code map: what depends on what in the code - .NET projects (their project references) and their \
+             namespaces (their usings), TypeScript projects (an Nx workspace's, through tsconfig paths and imports) \
+             and their folders, an Angular folder's NgModules and components (their imports), and Nx's implicit \
+             dependencies. Without part: the apps and their projects, every project (how many it depends on and how \
+             many use it), the cycles, and the links a rule doesn't allow (the profile's layers, Nx's module \
+             boundaries). With part (an app, project, namespace, folder, module or component by name, or a source \
+             file by its name or the end of its path - its namespace, folder or module): what it \
+             depends on and what uses it, each with its depth and the way to it, its own parts, the rules it breaks \
+             and what only Nx links it to.",
+            json!({
+                "part": {
+                    "type": "string",
+                    "description": "An app, project, namespace, folder, module or component by its name, or a source file",
+                },
+                "direction": { "type": "string", "enum": ["depends_on", "used_by", "both"] },
+                "depth": { "type": "integer", "minimum": 1, "description": "How far; all without it" },
+            }),
+            &[],
+            true,
+        ),
+        tool(
             "check_migrations",
             "Checks one DbContext against the database (`context`), or finds them again and checks them all. \
              Then wait for migrations_checked.",

@@ -52,6 +52,7 @@ pub fn keep_fresh(ui: &Ui, controller: &mut Controller) {
         controller.want_impact();
         controller.want_causes();
     }
+    super::code::keep_fresh(ui, controller);
 }
 
 /// `v` switched to the affected suites: the others fade, and the selection goes to the first affected one.

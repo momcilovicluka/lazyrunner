@@ -24,7 +24,7 @@ pub struct Fields {
 }
 
 pub const FIELDS: Fields = Fields {
-    top: &["$schema", "schemaVersion", "extends", "id", "name", "detect", "watch", "apps"],
+    top: &["$schema", "schemaVersion", "extends", "id", "name", "detect", "watch", "apps", "layers"],
     detect: &["anyFile"],
     dotnet: &[
         "key",
@@ -127,7 +127,26 @@ pub fn validate(data: &Value, in_repo: bool) -> Vec<String> {
     for app in apps.iter().filter(|app| app.is_object()) {
         check_depends_on(app, &keys, &mut problems);
     }
+    check_layers(field(data, "layers"), &mut problems);
     problems
+}
+
+/// `layers`: each a project's name (or a pattern) and the names it must not reference.
+fn check_layers(layers: &Value, problems: &mut Vec<String>) {
+    if layers.is_null() {
+        return;
+    }
+    let Some(layers) = layers.as_object() else {
+        problems.push("layers must be an object: a project's name and what it must not reference".into());
+        return;
+    };
+    for (parts, rule) in layers {
+        let names = field(rule, "mustNotReference");
+        let all_text = names.as_array().is_some_and(|names| !names.is_empty() && names.iter().all(Value::is_string));
+        if !rule.is_object() || !all_text {
+            problems.push(format!("layers.{parts}.mustNotReference must list project names, e.g. [\"Orders.Api\"]"));
+        }
+    }
 }
 
 /// `dependsOn`: other apps' keys.

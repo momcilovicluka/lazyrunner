@@ -68,6 +68,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
             controller.find_configured_calls();
             Ok(stack(controller))
         }
+        "dependencies" => dependencies(controller, args),
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
         "actions" => Ok(drive::actions(ui, controller)),
@@ -564,6 +565,138 @@ fn ports(controller: &Controller) -> Value {
         "summary": { "wanted": wanted, "conflicts": conflicts, "reserved": reserved },
         "reservedRanges": ranges,
     })
+}
+
+/// The code map (#89): with no `part`, the projects - each with how many it depends on and how many use it - and
+/// the cycles; with one (a project, namespace or folder, by name), what it depends on or what uses it (`direction`:
+/// `depends_on`, `used_by`, or both), as far as `depth` (all without it), each with the way to it.
+fn dependencies(controller: &mut Controller, args: &Value) -> Answer {
+    use lazyrunner_core::run::code::STACK;
+    if controller.code_map().is_none() {
+        controller.read_code_now();
+    }
+    let Some(map) = controller.code_map() else { return Err(("not_found", "the code couldn't be read".into())) };
+    let root = controller.root.clone();
+    let path = |at: usize| {
+        let path = &map.parts[at].path;
+        path.strip_prefix(&root).unwrap_or(path).display().to_string().replace('\\', "/")
+    };
+    let named = |parts: &[usize]| parts.iter().map(|&at| map.parts[at].name.clone()).collect::<Vec<_>>();
+    let breaks = |at: Option<usize>| -> Vec<Value> {
+        let wanted = |from: usize, to: usize| at.is_none_or(|at| from == at || to == at);
+        let breaks = map.breaks.iter().filter(|broken| wanted(broken.from, broken.to));
+        breaks
+            .map(|broken| {
+                json!({ "from": map.parts[broken.from].name, "to": map.parts[broken.to].name, "why": broken.why })
+            })
+            .collect()
+    };
+    let Some(wanted) = args["part"].as_str() else {
+        let (parts, links) = map.level(None);
+        let (apps, _) = map.level(Some(STACK));
+        let apps: Vec<Value> = apps
+            .iter()
+            .filter_map(|&at| map.parts[at].app.as_deref().map(|key| (at, key)))
+            .map(|(at, key)| {
+                let shares: serde_json::Map<String, Value> = map
+                    .level(Some(STACK))
+                    .0
+                    .iter()
+                    .filter_map(|&other| map.parts[other].app.as_deref().map(|other_key| (other, other_key)))
+                    .filter(|&(_, other_key)| other_key != key)
+                    .map(|(other, other_key)| (map.parts[other].name.clone(), json!(map.shared_projects(key, other_key))))
+                    .filter(|(_, count)| count != &json!(0))
+                    .collect();
+                json!({ "name": map.parts[at].name, "key": key, "projects": named(&map.app_projects(key)), "shares": shares })
+            })
+            .collect();
+        let projects: Vec<Value> = parts
+            .iter()
+            .map(|&at| {
+                let part = &map.parts[at];
+                let mut project = json!({
+                    "name": part.name,
+                    "kind": part.kind.name(),
+                    "dotnet": matches!(part.stack, lazyrunner_core::run::code::Stack::Dotnet),
+                    "path": path(at),
+                    "dependsOn": map.reach(at, true, false).len(),
+                    "usedBy": map.reach(at, false, false).len(),
+                });
+                if !part.tags.is_empty() {
+                    project["tags"] = json!(part.tags);
+                }
+                project
+            })
+            .collect();
+        let cycles: Vec<Vec<String>> = map.cycles(&parts, &links).iter().map(|cycle| named(cycle)).collect();
+        return Ok(json!({ "apps": apps, "projects": projects, "cycles": cycles, "breaks": breaks(None) }));
+    };
+    let Some(at) = map.named(wanted).or_else(|| map.by_file(wanted)) else {
+        let wanted = clean(wanted, CLIENT_CHARS);
+        return Err(("not_found", format!("no part '{wanted}' - get_dependencies without a part lists the projects")));
+    };
+    let depth = args["depth"].as_u64().map(|depth| depth as usize);
+    let direction = args["direction"].as_str().unwrap_or("both");
+    let walk = |forward: bool| -> Vec<Value> {
+        let mut found: Vec<(usize, usize)> = Vec::new();
+        let mut frontier = vec![at];
+        let mut far = 0;
+        while !frontier.is_empty() && depth.is_none_or(|depth| far < depth) {
+            far += 1;
+            let mut next = Vec::new();
+            for &here in &frontier {
+                for there in map.reach(here, forward, false) {
+                    if there != at && !found.iter().any(|(seen, _)| *seen == there) {
+                        found.push((there, far));
+                        next.push(there);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        found
+            .into_iter()
+            .map(|(there, far)| {
+                let way = if forward { map.way(at, there) } else { map.way(there, at) };
+                let way: Vec<String> =
+                    way.unwrap_or_default().iter().map(|&step| map.parts[step].name.clone()).collect();
+                json!({ "name": map.parts[there].name, "kind": map.parts[there].kind.name(), "depth": far, "way": way })
+            })
+            .collect()
+    };
+    let part = &map.parts[at];
+    let mut answer = json!({ "name": part.name, "kind": part.kind.name(), "path": path(at), "files": part.files });
+    if direction != "used_by" {
+        answer["dependsOn"] = json!(walk(true));
+    }
+    if direction != "depends_on" {
+        answer["usedBy"] = json!(walk(false));
+    }
+    if let Some(app) = part.app.as_deref().filter(|_| part.inside.as_deref() == Some(STACK)) {
+        answer["projects"] = json!(named(&map.app_projects(app)));
+    }
+    let own: Vec<usize> =
+        (0..map.parts.len()).filter(|&inner| map.parts[inner].inside.as_ref() == Some(&part.id)).collect();
+    if !own.is_empty() {
+        answer["parts"] = json!(named(&own));
+    }
+    if !part.tags.is_empty() {
+        answer["tags"] = json!(part.tags);
+    }
+    let broken = breaks(Some(at));
+    if !broken.is_empty() {
+        answer["breaks"] = json!(broken);
+    }
+    let implicit: Vec<usize> = map
+        .links
+        .iter()
+        .filter(|link| link.implicit && (link.from == at || link.to == at))
+        .map(|link| if link.from == at { link.to } else { link.from })
+        .collect();
+    if !implicit.is_empty() {
+        answer["linkedByNxAlone"] = json!(named(&implicit));
+    }
+    Ok(answer)
 }
 
 /// The failed calls an agent sees, the newest.

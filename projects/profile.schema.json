@@ -38,6 +38,15 @@
     "apps": {
       "type": "array", "minItems": 1,
       "description": "The apps lazyrunner runs, left to right as its columns: .NET apps and npm apps (the tables below)."
+    },
+    "layers": {
+      "type": "object",
+      "description": "Optional. Rules for the code map (K, then Tab): each key a project's name (* for anything, e.g. *.Api), and the projects it must not reference - a link that does is marked as a rule break. Nx's module boundaries (.eslintrc.json's depConstraints) are read as well.",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false, "required": ["mustNotReference"],
+        "properties": { "mustNotReference": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "Project names (or patterns) it must not reference." } }
+      },
+      "examples": [{ "Orders.Core": { "mustNotReference": ["Orders.Api"] } }]
     }
   },
   "allOf": [{

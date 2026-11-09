@@ -177,6 +177,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         || super::audit::click(ui, target)
         || super::ports::click(ui, controller, target, double)
         || super::stack::click(ui, controller, target, double)
+        || super::code::click(ui, controller, target, double)
         || super::durations::click(ui, target)
     {
         return;

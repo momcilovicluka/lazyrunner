@@ -69,6 +69,8 @@ pub enum Icon {
     Shield,
     /// The stack map's title.
     Stack,
+    /// An Angular (TypeScript) project in the code map.
+    Angular,
     Keyboard,
     Package,
     Clipboard,
@@ -188,6 +190,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Pencil, true) => "\u{f040}", // pencil
         (Icon::Shield, false) => "◈",
         (Icon::Shield, true) => "\u{f132}", // shield
+        (Icon::Angular, false) => "▲",
+        (Icon::Angular, true) => "\u{e753}", // Angular
         (Icon::Stack, false) => "⋈",
         (Icon::Stack, true) => "\u{f1e0}", // share-alt: three linked nodes
         (Icon::Keyboard, false) => "?",
@@ -326,6 +330,7 @@ mod tests {
             Icon::Pencil,
             Icon::Shield,
             Icon::Stack,
+            Icon::Angular,
             Icon::Keyboard,
             Icon::Package,
             Icon::Clipboard,

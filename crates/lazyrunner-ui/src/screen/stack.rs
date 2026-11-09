@@ -19,7 +19,7 @@ use super::graph::{self, Map, Motion};
 use super::icons::{self, Icon};
 use super::motion::Spot;
 use super::mouse::Target;
-use super::seg::{Seg, aim, pad, seg};
+use super::seg::{Seg, aim, on, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -166,7 +166,7 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
     let target = Some(Target::Item(index));
     if detail == 0 {
         let line = vec![seg(dot, color), seg(format!(" {word}{}", port.replace(" · ", "  ")), C::DarkGray)];
-        return graph::Node { lines: vec![vec![name], line], pad: 1, border, dashed: false, target };
+        return graph::Node { lines: vec![vec![name], line], pad: 1, border, dashed: false, target, bare: false };
     }
     let running = matches!(state.status, Status::Running);
     let since = state
@@ -200,7 +200,7 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
         let label = state.label.as_deref().map_or(String::new(), |label| format!(" · {label}"));
         lines.push(line(ui, format!("npm run {script}{label}"), C::DarkGray));
     }
-    graph::Node { lines, pad: 2, border, dashed: false, target }
+    graph::Node { lines, pad: 2, border, dashed: false, target, bare: false }
 }
 
 /// The database's box: its name; 1 its minute's commands and their time; 2 the slowest, and the requests that look
@@ -226,7 +226,7 @@ fn database_node(ui: &Ui, controller: &Controller, picked: bool, detail: usize, 
     }
     let border = if picked { C::Cyan } else { C::DarkGray };
     let pad = if detail == 0 { 1 } else { 2 };
-    graph::Node { lines, pad, border, dashed: false, target: Some(Target::Item(index)) }
+    graph::Node { lines, pad, border, dashed: false, target: Some(Target::Item(index)), bare: false }
 }
 
 /// An edge's colour and label: red with a failure in the last minute, cyan with calls, grey once seen, dim and
@@ -318,7 +318,7 @@ fn model(
     for edge in figures.iter().cloned() {
         let (Some(from), Some(to)) = (at(&edge.from), at(&edge.to)) else { continue };
         let (color, label) = look(&edge);
-        edges.push(graph::Edge { from, to, color, dashed: edge.seen == 0, label });
+        edges.push(graph::Edge { from, to, color, dashed: edge.seen == 0, label, quiet: false, top: false });
         let id = format!("{}>{}", edge.from, edge.to);
         motions.push(motion(ui, opened, &Traffic::of(&edge), dots, &id));
         kept.push(edge);
@@ -331,33 +331,12 @@ fn model(
             let label = if commands > 0 { format!("{commands}/min") } else { String::new() };
             let color = if commands > 0 { C::Gray } else { C::DarkGray };
             let dashed = !controller.database_seen(key);
-            edges.push(graph::Edge { from: user, to: count, color, dashed, label });
+            edges.push(graph::Edge { from: user, to: count, color, dashed, label, quiet: false, top: false });
             let traffic = Traffic { per_second: commands as f64 / 60.0, dot: C::Cyan, last_failed: None };
             motions.push(motion(ui, opened, &traffic, dots, &format!("{key}>database")));
         }
     }
     Model { nodes, edges, motion: motions, figures: kept }
-}
-
-/// h j k l: the node to go to from `picked`.
-fn step(layout: &graph::Layout, picked: usize, name: &str) -> usize {
-    let mut order: Vec<usize> = (0..layout.boxes.len()).collect();
-    order.sort_by_key(|&node| (layout.columns[node], layout.boxes[node].y));
-    let at = order.iter().position(|&node| node == picked).unwrap_or(0);
-    let column = layout.columns.get(picked).copied().unwrap_or(0);
-    let y = layout.boxes.get(picked).map_or(0, |found| found.y);
-    let nearest = |wanted: usize| {
-        (0..layout.boxes.len())
-            .filter(|&node| layout.columns[node] == wanted)
-            .min_by_key(|&node| layout.boxes[node].y.abs_diff(y))
-    };
-    match name {
-        "j" | "DownArrow" => order[(at + 1) % order.len()],
-        "k" | "UpArrow" => order[(at + order.len() - 1) % order.len()],
-        "l" | "RightArrow" => nearest(column + 1).unwrap_or(picked),
-        "h" | "LeftArrow" => column.checked_sub(1).and_then(nearest).unwrap_or(picked),
-        _ => picked,
-    }
 }
 
 /// h j k l choose a box, Enter goes to its app's column, Esc / q / K close; false for a key it doesn't use.
@@ -366,6 +345,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     let count = controller.apps.len();
     match name {
         "Escape" | "q" | "K" => ui.overlay = None,
+        "Tab" => super::code::open(ui, controller, None),
+        "c" => super::code::open(ui, controller, controller.apps.get(picked).map(|app| app.key.clone())),
         "Enter" if picked < count => {
             ui.overlay = None;
             ui.focus = picked;
@@ -375,7 +356,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "h" | "j" | "k" | "l" | "LeftArrow" | "DownArrow" | "UpArrow" | "RightArrow" => {
             let edges = controller.stack_edges();
             let model = model(ui, controller, (picked, opened), &edges, 0, &mut Dots::default());
-            let next = step(&graph::layout(&model.nodes, &model.edges), picked, name);
+            let next = graph::step(&graph::layout(&model.nodes, &model.edges), picked, name);
             ui.overlay = Some(Overlay::Stack { index: next, opened });
         }
         _ => return false,
@@ -414,7 +395,10 @@ fn header(ui: &Ui, controller: &Controller, figures: &[calls::Edge], width: usiz
     let edges = figures.len() + controller.database_users().len();
     let mut segs = vec![
         super::viewbar::chip(ui.nerd, Icon::Stack, "Stack"),
-        seg(format!("  {apps} app{} · {edges} edge{}", plural(apps), plural(edges)), C::DarkGray),
+        seg("  ", C::Gray),
+        on(" Map ", C::FocusText, C::FocusBack),
+        seg(" Code ", C::DarkGray),
+        seg(format!("   {apps} app{} · {edges} edge{}", plural(apps), plural(edges)), C::DarkGray),
     ];
     if per_second > 0.0 {
         segs.push(seg(format!(" · {per_second:.1} calls/s"), C::DarkGray));
@@ -519,7 +503,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     ui.stack_dots = dots;
     let picked = picked.min(model.nodes.len().saturating_sub(1));
     let from = map.layout.boxes.get(picked).map_or(0, |at| (at.x + at.w + MARGIN).saturating_sub(room));
-    let hint = " h j k l choose an app · Enter its column · Esc back";
+    let hint = " h j k l choose an app · Enter its column · c its code · Tab the code map · Esc back";
     let mut lines =
         vec![header(ui, controller, &model.figures, width), super::viewbar::keys(ui, hint, width), Vec::new()];
     for row in map.rows(from, room).into_iter().take(map_rows) {

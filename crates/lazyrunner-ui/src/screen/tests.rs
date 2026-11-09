@@ -1809,6 +1809,218 @@ async fn l_picks_a_test_of_the_suite_and_shows_its_message_and_stack() {
     assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 4, picking: None, .. })), "a suite: leaves it");
 }
 
+/// A code map by hand: the orders and shop apps; Orders.Api (the orders app's) uses Orders.Core, which uses
+/// Shared.Kernel - against a layer rule - and Shared.Kernel itself (implied); Orders.Tests tests Orders.Core;
+/// Orders.Core has two namespaces, one using the other, Pricing's file Rate.cs; the shop uses ui (a link only Nx knows
+/// of), lazily data, and ui and data import each other, data Shared.Kernel too (so the apps share it); ui has a
+/// folder with an NgModule and a component in it.
+fn with_code(screen: &mut Screen) {
+    use lazyrunner_core::run::code::{Break, CodeMap, Kind, Link, Part, STACK, Source, Stack};
+    let part = |id: &str, name: &str, kind: Kind, stack: Stack, inside: Option<&str>, app: Option<&str>| Part {
+        id: id.into(),
+        name: name.into(),
+        kind,
+        stack,
+        path: PathBuf::from(format!("/work/sample/{}", id.split_once(':').map_or(id, |(_, path)| path))),
+        inside: inside.map(str::to_string),
+        app: app.map(str::to_string),
+        framework: (stack == Stack::Dotnet && inside != Some(STACK)).then(|| "net8.0".to_string()),
+        files: 12,
+        packages: if stack == Stack::Dotnet { 3 } else { 0 },
+        modules: if stack == Stack::Node { 4 } else { 0 },
+        tags: Vec::new(),
+    };
+    let core = "dotnet:src/Orders.Core/Orders.Core.csproj";
+    let (ui, home) = ("node:web/shop/libs/ui", "node:web/shop/libs/ui#src/home");
+    let mut parts = vec![
+        part("dotnet:src/Orders.Api/Orders.Api.csproj", "Orders.Api", Kind::App, Stack::Dotnet, None, Some("orders")),
+        part(core, "Orders.Core", Kind::Library, Stack::Dotnet, None, None),
+        part(
+            "dotnet:src/Shared.Kernel/Shared.Kernel.csproj",
+            "Shared.Kernel",
+            Kind::Library,
+            Stack::Dotnet,
+            None,
+            None,
+        ),
+        part("dotnet:tests/Orders.Tests/Orders.Tests.csproj", "Orders.Tests", Kind::Tests, Stack::Dotnet, None, None),
+        part("node:web/shop/apps/shop", "shop", Kind::App, Stack::Node, None, Some("shop")),
+        part(ui, "ui", Kind::Library, Stack::Node, None, Some("shop")),
+        part("node:web/shop/libs/data", "data", Kind::Library, Stack::Node, None, Some("shop")),
+        part(
+            &format!("{core}#Orders.Core.Pricing"),
+            "Orders.Core.Pricing",
+            Kind::Namespace,
+            Stack::Dotnet,
+            Some(core),
+            None,
+        ),
+        part(&format!("{core}#Orders.Core.Tax"), "Orders.Core.Tax", Kind::Namespace, Stack::Dotnet, Some(core), None),
+        part("app:orders", "Orders", Kind::App, Stack::Dotnet, Some(STACK), Some("orders")),
+        part("app:shop", "Shop", Kind::App, Stack::Node, Some(STACK), Some("shop")),
+        part(home, "src/home", Kind::Folder, Stack::Node, Some(ui), Some("shop")),
+        part(&format!("{home}#HomeModule"), "HomeModule", Kind::Module, Stack::Node, Some(home), Some("shop")),
+        part(&format!("{home}#HomeComponent"), "HomeComponent", Kind::Component, Stack::Node, Some(home), Some("shop")),
+    ];
+    parts[5].tags = vec!["scope:shop".into(), "type:ui".into()];
+    parts[10].packages = 3;
+    let link = |from, to, lazy| Link { from, to, lazy, implicit: false };
+    let links = vec![
+        link(0, 1, false),
+        link(1, 2, false),
+        link(3, 1, false),
+        Link { from: 4, to: 5, lazy: false, implicit: true },
+        link(4, 6, true),
+        link(5, 6, false),
+        link(6, 5, false),
+        link(7, 8, false),
+        link(7, 2, false),
+        link(12, 13, false),
+        link(0, 2, false),
+        link(6, 2, false),
+    ];
+    let why = "layers: Orders.Core must not reference Shared.Kernel".to_string();
+    let breaks = vec![Break { from: 1, to: 2, why }];
+    let files = vec![Source { path: PathBuf::from("/work/sample/src/Orders.Core/Pricing/Rate.cs"), part: 7 }];
+    screen.controller.set_code_map(CodeMap { parts, links, breaks, files });
+}
+
+#[tokio::test]
+async fn the_code_map_shows_what_depends_on_what_goes_inside_a_project_and_finds_its_cycles() {
+    let mut screen = screen("snap-code", json!({}));
+    with_code(&mut screen);
+    screen.press("K Tab");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Code(_))), "Tab: the code map");
+    let frame = screen.frame();
+    assert!(frame.contains("2 apps") && frame.contains("Orders") && frame.contains("Shop"), "the apps: {frame}");
+    assert!(frame.contains("1 shared") && frame.contains("shares 1 projects with Shop"), "what they share: {frame}");
+    insta::assert_snapshot!("code_apps", frame);
+    screen.press("Enter");
+    let frame = screen.frame();
+    assert!(frame.contains("Orders: 3 .NET · 0 TypeScript projects · 1 rule break"), "its projects: {frame}");
+    assert!(!frame.contains("Orders.Tests"), "only what the app's code is: {frame}");
+    screen.press("Backspace");
+    assert!(screen.frame().contains("2 apps"), "back out: {}", screen.frame());
+
+    screen.press("a");
+    let frame = screen.frame();
+    assert!(frame.contains("4 .NET · 3 TypeScript projects · 1 cycle · 1 rule break"), "{frame}");
+    let why = "Orders.Api to Shared.Kernel through Orders.Core, shop to ui through data";
+    assert!(frame.contains("2 implied edges hidden"), "{why}: {frame}");
+    assert!(
+        frame.contains("Orders.Api   app · depends on 2 (2 in all) · used by 0 (0 in all)"),
+        "an app first: {frame}"
+    );
+    assert!(frame.contains("→ uses Orders.Core, Shared.Kernel"), "by name: {frame}");
+    insta::assert_snapshot!(frame);
+    screen.press("r");
+    assert!(!screen.frame().contains("implied edge"), "r shows them: {}", screen.frame());
+    screen.press("r t");
+    assert!(screen.frame().contains("tests hidden") && !screen.frame().contains("Orders.Tests"), "{}", screen.frame());
+    screen.press("t z");
+    assert!(screen.frame().contains("· compact"), "{}", screen.frame());
+    screen.press("z");
+    let frame = screen.frame();
+    assert!(frame.contains("· overview") && frame.contains("■ Shared.Kernel"), "names alone: {frame}");
+    screen.press("Z Z");
+    assert!(!screen.frame().contains("overview") && !screen.frame().contains("compact"), "{}", screen.frame());
+
+    screen.press("/ c o r e");
+    let frame = screen.frame();
+    assert!(frame.contains("▸ ■ Orders.Core") && frame.contains("Orders.Core.Pricing"), "the matches: {frame}");
+    screen.press("Enter");
+    let frame = screen.frame();
+    assert!(frame.contains("the graph of Orders.Core (3 linked)"), "all it uses and all that use it: {frame}");
+    assert!(!frame.contains("▲ shop"), "nothing else: {frame}");
+    assert!(frame.contains("Orders.Core   library · depends on 1 (1 in all) · used by 2 (2 in all)"), "{frame}");
+    assert!(frame.contains("a change here affects 2 projects, 1 test project"), "{frame}");
+    assert!(frame.contains("✗ Orders.Core → Shared.Kernel: layers: Orders.Core must not"), "the rule: {frame}");
+    screen.press("Enter");
+    let frame = screen.frame();
+    assert!(
+        frame.contains("Orders.Core · 2 namespaces") && frame.contains("Shared.Kernel"),
+        "inside, what it uses outside: {frame}"
+    );
+    let wide = screen.render(170, 44);
+    assert!(wide.contains("library · a project"), "outside the project, where it is: {wide}");
+    screen.press("Backspace f");
+    assert!(screen.frame().contains("focus 1"), "{}", screen.frame());
+    screen.press("f c");
+    let frame = screen.frame();
+    assert!(
+        frame.lines().any(|line| line.trim_start().starts_with("ui") || line.contains(" ui   library")),
+        "the cycle: {frame}"
+    );
+    screen.press("/ u i Enter");
+    let frame = screen.frame();
+    assert!(frame.contains("tags scope:shop, type:ui") && frame.contains("linked by Nx alone to shop"), "{frame}");
+    screen.press("Enter");
+    assert!(screen.frame().contains("ui · 1 folders"), "{}", screen.frame());
+    screen.press("Enter");
+    let frame = screen.frame();
+    assert!(frame.contains("src/home · 2 modules and components") && frame.contains("HomeComponent"), "{frame}");
+    screen.press("Backspace Backspace");
+    assert!(screen.frame().contains("4 .NET · 3 TypeScript projects"), "{}", screen.frame());
+    screen.press("/ r a t e . c s Enter");
+    let frame = screen.frame();
+    assert!(frame.contains("Orders.Core · 2 namespaces · the graph of Orders.Core.Pricing"), "a file's: {frame}");
+    screen.press("g");
+    assert!(!screen.frame().contains("the graph of"), "g again: the level: {}", screen.frame());
+    screen.press("g Esc");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Code(_))), "Esc leaves the graph first");
+    screen.press("Backspace");
+
+    let small = screen.render(60, 30);
+    assert!(small.contains("╭────────────────────╮"), "too big for the room: a minimap: {small}");
+
+    let answer = agent(&mut screen, "dependencies", json!({ "part": "Orders.Core", "direction": "used_by" }), None);
+    let users = answer["result"]["usedBy"].as_array().cloned().unwrap_or_default();
+    let names: Vec<&str> = users.iter().filter_map(|user| user["name"].as_str()).collect();
+    assert!(names.contains(&"Orders.Api") && names.contains(&"Orders.Tests"), "{answer}");
+    assert_eq!(answer["result"]["parts"], json!(["Orders.Core.Pricing", "Orders.Core.Tax"]), "{answer}");
+    assert_eq!(answer["result"]["breaks"][0]["to"], "Shared.Kernel", "{answer}");
+    let ui = agent(&mut screen, "dependencies", json!({ "part": "ui" }), None);
+    assert_eq!(ui["result"]["linkedByNxAlone"], json!(["shop"]), "{ui}");
+    let file = agent(&mut screen, "dependencies", json!({ "part": "Rate.cs" }), None);
+    assert_eq!(file["result"]["name"], "Orders.Core.Pricing", "a file: its namespace: {file}");
+    let all = agent(&mut screen, "dependencies", json!({}), None);
+    assert_eq!(all["result"]["cycles"], json!([["ui", "data"]]), "{all}");
+    assert_eq!(all["result"]["apps"][0]["projects"], json!(["Orders.Api", "Orders.Core", "Shared.Kernel"]), "{all}");
+    assert_eq!(all["result"]["apps"][0]["shares"], json!({ "Shop": 1 }), "{all}");
+
+    screen.press("Esc K c");
+    let app = match &screen.ui.overlay {
+        Some(Overlay::Code(view)) => view.app.clone(),
+        _ => None,
+    };
+    assert!(app.is_some_and(|app| app == "orders"), "the Map's c: its app's projects");
+}
+
+#[tokio::test]
+async fn the_code_map_zooms_in_draws_its_edges_in_and_dims_what_focus_hides_before_hiding_it() {
+    let mut screen = screen("snap-code-motion", json!({}));
+    with_code(&mut screen);
+    screen.ui.motion.enabled = true;
+    screen.press("K Tab");
+    screen.frame();
+    screen.ui.now += Duration::from_secs(2);
+    let now = screen.ui.now;
+    if let Some(Overlay::Code(view)) = &mut screen.ui.overlay {
+        view.changed = now;
+    }
+    assert!(screen.frame().contains("│■ Orders│"), "zooming in, the boxes small: {}", screen.frame());
+    screen.ui.now += Duration::from_millis(900);
+    assert!(screen.frame().contains("│  ■ Orders"), "grown: {}", screen.frame());
+    screen.press("a");
+    assert!(!screen.frame().contains("─▶"), "the edges not drawn yet: {}", screen.frame());
+    screen.ui.now += Duration::from_millis(900);
+    assert!(screen.frame().contains("─▶"), "drawn in: {}", screen.frame());
+    screen.press("/ c o r e Enter f");
+    assert!(screen.frame().contains("▲ data"), "what focus hides, dimmed first: {}", screen.frame());
+    screen.ui.now += Duration::from_millis(900);
+    assert!(!screen.frame().contains("▲ data"), "then hidden: {}", screen.frame());
+}
+
 #[tokio::test]
 async fn k_maps_which_app_calls_which_with_the_last_minutes_figures() {
     use lazyrunner_core::run::calls::Call;
