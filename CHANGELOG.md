@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.74.0] - 2026-11-09
+
+### Added
+- A failure's likely cause. Each test run keeps what it ran on, so a failed test that passed in an earlier run says what changed in between - git's diff between the two runs' commits, and the files that differed on top of them. Under the failure (and the picked test, `l`), `LIKELY CAUSE · changed since it last passed (09:41)` lists the changed sources as links: those its stack goes through first, then those of its project and the ones it references (`Orders.Tests ← Orders.Core`, the look of the affected suites' why), then the rest. It's left out rather than guessed when the test never passed in the runs kept or a commit is gone. `y` copies it with the failure, and the MCP's `get_test_results` gives each failure its `likely_cause` (#34)
+
 ## [1.73.1] - 2026-11-06
 
 ### Fixed

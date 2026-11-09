@@ -420,7 +420,9 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
         let summaries: Vec<Value> = suites.iter().map(|suite| suite_summary(controller, suite)).collect();
         return Ok(json!({ "suites": summaries }));
     };
-    let suite = find_suite(suites, wanted)?;
+    let key = find_suite(suites, wanted)?.key.clone();
+    controller.causes_now(&key);
+    let Some(suite) = controller.suite(&key) else { return Err(("not_found", format!("no suite {key}"))) };
     let history = controller.test_history.suite(&suite.key);
     let first = |text: &str| text.lines().take(FAILURE_LINES).collect::<Vec<_>>().join("\n");
     let failures: Vec<Value> = suite
@@ -438,6 +440,7 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
                 "stack": first(&test.stack),
                 "new": story.new,
                 "flaky": flaky,
+                "likely_cause": likely_cause(controller, &key, &test.name),
             })
         })
         .collect();
@@ -468,6 +471,18 @@ fn suite_summary(controller: &Controller, suite: &Suite) -> Value {
         "affected": affected,
         "affected_why": why,
     })
+}
+
+/// What changed since a failed test last passed (#34): when that was, and each changed source with why it may be the
+/// cause, the most likely first; null when it never passed in the runs kept or git can't say.
+fn likely_cause(controller: &Controller, key: &str, test: &str) -> Value {
+    let Some(found) = controller.likely_cause(key, test) else { return Value::Null };
+    let files: Vec<Value> = found
+        .causes
+        .iter()
+        .map(|cause| json!({ "file": cause.file, "why": crate::screen::suite_cause::lead(&cause.lead) }))
+        .collect();
+    json!({ "since_passed_at": found.passed_at, "changed": files })
 }
 
 /// Whether what changed since a suite's last whole run affects it (#78), and why: each reason as

@@ -633,6 +633,14 @@ say why under its run cells - `AFFECTED BECAUSE`, then `Orders.Tests ← Orders.
 changed file, a link. It's looked at again a moment after a save, after a run, and every 10 s while the view is open.
 The MCP's `list_tests` marks each suite `affected` with its `affected_why`, and `run_tests` takes `affected: true`.
 
+**A failure's likely cause:** each run also keeps what it ran on, so a failed test that passed in an earlier run
+kept says what changed in between - git's diff between the two runs' commits, and the files that differed on top of
+them. Under the failure, `LIKELY CAUSE · changed since it last passed (09:41)` lists the changed sources, each a link:
+those its stack goes through first (`in its stack`), then those of its project and the ones it references
+(`Orders.Tests ← Orders.Core`), then the rest; a failure with no source changed says so (flaky?). It's left out when
+the test never passed in the runs kept, or a commit isn't in the checkout any more. `y` copies it with the failure, and
+the MCP's `get_test_results` gives each failure its `likely_cause`.
+
 **Test watch:** `a` watches the selected suites (a side or an app: all of its), `A` all of them; again unwatches. A watched suite (`◉`) runs again when its code is saved, once saving has been quiet for 400 ms: a green one whole, a red one its failed tests, then, if they pass, whole. .NET suites follow the profile's watch folder - only those a save affects: the saved file's project is theirs or one they reference (`<ProjectReference>`, directly or not), and the log says why (`Orders.Tests (references Orders.Core, which changed)`); a file no project owns, such as `Directory.Build.props`, runs them all. npm and Nx suites follow their own folder. A running suite is never cancelled - a save during its run runs it again after - and a suite runs at most every 1.5 s. The header and the panel show `◉ WATCH 2`, and while a save waits a capsule (`▰▰▰▱▱▱▱▱`) that drains over the 400 ms (`rerun in 0.3s` with reduced motion); a suite the watch queues gets one sweep across its row; `s` drops what a save was about to run but keeps the watch. For this session only: lazyrunner never runs tests by itself when it opens. For a new test, `l`, pick it, `a`: the suite watches only that test - a save runs just it - and its row says `pinned: <test>`; `a` on it again stops, `a` on the suite (or `A`) watches all of it again. A pinned test that's gone after a rename stops being watched, with a line in the log. A watched suite (or its pinned test) that turns red or green again gets a desktop notification - the change is what's worth one; a run that stays the same colour notifies nothing.
 
 `l` opens the selected suite's tests (the failed first, then the skipped and the passed) to pick one: `j` `k` choose,
@@ -682,7 +690,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_screen` | The screen as you see it, as text |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
-| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, and what a change affects; run all, a suite, its failed tests, one test or the affected suites |
+| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, each failure's likely cause, and what a change affects; run all, a suite, its failed tests, one test or the affected suites |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |

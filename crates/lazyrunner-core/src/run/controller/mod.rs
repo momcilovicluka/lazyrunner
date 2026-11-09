@@ -5,6 +5,7 @@
 
 mod audit;
 mod builds;
+mod causes;
 mod handover;
 mod hooks;
 mod impact;
@@ -46,6 +47,7 @@ use crate::output::Hue;
 use crate::paths::Paths;
 use crate::profile::{App, Project};
 
+pub use causes::LikelyCause;
 pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_handover};
 pub use launch::Choice;
 pub use migrations::{EfJob, Work};
@@ -205,6 +207,8 @@ pub struct Controller {
     tests_base: Option<Option<super::impact::Baseline>>,
     /// What changes affect (#78).
     impacts: impact::Impacts,
+    /// Failures' likely causes (#34).
+    causes: causes::Causes,
     /// The queued .NET suites' projects building, in one MSBuild run.
     pub test_build: Option<TestBuild>,
     /// The suites waiting to run, in order.
@@ -299,6 +303,7 @@ impl Controller {
             tests_code: None,
             tests_base: None,
             impacts: impact::Impacts::default(),
+            causes: causes::Causes::default(),
             test_build: None,
             test_queue: Vec::new(),
             tests_started: None,
@@ -593,6 +598,7 @@ impl Controller {
                 self.impact_soon(now);
             }
             Event::Impact(found) => self.impact_done(found),
+            Event::Causes { key, stamp, found } => self.causes_done(key, stamp, found),
             Event::Suites(found) => self.suites_found(found),
             Event::Audit { key, result } => self.audit_done(key, result),
             Event::AuditInstalled { key, result } => self.audit_installed(key, result),

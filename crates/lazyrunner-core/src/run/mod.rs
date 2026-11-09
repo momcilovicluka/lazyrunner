@@ -6,6 +6,7 @@
 pub mod app;
 pub mod audit;
 pub mod build;
+pub mod cause;
 pub mod checks;
 pub mod child;
 pub mod command;
@@ -87,6 +88,12 @@ pub enum Event {
     Suites(Vec<suites::Suite>),
     /// What changes affect, each suite's, looked at in the background (#78).
     Impact(std::collections::HashMap<String, impact::Impact>),
+    /// A suite's failures' likely causes, worked out in the background for its history then (#34).
+    Causes {
+        key: String,
+        stamp: String,
+        found: std::collections::HashMap<String, controller::LikelyCause>,
+    },
     /// An app's packages scanned for the audit view (#79), or why they couldn't be.
     Audit {
         key: String,

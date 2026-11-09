@@ -36,6 +36,19 @@ pub struct SuiteHistory {
     /// What its last whole run ran on: what changed since is what affects it (#78).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base: Option<super::impact::Baseline>,
+    /// What each run ran on (none outside git), oldest first; runs kept from before this was are missing at the
+    /// front: a failure's likely cause is what changed between the run it last passed in and the one it failed in.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bases: Vec<Option<super::impact::Baseline>>,
+}
+
+/// A failure's two runs: the last it failed in and the last before that it passed in, each with what it ran on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Turned<'a> {
+    pub passed: &'a super::impact::Baseline,
+    /// When the passing run finished (`2026-11-02 09:41:07`), when that's known.
+    pub passed_at: Option<&'a str>,
+    pub failed: &'a super::impact::Baseline,
 }
 
 /// What a test's history says about it now.
@@ -61,11 +74,20 @@ pub struct Tally {
 impl SuiteHistory {
     /// A run on `code` (none outside git) and its `results`; the tests it didn't run weren't in it.
     pub fn record(&mut self, code: Option<&str>, results: &[TestResult]) {
+        self.record_on(code, None, results);
+    }
+
+    /// [`Self::record`], with what the run ran on.
+    pub fn record_on(&mut self, code: Option<&str>, base: Option<&super::impact::Baseline>, results: &[TestResult]) {
         let column = self.runs.len();
         while self.at.len() < column {
             self.at.insert(0, String::new());
         }
+        while self.bases.len() < column {
+            self.bases.insert(0, None);
+        }
         self.at.push(chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+        self.bases.push(base.cloned());
         self.runs.push(code.unwrap_or_default().to_string());
         for test in results {
             let mark = match test.outcome {
@@ -84,11 +106,27 @@ impl SuiteHistory {
             let drop = self.runs.len() - RUNS_KEPT;
             self.runs.drain(..drop);
             self.at.drain(..drop.min(self.at.len()));
+            self.bases.drain(..drop.min(self.bases.len()));
             for line in self.tests.values_mut() {
                 *line = line.chars().skip(drop).collect();
             }
             self.tests.retain(|_, line| line.chars().any(|mark| mark != ABSENT));
         }
+    }
+
+    /// What run `run` (0 = the oldest kept) ran on, when that's known.
+    pub fn base_of(&self, run: usize) -> Option<&super::impact::Baseline> {
+        let missing = self.runs.len().saturating_sub(self.bases.len());
+        self.bases.get(run.checked_sub(missing)?)?.as_ref()
+    }
+
+    /// The last run a test failed in and the last before it that it passed in, both with what they ran on; `None`
+    /// when it never passed before, or when either run's code isn't known.
+    pub fn turned(&self, name: &str) -> Option<Turned<'_>> {
+        let marks: Vec<char> = self.line(name).chars().collect();
+        let failed = marks.iter().rposition(|mark| *mark == FAILED)?;
+        let passed = marks[..failed].iter().rposition(|mark| *mark == PASSED)?;
+        Some(Turned { passed: self.base_of(passed)?, passed_at: self.when(passed), failed: self.base_of(failed)? })
     }
 
     /// When run `run` (0 = the oldest kept) finished, when that's known.
@@ -183,7 +221,18 @@ impl TestHistory {
     }
 
     pub fn record(&mut self, key: &str, code: Option<&str>, results: &[TestResult]) {
-        self.0.entry(key.to_string()).or_default().record(code, results);
+        self.record_on(key, code, None, results);
+    }
+
+    /// [`Self::record`], with what the run ran on.
+    pub fn record_on(
+        &mut self,
+        key: &str,
+        code: Option<&str>,
+        base: Option<&super::impact::Baseline>,
+        results: &[TestResult],
+    ) {
+        self.0.entry(key.to_string()).or_default().record_on(code, base, results);
     }
 
     /// What a suite's whole run ran on (none outside git).
@@ -247,6 +296,28 @@ mod tests {
         history.record(Some("d"), &[result("Totals", Outcome::Passed)]);
         assert!(history.story("Totals").fixed);
         assert_eq!(history.line("Totals"), "pffp");
+    }
+
+    #[test]
+    fn a_failure_turned_red_between_the_last_run_it_passed_in_and_the_last_it_failed_in() {
+        use crate::run::impact::Baseline;
+        let base = |head: &str| Baseline { head: head.into(), ..Baseline::default() };
+        let mut history = SuiteHistory::default();
+        history.record(Some("a"), &[result("Totals", Outcome::Passed)]);
+        history.record_on(Some("b"), Some(&base("b")), &[result("Totals", Outcome::Failed)]);
+        assert_eq!(history.turned("Totals"), None, "the run it passed in was kept before its code was");
+        history.record_on(Some("c"), Some(&base("c")), &[result("Totals", Outcome::Passed)]);
+        history.record_on(Some("d"), Some(&base("d")), &[result("Other", Outcome::Passed)]);
+        history.record_on(Some("e"), Some(&base("e")), &[result("Totals", Outcome::Failed)]);
+        history.record_on(Some("f"), Some(&base("f")), &[result("Totals", Outcome::Skipped)]);
+        let turned = history.turned("Totals").expect("it passed, then failed");
+        assert_eq!((turned.passed.head.as_str(), turned.failed.head.as_str()), ("c", "e"));
+        assert!(turned.passed_at.is_some_and(|at| at.len() == 19));
+        for code in 0..RUNS_KEPT {
+            history.record_on(Some("g"), Some(&base(&code.to_string())), &[result("Totals", Outcome::Failed)]);
+        }
+        assert_eq!(history.bases.len(), RUNS_KEPT, "kept with the runs");
+        assert_eq!(history.turned("Totals"), None, "it never passed in the runs kept");
     }
 
     #[test]

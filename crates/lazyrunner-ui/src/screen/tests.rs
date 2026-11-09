@@ -1810,6 +1810,35 @@ async fn l_picks_a_test_of_the_suite_and_shows_its_message_and_stack() {
 }
 
 #[tokio::test]
+async fn a_failure_says_its_likely_cause_and_y_copies_it() {
+    use lazyrunner_core::run::cause::{Cause, Lead};
+    use lazyrunner_core::run::controller::LikelyCause;
+    let mut screen = screen("snap-tests-likely-cause", json!({}));
+    with_suites(&mut screen);
+    let chain = Lead::Chain(vec!["Orders.Tests".into(), "Orders.Core".into()]);
+    let causes = vec![
+        Cause { file: "src/Orders.Core/Tax.cs".into(), lead: Lead::Stack },
+        Cause { file: "src/Orders.Core/Pricing.cs".into(), lead: chain },
+        Cause { file: "src/Billing/Invoice.cs".into(), lead: Lead::Changed },
+    ];
+    let found = LikelyCause { passed_at: Some("2026-11-02 09:41:07".into()), causes };
+    let totals = "Orders.Tests.CartTests.Totals(2, 3)".to_string();
+    screen.controller.set_likely_causes("dotnet:orders", std::collections::HashMap::from([(totals, found)]));
+    screen.press("T");
+    let frame = screen.frame();
+    assert!(frame.contains("LIKELY CAUSE · changed since it last passed (11-02 09:41)"), "{frame}");
+    assert!(frame.contains("src/Orders.Core/Tax.cs  in its stack"), "the stack's file first: {frame}");
+    assert!(frame.contains("src/Orders.Core/Pricing.cs  Orders.Tests ← Orders.Core"), "{frame}");
+    insta::assert_snapshot!(frame);
+    screen.press("y");
+    let copied = copied().join("\n");
+    assert!(copied.contains("Likely cause (changed since it last passed at 2026-11-02 09:41:07):"), "{copied}");
+    assert!(copied.contains("src/Orders.Core/Tax.cs (in its stack)"), "{copied}");
+    screen.press("l");
+    assert!(screen.frame().contains("LIKELY CAUSE"), "the picked failure says it too: {}", screen.frame());
+}
+
+#[tokio::test]
 async fn a_test_name_too_long_for_the_picker_scrolls_instead_of_being_cut() {
     let mut screen = screen("tests-pick-scroll", json!({}));
     with_suites(&mut screen);
