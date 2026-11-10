@@ -277,7 +277,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let (selected, picking) = (*index, *picking);
     let list_width = (width / 3).clamp(LIST_WIDTH.0, LIST_WIDTH.1).min(width.saturating_sub(20));
     let detail_width = width.saturating_sub(list_width + 2);
-    let height = rows.saturating_sub(3);
+    let hint = if picking.is_some() {
+        " j k choose · m migrate to it (forward or back) · u apply pending · h back · Esc back"
+    } else {
+        " j k choose · l its migrations · r check it · R find and check all · u apply pending · U everywhere · Esc back"
+    };
+    let keys = super::viewbar::keys(hint, width);
+    let height = rows.saturating_sub(2 + keys.len());
     let jobs = &controller.migration_jobs;
     let working = match jobs.first() {
         Some(job) => {
@@ -303,15 +309,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         seg(working, C::Yellow),
         seg(format!("   {} at once (+ -)", controller.migration_parallelism()), C::DarkGray),
     ];
-    let hint = if picking.is_some() {
-        " j k choose · m migrate to it (forward or back) · u apply pending · h back · Esc back"
-    } else {
-        " j k choose · l its migrations · r check it · R find and check all · u apply pending · U everywhere · Esc back"
-    };
     let note =
         " dotnet ef uses each app's last build (b rebuilds it) and its Development settings - the database d picks";
-    let mut out =
-        vec![fit(header, width), super::viewbar::keys(ui, hint, width), fit(vec![seg(note, C::DarkGray)], width)];
+    let mut out = vec![fit(header, width)];
+    out.extend(keys);
+    out.push(fit(vec![seg(note, C::DarkGray)], width));
     let several_apps = all.iter().any(|context| all.first().is_some_and(|first| first.app != context.app));
     let list: Vec<Vec<Seg>> = all
         .iter()

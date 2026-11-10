@@ -3,13 +3,13 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
  ⇄ REQUESTS    requests  endpoints    4 shown · 1 error · avg 400 ms
- Tab requests/endpoints · j k choose · Enter details · e errors only · a app · s sort (time) · / filter · y co
+ Tab requests/endpoints · j k choose · Enter details · e errors only · a app · s sort (time) · / filter
+ y copy (curl…) · p send again · w open · o log · c clear · Esc back
  TIME      APP       METHOD STATUS      MS  PATH
  09:41:07  Orders    GET       200      10  /api/orders/43
  09:41:07  Billing   GET       500    1530  /api/invoices/7
  09:41:07  Orders    POST      201      48  /api/orders
  09:41:07  Orders    GET       200      12  /api/orders/42
-
 
 
 

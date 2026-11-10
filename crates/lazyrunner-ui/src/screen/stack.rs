@@ -537,15 +537,17 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let known = |key: &str| controller.app(key).is_some();
     let shown: Vec<calls::Edge> = edges.iter().filter(|edge| known(&edge.from) && known(&edge.to)).cloned().collect();
     let below = figures(controller, &shown, controller.apps.get(picked).map(|app| app.key.as_str()));
-    let map_rows = rows.saturating_sub(3 + below.len() + 1).max(3);
+    let hint = " h j k l choose an app · Enter its column · c its code · Tab the code map · Esc back";
+    let keys = super::viewbar::keys(hint, width);
+    let map_rows = rows.saturating_sub(2 + keys.len() + below.len() + 1).max(3);
     let mut dots = std::mem::take(&mut ui.stack_dots);
     let (model, map) = fitting(ui, controller, (picked, opened), &edges, (room, map_rows), &mut dots);
     ui.stack_dots = dots;
     let picked = picked.min(model.nodes.len().saturating_sub(1));
     let from = map.layout.boxes.get(picked).map_or(0, |at| (at.x + at.w + MARGIN).saturating_sub(room));
-    let hint = " h j k l choose an app · Enter its column · c its code · Tab the code map · Esc back";
-    let mut lines =
-        vec![header(ui, controller, &model.figures, width), super::viewbar::keys(ui, hint, width), Vec::new()];
+    let mut lines = vec![header(ui, controller, &model.figures, width)];
+    lines.extend(keys);
+    lines.push(Vec::new());
     for row in map.rows(from, room).into_iter().take(map_rows) {
         let mut line = vec![seg("  ", C::Gray)];
         line.extend(row);

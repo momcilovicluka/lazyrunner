@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.78.1] - 2026-11-10
+
+### Fixed
+- A view's keys - the stack and code maps', and every other full-screen view's - no longer scroll sideways when they don't fit: they wrap onto rows of their own between keys, so each key stays in one place and all of them show at a glance. The code map's notes and the lines under it (what the picked part uses, what uses it, its rules) wrap the same way instead of scrolling (#90, thanks @ognjen004028)
+
 ## [1.78.0] - 2026-11-10
 
 ### Added

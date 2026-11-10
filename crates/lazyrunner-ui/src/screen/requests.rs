@@ -558,7 +558,7 @@ fn cut(text: &str, cells: usize) -> String {
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let (cursor, nerd) = (ui.cursor(), ui.nerd);
     let Some(Overlay::Requests(view)) = &ui.overlay else { return Vec::new() };
-    let keys = super::viewbar::keys(ui, &hint(view, controller), width);
+    let keys = super::viewbar::keys(&hint(view, controller), width);
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return Vec::new() };
     let list = shown(view, controller);
     if !view.follow && view.selected != 0 {
@@ -567,8 +567,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
             view.index = at;
         }
     }
-    let height = rows.saturating_sub(4);
-    let mut out = vec![header(view, controller, &list, width, cursor, nerd), keys];
+    let height = rows.saturating_sub(3 + keys.len());
+    let mut out = vec![header(view, controller, &list, width, cursor, nerd)];
+    out.extend(keys);
     let least = if view.tab == Tab::Requests { REQUEST_FIXED } else { ENDPOINT_FIXED } + LIST_PATH;
     let side_width = (width * LIST_SHARE / 20).max(least);
     let side = view.details && width >= side_width + 2 + PANEL_MIN;

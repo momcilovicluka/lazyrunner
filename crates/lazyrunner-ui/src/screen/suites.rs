@@ -537,7 +537,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let picking = *picking;
     let list_width = (width * 2 / 5).clamp(LIST_WIDTH.0, LIST_WIDTH.1).min(width.saturating_sub(20));
     let detail_width = width.saturating_sub(list_width + 2);
-    let height = rows.saturating_sub(2);
+    let hint = hint(width, picking.is_some());
+    let height = rows.saturating_sub(1 + hint.len());
     let mut list = list(ui, controller, &list_rows, selected, list_width);
     // The project's last runs under the list, when there is room.
     let spare = height.saturating_sub(list.len() + 2);
@@ -566,8 +567,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         }
         _ => 0,
     };
-    let hint = hint(ui, width, picking.is_some());
-    let mut out = vec![aim(header(ui, controller, width), Target::Box), aim(hint, Target::Box)];
+    let mut out = vec![aim(header(ui, controller, width), Target::Box)];
+    out.extend(hint.into_iter().map(|row| aim(row, Target::Box)));
     for row in 0..height {
         let left = list.get(list_top + row).cloned().unwrap_or_default();
         let right = detail.get(detail_top + row).cloned().unwrap_or_default();
@@ -667,7 +668,7 @@ pub fn sweeping(ui: &Ui, controller: &Controller) -> bool {
     controller.test_watch.suites.iter().any(|key| sweep(ui, controller, key).is_some())
 }
 
-fn hint(ui: &Ui, width: usize, picking: bool) -> Vec<Seg> {
+fn hint(width: usize, picking: bool) -> Vec<Vec<Seg>> {
     let text = if picking {
         " j k choose a test · r run it · a watch only it · y copy it · f failed again · s stop · h back to the suites"
     } else {
@@ -675,7 +676,7 @@ fn hint(ui: &Ui, width: usize, picking: bool) -> Vec<Seg> {
          run the affected · l its tests · f / F failed again · Alt+f flaky again · [ ] a run · a / A watch · v all / \
          failed / flaky / affected · / filter · s stop · o log · y copy failures · Esc back"
     };
-    super::viewbar::keys(ui, text, width)
+    super::viewbar::keys(text, width)
 }
 
 /// Picking a test: the suite's tests on top (around the picked one), the picked test's message and stack below.

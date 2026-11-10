@@ -283,8 +283,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     if let Some(line) = table.get_mut(bar) {
         light(line);
     }
-    let body = rows.saturating_sub(3);
-    let mut out = vec![header(&all, ui.nerd), super::viewbar::keys(ui, KEYS, cells), Vec::new()];
+    let keys = super::viewbar::keys(KEYS, cells);
+    let body = rows.saturating_sub(2 + keys.len());
+    let mut out = vec![header(&all, ui.nerd)];
+    out.extend(keys);
+    out.push(Vec::new());
     if beside {
         let table = window(&table, row, body);
         let details = details(ui, kind, item, DETAIL_WIDTH, body, picked);

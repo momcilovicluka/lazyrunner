@@ -66,6 +66,63 @@ pub fn width(segs: &[Seg]) -> usize {
 }
 
 /// The first `cells` cells of `text`.
+/// `segs` on as many rows as they need (at most `most`), broken between words - each word in its segment's colour -
+/// the rows after the first indented by `indent` cells; past `most` the last row ends with `…`.
+pub fn wrap(segs: &[Seg], cells: usize, indent: usize, most: usize) -> Vec<Vec<Seg>> {
+    let mut rows: Vec<Vec<Seg>> = vec![Vec::new()];
+    let mut used = 0;
+    let pieces = segs.iter().flat_map(|part| words(&part.text).into_iter().map(move |word| (word, part)));
+    for (word, part) in pieces {
+        let needs = word.trim_end().width();
+        if used > 0 && used + needs > cells {
+            let mut row = Vec::new();
+            if indent > 0 {
+                row.push(Seg { text: " ".repeat(indent), ..part.clone() });
+            }
+            rows.push(row);
+            used = indent;
+        }
+        let word = if used == indent && rows.len() > 1 { word.trim_start().to_string() } else { word };
+        let word = if word.width() > cells.saturating_sub(used) && used <= indent {
+            take_cells(&word, cells.saturating_sub(used))
+        } else {
+            word
+        };
+        used += word.width();
+        if let Some(row) = rows.last_mut() {
+            row.push(Seg { text: word, ..part.clone() });
+        }
+    }
+    if rows.len() > most {
+        rows.truncate(most);
+        if let Some(row) = rows.last_mut() {
+            let text: String = row.iter().map(|part| part.text.as_str()).collect();
+            let kept = take_cells(&text, cells.saturating_sub(1));
+            let template = row.last().cloned().unwrap_or_else(|| seg("", C::Gray));
+            *row = vec![Seg { text: format!("{kept}…"), ..template }];
+        }
+    }
+    rows
+}
+
+/// A text's words, each with the spaces after it (the spaces before the first word with it).
+fn words(text: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut spaces = false;
+    for c in text.chars() {
+        if c != ' ' && spaces && !word.trim().is_empty() {
+            words.push(std::mem::take(&mut word));
+        }
+        spaces = c == ' ';
+        word.push(c);
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words
+}
+
 pub fn take_cells(text: &str, cells: usize) -> String {
     let mut out = String::new();
     let mut used = 0;

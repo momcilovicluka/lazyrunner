@@ -822,7 +822,7 @@ fn details(
 /// What the view draws: its rows but the selection bar, and on which row of the table it goes.
 struct Layout {
     header: Vec<Seg>,
-    keys: Vec<Seg>,
+    keys: Vec<Vec<Seg>>,
     titles: Vec<Seg>,
     left: Vec<Vec<Seg>>,
     /// The table as it shows, cut to its room.
@@ -865,7 +865,14 @@ fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> O
     let right = view_width.saturating_sub(list_width + 3);
     let beside = right >= BESIDE_FROM;
     let table_width = if beside { right.saturating_sub(DETAIL_WIDTH + 3) } else { right };
-    let height = rows.saturating_sub(3);
+    let keys = if *batch {
+        vec![batch_question(controller, app_at, view_width)]
+    } else if *confirm {
+        vec![question(controller, app_at, list.get(index).copied(), view_width)]
+    } else {
+        super::viewbar::keys(&hint(*packages, *only, *typing), view_width)
+    };
+    let height = rows.saturating_sub(2 + keys.len());
     let failed = controller.audit_install_failed().filter(|(key, ..)| *key == the_app.key);
     let look = Look {
         dim: moving(ui) && controller.auditing().contains(&the_app.key),
@@ -915,13 +922,6 @@ fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> O
     } else {
         packages_title
     };
-    let keys = if *batch {
-        batch_question(controller, app_at, view_width)
-    } else if *confirm {
-        question(controller, app_at, list.get(index).copied(), view_width)
-    } else {
-        super::viewbar::keys(ui, &hint(*packages, *only, *typing), view_width)
-    };
     Some(Layout {
         header: header(ui, controller),
         keys,
@@ -959,7 +959,9 @@ fn compose(drawn: Layout, view_width: usize) -> Vec<Vec<Seg>> {
     let mut pane_titles = fit(vec![seg(" APPS", C::DarkCyan)], list_width);
     pane_titles.push(seg(" │ ", C::DarkGray));
     pane_titles.extend(titles);
-    let mut out = vec![fit(header, view_width), fit(keys, view_width), fit(pane_titles, view_width)];
+    let mut out = vec![fit(header, view_width)];
+    out.extend(keys.into_iter().map(|row| fit(row, view_width)));
+    out.push(fit(pane_titles, view_width));
     for row in 0..height {
         let mut line = fit(left.get(row).cloned().unwrap_or_default(), list_width);
         line.push(seg(" │ ", C::DarkGray));
