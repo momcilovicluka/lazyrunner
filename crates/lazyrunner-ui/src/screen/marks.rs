@@ -100,7 +100,7 @@ pub fn jump(ui: &mut Ui, controller: &mut Controller, older: bool) {
 }
 
 /// Every column's marks: (app, line number), oldest first (one whose line is gone from the buffer first).
-fn all(controller: &Controller) -> Vec<(usize, u64)> {
+pub(crate) fn all(controller: &Controller) -> Vec<(usize, u64)> {
     let mut marks: Vec<(usize, u64)> = controller
         .states
         .iter()

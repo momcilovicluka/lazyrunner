@@ -111,6 +111,7 @@ impl Row {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Item {
     pub name: String,
     pub status: Status,

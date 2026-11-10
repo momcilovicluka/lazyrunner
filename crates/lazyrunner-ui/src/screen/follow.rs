@@ -1,8 +1,10 @@
-//! Follow mode (`F`): the screen follows an agent working over MCP - the column, the lines, the requests, the suite
-//! or the migrations it reads come into view, what it read outlined for a few seconds - while your keys rest (all but
-//! `F` and `Ctrl+C`; the mouse too). `F` again gives them back and puts the screen back as it was; the places the agent
-//! took you stay in the jump list (`Ctrl+O`). With `followAgent` (`, F`) an agent's call starts it - not again while
-//! that agent works, once you've taken the keys back.
+//! Follow mode (`F`): the screen follows an agent working over MCP - the column, the lines, the requests, the suite,
+//! the migrations, the stack or code map, the ports, the audit, the durations, the timeline, the start sheet or the
+//! marks it reads come into view, what it read outlined for a few seconds - while your keys rest (all but `F` and
+//! `Ctrl+C`; the mouse too). `F` again gives them back and puts the screen back as it was; the places the agent took
+//! you stay in the jump list (`Ctrl+O`); `F` once more follows again, on the screen the agent is at. With
+//! `followAgent` (`, F`, on by default) an agent's call starts it - not again while that agent works, once you've
+//! taken the keys back - and while the terminal is in the background, a notification says an agent is at work.
 
 use std::collections::{HashSet, VecDeque};
 use std::time::{Duration, Instant};
@@ -12,6 +14,7 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 use serde_json::Value;
 
+use super::actions::Run;
 use super::jumps::{self, Place};
 use super::motion::Spot;
 use super::requests::{self, Tab};
@@ -38,6 +41,10 @@ pub struct Follow {
     /// The keys were taken back while the agent worked: `followAgent` waits for it to go quiet.
     declined: bool,
     last_call: Option<Instant>,
+    /// The agent's last call - its op, arguments and answer: `F` follows again on its screen.
+    last: Option<(String, Value, Value)>,
+    /// A notification said an agent is at work while the terminal was in the background (again once it's been seen).
+    pub notified: bool,
 }
 
 /// F: follow the agent, or take the keys back - the screen back as it was.
@@ -52,6 +59,9 @@ pub fn toggle(ui: &mut Ui, controller: &mut Controller) {
         for (state, scroll) in controller.states.iter_mut().zip(scrolls) {
             state.scroll = scroll;
         }
+        if place.view.is_none() && !matches!(ui.overlay, Some(Overlay::Checklist(_))) {
+            ui.overlay = None; // a view the jump list doesn't keep (the stack map, the durations...)
+        }
         jumps::go(ui, controller, &place);
         ui.zoom = zoom;
     }
@@ -65,6 +75,33 @@ fn start(ui: &mut Ui, controller: &mut Controller) {
     ui.follow.from = Some((jumps::here(ui, controller), scrolls, ui.zoom));
     controller
         .add_log("Following the agent: the screen shows what it reads - F gives you the keys back.", Hue::Magenta);
+    // Where the agent is: its last call's screen.
+    if let Some((op, args, result)) = ui.follow.last.clone() {
+        let before = jumps::before(ui, controller);
+        let said = show(ui, controller, &op, &args, &result);
+        jumps::noticed(ui, controller, before);
+        if let Some(said) = said {
+            remember(ui, said);
+        }
+    }
+}
+
+/// A call in words, in the ticker.
+fn remember(ui: &mut Ui, said: String) {
+    ui.follow.ticker.push_back(said);
+    while ui.follow.ticker.len() > TICKER {
+        ui.follow.ticker.pop_front();
+    }
+}
+
+/// While the terminal is in the background (it said so), the first call of an agent at work says so in a
+/// notification - again once you've been back.
+fn notify_away(ui: &mut Ui, controller: &mut Controller, client: &str, what: String) {
+    if ui.terminal_focused != Some(false) || ui.follow.notified || !controller.setting(Toggle::FollowAgent) {
+        return;
+    }
+    ui.follow.notified = true;
+    controller.notifications.push((format!("{client} is working in lazyrunner"), what));
 }
 
 /// An agent's call, answered: following, the screen goes where it looked.
@@ -72,23 +109,36 @@ pub fn agent_call(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Val
     let now = ui.now;
     if ui.follow.last_call.is_none_or(|at| now.saturating_duration_since(at) > QUIET) {
         ui.follow.declined = false;
+        ui.follow.notified = false;
     }
     ui.follow.last_call = Some(now);
+    ui.follow.client = client.to_string();
+    ui.follow.last = Some((op.to_string(), args.clone(), result.clone()));
+    let what = result["doing"].as_str().map_or_else(|| op.replace('_', " "), str::to_string);
     if !ui.follow.on && !ui.follow.declined && controller.setting(Toggle::FollowAgent) && jumps::can_travel(ui) {
-        start(ui, controller);
-    }
-    if !ui.follow.on {
+        start(ui, controller); // on this call's screen
+        let said = ui.follow.ticker.back().cloned().unwrap_or(what);
+        notify_away(ui, controller, client, said);
         return;
     }
-    ui.follow.client = client.to_string();
+    if !ui.follow.on {
+        notify_away(ui, controller, client, what);
+        return;
+    }
     let before = jumps::before(ui, controller);
     let said = show(ui, controller, op, args, result);
     jumps::noticed(ui, controller, before);
+    notify_away(ui, controller, client, said.clone().unwrap_or(what));
     if let Some(said) = said {
-        ui.follow.ticker.push_back(said);
-        while ui.follow.ticker.len() > TICKER {
-            ui.follow.ticker.pop_front();
-        }
+        remember(ui, said);
+    }
+}
+
+/// Opens the view `kind` with its action - unless it's open already (an action that toggles would close it).
+fn open_view(ui: &mut Ui, controller: &mut Controller, kind: &str, run: Run) {
+    if ui.overlay.as_ref().map(|overlay| overlay.kind()) != Some(kind) {
+        ui.overlay = None;
+        super::keys::run(ui, controller, &run);
     }
 }
 
@@ -149,7 +199,59 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             }
             result["doing"].as_str().map(str::to_string)
         }
-        "status" => Some("looked at the status".to_string()),
+        "status" => {
+            close_view(ui);
+            Some("looked at the status".to_string())
+        }
+        "audit" => {
+            open_view(ui, controller, "audit", Run::Audit);
+            Some("read the audit".to_string())
+        }
+        "ports" => {
+            open_view(ui, controller, "ports", Run::Ports);
+            Some("read the port map".to_string())
+        }
+        "stack" => {
+            open_view(ui, controller, "stack", Run::Stack);
+            Some("read the stack map".to_string())
+        }
+        "dependencies" => {
+            let app = app_of(controller, &args["part"]).map(|app| controller.apps[app].key.clone());
+            ui.overlay = None;
+            super::code::open(ui, controller, app);
+            let part = args["part"].as_str().map_or(String::new(), |part| format!(" for {part}"));
+            Some(format!("read the code map{part}"))
+        }
+        "durations" => {
+            open_view(ui, controller, "durations", Run::Durations);
+            Some("read the durations".to_string())
+        }
+        "timeline" => {
+            open_view(ui, controller, "timeline", Run::Timeline);
+            Some(format!("read the timeline ({} lines)", result["shown"].as_u64().unwrap_or_default()))
+        }
+        "sheet" => {
+            let app = app_of(controller, &result["app"])?;
+            if ui.focus != app {
+                ui.overlay = None;
+                ui.focus = app;
+            }
+            open_view(ui, controller, "sheet", Run::Sheet);
+            Some(format!("read {}'s start sheet", controller.apps[app].name))
+        }
+        "checks" => Some(if result["running"].as_bool() == Some(true) {
+            "runs the startup checks".to_string()
+        } else {
+            "read the startup checks".to_string()
+        }),
+        "marks" => {
+            open_view(ui, controller, "marks", Run::Marks);
+            Some(format!("read your marks ({})", result["marks"].as_array().map_or(0, Vec::len)))
+        }
+        "changelog" => {
+            open_view(ui, controller, "changelog", Run::Changelog);
+            Some("read the changelog".to_string())
+        }
         _ => result["doing"].as_str().map(str::to_string),
     }
 }
@@ -159,8 +261,9 @@ fn app_of(controller: &Controller, wanted: &Value) -> Option<usize> {
     controller.apps.iter().position(|app| app.key.eq_ignore_ascii_case(wanted) || app.name.eq_ignore_ascii_case(wanted))
 }
 
+/// Back to the columns: any view the agent took you to closes (the checklist finishes by itself).
 fn close_view(ui: &mut Ui) {
-    if matches!(ui.overlay, Some(Overlay::Requests(_) | Overlay::Tests { .. } | Overlay::Migrations { .. })) {
+    if !matches!(ui.overlay, Some(Overlay::Checklist(_))) {
         ui.overlay = None;
     }
 }

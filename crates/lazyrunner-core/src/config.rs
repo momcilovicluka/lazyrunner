@@ -87,7 +87,6 @@ impl Toggle {
                 | Toggle::ReducedMotion
                 | Toggle::GitBeside
                 | Toggle::CheckMigrationsOnOpen
-                | Toggle::FollowAgent
         )
     }
 
@@ -233,6 +232,12 @@ pub fn write(path: &Path, value: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_agents_call_starts_follow_mode_unless_its_turned_off() {
+        assert!(Toggle::FollowAgent.default_on());
+        assert!(!Toggle::FollowAgent.read(&serde_json::json!({ "followAgent": false })));
+    }
 
     #[test]
     fn every_toggle_has_its_own_name_and_a_default() {

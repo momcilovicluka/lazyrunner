@@ -430,6 +430,8 @@ pub struct Ui {
     pub reduced_motion: bool,
     /// Whether the terminal has the focus, once it has said (focus reports): a notification is for when it hasn't.
     pub terminal_focused: Option<bool>,
+    /// The last startup checklist's results, and when it finished (for an agent's get_checks).
+    pub last_checks: Option<(Instant, Vec<checklist::Item>)>,
     /// The nerdIcons setting (`, i`), read at every frame: Nerd Font icons in the chrome.
     pub nerd: bool,
     /// The short effects that answer input: flashes, boxes opening, widths and scrolling gliding.
@@ -503,6 +505,7 @@ impl Ui {
             clipboard: copy::to_clipboard,
             reduced_motion: controller.setting(Toggle::ReducedMotion),
             terminal_focused: None,
+            last_checks: None,
             nerd: controller.setting(Toggle::NerdIcons),
             motion: motion::Motion::default(),
             replay: None,

@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.78.0] - 2026-11-10
+
+### Added
+- An agent can read every screen: new MCP tools `get_durations` (each build's, start's, install's, suite's and task's last runs and usual time), `get_timeline` (every app's output in the order it came, narrowed by app, words or errors), `get_start_sheet` (an app's command line and environment, secrets masked), `get_checks` (the startup checks, or `rerun` them), `get_marks` (the lines you marked for it) and `get_changelog`. Following an agent, each screen it reads opens - the stack map, the code map, the ports, the audit, the durations, the timeline, an app's start sheet, your marks and the changelog besides the columns, requests, tests and migrations - and `F` after taking the keys back follows again on the screen the agent is at
+- `followAgent` is on by default: an agent's call starts follow mode (`, F` turns it off). While the terminal is in the background - minimized, or behind another window - a desktop notification says an agent is at work and what it did, once until you've been back
+
 ## [1.77.0] - 2026-11-10
 
 ### Added

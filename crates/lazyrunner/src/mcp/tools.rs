@@ -304,6 +304,64 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "get_durations",
+            "The durations (D): how long builds, starts, npm ci and installs, test suites and tasks took - each \
+             item's last runs (when, seconds, whether it went fine), its usual time (the median of its good runs) and \
+             how the last compares. kind narrows them.",
+            json!({ "kind": { "type": "string", "description": "build, start, npm, test or task" } }),
+            &[],
+            true,
+        ),
+        tool(
+            "get_timeline",
+            "The timeline (~): every app's output in the order it came, each line after how long ago it came and its \
+             app - what happened across the stack around a moment (a request in one app, its error in another). \
+             app, grep and errors_only narrow it; count lines, the newest (100 by default, 500 at most).",
+            json!({
+                "app": { "type": "string" },
+                "grep": { "type": "string", "description": "Words a line holds (case doesn't matter)" },
+                "errors_only": { "type": "boolean" },
+                "count": { "type": "integer", "minimum": 1, "maximum": 500 },
+            }),
+            &[],
+            true,
+        ),
+        tool(
+            "get_start_sheet",
+            "An app's start sheet (x, e): what it's started with - its command line, its launch profile, or a command \
+             or compose app's profile fields - and its environment, each variable with where it comes from (the \
+             profile, the launch profile, this machine's overrides) and what it hides; secrets masked. Without app, \
+             the focused one.",
+            json!({ "app": { "type": "string" } }),
+            &[],
+            true,
+        ),
+        tool(
+            "get_checks",
+            "The startup checks: git, the SDKs and tools the apps need (with their versions), ports, the database, \
+             packages, the profile, the branch and the update - each ok, warn or fail with what it found, as the \
+             last checklist left them. rerun: true runs them again (the checklist opens); call again for the results.",
+            json!({ "rerun": { "type": "boolean" } }),
+            &[],
+            true,
+        ),
+        tool(
+            "get_marks",
+            "The lines the user marked in the columns (m; ' lists them), oldest first, each with its app and line \
+             number - what they want you to look at.",
+            json!({}),
+            &[],
+            true,
+        ),
+        tool(
+            "get_changelog",
+            "What the newest lazyrunner versions changed (count of them, 3 by default), and the version that runs - \
+             to know what lazyrunner can do.",
+            json!({ "count": { "type": "integer", "minimum": 1, "maximum": 20 } }),
+            &[],
+            true,
+        ),
+        tool(
             "check_migrations",
             "Checks one DbContext against the database (`context`), or finds them again and checks them all. \
              Then wait for migrations_checked.",

@@ -19,6 +19,7 @@ use crate::screen::Ui;
 use crate::screen::copy::{self, Pick};
 
 mod drive;
+mod views;
 
 /// The agent protocol this lazyrunner speaks; `lazyrunner mcp` sends it with every request.
 pub const PROTOCOL: u64 = 1;
@@ -72,6 +73,12 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
         "actions" => Ok(drive::actions(ui, controller)),
+        "durations" => Ok(views::durations(controller, args)),
+        "timeline" => views::timeline(ui, controller, args),
+        "sheet" => views::sheet(ui, controller, args),
+        "checks" => Ok(views::checks(ui, controller, args)),
+        "marks" => Ok(views::marks(controller)),
+        "changelog" => Ok(views::changelog(args)),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
         | "run_action" | "press_keys" | "switch_database" | "install_packages" | "apply_migrations"
         | "kill_port_holder" | "set_setting" | "run_task") => {
