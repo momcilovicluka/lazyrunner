@@ -794,6 +794,12 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
 | `get_stack` | The stack map: which app calls which (seen and declared), each edge's calls, p95 and failures over the last minute, the apps that use the database, and the newest failed calls |
 | `get_dependencies` | The code map: the apps and their projects, every project with how many it depends on and how many use it, the cycles and the links a rule doesn't allow; or for one app, project, namespace, folder, module, component or source file, what it depends on and what uses it, each with its depth and the way to it, its own parts, the rules it breaks and what only Nx links it to |
+| `get_durations` | The durations: builds, starts, installs, test suites and tasks - each one's last runs, its usual time and how the last compares |
+| `get_timeline` | The timeline: every app's output in the order it came, each line with how long ago and its app; one app, `grep`, errors only |
+| `get_start_sheet` | An app's start sheet: its command line (or launch profile, or profile fields) and its environment, each variable with where it comes from - secrets masked |
+| `get_checks` | The startup checks as the last checklist left them (tools and their versions, ports, database, packages, profile, branch, update); `rerun` runs them again |
+| `get_marks` | The lines you marked (`m`), each with its app and line number - what you want the agent to look at |
+| `get_changelog` | What the newest versions changed, and the version that runs |
 | `list_actions` | Everything lazyrunner can do: every action as the palette lists it (its key, whether it runs while an app builds, whether it needs `confirm`) and every setting with its state |
 | `run_action` | Any action by its key, on an app, as your key would |
 | `press_keys` | Keys as the key reference names them (`"g g"`, `"Ctrl+o"`, `"Esc"`), for what no tool covers; answers with the screen after. It waits while you type in a prompt |
@@ -804,11 +810,16 @@ switching the database, clearing the output, reopening lazyrunner, the git tool 
 `"confirm": true`, and the agent is told to ask you first.
 
 **Follow mode** (`F`) lets you watch it work: the screen goes where the agent looks - the column whose output it reads,
-scrolled to the lines it read; the requests view with its filters; the tests view on its suite; the migrations view -
-and outlines what it read for a few seconds. Your keys rest meanwhile (all but `F`, and `Ctrl+C`; the mouse too), the
-header says whom you follow, and the keys row tells its last calls in words. `F` again gives you the keys back and puts
-the screen back as it was; the places the agent took you stay in the jump list (`Ctrl+O`). With `followAgent` (`, F`)
-an agent's call starts following - not again while that agent works, once you've taken the keys back.
+scrolled to the lines it read; the requests view with its filters; the tests view on its suite; the migrations view;
+the stack map, the code map, the ports, the audit, the durations, the timeline, an app's start sheet, your marks or the
+changelog, whichever it reads - and outlines what it read for a few seconds. Your keys rest meanwhile (all but `F`, and
+`Ctrl+C`; the mouse too), the header says whom you follow, and the keys row tells its last calls in words. `F` again
+gives you the keys back and puts the screen back as it was; the places the agent took you stay in the jump list
+(`Ctrl+O`); `F` once more follows again, on the screen the agent is at. With `followAgent` (`, F`, on by default) an
+agent's call starts following - not again while that agent works, once you've taken the keys back - and while the
+terminal is in the background (minimized, or behind another window: the terminal says when it loses the focus), a
+desktop notification says the agent is at work and what it did first; once you've been back, the next time you're
+away says so again.
 
 It asks from anywhere, but acts only in the checkout lazyrunner runs (or a folder in it): an agent working in another
 worktree is told to have you open lazyrunner there. Its actions follow the keys' rules while an app builds. Applying
@@ -1034,7 +1045,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `nerdIcons` | `true` | Nerd Font icons in the chrome; for a terminal whose font is a Nerd Font (a "Mono" one) |
 | `checkMigrationsOnOpen` | `false` | `M` checks every DbContext against the database when it opens, and again after a database or branch switch |
 | `linksOnAltClick` | `true` | Links in the output open on Alt+click (Ctrl+click too, where the terminal allows); off, on a plain click |
-| `followAgent` | `false` | An agent's call over MCP starts follow mode (`F`): the screen shows what it reads, your keys rest until `F` |
+| `followAgent` | `true` | An agent's call over MCP starts follow mode (`F`): the screen shows what it reads, your keys rest until `F`; while the terminal is in the background a notification says an agent is at work |
 | `spinner` | lazyrunner's | What spins while something runs, as lazygit's `gui.spinner`: `{ "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` - texts of up to 8 cells, and milliseconds a frame (16 to 2000; 100 left out) |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |

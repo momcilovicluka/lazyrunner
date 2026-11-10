@@ -487,7 +487,7 @@ fn masked(var: &Var) -> String {
 }
 
 /// y: the sheet as text, the secrets masked.
-fn copied(controller: &Controller, app: usize) -> String {
+pub(crate) fn copied(controller: &Controller, app: usize) -> String {
     let lines: Vec<String> = build(controller, app, false)
         .into_iter()
         .flat_map(|row| match row {

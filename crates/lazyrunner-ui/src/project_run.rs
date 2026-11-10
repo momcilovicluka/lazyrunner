@@ -162,7 +162,10 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                     dirty = true;
                     urgent = true;
                 }
-                Some(Ok(Event::FocusGained)) => ui.terminal_focused = Some(true),
+                Some(Ok(Event::FocusGained)) => {
+                    ui.terminal_focused = Some(true);
+                    ui.follow.notified = false; // you've seen it: a later call while you're away says so again
+                }
                 Some(Ok(Event::FocusLost)) => ui.terminal_focused = Some(false),
                 Some(Ok(Event::Resize(..))) => {
                     dirty = true;
@@ -427,6 +430,7 @@ fn update_checklist(ui: &mut Ui, controller: &mut Controller, still_checking: &m
         return;
     }
     let Some(Overlay::Checklist(checklist)) = ui.overlay.take() else { return };
+    ui.last_checks = Some((ui.now, checklist.items.clone()));
     let (manual, start_after, updated_to) = (checklist.manual, checklist.start_after, checklist.updated_to.clone());
     if let Some(still) = checklist.still_checking() {
         *still_checking = Some(still); // a checklist opened by hand (, r) never has one: keeps the startup's

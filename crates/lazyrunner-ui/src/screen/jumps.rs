@@ -25,7 +25,7 @@ pub enum View {
 /// Where you are: the view open (none: the columns), the focused column, and its bottom line (none: following).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Place {
-    view: Option<View>,
+    pub(super) view: Option<View>,
     app: usize,
     line: Option<u64>,
 }

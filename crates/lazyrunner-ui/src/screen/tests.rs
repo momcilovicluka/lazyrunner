@@ -102,6 +102,9 @@ fn screen(label: &str, config: Value) -> Screen {
     if config.get("nerdIcons").is_none() {
         config["nerdIcons"] = json!(false);
     }
+    if config.get("followAgent").is_none() {
+        config["followAgent"] = json!(false);
+    }
     lazyrunner_core::config::write(&paths.config_file, &config).unwrap();
     let project = import(&sample_profile(), &paths.profiles).unwrap();
     let (events, rx) = mpsc::unbounded_channel();
@@ -4087,4 +4090,110 @@ async fn an_app_without_a_port_thats_up_is_running_not_a_watch_build() {
     (state.status, state.generation, state.up_generation, state.up_after) = (Status::Running, 1, Some(1), Some(2.0));
     let frame = screen.frame();
     assert!(frame.contains("● running") && !frame.contains("built, watching"), "{frame}");
+}
+
+#[tokio::test]
+async fn an_agent_reads_the_durations_the_timeline_a_start_sheet_the_checks_the_marks_and_the_changelog() {
+    use lazyrunner_core::run::history::Kind;
+    let mut screen = screen("agent-views", json!({}));
+    for seconds in [20.0, 22.0, 30.0] {
+        screen.controller.durations.add(Kind::Build, "orders", "Orders", seconds, true);
+    }
+    let durations = agent(&mut screen, "durations", json!({ "kind": "build" }), None);
+    let item = &durations["result"]["kinds"][0]["items"][0];
+    assert_eq!(
+        (item["key"].as_str(), item["runs"][0]["seconds"].as_f64()),
+        (Some("orders"), Some(30.0)),
+        "{durations}"
+    );
+    assert_eq!(item["usual_seconds"], 22.0, "the median of its good runs");
+
+    let at = screen.ui.now - Duration::from_secs(4);
+    screen.controller.states[0].add_line("orders started", Hue::Gray, at - Duration::from_secs(2));
+    screen.controller.states[1].add_line("billing failed: no database", Hue::Red, at);
+    let timeline = agent(&mut screen, "timeline", json!({}), None);
+    let text = timeline["result"]["text"].as_str().unwrap_or_default().to_string();
+    let (orders, billing) = (text.find("orders | orders started"), text.find("billing | billing failed"));
+    assert!(orders.is_some() && billing.is_some() && orders < billing, "in the order it came: {text}");
+    let errors = agent(&mut screen, "timeline", json!({ "errors_only": true }), None);
+    assert_eq!(errors["result"]["shown"], 1, "{errors}");
+
+    let sheet = agent(&mut screen, "sheet", json!({ "app": "Orders" }), None);
+    let sheet = sheet["result"]["text"].as_str().unwrap_or_default().to_string();
+    assert!(sheet.contains("Command line") && sheet.contains("--launch-profile"), "{sheet}");
+
+    let none = agent(&mut screen, "checks", json!({}), None);
+    assert!(none["result"]["hint"].as_str().is_some_and(|hint| hint.contains("rerun")), "{none}");
+    let item = crate::screen::checklist::Item {
+        name: "git".into(),
+        status: lazyrunner_core::run::checks::Status::Ok,
+        detail: "2.47.1".into(),
+    };
+    screen.ui.last_checks = Some((screen.ui.now, vec![item]));
+    let checks = agent(&mut screen, "checks", json!({}), None);
+    assert_eq!(
+        (checks["result"]["checks"][0]["status"].as_str(), checks["result"]["running"].as_bool()),
+        (Some("ok"), Some(false))
+    );
+
+    let number = screen.controller.states[1].output.total();
+    screen.controller.states[1].marks.push(number);
+    let marks = agent(&mut screen, "marks", json!({}), None);
+    assert_eq!(marks["result"]["marks"][0]["text"], "billing failed: no database", "{marks}");
+
+    let changelog = agent(&mut screen, "changelog", json!({ "count": 1 }), None);
+    assert_eq!(changelog["result"]["running"], lazyrunner_core::changelog::VERSION);
+    assert_eq!(changelog["result"]["entries"].as_array().map(Vec::len), Some(1));
+}
+
+#[tokio::test]
+async fn following_each_screen_the_agent_reads_opens_and_f_follows_again_on_the_agents_screen() {
+    let mut screen = screen("follow-screens", json!({ "followAgent": true }));
+    screen.controller.durations.add(lazyrunner_core::run::history::Kind::Build, "orders", "Orders", 21.0, true);
+    let kind = |screen: &Screen| screen.ui.overlay.as_ref().map(|overlay| overlay.kind());
+    for (op, args, view) in [
+        ("stack", json!({}), "stack"),
+        ("ports", json!({}), "ports"),
+        ("audit", json!({}), "audit"),
+        ("durations", json!({}), "durations"),
+        ("timeline", json!({}), "timeline"),
+        ("marks", json!({}), "marks"),
+        ("changelog", json!({}), "changelog"),
+        ("sheet", json!({ "app": "Billing" }), "sheet"),
+    ] {
+        let answer = agent(&mut screen, op, args, None);
+        assert_eq!(answer["ok"], true, "{op}: {answer}");
+        assert_eq!(kind(&screen), Some(view), "{op} opens its screen");
+    }
+    assert_eq!(screen.ui.focus, 1, "the sheet of the app it read");
+    agent(&mut screen, "durations", json!({}), None);
+    agent(&mut screen, "durations", json!({}), None);
+    assert_eq!(kind(&screen), Some("durations"), "read twice: still open");
+    agent(&mut screen, "status", json!({}), None);
+    assert_eq!(kind(&screen), None, "the status: the columns");
+
+    agent(&mut screen, "stack", json!({}), None);
+    screen.press("F");
+    assert!(!screen.ui.follow.on && kind(&screen).is_none(), "the keys back, the screen as it was");
+    screen.press("F");
+    assert!(screen.ui.follow.on && kind(&screen) == Some("stack"), "following again, on the agent's screen");
+}
+
+#[tokio::test]
+async fn an_agent_at_work_while_the_terminal_is_in_the_background_says_so_once() {
+    let mut screen = screen("follow-away", json!({ "followAgent": true }));
+    let said = |screen: &Screen| {
+        screen.controller.notifications.iter().filter(|(title, _)| title.contains("is working in lazyrunner")).count()
+    };
+    agent(&mut screen, "status", json!({}), None);
+    assert_eq!(said(&screen), 0, "you're there (or the terminal can't say)");
+    screen.ui.terminal_focused = Some(false);
+    agent(&mut screen, "stack", json!({}), None);
+    agent(&mut screen, "ports", json!({}), None);
+    assert_eq!(said(&screen), 1, "once while you're away");
+    let (title, what) = screen.controller.notifications.last().cloned().unwrap_or_default();
+    assert!(title.starts_with("claude-code") && what == "read the stack map", "{title}: {what}");
+    screen.ui.follow.notified = false; // you came back (FocusGained)
+    agent(&mut screen, "durations", json!({}), None);
+    assert_eq!(said(&screen), 2, "away again: said again");
 }
