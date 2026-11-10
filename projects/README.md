@@ -92,7 +92,9 @@ What a project is for lazyrunner: the file that marks its repo, the folder whose
 | `detect` | object |  | How lazyrunner recognises the repo. Required, except in a repo's .lazyrunner.json (that file marks the repo). |
 | `detect.anyFile` | array of paths | yes | A file only this project's repo has, relative to its root. lazyrunner looks for it upward from the current folder. One file for now. Example: `["Shop.sln"]`. |
 | `watch` | array of paths | yes | The folder whose changes need a rebuild of the .NET apps (unchanged builds are skipped; restart on code change). One folder for now. Example: `["services"]`. |
-| `apps` | array | yes | The apps lazyrunner runs, left to right as its columns: .NET apps and npm apps (the tables below). |
+| `apps` | array | yes | The apps lazyrunner runs, left to right as its columns: .NET apps, npm apps and command apps (the tables below). |
+| `tasks` | array of objects |  | Optional. One-off commands run from the palette or by an agent (the task table below). Example: `[{"key":"seed","name":"Seed the database","run":"python seed.py"}]`. |
+| `presets` | object |  | Optional. This profile's own presets, by name: a command app's "preset" finds them before yours and lazyrunner's (the preset table below). Example: `{"fastapi":{"run":"uvicorn main:app --port {port}","install":"uv sync"}}`. |
 | `layers` | object |  | Optional. Rules for the code map (K, then Tab): each key a project's name (* for anything, e.g. *.Api), and the projects it must not reference - a link that does is marked as a rule break. Nx's module boundaries (.eslintrc.json's depConstraints) are read as well. Example: `{"Orders.Core":{"mustNotReference":["Orders.Api"]}}`. |
 
 #### A .NET app ("type": "dotnet")
@@ -160,6 +162,98 @@ The script builds and keeps watching, and a .NET app serves the output. The app 
 | `ready` | object | yes | When the build is done. |
 | `ready.file` | path | yes | A file the build writes, relative to dir: the app is ready once it is newer than the start. Example: `"dist/index.html"`. |
 
+#### A command app ("type": "command")
+
+Any long-running command - a Python, Go or Rust service, a queue emulator, a script - with what .NET and npm apps get, each optional: a build before it starts, an install (i), when it counts as up, what counts as its code (restart on code change), and what its errors and stack frames look like. Stopping takes its whole process tree down.
+
+| Field | Type | Required | What it does |
+|---|---|---|---|
+| `key` | app key | yes | Short name, unique in the profile. Example: `"pricing"`. |
+| `name` | string | yes | The column's title. Example: `"Pricing"`. |
+| `icon` | character |  | One character before the app's name in its title bar. Default: `■`. Example: `"◆"`. |
+| `nerdIcon` | character |  | Optional. Its icon in the title bar when Nerd Font icons are on (nerdIcons): one Nerd Font character. Without it .NET's, or the framework's in package.json (Angular, React, Vue) else Node.js's, as a JSON escape (\uf0ac, a globe) or the character itself. |
+| `type` | `"command"` | yes | The app type: what lazyrunner does with the app follows from it. |
+| `run` | text or list |  | The long-running command; required unless its preset knows it for this folder. Example: `"uvicorn main:app --port {port}"`. |
+| `preset` | string |  | Optional. A preset that fills in each field this app leaves out - by what's in its folder: python (its install by uv.lock or requirements.txt, its .venv on PATH, its errors and stack frames, *.py as its code), go (go mod download, go build, go run . by a main.go) or rust (cargo build, cargo run by a src/main.rs). Example: `"python"`. |
+| `path` | array of strings |  | Optional. Folders from cwd (or from your home folder, starting ~/) put first on PATH when they exist, and where its programs are looked for first (a .venv's Scripts, ~/.cargo/bin). Example: `[".venv/Scripts",".venv/bin"]`. |
+| `tools` | array of strings |  | Optional. Programs the startup checklist shows with their versions. Example: `["python","uv"]`. |
+| `cwd` | path |  | Optional. Where it runs, from the repo root (the root without it). Example: `"services/pricing"`. |
+| `port` | integer |  | Optional. Its port: {port} in run, build, install and env is replaced with it, and the ports view (P) and port conflicts see it. Without ready it is up once the port listens. Example: `8000`. |
+| `build` | text or list |  | Optional. Runs before it starts and on b, one build at a time; skipped when nothing in cwd changed since its last good build (as git sees the folder). Example: `"cargo build"`. |
+| `install` | text or list |  | Optional. Installs its packages, as npm ci does an npm app's: i runs it. Example: `"uv sync"`. |
+| `setup` |  |  | Optional. Runs before i's install while none of its own path folders is there - it makes them ([] for none). Example: `"python -m venv .venv"`. |
+| `installFrom` | array of strings |  | Optional. The files its install installs from, from cwd: when they change since lazyrunner's last install, the startup checklist and the panel say it's due. Example: `["uv.lock","pyproject.toml"]`. |
+| `ready` | object |  | Optional. When it counts as up: one of port, line or http. Without it, once its port listens - or once it has started, when it has no port. |
+| `ready.port` | integer |  | Up once this port listens. Example: `8000`. |
+| `ready.line` | string |  | Up once a line of its output matches this regular expression. Example: `"Uvicorn running on"`. |
+| `ready.orPort` | boolean |  | With line: up once the line shows or its port listens, whichever comes first. |
+| `ready.http` | string |  | Up once this path on its port answers with a 2xx (it needs port). Example: `"/health"`. |
+| `watch` | array of strings |  | Optional. Globs of its code, from cwd (** any folders, * and ? within a name): with restart on code change, saving one restarts it - built first when it builds. .git, .venv, venv, node_modules, target, __pycache__, bin, obj, dist and build are never watched. Example: `["**/*.py"]`. |
+| `errors` | array of strings |  | Optional. Regular expressions of an error line: shown red and counted as an error (the title flashes). Example: `["^ERROR","Traceback"]`. |
+| `warnings` | array of strings |  | Optional. Regular expressions of a warning line: shown yellow and counted as a warning. Example: `["^WARNING"]`. |
+| `frames` | string |  | Optional. A regular expression of a stack frame with (?P<file>...) and (?P<line>...) groups, and (?P<col>...) when it says: the file becomes a link that opens the editor at its line. Example: `"File \"(?P<file>[^\"]+)\", line (?P<line>\\d+)"`. |
+| `env` | object |  | Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them); {port} in a value is its port, {cwd} its folder. Example: `{"APP_ENV":"dev"}`. |
+| `dependsOn` | array of app keys |  | Optional. The apps it calls, by key: the stack map (K) draws these edges dashed. Example: `["orders"]`. |
+
+#### A compose app ("type": "compose")
+
+Docker Compose services as one app: starting it runs docker compose up for them, its column shows their output and its title each one's state (● up, ◌ starting, ✗ down, ✓ done), and it is up once each runs - healthy, when it has a healthcheck. Stopping it stops them (docker compose stop); the startup checklist says whether Docker is running. The ports are Docker's: a compose app has none of its own.
+
+| Field | Type | Required | What it does |
+|---|---|---|---|
+| `key` | app key | yes | Short name, unique in the profile. Example: `"services"`. |
+| `name` | string | yes | The column's title. Example: `"Services"`. |
+| `icon` | character |  | One character before the app's name in its title bar. Default: `■`. Example: `"◆"`. |
+| `nerdIcon` | character |  | Optional. Its icon in the title bar when Nerd Font icons are on (nerdIcons): one Nerd Font character. Without it .NET's, or the framework's in package.json (Angular, React, Vue) else Node.js's, as a JSON escape (\uf0ac, a globe) or the character itself. |
+| `type` | `"compose"` | yes | The app type: what lazyrunner does with the app follows from it. |
+| `file` | path |  | Optional. The compose file, from cwd; without it Docker's own (compose.yaml, docker-compose.yml, with its override file). Example: `"docker-compose.dev.yml"`. |
+| `cwd` | path |  | Optional. The folder of the compose file, from the repo root (the root without it). Example: `"ops"`. |
+| `services` | array of strings |  | Optional. The services it runs; all of the file's without it. Example: `["db","redis"]`. |
+| `env` | object |  | Optional. Environment variables docker compose gets on top of lazyrunner's own: the compose file's ${VARIABLES}. Example: `{"DB_PORT":"5433"}`. |
+| `dependsOn` | array of app keys |  | Optional. The apps it calls, by key: the stack map (K) draws these edges dashed. Example: `["orders"]`. |
+
+#### A preset ("presets")
+
+What a language needs to run as a command app ("preset" names it): each field the app leaves out comes from the first of the preset's options that holds in the app's folder and has it, else from the preset (env merged, the app's own on top). lazyrunner's own are in projects/presets (python, go, rust); a presets folder beside your profiles and a profile's "presets" add to them or replace them.
+
+| Field | Type | Required | What it does |
+|---|---|---|---|
+| `id` | string |  | Its name, as "preset" says it (a profile's own presets go by their key). Example: `"python"`. |
+| `name` | string |  | The language, in messages. Example: `"Python"`. |
+| `nerdIcon` | character |  | Optional. Its icon in the title bar when Nerd Font icons are on (nerdIcons): one Nerd Font character. Without it .NET's, or the framework's in package.json (Angular, React, Vue) else Node.js's, as a JSON escape (\uf0ac, a globe) or the character itself. |
+| `detect` | object |  | Optional. The files that mark a folder as this language's: profile check suggests the preset for a command app there, and profile init adds one. |
+| `detect.anyFile` | array of strings |  | Example: `["pyproject.toml"]`. |
+| `tools` | array of strings |  | Optional. Programs the startup checklist shows with their versions. Example: `["python","uv"]`. |
+| `path` | array of strings |  | Optional. Folders from the app's cwd put first on PATH when they exist, and where its programs are looked for first. Example: `[".venv/Scripts",".venv/bin"]`. |
+| `env` | object |  | Optional. Variables for the app, under its own; {cwd} is its folder, {port} its port. Example: `{"PYTHONUNBUFFERED":"1"}`. |
+| `run` | text or list |  | Optional. What runs it. |
+| `build` | text or list |  | Optional. Its build. |
+| `install` | text or list |  | Optional. Its install. |
+| `setup` |  |  | Optional. What makes its path folder before its first install. |
+| `installFrom` | array of strings |  | Optional. The files its install installs from. |
+| `ready` | object |  | Optional. When it counts as up, as a command app's ready. |
+| `ready.port` | integer |  | Up once this port listens. |
+| `ready.line` | string |  | Up once a line of its output matches this regular expression. |
+| `ready.orPort` | boolean |  | With line: or once its port listens. |
+| `ready.http` | string |  | Up once this path on its port answers with a 2xx. |
+| `watch` | array of strings |  | Optional. Globs of its code. Example: `["**/*.py"]`. |
+| `errors` | array of strings |  | Optional. Regular expressions of an error line. |
+| `warnings` | array of strings |  | Optional. Regular expressions of a warning line. |
+| `frames` | string |  | Optional. A regular expression of a stack frame, with file and line groups. |
+| `options` | array of objects |  | Optional. What depends on the folder: each option's fields apply when its when holds - one of its anyFile in the app's folder, its program on PATH - the first option with a field winning over the later ones and the preset's own. Example: `[{"when":{"anyFile":["uv.lock"]},"install":"uv sync"}]`. |
+
+#### A task ("tasks")
+
+A one-off command run from the palette (: then its name) or by an agent (run_task) - seed the database, regenerate a client - in the background, beside the apps. Its output goes to the panel's log between a rule with its name and its result: how long it took against its usual time, and its first error line when it failed.
+
+| Field | Type | Required | What it does |
+|---|---|---|---|
+| `key` | app key | yes | Short name, unique among the tasks. Example: `"seed"`. |
+| `name` | string | yes | What the palette calls it. Example: `"Seed the database"`. |
+| `run` | text or list | yes | The command, as a command app's run. Example: `"python seed.py"`. |
+| `cwd` | path |  | Optional. Where it runs, from the repo root (the root without it). Example: `"tools"`. |
+| `env` | object |  | Optional. Variables it gets on top of lazyrunner's own; {cwd} is its folder. Example: `{"SEED":"demo"}`. |
+
 <!-- end of reference -->
 
 ## Recipes
@@ -195,6 +289,49 @@ in `package.json` runs. A branch that adds a `dev:mock` script gets the mock set
 
 When a branch switch needs another variant, lazyrunner restarts the app; otherwise npm's own watcher picks up the change.
 
+**Any other command.** A Python, Go or Rust service, a queue emulator, a script: a `command` app with its `run`, and
+as much as it needs of the rest - a `port` (`{port}` in its commands and env), a `build` before it starts, an
+`install` for `i`, when it's `ready`, the `watch` globs of its code, and patterns for its `errors`, `warnings` and
+stack `frames`:
+
+```json
+{ "key": "pricing", "name": "Pricing", "type": "command", "cwd": "services/pricing",
+  "run": "uvicorn main:app --port {port}", "port": 8000, "install": "uv sync",
+  "ready": { "line": "Uvicorn running on" }, "watch": ["**/*.py"] }
+```
+
+**A Python service.** A command app with `"preset": "python"`: the preset fills in what it leaves out by what's in
+its folder - `uv sync` or `pip install -r requirements.txt` for `i`, its `.venv` first on PATH, `*.py` as its code,
+its tracebacks as errors and their frames as links, and a run for Django (`manage.py`), `main.py` or `app.py`:
+
+```json
+{ "key": "pricing", "name": "Pricing", "type": "command", "preset": "python", "cwd": "services/pricing",
+  "run": "uvicorn main:app --port {port}", "port": 8000 }
+```
+
+**A one-off command.** Seeding the database, regenerating a client: a task, run from the palette (`:` then its name)
+with its output in the panel's log and its result, or by an agent (`run_task`):
+
+```json
+"tasks": [{ "key": "seed", "name": "Seed the database", "run": "python seed.py", "cwd": "tools" }]
+```
+
+**A Go or Rust service.** `"preset": "go"` (`go mod download`, `go build ./...` before a start, `go run .` where
+there's a `main.go`) or `"preset": "rust"` (`cargo build`, `cargo run` where there's a `src/main.rs`); either way
+with its errors coloured, its frames as links and its code watched. Give it a `run` when it isn't the folder's main
+(`["go", "run", "./cmd/api"]`, `"cargo run -p api"`).
+
+**Your own preset.** A preset is the fields it fills in, plus `options` for what depends on the folder (the first
+whose `when` holds - a file there, a program on PATH - wins). Put one in a `presets` folder beside your profiles
+(`presets/go.json`), or in a profile's `"presets"` (the preset table below):
+
+```json
+"presets": {
+  "go": { "build": "go build ./...", "watch": ["**/*.go"], "errors": ["^panic:", "level=error"],
+          "options": [{ "when": { "anyFile": ["go.mod"] }, "install": "go mod download" }] }
+}
+```
+
 **A team's changes to a profile.** A `.lazyrunner.json` with `extends` (see "Where lazyrunner looks") renames, adds or
 changes apps without copying the whole profile.
 
@@ -207,8 +344,7 @@ changes apps without copying the whole profile.
 `enabled: false` leaves the app out (no column); `"frontend": false` does that for every npm app. `includeInAll:
 false` keeps it running on Stop all / Restart all; npm apps follow `stopFrontendOnStop` (`,` then `s`) unless set.
 
-**Not yet:** extra arguments or environment for an app, toggles, migrations, tests, hooks before and after start,
-and app types other than `dotnet` and `npm`.
+**Not yet:** toggles, hooks before and after start, and migrations or tests for a command app.
 
 ## Writing a profile for a repo
 
@@ -289,7 +425,7 @@ A broken profile also stops `lazyrunner` itself, with the same messages.
 ## Limits for now
 
 - one marker file in `detect.anyFile`, one folder in `watch`
-- app types are `dotnet` and `npm` (what each does is in `lib\apptypes.ps1`)
+- app types are `dotnet`, `npm` and `command` (what each does is in `crates/lazyrunner-core/src/apptypes.rs`)
 - the apps are columns side by side, focused with 1-9
 - a watch build's page (`w`) opens at the root of the app that serves it; there is no field for a path under it
 

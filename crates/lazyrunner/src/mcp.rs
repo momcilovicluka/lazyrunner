@@ -32,7 +32,7 @@ const WAIT_DEFAULT_SECS: u64 = 120;
 const WAIT_MAX_SECS: u64 = 600;
 /// What a tool answers at most; more is cut, with a note to ask for less.
 const MAX_ANSWER_CHARS: usize = 60_000;
-const WAITS: [&str; 4] = ["ready", "build_done", "tests_done", "migrations_checked"];
+const WAITS: [&str; 5] = ["ready", "build_done", "tests_done", "migrations_checked", "task_done"];
 const NOT_OPEN: &str = "not_running: lazyrunner isn't open - ask the user to open it in the project's folder (run \
                         lazyrunner in a terminal there), then try again.";
 const ELEVATED: &str = "elevated: lazyrunner runs as Administrator and this agent doesn't, and Windows doesn't let a \
@@ -40,9 +40,10 @@ const ELEVATED: &str = "elevated: lazyrunner runs as Administrator and this agen
                         it again in a terminal that isn't \"Run as administrator\"";
 const NOT_ANSWERING: &str = "not_answering: lazyrunner didn't answer in 10 s - it may be paused (a selection in its \
                              window); ask the user to look at it";
-const INSTRUCTIONS: &str = "lazyrunner runs this project's apps (.NET APIs, npm frontends) in a terminal the user \
-watches, and builds, tests and checks migrations for them. While it's open, use its tools instead of running dotnet \
-or npm yourself: what you do shows in its log. Start every turn with get_status - the user may have changed things \
+const INSTRUCTIONS: &str = "lazyrunner runs this project's apps (.NET APIs, npm frontends, and any command - a \
+Python, Go or Rust service, a script) in a terminal the user watches, and builds, tests and checks migrations for \
+them. While it's open, use its tools instead of running dotnet, npm or the apps' own commands yourself: what you do \
+shows in its log. Start every turn with get_status - the user may have changed things \
 since. Use wait instead of calling get_status in a loop. Keep get_logs small with since, grep or errors_only; after \
 a failed build or a crash, get_errors has the error with its stack. For a slow or failing endpoint, get_requests \
 (errors_only, sort slowest, endpoints) and get_request show what the app logged and queried while serving it. Tell \
@@ -290,7 +291,7 @@ impl<C: Channel> Server<C> {
             "list_actions" => self.agent("actions", json!({})).await,
             "press_keys" => self.pressed(args).await,
             name @ ("run_action" | "switch_database" | "install_packages" | "apply_migrations" | "kill_port_holder"
-            | "set_setting") => self.agent(name, args).await,
+            | "set_setting" | "run_task") => self.agent(name, args).await,
             _ => return None,
         };
         Some(match outcome {
@@ -404,8 +405,28 @@ fn done(condition: &str, status: &Value, built: &HashSet<String>) -> Option<Stri
             Some(format!("tests: {} passed, {} failed, {} skipped", tests["passed"], tests["failed"], tests["skipped"]))
         }
         "migrations_checked" if busy["migrations"] != true => Some("migrations checked (get_migrations)".into()),
+        "task_done"
+            if status["tasks"].as_array().is_none_or(|tasks| tasks.iter().all(|task| task["running"] != true)) =>
+        {
+            Some(task_summary(status))
+        }
         _ => None,
     }
+}
+
+/// How the tasks' last runs went, for wait's task_done.
+fn task_summary(status: &Value) -> String {
+    let ran = status["tasks"].as_array().into_iter().flatten().filter(|task| !task["last"].is_null());
+    let said: Vec<String> = ran
+        .map(|task| {
+            let (name, last) = (task["name"].as_str().unwrap_or_default(), &task["last"]);
+            match last["ok"].as_bool() {
+                Some(true) => format!("{name}: done in {} s", last["seconds"]),
+                _ => format!("{name}: failed - {}", last["error"].as_str().unwrap_or("?")),
+            }
+        })
+        .collect();
+    if said.is_empty() { "no task has run".into() } else { said.join("; ") }
 }
 
 /// The builds that ran while waiting, and how they went; failures from before are said as such.
@@ -593,7 +614,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 29));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 30));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);
@@ -668,5 +689,27 @@ mod tests {
         let cut = tool_result(long, false)["content"][0]["text"].as_str().unwrap().to_string();
         assert!(cut.ends_with("ask for less (since, limit, grep, a suite)"));
         assert_eq!(cut.chars().filter(|c| *c == 'é').count(), MAX_ANSWER_CHARS);
+    }
+}
+
+#[cfg(test)]
+mod task_wait {
+    use std::collections::HashSet;
+
+    use serde_json::json;
+
+    use super::done;
+
+    #[test]
+    fn task_done_waits_for_every_running_task_then_says_how_they_went() {
+        let running = json!({ "busy": {}, "tasks": [{ "name": "Seed", "running": true, "last": null }] });
+        assert_eq!(done("task_done", &running, &HashSet::new()), None);
+        let finished = json!({ "busy": {}, "tasks": [
+            { "name": "Seed", "running": false, "last": { "ok": true, "seconds": 11.8, "error": null } },
+            { "name": "Client", "running": false, "last": { "ok": false, "seconds": 2.0, "error": "no npm" } },
+            { "name": "Unused", "running": false, "last": null }
+        ] });
+        let said = done("task_done", &finished, &HashSet::new()).unwrap();
+        assert_eq!(said, "Seed: done in 11.8 s; Client: failed - no npm");
     }
 }

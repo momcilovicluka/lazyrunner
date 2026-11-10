@@ -12,7 +12,7 @@ use super::Controller;
 use super::net::Listening;
 use super::secrets;
 use super::tools;
-use crate::profile::{AppKind, Source};
+use crate::profile::{App, AppKind, Source};
 use crate::update;
 
 const SQL_TIMEOUT: Duration = Duration::from_secs(2);
@@ -39,6 +39,8 @@ pub type Report<'a> = &'a mut dyn FnMut(&str);
 pub struct Check {
     pub name: String,
     pub kind: Kind,
+    /// The language of the command app it's about: its icon in the checklist.
+    pub language: Option<&'static str>,
     pub run: Box<dyn FnOnce(Report) -> Outcome + Send>,
     /// The apps needn't wait for it at startup (the update check): it may finish after the checklist closes.
     pub background: bool,
@@ -111,7 +113,7 @@ impl Group {
 }
 
 fn check(kind: Kind, name: impl Into<String>, run: impl FnOnce() -> Outcome + Send + 'static) -> Check {
-    Check { name: name.into(), kind, run: Box::new(move |_: Report| run()), background: false }
+    Check { name: name.into(), kind, language: None, run: Box::new(move |_: Report| run()), background: false }
 }
 
 /// The first line a tool prints for `args`, when it runs and succeeds.
@@ -177,6 +179,7 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
     checks.push(Check {
         name: "lazyrunner".into(),
         kind: Kind::Update,
+        language: None,
         run: Box::new(move |report: Report| {
             let outcome = update::update(&config, &state_dir, false, &mut update::Progress::new(report));
             crate::contributors::refresh(&config, &state_dir);
@@ -193,26 +196,36 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
         Some(version) => (Status::Ok, version.trim_start_matches("git version ").to_string()),
         None => (Status::Fail, "not found on PATH".into()),
     }));
-    if controller.apps.iter().any(|app| app.traits().builds) {
+    if controller.apps.iter().any(App::is_dotnet) {
         checks.push(check(Kind::Tool, ".NET SDK", || match version_of("dotnet") {
             Some(version) => (Status::Ok, version),
             None => (Status::Fail, "dotnet not found on PATH".into()),
         }));
     }
-    if controller.apps.iter().any(|app| app.traits().installs) {
+    if controller.apps.iter().any(|app| matches!(app.kind, AppKind::Npm { .. })) {
         checks.push(check(Kind::Tool, "Node.js / npm", || {
             let Some(node) = version_of("node") else { return (Status::Fail, "node not found on PATH".into()) };
             (Status::Ok, format!("node {node} · npm {}", npm_version().unwrap_or_else(|| "?".into())))
+        }));
+    }
+    for app in controller.apps.iter().filter(|app| app.command().is_some_and(|command| command.compose.is_none())) {
+        checks.push(Check { language: crate::apptypes::language(app), ..command_check(controller, app) });
+    }
+    if controller.apps.iter().any(|app| app.command().is_some_and(|command| command.compose.is_some())) {
+        checks.push(check(Kind::Tool, DOCKER_CHECK, || match crate::run::compose::engine_version() {
+            Ok(version) => (Status::Ok, format!("engine {version}")),
+            Err(error) => (Status::Fail, error),
         }));
     }
     checks.push(ports_check(controller));
     if controller.apps.iter().any(|app| app.traits().uses_secrets) {
         checks.push(database_check(controller));
     }
-    for app in controller.apps.iter().filter(|app| app.traits().installs) {
+    let installs = |app: &&App| app.command().is_some_and(|command| !command.install.is_empty());
+    for app in controller.apps.iter().filter(|app| matches!(app.kind, AppKind::Npm { .. }) || installs(app)) {
         checks.push(packages_check(controller, &app.key));
     }
-    if controller.apps.iter().any(|app| app.traits().builds || app.traits().installs) {
+    if controller.apps.iter().any(|app| app.command().is_none()) {
         checks.push(audit_check(controller));
     }
     checks.push(project_check(controller));
@@ -339,10 +352,80 @@ fn audit_report(scans: &[(String, crate::run::audit::AppAudit)]) -> Outcome {
     }
 }
 
+/// A command app's programs - its tools (with their versions), what it runs, builds and installs with - each found in
+/// its `path` folders, on PATH or in its folder.
+/// How to get a tool a command app needs, when it's missing (on Windows, which lazyrunner's releases are for).
+const HOW_TO_GET: [(&str, &str); 7] = [
+    ("python", "winget install Python.Python.3.12"),
+    ("uv", "winget install astral-sh.uv"),
+    ("go", "winget install GoLang.Go"),
+    ("cargo", "winget install Rustlang.Rustup"),
+    ("node", "winget install OpenJS.NodeJS.LTS"),
+    ("npm", "winget install OpenJS.NodeJS.LTS"),
+    ("docker", "winget install Docker.DockerDesktop"),
+];
+/// The version in what a tool says about itself: `Python 3.12.1`, `go version go1.23.1 windows/amd64`.
+static VERSION: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"\d+\.\d+(\.\d+)?").expect("a valid pattern"));
+
+/// A tool as a capsule: `python 3.12.1`, else what it said.
+pub fn capsule(program: &str, said: &str) -> String {
+    VERSION.find(said).map_or_else(|| said.to_string(), |version| format!("{program} {}", version.as_str()))
+}
+
+/// The tools missing, each with how to get it when lazyrunner knows.
+pub fn missing_tools(missing: &[&str]) -> String {
+    let get = |tool: &str| HOW_TO_GET.iter().find(|(name, _)| name.eq_ignore_ascii_case(tool)).map(|(_, how)| *how);
+    let each: Vec<String> = missing
+        .iter()
+        .map(|tool| get(tool).map_or_else(|| tool.to_string(), |how| format!("{tool} ({how})")))
+        .collect();
+    each.join(", ")
+}
+
+/// The checklist's row for Docker, which runs the compose apps.
+pub const DOCKER_CHECK: &str = "Docker";
+
+fn command_check(controller: &Controller, app: &App) -> Check {
+    let command = app.command().expect("a command app").clone();
+    let (dir, folders) = tools::command_folders(&controller.root, &command);
+    let mut programs: Vec<String> = command.tools.clone();
+    for words in [&command.run, &command.build, &command.install] {
+        if let Some(program) = words.first().filter(|program| !programs.contains(program)) {
+            programs.push(program.clone());
+        }
+    }
+    check(Kind::Tool, app.name.clone(), move || {
+        let found = |program: &String| tools::program_path(&dir, &folders, program);
+        let missing: Vec<&str> =
+            programs.iter().filter(|program| found(program).is_none()).map(String::as_str).collect();
+        if !missing.is_empty() {
+            let hint = crate::apptypes::missing_path(&command, &folders);
+            return (
+                Status::Fail,
+                format!("{} not found on PATH or in {}{hint}", missing_tools(&missing), dir.display()),
+            );
+        }
+        let shown: Vec<String> = programs
+            .iter()
+            .map(|program| match command.tools.contains(program) {
+                true => found(program)
+                    .and_then(|path| tool_version(&path, &["--version"]).or_else(|| tool_version(&path, &["version"])))
+                    .map_or(program.clone(), |said| capsule(program, &said)),
+                false => program.clone(),
+            })
+            .collect();
+        (Status::Ok, shown.join(" · "))
+    })
+}
+
 fn packages_check(controller: &Controller, key: &str) -> Check {
     let app = controller.app(key).expect("a known app");
     let name = format!("{} packages", app.name);
     let kind = Kind::Packages(key.to_string());
+    if let Some(command) = app.command() {
+        return command_packages_check(controller, key, command, kind, name);
+    }
     let AppKind::Npm { dir, .. } = &app.kind else { return check(kind, name, || (Status::Skip, String::new())) };
     let folder = controller.root.join(dir);
     let dir = dir.clone();
@@ -361,6 +444,35 @@ fn packages_check(controller: &Controller, key: &str) -> Check {
             None => (Status::Ok, "installed (no npm ci from lazyrunner yet to compare with)".into()),
             Some(false) => (Status::Warn, "package-lock.json changed since the last npm ci - press i".into()),
             Some(true) => (Status::Ok, "in sync with package-lock.json".into()),
+        }
+    })
+}
+
+/// A command app's install: its own `path` folder (a `.venv`) there, and in sync with the files it installs from
+/// (`installFrom`) as lazyrunner's last install left them.
+fn command_packages_check(
+    controller: &Controller,
+    key: &str,
+    command: &crate::profile::Command,
+    kind: Kind,
+    name: String,
+) -> Check {
+    let missing = tools::lacks_own_folders(&controller.root, command);
+    let env = tools::own_folders(command)
+        .first()
+        .map(|folder| folder.split(['/', '\\']).next().unwrap_or(folder).to_string());
+    let (install, files) = (command.install.join(" "), command.install_from.join(", "));
+    let in_sync = controller.lock_in_sync(key);
+    check(kind, name, move || {
+        if let Some(env) = env.as_ref().filter(|_| missing) {
+            return (Status::Fail, format!("{env} isn't there yet - press i ({install})"));
+        }
+        let place = env.as_ref().map_or(String::new(), |env| format!("{env} · "));
+        match in_sync {
+            None if files.is_empty() => (Status::Ok, format!("{place}i runs {install}")),
+            None => (Status::Ok, format!("{place}no install from lazyrunner yet to compare {files} with")),
+            Some(false) => (Status::Warn, format!("{place}{files} changed since the last install - press i")),
+            Some(true) => (Status::Ok, format!("{place}in sync with {files}")),
         }
     })
 }
@@ -387,6 +499,15 @@ fn project_check(controller: &Controller) -> Check {
 mod tests {
     use super::*;
     use crate::run::net::Owner;
+
+    #[test]
+    fn a_tool_shows_as_a_capsule_and_a_missing_one_says_how_to_get_it() {
+        assert_eq!(capsule("python", "Python 3.12.1"), "python 3.12.1");
+        assert_eq!(capsule("go", "go version go1.23.1 windows/amd64"), "go 1.23.1");
+        assert_eq!(capsule("uv", "uv 0.5.1 (f399a5271 2024-11-08)"), "uv 0.5.1");
+        assert_eq!(capsule("tool", "no version here"), "no version here");
+        assert_eq!(missing_tools(&["uv", "azurite"]), "uv (winget install astral-sh.uv), azurite");
+    }
 
     #[test]
     fn a_reserved_port_fails_the_ports_check_and_a_busy_one_warns() {

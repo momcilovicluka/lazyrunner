@@ -486,12 +486,15 @@ fn icon(status: Status, spin: Option<&str>, nerd: bool) -> String {
     }
 }
 
-/// A check's name in its column, after its icon with Nerd Font icons.
-fn check_name(nerd: bool, name: &str) -> String {
-    match icons::check(name).filter(|_| nerd) {
-        Some(icon) => format!("{} {name:<17}", icons::icon(true, icon)),
-        None if nerd => format!("  {name:<17}"),
-        None => format!("{name:<19}"),
+/// A check's name in its column, after its icon with Nerd Font icons - a command app's its language's, and its
+/// language's chip without them.
+fn check_name(nerd: bool, name: &str, language: Option<&str>) -> String {
+    let icon = language.map(icons::language_icon).or_else(|| icons::check(name));
+    match (icon.filter(|_| nerd), language) {
+        (Some(icon), _) => format!("{} {name:<17}", icons::icon(true, icon)),
+        (None, Some(language)) if !nerd => format!("{} {name:<16}", icons::language_chip(language)),
+        (None, _) if nerd => format!("  {name:<17}"),
+        (None, _) => format!("{name:<19}"),
     }
 }
 
@@ -770,7 +773,7 @@ fn check_row(ui: &Ui, list: &Checklist, index: usize, width: usize, slowest: Dur
     let segs = vec![
         edge,
         mark,
-        seg(check_name(ui.nerd, &item.name), if dim { C::DarkGray } else { C::White }),
+        seg(check_name(ui.nerd, &item.name, row.language), if dim { C::DarkGray } else { C::White }),
         seg(detail, detail_color),
     ];
     let running = row.started.filter(|_| status == Status::Running && row.took.is_none());

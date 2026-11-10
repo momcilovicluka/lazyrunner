@@ -9,6 +9,8 @@ use lazyrunner_core::output::{Hue, Level, LevelFilter, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
 use lazyrunner_core::run::audit::Severity;
+use lazyrunner_core::run::compose::{self as services_of, State};
+use lazyrunner_core::run::controller::compose;
 use lazyrunner_core::run::format_duration;
 use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
@@ -265,7 +267,11 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         name.push_str(" · env*"); // what it gets on this machine differs (the start sheet)
     }
     super::phases::note(ui, &app.key, super::phases::Phase::of(&controller.states[index]));
-    let text = format!(" {marker}{icon} {name} ");
+    // Without Nerd Font icons a command app's language is a chip beside the plain icon: `■ py Pricing`.
+    let chip = lazyrunner_core::apptypes::language(app)
+        .filter(|_| !ui.nerd && app.icon.is_none())
+        .map_or(String::new(), |language| format!("{} ", icons::language_chip(language)));
+    let text = format!(" {marker}{icon} {chip}{name} ");
     // An action's flash wins; else the chip moves as the app changes state.
     let mut segs = if ui.motion.title_lit(index, ui.now) {
         vec![on(text, chip_fg, chip_bg)]
@@ -283,8 +289,9 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         let chip = format!(" {} {} {}", icons::icon(ui.nerd, Icon::Warn), scan.count(worst), worst.name());
         segs.push(seg(chip, C::Red));
     }
-    let port = seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray);
     let status = status(ui, controller, index);
+    segs.extend(services(ui, controller, &app.key, cells.saturating_sub(width(&segs) + width(&status) + 2)));
+    let port = seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray);
     // A title that doesn't fit drops its port before its state is cut.
     let fits = width(&segs) + port.text.width() + width(&status) <= cells;
     segs.push(if fits { port } else { seg("  ", C::DarkGray) });
@@ -372,9 +379,21 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
     match &state.status {
         Status::Running if state.is_up() => {
             let up = format!("  up in {}", format_duration(state.up_after.unwrap_or_default()));
-            if controller.port(&key).is_none() {
+            if controller.port(&key).is_none() && controller.apps[index].traits().variants {
                 let watching = icons::icon(ui.nerd, Icon::Watching);
                 return vec![seg(format!("{watching} built, watching"), C::Green), seg(up, C::DarkGray)];
+            }
+            if controller.is_compose(&key) {
+                // Its services' dots say how each is: the title keeps room for them.
+                let up = up.trim_start().to_string();
+                return vec![seg(format!("{} ", icons::icon(ui.nerd, Icon::Up)), C::Green), seg(up, C::DarkGray)];
+            }
+            if controller.port(&key).is_none() {
+                // A worker: nothing to ask how fast it answers.
+                return vec![
+                    seg(format!("{} {RUNNING}", icons::icon(ui.nerd, Icon::Up)), C::Green),
+                    seg(up, C::DarkGray),
+                ];
             }
             let mut segs = vec![seg(format!("{} ", icons::icon(ui.nerd, Icon::Up)), C::Green)];
             segs.push(match controller.last_probe(&key) {
@@ -511,6 +530,71 @@ pub fn line_color(line: &OutputLine) -> C {
     }
 }
 
+/// What an app that's up says when it has no port to answer on.
+const RUNNING: &str = "running";
+/// How slowly a starting service's dot breathes.
+const BREATH: Duration = Duration::from_millis(1600);
+/// How long the line that made a command app up stays outlined.
+const READY_OUTLINE: Duration = Duration::from_secs(3);
+/// The colours a compose app's services' lines are told apart by, in the order of its services.
+const SERVICE_COLORS: [C; 8] =
+    [C::Cyan, C::Magenta, C::Blue, C::Green, C::DarkCyan, C::DarkMagenta, C::DarkBlue, C::DarkGreen];
+
+/// A service's state colour: a starting one breathes.
+pub fn service_color(ui: &Ui, state: State) -> C {
+    let breath = ui.now.saturating_duration_since(ui.started).as_millis() % BREATH.as_millis();
+    match state {
+        State::Starting if !ui.reduced_motion && breath >= BREATH.as_millis() / 2 => C::DarkYellow,
+        state => hue_color(compose::hue(state)),
+    }
+}
+
+/// Whether a column moves: a compose service's dot breathing, a ready line's outline going.
+pub fn animating(ui: &Ui, controller: &Controller) -> bool {
+    let breathing = |key: &str| {
+        controller.compose_services(key).is_some_and(|services| services.iter().any(|s| s.state == State::Starting))
+    };
+    let outlined =
+        |state: &AppState| state.ready_at.is_some_and(|(_, at)| ui.now.saturating_duration_since(at) < READY_OUTLINE);
+    controller.states.iter().any(outlined)
+        || (!ui.reduced_motion && controller.apps.iter().any(|app| breathing(&app.key)))
+}
+
+/// The compose service a line of a compose app's is from.
+fn line_service(composed: bool, text: &str) -> Option<&str> {
+    if composed { services_of::split_line(text).map(|(service, _)| service) } else { None }
+}
+
+/// A compose service's colour in its column's gutter: by its place among the app's services.
+fn service_tone(controller: &Controller, index: usize, service: &str) -> C {
+    let app = &controller.apps[index];
+    let named = app.command().and_then(|command| command.compose.as_ref()).map_or(&[][..], |compose| &compose.services);
+    let polled = controller.compose_services(&app.key).unwrap_or_default();
+    let at = named
+        .iter()
+        .position(|name| name == service)
+        .or_else(|| polled.iter().position(|polled| polled.name == service).map(|at| at + named.len()))
+        .unwrap_or_else(|| service.bytes().map(usize::from).sum());
+    SERVICE_COLORS[at % SERVICE_COLORS.len()]
+}
+
+/// A compose app's services in its title, named when there's `room`, else just their dots: ● up, ◌ starting,
+/// ✗ down, ✓ done.
+fn services(ui: &Ui, controller: &Controller, key: &str, room: usize) -> Vec<Seg> {
+    let Some(services) = controller.compose_services(key) else { return Vec::new() };
+    let color = |state| service_color(ui, state);
+    let named: Vec<Seg> = services
+        .iter()
+        .map(|service| seg(format!(" {} {}", compose::symbol(service.state), service.name), color(service.state)))
+        .collect();
+    if width(&named) <= room {
+        return named;
+    }
+    let mut dots = vec![seg(" ", C::DarkGray)];
+    dots.extend(services.iter().map(|service| seg(compose::symbol(service.state), color(service.state))));
+    if width(&dots) <= room { dots } else { Vec::new() }
+}
+
 pub fn hue_color(hue: Hue) -> C {
     match hue {
         Hue::Gray => C::Gray,
@@ -616,13 +700,17 @@ fn body(
     let scroll = scroll.min(shown.saturating_sub(1));
     let copied = ui.motion.copied(index, ui.now);
     let looked = ui.motion.looked(index, ui.now);
+    let composed = controller.apps[index].command().is_some_and(|command| command.compose.is_some());
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
-    for item in list.iter().rev().skip(scroll) {
+    for (at, item) in list.iter().enumerate().rev().skip(scroll) {
         if result.len() >= rows {
             break;
         }
         let (position, line) = (item.position, item.line); // position: 0 = the oldest line kept
         let mut color = if item.context { C::DarkGray } else { line_color(line) };
+        if links::library_frame(&line.text, state.frames()) {
+            color = C::DarkGray; // a library's frame: the app's own stand out
+        }
         let mut back = None;
         let age = ui.now.saturating_duration_since(line.born);
         if ui.reduced_motion {
@@ -653,13 +741,25 @@ fn body(
         {
             (color, back) = (C::Black, Some(C::White)); // n N just went to it
         }
+        let ready = state
+            .ready_at
+            .filter(|(ready, since)| *ready == number && ui.now.saturating_duration_since(*since) < READY_OUTLINE);
+        if ready.is_some() {
+            (color, back) = (C::Black, Some(C::Green)); // what made it up
+        }
         if looked.is_some_and(|lines| lines.contains(&line.text)) {
             (color, back) = (C::Black, Some(C::Magenta)); // an agent read it (follow mode)
         }
         if copied.is_some_and(|lines| lines.contains(&line.text)) {
             (color, back) = (C::Black, Some(C::Cyan)); // just copied
         }
-        let line_links = if back.is_none() { links::find(&line.text) } else { Vec::new() };
+        // A compose service's line: its prefix becomes a gutter in its colour, its name shown where it changes.
+        let split = if composed { services_of::split_line(&line.text) } else { None };
+        let (service, text) = split.map_or((None, line.text.as_str()), |(service, text)| (Some(service), text));
+        let before = at.checked_sub(1).and_then(|before| line_service(composed, &list[before].line.text));
+        let named = service.filter(|service| before != Some(*service));
+        let tone = service.map(|service| service_tone(controller, index, service));
+        let line_links = if back.is_none() { links::find_with(text, state.frames()) } else { Vec::new() };
         let ids: Vec<usize> = line_links
             .iter()
             .map(|link| {
@@ -669,8 +769,9 @@ fn body(
             .collect();
         let marked = state.marks.binary_search(&number).is_ok();
         let gutter = diff.as_ref().filter(|diff| diff.has_gutter());
-        let room = cells.saturating_sub(usize::from(marked) + usize::from(gutter.is_some()));
-        let chunks = chunk(&line.text, room);
+        let service_room = service.map_or(0, |_| 1) + named.map_or(0, |name| name.width() + 1);
+        let room = cells.saturating_sub(usize::from(marked) + usize::from(gutter.is_some()) + service_room);
+        let chunks = chunk(text, room);
         let starts: Vec<usize> = chunks
             .iter()
             .scan(0, |at, text| {
@@ -689,6 +790,11 @@ fn body(
             } else {
                 linked(text, start, &line_links, &ids, color, index)
             };
+            if let Some(tone) = tone {
+                let name = named.filter(|_| start == 0).map_or(" ".repeat(service_room - 1), |name| format!("{name} "));
+                segs.insert(0, seg(name, tone));
+                segs.insert(0, seg("▎", tone));
+            }
             if marked {
                 segs.insert(0, seg("▌", C::Magenta));
             }

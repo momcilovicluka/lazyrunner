@@ -48,6 +48,7 @@ pub mod suite_cause;
 pub mod suite_impact;
 pub mod suite_runs;
 pub mod suites;
+pub mod task_chips;
 #[cfg(test)]
 mod tests;
 pub mod theme;
@@ -427,6 +428,8 @@ pub struct Ui {
     pub clipboard: copy::Clipboard,
     /// The reducedMotion setting (`, f`), read at every frame: nothing blinks, spins, glides or fades.
     pub reduced_motion: bool,
+    /// Whether the terminal has the focus, once it has said (focus reports): a notification is for when it hasn't.
+    pub terminal_focused: Option<bool>,
     /// The nerdIcons setting (`, i`), read at every frame: Nerd Font icons in the chrome.
     pub nerd: bool,
     /// The short effects that answer input: flashes, boxes opening, widths and scrolling gliding.
@@ -499,6 +502,7 @@ impl Ui {
             opener: status::open,
             clipboard: copy::to_clipboard,
             reduced_motion: controller.setting(Toggle::ReducedMotion),
+            terminal_focused: None,
             nerd: controller.setting(Toggle::NerdIcons),
             motion: motion::Motion::default(),
             replay: None,
@@ -628,6 +632,8 @@ impl Ui {
             || diff::animating(self)
             || suite_runs::animating(self, controller)
             || migrations_rail::animating(self, controller)
+            || columns::animating(self, controller)
+            || task_chips::animating(self, controller)
         {
             return true;
         }

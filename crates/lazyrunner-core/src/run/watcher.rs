@@ -1,7 +1,10 @@
-//! Watching the .NET sources (the profile's watch folder) for "restart on code change", and a watched npm or Nx test
-//! suite's folder for test watch: a saved source file is an event; build output and packages are not.
+//! Watching the .NET sources (the profile's watch folder) and each command app's code (its `watch` globs) for "restart
+//! on code change", and a watched npm or Nx test suite's folder for test watch: a saved source file is an event;
+//! build output, packages and virtual environments are not.
 
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
+
+use regex::Regex;
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc::UnboundedSender;
@@ -15,6 +18,22 @@ const TEST_EXTENSIONS: [&str; 13] =
     ["ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts", "vue", "html", "json", "scss", "css"];
 const TEST_IGNORED_FOLDERS: [&str; 9] =
     ["bin", "obj", "node_modules", ".git", "dist", ".nx", ".angular", "coverage", "TestResults"];
+
+/// Folders a command app's code is never in: build output, packages, virtual environments, caches.
+const COMMAND_IGNORED_FOLDERS: [&str; 12] = [
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "target",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    "bin",
+    "obj",
+    "dist",
+    "build",
+];
 
 /// Watches while it lives.
 pub struct CodeWatcher {
@@ -31,11 +50,59 @@ pub fn watch_tests(dir: &Path, events: UnboundedSender<Event>) -> Option<CodeWat
     watch_with(dir, events, is_test_source, Event::TestFileChanged)
 }
 
+/// Starts watching a command app's folder for the files its `watch` globs name.
+pub fn watch_command(dir: &Path, globs: &[String], key: &str, events: UnboundedSender<Event>) -> Option<CodeWatcher> {
+    let patterns: Vec<Regex> = globs.iter().filter_map(|glob| glob_pattern(glob)).collect();
+    let folder = dir.to_path_buf();
+    let wanted = move |path: &Path| is_command_source(&folder, &patterns, path);
+    let key = key.to_string();
+    watch_with(dir, events, wanted, move |path| Event::CommandFileChanged { key: key.clone(), path })
+}
+
+/// A file of a command app's code: one its globs name, from its folder, outside the folders its code is never in.
+fn is_command_source(folder: &Path, patterns: &[Regex], path: &Path) -> bool {
+    let Ok(relative) = path.strip_prefix(folder) else { return false };
+    let ignored = relative.components().any(|part| match part {
+        Component::Normal(name) => COMMAND_IGNORED_FOLDERS.iter().any(|ignored| name.eq_ignore_ascii_case(ignored)),
+        _ => false,
+    });
+    let relative = relative.to_string_lossy().replace('\\', "/");
+    !ignored && patterns.iter().any(|pattern| pattern.is_match(&relative))
+}
+
+/// A glob (`**/*.py`, `src/*.go`) as a pattern for a path from its folder, `/` between folders: `**` any folders,
+/// `*` and `?` within one name; any case.
+pub fn glob_pattern(glob: &str) -> Option<Regex> {
+    let glob: Vec<char> = glob.replace('\\', "/").chars().collect();
+    let mut pattern = String::from("(?i)^");
+    let mut at = 0;
+    while at < glob.len() {
+        match glob[at] {
+            '*' if glob.get(at + 1) == Some(&'*') && glob.get(at + 2) == Some(&'/') => {
+                pattern.push_str("(?:.*/)?");
+                at += 3;
+                continue;
+            }
+            '*' if glob.get(at + 1) == Some(&'*') => {
+                pattern.push_str(".*");
+                at += 2;
+                continue;
+            }
+            '*' => pattern.push_str("[^/]*"),
+            '?' => pattern.push_str("[^/]"),
+            other => pattern.push_str(&regex::escape(&other.to_string())),
+        }
+        at += 1;
+    }
+    pattern.push('$');
+    Regex::new(&pattern).ok()
+}
+
 fn watch_with(
     dir: &Path,
     events: UnboundedSender<Event>,
-    wanted: fn(&Path) -> bool,
-    event: fn(std::path::PathBuf) -> Event,
+    wanted: impl Fn(&Path) -> bool + Send + 'static,
+    event: impl Fn(PathBuf) -> Event + Send + 'static,
 ) -> Option<CodeWatcher> {
     if !dir.is_dir() {
         return None;
@@ -88,6 +155,20 @@ mod tests {
         assert!(is_test_source(Path::new("web/shop/src/cart.spec.ts")));
         assert!(!is_test_source(Path::new("web/shop/coverage/lcov.json")));
         assert!(!is_test_source(Path::new("web/shop/src/cart.cs")));
+    }
+
+    #[test]
+    fn a_command_apps_globs_name_its_code_outside_virtual_environments_and_build_output() {
+        let any = glob_pattern("**/*.py").unwrap();
+        assert!(any.is_match("main.py") && any.is_match("app/api.py") && !any.is_match("main.pyc"));
+        let one = glob_pattern("src/*.go").unwrap();
+        assert!(one.is_match("src/a.go") && one.is_match("SRC/A.GO") && !one.is_match("src/x/a.go"));
+        let folder = Path::new("repo").join("pricing");
+        let patterns = vec![any];
+        assert!(is_command_source(&folder, &patterns, &folder.join("app").join("api.py")));
+        assert!(!is_command_source(&folder, &patterns, &folder.join(".venv").join("Lib").join("x.py")));
+        assert!(!is_command_source(&folder, &patterns, &folder.join("__pycache__").join("x.py")));
+        assert!(!is_command_source(&folder, &patterns, Path::new("elsewhere").join("x.py").as_path()));
     }
 
     #[tokio::test]

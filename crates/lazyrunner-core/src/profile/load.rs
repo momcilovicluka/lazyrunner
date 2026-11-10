@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow, bail};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-use super::{App, AppKind, Migrations, ProfileDirs, Project, REPO_PROFILE_FILE, Source, Variant, check, native};
+use super::{App, AppKind, Migrations, ProfileDirs, Project, REPO_PROFILE_FILE, Ready, Source, Variant, check, native};
 use crate::json::{self, field, list, text, truthy};
 
 /// A profile lazyrunner knows besides a repo's own.
@@ -134,7 +134,8 @@ pub fn resolve(found: &Found, dirs: &ProfileDirs) -> Result<Project> {
         };
         data = merge(&base.data, &data);
     }
-    let problems = check::validate(&data, in_repo);
+    let (data, mut problems) = super::preset::apply_all(&data, found.root.as_deref(), dirs);
+    problems.extend(check::validate(&data, in_repo));
     if !problems.is_empty() {
         let count = if problems.len() == 1 { "a problem".to_string() } else { format!("{} problems", problems.len()) };
         bail!("lazyrunner: {file} has {count}:\n  - {}", problems.join("\n  - "));
@@ -199,11 +200,33 @@ fn to_project(data: &Value, path: &Path) -> Project {
         source_dir: native(&list(field(data, "watch")).first().map_or(String::new(), |w| text(w))),
         apps,
         layers: to_layers(field(data, "layers")),
+        tasks: to_tasks(field(data, "tasks")),
         root: None,
         source: Source::Given,
         file_hash: String::new(),
         hash: String::new(),
     }
+}
+
+/// `"tasks": [{ "key": "seed", "name": "Seed the database", "run": "python seed.py" }]`.
+fn to_tasks(tasks: &Value) -> Vec<super::Task> {
+    let env = |task: &Value| {
+        let vars = field(task, "env").as_object();
+        vars.map(|vars| {
+            vars.iter().filter_map(|(name, value)| Some((name.clone(), value.as_str()?.to_string()))).collect()
+        })
+        .unwrap_or_default()
+    };
+    list(tasks)
+        .into_iter()
+        .map(|task| super::Task {
+            key: text(field(task, "key")),
+            name: text(field(task, "name")),
+            run: words(field(task, "run")),
+            cwd: native(&text(field(task, "cwd"))),
+            env: env(task),
+        })
+        .collect()
 }
 
 /// `"layers": { "Orders.Core": { "mustNotReference": ["Orders.Api"] } }`.
@@ -218,18 +241,121 @@ fn to_layers(layers: &Value) -> Vec<super::Layer> {
         .collect()
 }
 
+/// A command: a list of arguments as written, or text split into them (see [`split`]).
+pub fn words(value: &Value) -> Vec<String> {
+    match value.as_array() {
+        Some(arguments) => arguments.iter().map(text).collect(),
+        None => split(&text(value)),
+    }
+}
+
+/// Text split into arguments at spaces; a "quoted part" stays one argument, without its quotes.
+pub fn split(line: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let (mut quoted, mut started) = (false, false);
+    for c in line.chars() {
+        match c {
+            '"' => (quoted, started) = (!quoted, true),
+            c if c.is_whitespace() && !quoted => {
+                if started {
+                    words.push(std::mem::take(&mut word));
+                    started = false;
+                }
+            }
+            c => {
+                word.push(c);
+                started = true;
+            }
+        }
+    }
+    if started {
+        words.push(word);
+    }
+    words
+}
+
+fn to_command(app: &Value) -> super::Command {
+    let port_of = |value: &Value| value.as_u64().and_then(|port| u16::try_from(port).ok());
+    let port = port_of(field(app, "port"));
+    let ready = field(app, "ready");
+    let ready = match port_of(field(ready, "port")) {
+        Some(port) => Ready::Port(port),
+        None if truthy(field(ready, "line")) && truthy(field(ready, "orPort")) => {
+            Ready::LineOrPort(text(field(ready, "line")))
+        }
+        None if truthy(field(ready, "line")) => Ready::Line(text(field(ready, "line"))),
+        None if truthy(field(ready, "http")) => Ready::Http(text(field(ready, "http"))),
+        None => port.map_or(Ready::Started, Ready::Port),
+    };
+    let texts = |name: &str| list(field(app, name)).into_iter().map(text).collect();
+    super::Command {
+        run: words(field(app, "run")),
+        cwd: native(&text(field(app, "cwd"))),
+        port,
+        build: words(field(app, "build")),
+        install: words(field(app, "install")),
+        setup: words(field(app, "setup")),
+        install_from: texts("installFrom"),
+        ready,
+        watch: texts("watch"),
+        errors: texts("errors"),
+        warnings: texts("warnings"),
+        frames: truthy(field(app, "frames")).then(|| text(field(app, "frames"))),
+        preset: truthy(field(app, "preset")).then(|| text(field(app, "preset"))),
+        path: texts("path"),
+        tools: texts("tools"),
+        compose: None,
+    }
+}
+
+/// An error line in a compose app's output, and a warning line.
+const COMPOSE_ERRORS: &str = r"(?i)\b(error|fatal|panic|exception)\b";
+const COMPOSE_WARNINGS: &str = r"(?i)\bwarn(ing)?\b";
+
+/// A compose app: a command app whose run is `docker compose up` of its services, up once they are.
+fn to_compose(app: &Value) -> super::Command {
+    let compose = super::Compose {
+        file: truthy(field(app, "file")).then(|| native(&text(field(app, "file")))),
+        services: list(field(app, "services")).into_iter().map(text).collect(),
+    };
+    let mut run = vec![super::DOCKER.to_string()];
+    run.extend(compose.args(super::COMPOSE_UP, &[]));
+    super::Command {
+        run,
+        cwd: native(&text(field(app, "cwd"))),
+        port: None,
+        build: Vec::new(),
+        install: Vec::new(),
+        setup: Vec::new(),
+        install_from: Vec::new(),
+        ready: Ready::Services,
+        watch: Vec::new(),
+        errors: vec![COMPOSE_ERRORS.into()],
+        warnings: vec![COMPOSE_WARNINGS.into()],
+        frames: None,
+        preset: None,
+        path: Vec::new(),
+        tools: vec![super::DOCKER.into()],
+        compose: Some(compose),
+    }
+}
+
 fn to_app(app: &Value) -> App {
     let optional = |name: &str| truthy(field(app, name)).then(|| text(field(app, name)));
-    let kind = if text(field(app, "type")).eq_ignore_ascii_case("dotnet") {
-        AppKind::Dotnet {
+    let kind = match text(field(app, "type")).to_lowercase().as_str() {
+        super::TYPE_DOTNET => AppKind::Dotnet {
             project: native(&text(field(app, "project"))),
             launch_profile: text(field(app, "launchProfile")),
             swagger: optional("swagger"),
             args: list(field(app, "args")).into_iter().map(text).collect(),
+        },
+        super::TYPE_COMMAND => AppKind::Command(Box::new(to_command(app))),
+        super::TYPE_COMPOSE => AppKind::Command(Box::new(to_compose(app))),
+        _ => {
+            let variants = list(field(app, "variants")).into_iter().map(to_variant).collect();
+            AppKind::Npm { dir: native(&text(field(app, "dir"))), variants }
         }
-    } else {
-        let variants = list(field(app, "variants")).into_iter().map(to_variant).collect();
-        AppKind::Npm { dir: native(&text(field(app, "dir"))), variants }
     };
     let tests = list(field(app, "tests")).into_iter().map(text).collect();
     let depends_on = list(field(app, "dependsOn")).into_iter().map(text).collect();

@@ -462,11 +462,13 @@ pub fn scan(root: &Path, apps: &[App], layers: &[Layer], cache: &mut FileCache) 
 fn stack(root: &Path, apps: &[App], map: &mut CodeMap) {
     let first = map.parts.len();
     let mut closures = Vec::new();
-    for app in apps {
+    let apps: Vec<&App> = apps.iter().filter(|app| app.command().is_none()).collect();
+    for app in &apps {
         let projects = map.app_projects(&app.key);
         let (stack, path) = match &app.kind {
             AppKind::Dotnet { project, .. } => (Stack::Dotnet, root.join(project)),
             AppKind::Npm { dir, .. } => (Stack::Node, root.join(dir)),
+            AppKind::Command(_) => continue,
         };
         map.parts.push(Part {
             id: format!("app:{}", app.key),

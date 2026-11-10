@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Result, anyhow};
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+use crossterm::event::{DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture};
 use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{execute, queue};
 use ratatui::backend::{CrosstermBackend, TestBackend};
@@ -150,6 +150,26 @@ impl MouseCapture {
 impl Drop for MouseCapture {
     fn drop(&mut self) {
         self.set(false);
+    }
+}
+
+/// The terminal says when it gets and loses the focus while this lives (headless runs have no terminal).
+pub struct FocusReports {
+    live: bool,
+}
+
+impl FocusReports {
+    pub fn new(live: bool) -> Self {
+        let live = live && execute!(io::stdout(), EnableFocusChange).is_ok();
+        Self { live }
+    }
+}
+
+impl Drop for FocusReports {
+    fn drop(&mut self) {
+        if self.live {
+            let _ = execute!(io::stdout(), DisableFocusChange);
+        }
     }
 }
 

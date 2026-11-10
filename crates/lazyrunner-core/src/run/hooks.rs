@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 
 /// What a hook can wait for.
-pub const EVENTS: [&str; 8] = [
+pub const EVENTS: [&str; 10] = [
     "app.up",
     "app.crashed",
     "build.passed",
@@ -21,6 +21,8 @@ pub const EVENTS: [&str; 8] = [
     "tests.red",
     "migrations.applied",
     "update.installed",
+    "task.passed",
+    "task.failed",
 ];
 /// A hook still running after this long is stopped.
 pub const TIMEOUT: Duration = Duration::from_secs(60);

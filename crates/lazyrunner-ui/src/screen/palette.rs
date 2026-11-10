@@ -133,6 +133,7 @@ fn group_icon(group: &str) -> Icon {
     match group {
         "Recent" => Icon::Changelog,
         "Run" => Icon::Run,
+        super::actions::TASKS_GROUP => Icon::Tasks,
         "Tools" => Icon::Tools,
         "View" => Icon::View,
         "Help" => Icon::Help,

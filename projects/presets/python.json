@@ -1,0 +1,23 @@
+{
+  "id": "python",
+  "name": "Python",
+  "nerdIcon": "",
+  "detect": { "anyFile": ["pyproject.toml", "requirements.txt", "manage.py"] },
+  "tools": ["python"],
+  "path": [".venv/Scripts", ".venv/bin"],
+  "env": { "VIRTUAL_ENV": "{cwd}/.venv", "PYTHONUNBUFFERED": "1" },
+  "watch": ["**/*.py"],
+  "ready": { "line": "(?i)(running on|listening (on|at)|application startup complete|starting development server|serving on)", "orPort": true },
+  "errors": ["^[A-Za-z_][\\w.]*(Error|Exception)(: |$)", "\\b(ERROR|CRITICAL)\\b"],
+  "warnings": ["\\bWARNING\\b", "^\\S+Warning: "],
+  "frames": "File \"(?P<file>[^\"]+)\", line (?P<line>\\d+)",
+  "options": [
+    { "when": { "anyFile": ["uv.lock"] }, "install": "uv sync", "setup": [], "installFrom": ["uv.lock", "pyproject.toml"], "tools": ["python", "uv"] },
+    { "when": { "anyFile": ["pyproject.toml"], "program": "uv" }, "install": "uv sync", "setup": [], "installFrom": ["pyproject.toml"], "tools": ["python", "uv"] },
+    { "when": { "anyFile": ["requirements.txt"] }, "setup": "python -m venv .venv", "install": "python -m pip install -r requirements.txt", "installFrom": ["requirements.txt"] },
+    { "when": { "anyFile": ["pyproject.toml"] }, "setup": "python -m venv .venv", "install": "python -m pip install -e .", "installFrom": ["pyproject.toml"] },
+    { "when": { "anyFile": ["manage.py"] }, "run": "python manage.py runserver 127.0.0.1:{port}" },
+    { "when": { "anyFile": ["main.py"] }, "run": "python main.py" },
+    { "when": { "anyFile": ["app.py"] }, "run": "python app.py" }
+  ]
+}

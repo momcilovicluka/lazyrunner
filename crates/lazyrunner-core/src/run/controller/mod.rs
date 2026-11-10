@@ -7,6 +7,7 @@ mod audit;
 mod builds;
 mod causes;
 mod code_map;
+pub mod compose;
 mod handover;
 mod hooks;
 mod impact;
@@ -18,6 +19,7 @@ mod parallel;
 mod stack;
 mod start;
 mod suites;
+mod tasks;
 mod test_watch;
 #[cfg(test)]
 mod tests;
@@ -69,6 +71,8 @@ pub struct LogEntry {
     pub time: String,
     pub text: String,
     pub hue: Hue,
+    /// The task run (its job) whose output it is: folded away once that run passes.
+    pub task: Option<u64>,
 }
 
 /// A port an app needs that something else holds.
@@ -264,6 +268,17 @@ pub struct Controller {
     /// The code changes seen when the current start's builds began.
     code_at_start: u64,
     _watcher: Option<CodeWatcher>,
+    /// A command app's code (its `watch`), watched; the last save of each, until it restarts.
+    command_watchers: Vec<CodeWatcher>,
+    command_changes: HashMap<String, (Instant, PathBuf)>,
+    /// A command app's sources as its build began, for its stamp once it's built.
+    command_fingerprints: HashMap<String, Option<String>>,
+    /// The tasks running, and how each one's last run went.
+    task_jobs: Vec<tasks::TaskJob>,
+    composed: compose::Composed,
+    /// The most units a command app's build has compiled in this session (cargo's `Compiling` lines): its bar's end.
+    build_units: HashMap<String, usize>,
+    task_results: HashMap<String, tasks::TaskResult>,
     metric_roots: Arc<Mutex<Vec<(String, u32)>>>,
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
     pub(crate) commands: Arc<dyn super::tools::Commands>,
@@ -393,6 +408,13 @@ impl Controller {
             code: watch::CodeChanges::default(),
             code_at_start: 0,
             _watcher: watcher,
+            command_watchers: Vec::new(),
+            command_changes: HashMap::new(),
+            command_fingerprints: HashMap::new(),
+            task_jobs: Vec::new(),
+            composed: compose::Composed::default(),
+            build_units: HashMap::new(),
+            task_results: HashMap::new(),
             metric_roots,
             commands: Arc::new(super::tools::Tools),
             now: Instant::now,
@@ -418,6 +440,15 @@ impl Controller {
     /// Runs the project in `root` (another worktree of it, say).
     pub fn set_root(&mut self, root: &Path) {
         self.root = root.to_path_buf();
+        self.command_watchers = self
+            .apps
+            .iter()
+            .filter_map(|app| {
+                let command = app.command().filter(|command| !command.watch.is_empty())?;
+                let dir = root.join(&command.cwd);
+                super::watcher::watch_command(&dir, &command.watch, &app.key, self.events.clone())
+            })
+            .collect();
         self.git_dir = super::tools::git_dir(root);
         self.branch = self.git_dir.as_deref().and_then(super::tools::branch).unwrap_or_default();
         self.pending_branch = None;
@@ -543,7 +574,7 @@ impl Controller {
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&self.log_path) {
             let _ = writeln!(file, "{} {time} {text}", now.format("%Y-%m-%d"));
         }
-        self.log.push_back(LogEntry { time, text, hue });
+        self.log.push_back(LogEntry { time, text, hue, task: None });
         while self.log.len() > MAX_LOG_ENTRIES {
             self.log.pop_front();
         }
@@ -565,7 +596,11 @@ impl Controller {
                 let Some(index) = self.index(&key) else { return };
                 if self.states[index].generation == generation {
                     let app = self.apps[index].clone();
+                    let was_ready = self.states[index].ready_line;
                     let request = self.states[index].receive(&app, &line, now);
+                    if self.states[index].ready_line != was_ready {
+                        self.watch_states();
+                    }
                     let calls = self.states[index].outgoing.take();
                     if !calls.is_empty() {
                         self.calls.add(calls, now);
@@ -579,9 +614,11 @@ impl Controller {
             }
             Event::Output { tag: Tag::Build { key, job }, line } => self.build_output(&key, job, &line),
             Event::Output { tag: Tag::NpmCi { key, job }, line } => self.npm_ci_output(&key, job, &line),
+            Event::Output { tag: Tag::Task { key, job }, line } => self.task_output(&key, job, &line),
             Event::Exited { tag: Tag::App { key, generation }, code } => self.app_exited(&key, generation, code),
             Event::Exited { tag: Tag::Build { key, job }, code } => self.build_exited(&key, job, code),
             Event::Exited { tag: Tag::NpmCi { key, job }, code } => self.npm_ci_exited(&key, job, code),
+            Event::Exited { tag: Tag::Task { key, job }, code } => self.task_exited(&key, job, code),
             Event::Output { tag: Tag::Suite { key, job }, line } => self.suite_output(&key, job, &line),
             Event::Exited { tag: Tag::Suite { key, job }, code } => self.suite_exited(&key, job, code),
             Event::Output { tag: Tag::TestBuild { job }, line } => self.test_build_output(job, &line),
@@ -598,7 +635,11 @@ impl Controller {
                 let wanted: Vec<(String, u16, bool)> = self
                     .apps
                     .iter()
-                    .filter_map(|app| Some((app.key.clone(), self.port(&app.key)?, self.is_running(&app.key))))
+                    .flat_map(|app| self.app_ports(&app.key).into_iter().map(move |port| (app.key.clone(), port)))
+                    .map(|(key, port)| {
+                        let own = self.is_running(&key) || self.docker_holds(&key, port);
+                        (key, port, own)
+                    })
                     .collect();
                 self.port_map.update(&wanted, &self.listening, now);
                 self.listening_in_flight = false;
@@ -613,6 +654,9 @@ impl Controller {
                 self.code_soon(now);
                 self.code.changed(path, now);
             }
+            Event::CommandFileChanged { key, path } => {
+                self.command_changes.insert(key, (now, path));
+            }
             Event::TestFileChanged(path) => {
                 self.test_file_saved(&path, false, now);
                 self.impact_soon(now);
@@ -625,6 +669,8 @@ impl Controller {
             Event::Audit { key, result } => self.audit_done(key, result),
             Event::AuditInstalled { key, result } => self.audit_installed(key, result),
             Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),
+            Event::ComposeServices { key, generation, services } => self.compose_arrived(key, generation, services),
+            Event::ComposePorts { key, ports } => self.compose_ports_arrived(key, ports),
         }
     }
 
@@ -636,6 +682,7 @@ impl Controller {
         let Some(child) = self.states[index].child.take() else { return false };
         child.kill();
         drop(child);
+        self.stop_compose(key);
         self.states[index].status = Status::Stopped;
         if let Some(port) = self.port(key) {
             self.listening.ports.remove(&port);

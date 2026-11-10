@@ -53,6 +53,16 @@ pub fn summary(project: &Project) -> Vec<String> {
             AppKind::Dotnet { project, launch_profile, .. } => {
                 format!("  {}: dotnet build + run {project} (launch profile {launch_profile})", app.name)
             }
+            AppKind::Command(command) => {
+                let place = if command.cwd.is_empty() { "the repo root".to_string() } else { command.cwd.clone() };
+                let mut line = format!("  {}: {} in {place}", app.name, command.run.join(" "));
+                for (what, words) in [("built with", &command.build), ("installed with", &command.install)] {
+                    if !words.is_empty() {
+                        line.push_str(&format!(", {what} {}", words.join(" ")));
+                    }
+                }
+                line
+            }
         })
         .collect()
 }

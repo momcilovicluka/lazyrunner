@@ -248,6 +248,7 @@ pub fn scan(root: &Path, app: &App) -> Result<Vec<Package>> {
             let (audit, outdated) = both(|| run(&["audit", "--json"]), || run(&["outdated", "--json"]));
             npm(&audit?, &outdated?, |name| installed(&folder, name))
         }
+        AppKind::Command(_) => Ok(Vec::new()),
     }
 }
 
@@ -502,6 +503,7 @@ fn fix_args(app: &App, package: &Package) -> Option<(bool, Vec<String>)> {
         }
         AppKind::Npm { .. } if version.is_empty() => (false, vec!["audit".into(), "fix".into()]),
         AppKind::Npm { .. } => (false, vec!["install".into(), format!("{name}@{version}")]),
+        AppKind::Command(_) => return None,
     })
 }
 
@@ -544,13 +546,14 @@ fn run(root: &Path, app: &App, dotnet: bool, args: &[String]) -> Result<()> {
     bail!("{}", line.copied().unwrap_or("it failed"))
 }
 
-/// Where an app's [`command`] runs: a .NET app's project folder, an npm app's.
+/// Where an app's [`command`] runs: a .NET app's project folder, an npm app's, a command app's.
 pub fn folder(root: &Path, app: &App) -> PathBuf {
     match &app.kind {
         AppKind::Dotnet { project, .. } => {
             root.join(project).parent().map_or_else(|| root.to_path_buf(), Path::to_path_buf)
         }
         AppKind::Npm { dir, .. } => root.join(dir),
+        AppKind::Command(command) => root.join(&command.cwd),
     }
 }
 

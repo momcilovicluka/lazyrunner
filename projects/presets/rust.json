@@ -1,0 +1,17 @@
+{
+  "id": "rust",
+  "name": "Rust",
+  "nerdIcon": "",
+  "detect": { "anyFile": ["Cargo.toml"] },
+  "tools": ["cargo"],
+  "path": ["~/.cargo/bin"],
+  "build": "cargo build",
+  "env": { "RUST_BACKTRACE": "1" },
+  "watch": ["**/*.rs", "**/Cargo.toml"],
+  "errors": ["^error(\\[E\\d+\\])?: ", "panicked at", "\\bERROR\\b"],
+  "warnings": ["^warning: ", "\\bWARN\\b"],
+  "frames": "(?P<file>(?:[A-Za-z]:)?[^\\s:]+\\.rs):(?P<line>\\d+)(?::(?P<col>\\d+))?",
+  "options": [
+    { "when": { "anyFile": ["src/main.rs"] }, "run": "cargo run" }
+  ]
+}

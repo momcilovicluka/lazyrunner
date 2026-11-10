@@ -1012,7 +1012,7 @@ fn silent_apps(controller: &Controller) -> Vec<Vec<Seg>> {
         .iter()
         .zip(&controller.states)
         .filter(|(app, state)| {
-            app.traits().builds
+            app.is_dotnet()
                 && state.is_up()
                 && !state.output.newest_first(0).any(|line| line.text.contains("Now listening on"))
         })

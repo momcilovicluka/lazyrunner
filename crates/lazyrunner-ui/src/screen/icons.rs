@@ -3,7 +3,7 @@
 //! icon takes one cell. With them an app's title shows its `"nerdIcon"`, else .NET's or its framework's (Angular,
 //! React, Vue) else Node.js's; text written into the columns and the log stays as it is.
 
-use lazyrunner_core::apptypes::Framework;
+use lazyrunner_core::apptypes::{self, Framework};
 use lazyrunner_core::profile::App;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,6 +73,13 @@ pub enum Icon {
     Angular,
     Keyboard,
     Package,
+    /// A compose app, and Docker in the checklist.
+    Docker,
+    /// The palette's tasks.
+    Tasks,
+    /// A command app in Python, in Go.
+    Python,
+    Go,
     Clipboard,
     Copy,
     Hourglass,
@@ -180,6 +187,13 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Slower, true) => "\u{f062}", // arrow up
         (Icon::Faster, false) => "▼",
         (Icon::Faster, true) => "\u{f063}", // arrow down
+        (Icon::Docker, false) => "■",
+        (Icon::Python | Icon::Go, false) => "■",
+        (Icon::Python, true) => "\u{e73c}", // Python
+        (Icon::Go, true) => "\u{e724}",     // Go
+        (Icon::Tasks, false) => "▸",
+        (Icon::Tasks, true) => "\u{f0ae}",  // tasks
+        (Icon::Docker, true) => "\u{e7b0}", // Docker
         (Icon::Terminal, false) => "$",
         (Icon::Terminal, true) => "\u{f120}", // terminal
         (Icon::Bookmark, false) => "▌",
@@ -240,6 +254,26 @@ pub fn titled(nerd: bool, icon: Icon, title: &str) -> String {
     if nerd { format!("{} {title}", self::icon(true, icon)) } else { title.to_string() }
 }
 
+/// A language's icon (with Nerd Font icons).
+pub fn language_icon(language: &str) -> Icon {
+    match language {
+        apptypes::PYTHON => Icon::Python,
+        apptypes::GO => Icon::Go,
+        apptypes::RUST => Icon::Rust,
+        _ => Icon::Npm,
+    }
+}
+
+/// A language's chip without Nerd Font icons: `py`, `go`, `rs`, `js`.
+pub fn language_chip(language: &str) -> &'static str {
+    match language {
+        apptypes::PYTHON => "py",
+        apptypes::GO => "go",
+        apptypes::RUST => "rs",
+        _ => "js",
+    }
+}
+
 /// A startup check's icon, by its name.
 pub fn check(name: &str) -> Option<Icon> {
     match name {
@@ -252,20 +286,24 @@ pub fn check(name: &str) -> Option<Icon> {
         "Database" => Some(Icon::Database),
         "Profile" => Some(Icon::Folder),
         "Vulnerabilities" => Some(Icon::Shield),
+        lazyrunner_core::run::checks::DOCKER_CHECK => Some(Icon::Docker),
         _ if name.ends_with(" packages") => Some(Icon::Package),
         _ => None,
     }
 }
 
-/// An app's icon in its title bar: its profile's, else one for its kind - with Nerd Font icons .NET's, or its
-/// framework's (`framework`) else Node.js's.
+/// An app's icon in its title bar: its profile's, else one for its kind - with Nerd Font icons .NET's, a command
+/// app's terminal, or its framework's (`framework`) else Node.js's.
 pub fn app(nerd: bool, app: &App, framework: Option<Framework>) -> &str {
-    let builds = app.traits().builds;
+    let dotnet = app.is_dotnet();
+    let compose = app.command().is_some_and(|command| command.compose.is_some());
     if !nerd {
-        return app.icon.as_deref().unwrap_or(icon(false, if builds { Icon::Dotnet } else { Icon::Npm }));
+        return app.icon.as_deref().unwrap_or(icon(false, if dotnet { Icon::Dotnet } else { Icon::Npm }));
     }
     let kind = match framework {
-        _ if builds => icon(true, Icon::Dotnet),
+        _ if dotnet => icon(true, Icon::Dotnet),
+        _ if compose => icon(true, Icon::Docker),
+        _ if app.command().is_some() => icon(true, apptypes::language(app).map_or(Icon::Terminal, language_icon)),
         Some(Framework::Angular) => "\u{e753}",
         Some(Framework::React) => "\u{e7ba}",
         Some(Framework::Vue) => "\u{e6a0}",
@@ -279,6 +317,14 @@ mod tests {
     use unicode_width::UnicodeWidthStr;
 
     use super::*;
+
+    #[test]
+    fn a_languages_icon_and_chip() {
+        assert_eq!((language_icon(apptypes::PYTHON), language_chip(apptypes::PYTHON)), (Icon::Python, "py"));
+        assert_eq!((language_icon(apptypes::GO), language_chip(apptypes::GO)), (Icon::Go, "go"));
+        assert_eq!((language_icon(apptypes::RUST), language_chip(apptypes::RUST)), (Icon::Rust, "rs"));
+        assert_eq!((language_icon(apptypes::NODE), language_chip(apptypes::NODE)), (Icon::Npm, "js"));
+    }
 
     #[test]
     fn every_nerd_icon_takes_one_cell() {
@@ -325,6 +371,10 @@ mod tests {
             Icon::Slower,
             Icon::Faster,
             Icon::Terminal,
+            Icon::Docker,
+            Icon::Tasks,
+            Icon::Python,
+            Icon::Go,
             Icon::Bookmark,
             Icon::Lock,
             Icon::Pencil,

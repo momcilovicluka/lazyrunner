@@ -516,3 +516,171 @@ mod scripted {
         drop(holder);
     }
 }
+
+/// A command app run for real (by cmd or sh): in its folder, its port in its command, up once its ready line shows,
+/// its error line counted.
+#[tokio::test]
+async fn a_command_app_runs_in_its_folder_with_its_port_and_is_up_once_its_line_shows() {
+    use std::time::Duration;
+    let temp = TempDir::new("command-run");
+    let repo = temp.join("repo");
+    std::fs::create_dir_all(repo.join("svc")).unwrap();
+    let (shell, flag, script) = if cfg!(windows) {
+        ("cmd", "/C", "echo port {port} in %CD%& echo BOOM bad& echo Worker ready& ping -n 30 127.0.0.1 >nul")
+    } else {
+        ("sh", "-c", "echo port {port} in $PWD; echo BOOM bad; echo Worker ready; sleep 30")
+    };
+    let profile = json!({
+        "schemaVersion": 1, "id": "cmd", "name": "Commands", "detect": { "anyFile": ["marker"] }, "watch": ["svc"],
+        "apps": [{ "key": "worker", "name": "Worker", "type": "command", "run": [shell, flag, script], "cwd": "svc",
+                   "port": 47998, "ready": { "line": "Worker ready" }, "errors": ["^BOOM"] }]
+    });
+    let file = temp.join("profile.json");
+    crate::config::write(&file, &profile).unwrap();
+    let paths = Paths {
+        config_file: temp.join("config.json"),
+        state_dir: temp.join("state"),
+        profiles: ProfileDirs { user: temp.join("profiles"), bundled: temp.join("bundled"), only: Some(file.clone()) },
+    };
+    crate::config::write(&paths.config_file, &json!({})).unwrap();
+    let project = import(&file, &paths.profiles).unwrap();
+    let (events, mut rx) = mpsc::unbounded_channel();
+    let mut controller = Controller::new(Setup { project, root: repo, paths, events, guard: None }).unwrap();
+    controller.start(None, false);
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+    while !controller.state("worker").is_some_and(|state| state.is_up()) {
+        let log: Vec<String> = controller.log.iter().map(|entry| entry.text.clone()).collect();
+        match tokio::time::timeout_at(deadline, rx.recv()).await {
+            Ok(Some(event)) => controller.handle(event),
+            _ => panic!("not up; the log:\n{}", log.join("\n")),
+        }
+    }
+    let state = controller.state("worker").unwrap();
+    let said: Vec<String> = state.output.newest_first(0).map(|line| line.text.clone()).collect();
+    let started = said.iter().find(|line| line.starts_with("port ")).cloned().unwrap_or_default();
+    assert!(started.starts_with("port 47998 in") && started.trim_end().ends_with("svc"), "{said:?}");
+    assert_eq!(state.errors, 1, "{said:?}");
+    controller.stop(None, true);
+}
+
+/// Tasks run for real (by cmd or sh): their output under a rule in the panel's log, a good one's time, a failed one's
+/// first error line, both kept in the durations and as their last result.
+#[tokio::test]
+async fn a_task_runs_in_the_background_its_output_in_the_log_and_its_result_said() {
+    use std::time::Duration;
+    let temp = TempDir::new("task-run");
+    let repo = temp.join("repo");
+    std::fs::create_dir_all(repo.join("tools")).unwrap();
+    let (shell, flag) = if cfg!(windows) { ("cmd", "/C") } else { ("sh", "-c") };
+    let (good, bad) = if cfg!(windows) {
+        ("echo seeding& echo 3 rows in %CD%", "echo starting& echo error: no database& exit /b 3")
+    } else {
+        ("echo seeding; echo 3 rows in $PWD", "echo starting; echo error: no database; exit 3")
+    };
+    let profile = json!({
+        "schemaVersion": 1, "id": "tasks", "name": "Tasks", "detect": { "anyFile": ["marker"] }, "watch": ["tools"],
+        "apps": [{ "key": "worker", "name": "Worker", "type": "command", "run": [shell, flag, "echo up"] }],
+        "tasks": [
+            { "key": "seed", "name": "Seed the database", "run": [shell, flag, good], "cwd": "tools" },
+            { "key": "broken", "name": "Broken", "run": [shell, flag, bad] }
+        ]
+    });
+    let file = temp.join("profile.json");
+    crate::config::write(&file, &profile).unwrap();
+    let paths = Paths {
+        config_file: temp.join("config.json"),
+        state_dir: temp.join("state"),
+        profiles: ProfileDirs { user: temp.join("profiles"), bundled: temp.join("bundled"), only: Some(file.clone()) },
+    };
+    crate::config::write(&paths.config_file, &json!({})).unwrap();
+    let project = import(&file, &paths.profiles).unwrap();
+    let (events, mut rx) = mpsc::unbounded_channel();
+    let mut controller = Controller::new(Setup { project, root: repo, paths, events, guard: None }).unwrap();
+    controller.run_task("seed");
+    controller.run_task("broken");
+    assert_eq!(controller.tasks_running().len(), 2);
+    controller.run_task("seed");
+    assert!(last_log(&controller).contains("already running"), "{}", last_log(&controller));
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+    while !controller.tasks_running().is_empty() {
+        let log: Vec<String> = controller.log.iter().map(|entry| entry.text.clone()).collect();
+        match tokio::time::timeout_at(deadline, rx.recv()).await {
+            Ok(Some(event)) => controller.handle(event),
+            _ => panic!("still running; the log:\n{}", log.join("\n")),
+        }
+    }
+    let log: Vec<String> = controller.log.iter().map(|entry| entry.text.clone()).collect();
+    let said = log.join("\n");
+    assert!(said.contains("╭─ ▸ Seed the database ·") && !said.contains("│ seeding"), "it passed: folded {said}");
+    let passed = log.iter().find(|line| line.starts_with("╰─ ✓ Seed the database in")).cloned().unwrap_or_default();
+    assert!(passed.ends_with("2 lines folded (the log file has them)"), "{said}");
+    let file = std::fs::read_to_string(&controller.log_path).unwrap();
+    assert!(file.lines().any(|line| line.contains("│ 3 rows in") && line.trim_end().ends_with("tools")), "{file}");
+    assert!(
+        said.contains("│ starting") && said.contains("╰─ ✗ Broken failed after"),
+        "a failure keeps its lines: {said}"
+    );
+    assert!(said.contains(": error: no database"), "{said}");
+    let failed: Vec<&str> = controller.task_failures().iter().map(|(task, _)| task.key.as_str()).collect();
+    assert_eq!(failed, ["broken"]);
+    controller.dismiss_task_result("broken");
+    assert!(controller.task_failures().is_empty(), "put away");
+    let seed = controller.task_result("seed").unwrap();
+    let broken = controller.task_result("broken").unwrap();
+    assert!(seed.ok && !broken.ok && broken.error.as_deref() == Some("error: no database"));
+    assert!(controller.durations.item(crate::run::history::Kind::Task, "seed").is_some());
+    controller.run_task("nothing");
+    assert!(last_log(&controller).contains("There is no task 'nothing'"));
+}
+
+/// A command app's install for real (by cmd or sh): its setup first while its .venv isn't there, then its install;
+/// in sync with what it installs from until that changes, which the log says.
+#[tokio::test]
+async fn a_command_apps_setup_makes_its_folder_then_its_install_runs_and_a_change_makes_it_due() {
+    use std::time::Duration;
+    let temp = TempDir::new("command-install");
+    let repo = temp.join("repo");
+    crate::testing::write(repo.join("svc/requirements.txt"), "flask\n");
+    let (shell, flag, make, install) = if cfg!(windows) {
+        ("cmd", "/C", "mkdir .venv\\Scripts", "echo installed")
+    } else {
+        ("sh", "-c", "mkdir -p .venv/bin", "echo installed")
+    };
+    let profile = json!({
+        "schemaVersion": 1, "id": "cmd", "name": "Commands", "detect": { "anyFile": ["marker"] }, "watch": ["svc"],
+        "apps": [{ "key": "svc", "name": "Svc", "type": "command", "run": "x", "cwd": "svc",
+                   "path": [".venv/Scripts", ".venv/bin"], "setup": [shell, flag, make], "install": [shell, flag, install],
+                   "installFrom": ["requirements.txt"] }]
+    });
+    let file = temp.join("profile.json");
+    crate::config::write(&file, &profile).unwrap();
+    let paths = Paths {
+        config_file: temp.join("config.json"),
+        state_dir: temp.join("state"),
+        profiles: ProfileDirs { user: temp.join("profiles"), bundled: temp.join("bundled"), only: Some(file.clone()) },
+    };
+    crate::config::write(&paths.config_file, &json!({})).unwrap();
+    let project = import(&file, &paths.profiles).unwrap();
+    let (events, mut rx) = mpsc::unbounded_channel();
+    let mut controller = Controller::new(Setup { project, root: repo.clone(), paths, events, guard: None }).unwrap();
+    controller.npm_ci(Some("svc"));
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+    while !controller.log.iter().any(|entry| entry.text.starts_with("✓ install done")) {
+        let log: Vec<String> = controller.log.iter().map(|entry| entry.text.clone()).collect();
+        match tokio::time::timeout_at(deadline, rx.recv()).await {
+            Ok(Some(event)) => controller.handle(event),
+            _ => panic!("not installed; the log:\n{}", log.join("\n")),
+        }
+    }
+    let said: Vec<String> = controller.log.iter().map(|entry| entry.text.clone()).collect();
+    assert!(said.iter().any(|line| line.starts_with("Running setup for Svc")), "{said:?}");
+    assert!(repo.join("svc/.venv").is_dir() && controller.lock_in_sync("svc") == Some(true), "{said:?}");
+    crate::testing::write(repo.join("svc/requirements.txt"), "flask\nrequests\n");
+    assert_eq!(controller.lock_in_sync("svc"), Some(false));
+    controller.test_lock_changed();
+    assert!(
+        last_log(&controller).contains("requirements.txt changed since its last install - press i"),
+        "{}",
+        last_log(&controller)
+    );
+}

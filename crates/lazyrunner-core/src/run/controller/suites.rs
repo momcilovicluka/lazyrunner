@@ -394,7 +394,7 @@ impl Controller {
         let limit = self.test_parallelism();
         let npm_ci_dir = self.npm_ci.as_ref().and_then(|job| match &self.app(&job.key)?.kind {
             AppKind::Npm { dir, .. } => Some(self.root.join(dir)),
-            AppKind::Dotnet { .. } => None,
+            AppKind::Dotnet { .. } | AppKind::Command(_) => None,
         });
         for key in self.test_queue.clone() {
             let running = self.all_suites().filter(|suite| suite.status == Status::Running).count();
