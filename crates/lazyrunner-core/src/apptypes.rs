@@ -1,5 +1,5 @@
-//! App types: the one place that knows what a dotnet or an npm app is. Everything else asks about a trait
-//! (`app.traits().builds`) or calls a function here, so a new type is a new entry plus its commands.
+//! App types: the one place that knows what a dotnet, an npm or a command app is. Everything else asks about a
+//! trait (`app.traits().builds`) or calls a function here, so a new type is a new entry plus its commands.
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -8,13 +8,16 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::json::{self, field, field_ci, has_key_ci, keys, truthy};
-use crate::profile::{App, AppKind, Variant, join};
+use crate::profile::{App, AppKind, Command, Ready, TYPE_COMMAND, TYPE_COMPOSE, TYPE_DOTNET, TYPE_NPM, Variant, join};
 use crate::profiletools::{Problem, Severity};
 
 /// What a type of app does.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Traits {
-    /// Built before it starts (dotnet build), one build at a time, skipped when nothing changed.
+    /// Its type in the profile (`"type"`).
+    pub name: &'static str,
+    /// Built before it starts (dotnet build, a command app's build), one build at a time, skipped when nothing
+    /// changed.
     pub builds: bool,
     /// Reads the user secrets: restarts when the database is switched.
     pub uses_secrets: bool,
@@ -22,7 +25,7 @@ pub struct Traits {
     pub counts_requests: bool,
     /// Indented lines continue the previous log entry.
     pub indented_logs: bool,
-    /// Has a package-lock.json to install with npm ci.
+    /// Has packages to install: npm ci with its package-lock.json, a command app's install.
     pub installs: bool,
     /// Runs one of the profile's variants, picked by which script package.json has.
     pub variants: bool,
@@ -37,6 +40,7 @@ pub struct Traits {
 }
 
 const DOTNET: Traits = Traits {
+    name: TYPE_DOTNET,
     builds: true,
     uses_secrets: true,
     counts_requests: true,
@@ -49,6 +53,7 @@ const DOTNET: Traits = Traits {
     start_verb: "starting",
 };
 const NPM: Traits = Traits {
+    name: TYPE_NPM,
     builds: false,
     uses_secrets: false,
     counts_requests: false,
@@ -60,14 +65,95 @@ const NPM: Traits = Traits {
     frontend: true,
     start_verb: "compiling",
 };
+/// A command app builds when it has a build and installs when it has an install.
+const COMMAND: Traits = Traits {
+    name: TYPE_COMMAND,
+    builds: false,
+    uses_secrets: false,
+    counts_requests: false,
+    indented_logs: false,
+    installs: false,
+    variants: false,
+    watches_own_files: false,
+    colors_errors: true,
+    frontend: false,
+    start_verb: "starting",
+};
 
 impl App {
-    pub fn traits(&self) -> &'static Traits {
-        match self.kind {
-            AppKind::Dotnet { .. } => &DOTNET,
-            AppKind::Npm { .. } => &NPM,
+    pub fn traits(&self) -> Traits {
+        match &self.kind {
+            AppKind::Dotnet { .. } => DOTNET,
+            AppKind::Npm { .. } => NPM,
+            AppKind::Command(command) => Traits {
+                name: if command.compose.is_some() { TYPE_COMPOSE } else { TYPE_COMMAND },
+                builds: !command.build.is_empty(),
+                installs: !command.install.is_empty(),
+                ..COMMAND
+            },
         }
     }
+
+    pub fn is_dotnet(&self) -> bool {
+        matches!(self.kind, AppKind::Dotnet { .. })
+    }
+
+    pub fn command(&self) -> Option<&Command> {
+        match &self.kind {
+            AppKind::Command(command) => Some(command),
+            _ => None,
+        }
+    }
+}
+
+/// The languages lazyrunner knows a command app by.
+pub const PYTHON: &str = "python";
+pub const GO: &str = "go";
+pub const RUST: &str = "rust";
+pub const NODE: &str = "node";
+/// The programs that say what a command app is written in.
+const LANGUAGE_PROGRAMS: [(&str, &[&str]); 4] = [
+    (
+        PYTHON,
+        &[
+            "python",
+            "python3",
+            "py",
+            "uv",
+            "uvicorn",
+            "gunicorn",
+            "hypercorn",
+            "flask",
+            "fastapi",
+            "poetry",
+            "django-admin",
+        ],
+    ),
+    (GO, &["go", "air"]),
+    (RUST, &["cargo"]),
+    (NODE, &["node", "npm", "npx", "pnpm", "yarn", "bun", "tsx", "nodemon"]),
+];
+
+/// What a command app is written in: its preset's language, else its program's (`.venv/Scripts/python.exe`).
+pub fn language(app: &App) -> Option<&'static str> {
+    let command = app.command().filter(|command| command.compose.is_none())?;
+    let known = |name: &str| {
+        LANGUAGE_PROGRAMS.iter().map(|(language, _)| *language).find(|language| language.eq_ignore_ascii_case(name))
+    };
+    if let Some(language) = command.preset.as_deref().and_then(known) {
+        return Some(language);
+    }
+    let program = command.run.first().and_then(|program| Path::new(program).file_stem())?;
+    let program = program.to_string_lossy().to_lowercase();
+    LANGUAGE_PROGRAMS.iter().find(|(_, programs)| programs.contains(&program.as_str())).map(|(language, _)| *language)
+}
+
+/// A command app's port: its own, else the one `ready` waits for.
+pub fn command_port(command: &Command) -> Option<u16> {
+    command.port.or(match command.ready {
+        Ready::Port(port) => Some(port),
+        _ => None,
+    })
 }
 
 fn app_setting<'a>(config: &'a Value, key: &str, setting: &str) -> &'a Value {
@@ -239,6 +325,7 @@ pub fn available_variants(root: &Path, app: &App) -> Vec<Variant> {
 pub fn port(root: &Path, app: &App, active: &[App]) -> Option<u16> {
     match &app.kind {
         AppKind::Npm { .. } => mode(root, app, active)?.port,
+        AppKind::Command(command) => command_port(command),
         AppKind::Dotnet { project, launch_profile, .. } => {
             let settings = json::read(&root.join(launch_settings_path(project)))?;
             let profile = field_ci(field(&settings, "profiles"), launch_profile)?;
@@ -364,13 +451,116 @@ pub fn setup_problems(root: &Path, app: &App, at: &str, active: &[App]) -> Vec<P
                 problems.push(Problem::new(Severity::Info, at, message));
             }
         }
+        AppKind::Command(command) => command_problems(root, command, at, &mut problems),
     }
     problems
+}
+
+/// A command app: its folder is there, each of its programs can be found, and a preset is suggested when its folder
+/// looks like one's.
+fn command_problems(root: &Path, command: &Command, at: &str, problems: &mut Vec<Problem>) {
+    let (dir, folders) = crate::run::tools::command_folders(root, command);
+    if !dir.is_dir() {
+        let message = format!("{} doesn't exist", command.cwd);
+        problems.push(Problem::new(Severity::Error, format!("{at}.cwd"), message));
+        return;
+    }
+    if let Some(compose) = &command.compose {
+        compose_problems(&dir, compose, at, problems);
+        return;
+    }
+    for (name, words) in [("run", &command.run), ("build", &command.build), ("install", &command.install)] {
+        let Some(program) = words.first() else { continue };
+        if crate::run::tools::program_path(&dir, &folders, program).is_none() {
+            let hint = missing_path(command, &folders);
+            let message =
+                format!("{program} was not found on PATH or in its folder - install it, or name it by its path{hint}");
+            problems.push(Problem::new(Severity::Warning, format!("{at}.{name}"), message));
+        }
+    }
+    if command.preset.is_none()
+        && let Some(preset) = crate::profile::preset::looks_like(&dir)
+    {
+        let (id, name) = (json::text(field(&preset, "id")), json::text(field(&preset, "name")));
+        let message = format!(
+            "it looks like a {name} project: \"preset\": \"{id}\" fills in its install, its errors and stack frames, and what counts as its code"
+        );
+        problems.push(Problem::new(Severity::Info, at.to_string(), message));
+    }
+}
+
+/// A compose app: Docker is installed, and its compose file is there.
+fn compose_problems(dir: &Path, compose: &crate::profile::Compose, at: &str, problems: &mut Vec<Problem>) {
+    if crate::run::tools::find_on_path(crate::profile::DOCKER).is_none() {
+        let message = "docker was not found on PATH - install Docker".to_string();
+        problems.push(Problem::new(Severity::Warning, at.to_string(), message));
+    }
+    match &compose.file {
+        Some(file) if !dir.join(file).is_file() => {
+            problems.push(Problem::new(Severity::Error, format!("{at}.file"), format!("{file} doesn't exist")));
+        }
+        None if !crate::profile::COMPOSE_FILES.iter().any(|file| dir.join(file).is_file()) => {
+            let files = crate::profile::COMPOSE_FILES.join(", ");
+            let message = format!("{} has no compose file ({files})", dir.display());
+            problems.push(Problem::new(Severity::Error, at.to_string(), message));
+        }
+        _ => {}
+    }
+}
+
+/// When none of a command app's `path` folders is there yet: which, and that installing makes it.
+pub fn missing_path(command: &Command, folders: &[PathBuf]) -> String {
+    let own: Vec<&str> = crate::run::tools::own_folders(command).into_iter().map(String::as_str).collect();
+    if own.is_empty() || !folders.is_empty() {
+        return String::new();
+    }
+    format!(" ({} isn't there yet - i installs it)", own.join(" or "))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_command_apps_language_is_its_presets_else_its_programs() {
+        let app = |preset: Option<&str>, run: &str| {
+            let command = Command {
+                run: vec![run.to_string()],
+                cwd: String::new(),
+                port: None,
+                build: Vec::new(),
+                install: Vec::new(),
+                setup: Vec::new(),
+                install_from: Vec::new(),
+                ready: Ready::Started,
+                watch: Vec::new(),
+                errors: Vec::new(),
+                warnings: Vec::new(),
+                frames: None,
+                preset: preset.map(str::to_string),
+                path: Vec::new(),
+                tools: Vec::new(),
+                compose: None,
+            };
+            App {
+                key: "a".into(),
+                name: "A".into(),
+                icon: None,
+                nerd_icon: None,
+                kind: AppKind::Command(Box::new(command)),
+                tests: Vec::new(),
+                migrations: None,
+                env: Vec::new(),
+                depends_on: Vec::new(),
+            }
+        };
+        assert_eq!(language(&app(Some("python"), "./serve.ps1")), Some(PYTHON), "its preset's");
+        assert_eq!(language(&app(None, ".venv/Scripts/python.exe")), Some(PYTHON));
+        assert_eq!(language(&app(None, "go")), Some(GO));
+        assert_eq!(language(&app(None, "cargo")), Some(RUST));
+        assert_eq!(language(&app(Some("java"), "npx")), Some(NODE), "an unknown preset: by its program");
+        assert_eq!(language(&app(None, "azurite")), None);
+    }
 
     #[test]
     fn a_url_gives_its_port_or_the_schemes_default() {

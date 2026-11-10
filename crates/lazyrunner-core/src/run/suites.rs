@@ -341,13 +341,13 @@ fn owner(root: &Path, apps: &[App], suite: &Suite) -> Option<String> {
             let referenced = references(project);
             apps.iter().find(|app| match &app.kind {
                 AppKind::Dotnet { project: own, .. } => referenced.contains(&same(&root.join(own))),
-                AppKind::Npm { .. } => false,
+                AppKind::Npm { .. } | AppKind::Command(_) => false,
             })
         }
         Runner::Npm { dir: folder, .. } | Runner::Nx { workspace: folder, .. } => {
             apps.iter().find(|app| match &app.kind {
                 AppKind::Npm { dir, .. } => same(&root.join(dir)) == same(folder),
-                AppKind::Dotnet { .. } => false,
+                AppKind::Dotnet { .. } | AppKind::Command(_) => false,
             })
         }
     });

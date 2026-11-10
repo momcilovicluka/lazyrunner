@@ -11,22 +11,19 @@
 <rect x="887.6" y="48.0" width="92.4" height="18" fill="#a6e3a1"/>
 <rect x="1106.0" y="48.0" width="67.2" height="18" fill="#cba6f7"/>
 <text x="14.0" y="61.7" fill="#11111b" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ▸ ◆ Orders </text>
-<text x="114.8" y="61.7" fill="#1e1e2e" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> :47201  ● 12</text>
+<text x="114.8" y="61.7" fill="#1e1e2e" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● 12 ms  up</text>
 <text x="224.0" y="61.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┳</text>
 <text x="232.4" y="61.7" fill="#11111b" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ■ Billing </text>
-<text x="324.8" y="61.7" fill="#6c7086" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> :47202  </text>
-<text x="400.4" y="61.7" fill="#a6e3a1" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● 8 m</text>
+<text x="341.6" y="61.7" fill="#a6e3a1" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● 8 ms  up i</text>
 <text x="442.4" y="61.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┬</text>
 <text x="450.8" y="61.7" fill="#11111b" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ■ Shop </text>
-<text x="518.0" y="61.7" fill="#6c7086" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> :47301  </text>
-<text x="593.6" y="61.7" fill="#a6e3a1" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● 3 ms</text>
+<text x="534.8" y="61.7" fill="#a6e3a1" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● 3 ms  up in 3</text>
 <text x="660.8" y="61.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┬</text>
 <text x="669.2" y="61.7" fill="#11111b" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ■ Docs </text>
 <text x="753.2" y="61.7" fill="#a6e3a1" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● built, watchi</text>
 <text x="879.2" y="61.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┬</text>
 <text x="887.6" y="61.7" fill="#11111b" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ■ Console </text>
-<text x="980.0" y="61.7" fill="#6c7086" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> :47303  </text>
-<text x="1055.6" y="61.7" fill="#a6e3a1" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● 4 m</text>
+<text x="996.8" y="61.7" fill="#a6e3a1" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● 4 ms  up i</text>
 <text x="1097.6" y="61.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="61.7" fill="#1e1e2e" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Themes </text>
 <text x="1173.2" y="61.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  26 of 26</text>
@@ -74,7 +71,7 @@
 <text x="1383.2" y="115.7" fill="#61d6d6" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="115.7" fill="#3b78ff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="115.7" fill="#b4009e" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="133.7" fill="#94e2d5" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.L</text>
+<text x="14.0" y="133.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.</text>
 <text x="224.0" y="133.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="133.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="133.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -82,7 +79,7 @@
 <text x="1097.6" y="133.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="133.7" fill="#89dceb" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Dark </text>
 <text x="1156.4" y="133.7" fill="#6c7086" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">─────────────────────────────────</text>
-<text x="14.0" y="151.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ifetime[14]</text>
+<text x="14.0" y="151.7" fill="#94e2d5" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Lifetime[14]</text>
 <text x="224.0" y="151.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="151.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="151.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -97,7 +94,6 @@
 <text x="1400.0" y="151.7" fill="#dfbfff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <rect x="1106.0" y="156.0" width="252.0" height="18" fill="#cba6f7"/>
 <text x="14.0" y="169.7" fill="#a6e3a1" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Now listening on: </text>
-<text x="215.6" y="169.7" fill="#a6e3a1" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">h</text>
 <text x="224.0" y="169.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="169.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="169.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -110,7 +106,7 @@
 <text x="1383.2" y="169.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="169.7" fill="#89b4fa" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="169.7" fill="#f5c2e7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="187.7" fill="#a6e3a1" textLength="176.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">ttp://localhost:47201</text>
+<text x="14.0" y="187.7" fill="#a6e3a1" textLength="184.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">http://localhost:47201</text>
 <text x="224.0" y="187.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="187.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="187.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -123,7 +119,7 @@
 <text x="1383.2" y="187.7" fill="#56b6c2" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="187.7" fill="#61afef" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="187.7" fill="#c678dd" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="205.7" fill="#94e2d5" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.L</text>
+<text x="14.0" y="205.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.</text>
 <text x="224.0" y="205.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="205.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="205.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -136,7 +132,7 @@
 <text x="1383.2" y="205.7" fill="#a4ffff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="205.7" fill="#bd93f9" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="205.7" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="223.7" fill="#94e2d5" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ifetime[0]</text>
+<text x="14.0" y="223.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Lifetime[0]</text>
 <text x="224.0" y="223.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="223.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="223.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -148,7 +144,7 @@
 <text x="1374.8" y="223.7" fill="#87ff5f" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1383.2" y="223.7" fill="#a4d2ec" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■■</text>
 <text x="1400.0" y="223.7" fill="#b968fc" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="241.7" fill="#a6e3a1" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Application started</text>
+<text x="14.0" y="241.7" fill="#a6e3a1" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Application </text>
 <text x="224.0" y="241.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="241.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="241.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -161,7 +157,7 @@
 <text x="1383.2" y="241.7" fill="#83c092" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="241.7" fill="#7fbbb3" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="241.7" fill="#d699b6" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="259.7" fill="#a6e3a1" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">.</text>
+<text x="14.0" y="259.7" fill="#a6e3a1" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">started.</text>
 <text x="224.0" y="259.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="259.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="259.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -177,6 +173,7 @@
 <text x="14.0" y="277.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Shop.Orders.Api[0]</text>
 <text x="224.0" y="277.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="442.4" y="277.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="450.8" y="277.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; shop@1.4.0 dev         </text>
 <text x="660.8" y="277.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="879.2" y="277.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="1097.6" y="277.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
@@ -187,9 +184,11 @@
 <text x="1383.2" y="277.7" fill="#8ec07c" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="277.7" fill="#83a598" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="277.7" fill="#d3869b" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="295.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders?pag</text>
+<text x="14.0" y="295.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders?   </text>
 <text x="224.0" y="295.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="295.7" fill="#94e2d5" textLength="218.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.L│</text>
+<text x="232.4" y="295.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.</text>
+<text x="442.4" y="295.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="450.8" y="295.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; vite --port 47301      </text>
 <text x="660.8" y="295.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="879.2" y="295.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="1097.6" y="295.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
@@ -200,11 +199,10 @@
 <text x="1383.2" y="295.7" fill="#7bf8e1" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="295.7" fill="#7bb9fd" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="295.7" fill="#ff9cea" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="313.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">e=1 200 14 ms            </text>
+<text x="14.0" y="313.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">page=1 200 14 ms         </text>
 <text x="224.0" y="313.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="313.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ifetime[14]</text>
+<text x="232.4" y="313.7" fill="#94e2d5" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Lifetime[14]</text>
 <text x="442.4" y="313.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="313.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; shop@1.4.0 dev         </text>
 <text x="660.8" y="313.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="879.2" y="313.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="1097.6" y="313.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
@@ -218,9 +216,8 @@
 <text x="14.0" y="331.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Shop.Orders.Api[0]</text>
 <text x="224.0" y="331.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="232.4" y="331.7" fill="#a6e3a1" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Now listening on: </text>
-<text x="434.0" y="331.7" fill="#a6e3a1" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">h</text>
 <text x="442.4" y="331.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="331.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; vite --port 47301      </text>
+<text x="450.8" y="331.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  VITE v5.4.10  ready    </text>
 <text x="660.8" y="331.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="879.2" y="331.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="1097.6" y="331.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
@@ -231,10 +228,11 @@
 <text x="1383.2" y="331.7" fill="#7aa89f" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="331.7" fill="#7fb4ca" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="331.7" fill="#d27e99" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="349.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders/104</text>
+<text x="14.0" y="349.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders/   </text>
 <text x="224.0" y="349.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="349.7" fill="#a6e3a1" textLength="176.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">ttp://localhost:47202</text>
+<text x="232.4" y="349.7" fill="#a6e3a1" textLength="184.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">http://localhost:47202</text>
 <text x="442.4" y="349.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="450.8" y="349.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">in 812 ms                </text>
 <text x="660.8" y="349.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="879.2" y="349.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="1097.6" y="349.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
@@ -244,10 +242,10 @@
 <text x="1374.8" y="349.7" fill="#a9dc76" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1383.2" y="349.7" fill="#78dce8" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■■</text>
 <text x="1400.0" y="349.7" fill="#ab9df2" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="367.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 200 7 ms               </text>
+<text x="14.0" y="367.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1042 200 7 ms            </text>
 <text x="224.0" y="367.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="367.7" fill="#94e2d5" textLength="218.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.L│</text>
-<text x="450.8" y="367.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  VITE v5.4.10  ready in </text>
+<text x="232.4" y="367.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Microsoft.Hosting.</text>
+<text x="442.4" y="367.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="660.8" y="367.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="879.2" y="367.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="1097.6" y="367.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
@@ -258,11 +256,12 @@
 <text x="1383.2" y="367.7" fill="#7fdbca" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="367.7" fill="#82aaff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="367.7" fill="#c792ea" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="385.7" fill="#f9e2af" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">warn: Shop.Orders.Checkou</text>
+<text x="14.0" y="385.7" fill="#f9e2af" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">warn: Shop.Orders.</text>
 <text x="224.0" y="385.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="385.7" fill="#94e2d5" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ifetime[0]</text>
+<text x="232.4" y="385.7" fill="#94e2d5" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Lifetime[0]</text>
 <text x="442.4" y="385.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="385.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">812 ms                   </text>
+<text x="450.8" y="385.7" fill="#cdd6f4" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ➜  Local:   </text>
+<text x="568.4" y="385.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">http://</text>
 <text x="660.8" y="385.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="669.2" y="385.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; docs@1.4.0 watch       </text>
 <text x="879.2" y="385.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -274,10 +273,11 @@
 <text x="1383.2" y="385.7" fill="#88c0d0" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="385.7" fill="#81a1c1" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="385.7" fill="#b48ead" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="403.7" fill="#f9e2af" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">t[0]</text>
+<text x="14.0" y="403.7" fill="#f9e2af" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Checkout[0]</text>
 <text x="224.0" y="403.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="403.7" fill="#a6e3a1" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Application started</text>
+<text x="232.4" y="403.7" fill="#a6e3a1" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Application </text>
 <text x="442.4" y="403.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="450.8" y="403.7" fill="#cdd6f4" textLength="134.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">localhost:47301/</text>
 <text x="660.8" y="403.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="669.2" y="403.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; vite build --watch     </text>
 <text x="879.2" y="403.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -289,14 +289,14 @@
 <text x="1383.2" y="403.7" fill="#56b6c2" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="403.7" fill="#61afef" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="403.7" fill="#c678dd" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="421.7" fill="#fab387" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Payment provider sl</text>
+<text x="14.0" y="421.7" fill="#fab387" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Payment provider </text>
 <text x="224.0" y="421.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="421.7" fill="#a6e3a1" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">.</text>
+<text x="232.4" y="421.7" fill="#a6e3a1" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">started.</text>
 <text x="442.4" y="421.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="421.7" fill="#cdd6f4" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ➜  Local:   </text>
-<text x="568.4" y="421.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">http://loca</text>
+<text x="450.8" y="421.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ➜  Network: use --     </text>
 <text x="660.8" y="421.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="879.2" y="421.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="887.6" y="421.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; console@1.4.0 dev      </text>
 <text x="1097.6" y="421.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="421.7" fill="#cdd6f4" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Rem                       </text>
 <text x="1358.0" y="421.7" fill="#ff6b81" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
@@ -305,14 +305,14 @@
 <text x="1383.2" y="421.7" fill="#6ec8f8" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="421.7" fill="#6893f3" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="421.7" fill="#f0a1ff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="439.7" fill="#fab387" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ow (812 ms)</text>
+<text x="14.0" y="439.7" fill="#fab387" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">slow (812 ms)</text>
 <text x="224.0" y="439.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="232.4" y="439.7" fill="#94e2d5" textLength="218.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Shop.Billing.Api[0]│</text>
-<text x="450.8" y="439.7" fill="#cdd6f4" textLength="100.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">lhost:47301/</text>
+<text x="450.8" y="439.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">host to expose           </text>
 <text x="660.8" y="439.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="669.2" y="439.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">vite v5.4.10 building for</text>
+<text x="669.2" y="439.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">vite v5.4.10 building    </text>
 <text x="879.2" y="439.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="439.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; console@1.4.0 dev      </text>
+<text x="887.6" y="439.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; vite --port 47303      </text>
 <text x="1097.6" y="439.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="439.7" fill="#cdd6f4" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Rosé Pine                 </text>
 <text x="1358.0" y="439.7" fill="#eb6f92" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
@@ -323,13 +323,12 @@
 <text x="1400.0" y="439.7" fill="#c4a7e7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="14.0" y="457.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Shop.Orders.Api[0]</text>
 <text x="224.0" y="457.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="457.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/invoices 2</text>
+<text x="232.4" y="457.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/invoices  </text>
 <text x="442.4" y="457.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="457.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ➜  Network: use --host </text>
+<text x="450.8" y="457.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:39:12 [vite] hmr      </text>
 <text x="660.8" y="457.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="669.2" y="457.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> production...           </text>
+<text x="669.2" y="457.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">for production...        </text>
 <text x="879.2" y="457.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="457.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt; vite --port 47303      </text>
 <text x="1097.6" y="457.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="457.7" fill="#cdd6f4" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Shades of Purple          </text>
 <text x="1358.0" y="457.7" fill="#ff628c" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
@@ -338,14 +337,15 @@
 <text x="1383.2" y="457.7" fill="#80fcff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="457.7" fill="#886bfe" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="457.7" fill="#fb94ff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      POST /api/orders 20</text>
+<text x="14.0" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      POST /api/orders   </text>
 <text x="224.0" y="475.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">00 9 ms                  </text>
+<text x="232.4" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">200 9 ms                 </text>
 <text x="442.4" y="475.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">to expose                </text>
+<text x="450.8" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">update /src/cart/        </text>
 <text x="660.8" y="475.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="669.2" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ 38 modules transformed.</text>
 <text x="879.2" y="475.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="887.6" y="475.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  VITE v5.4.10  ready    </text>
 <text x="1097.6" y="475.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="475.7" fill="#cdd6f4" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Solarized Dark            </text>
 <text x="1358.0" y="475.7" fill="#dc322f" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
@@ -354,15 +354,15 @@
 <text x="1383.2" y="475.7" fill="#2aa198" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="475.7" fill="#268bd2" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="475.7" fill="#d33682" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="493.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1 42 ms                  </text>
+<text x="14.0" y="493.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">201 42 ms                </text>
 <text x="224.0" y="493.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="493.7" fill="#f38ba8" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">fail: Shop.Billing.Invoic</text>
+<text x="232.4" y="493.7" fill="#f38ba8" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">fail: Shop.Billing.</text>
 <text x="442.4" y="493.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="493.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:39:12 [vite] hmr updat</text>
+<text x="450.8" y="493.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">CartPage.tsx             </text>
 <text x="660.8" y="493.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="669.2" y="493.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">dist/index.html          </text>
 <text x="879.2" y="493.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="493.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  VITE v5.4.10  ready in </text>
+<text x="887.6" y="493.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">in 604 ms                </text>
 <text x="1097.6" y="493.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="493.7" fill="#cdd6f4" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Tokyo Night               </text>
 <text x="1358.0" y="493.7" fill="#f7768e" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
@@ -373,13 +373,12 @@
 <text x="1400.0" y="493.7" fill="#bb9af7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="14.0" y="511.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Shop.Orders.Api[0]</text>
 <text x="224.0" y="511.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="511.7" fill="#f38ba8" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">es[0]</text>
+<text x="232.4" y="511.7" fill="#f38ba8" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Invoices[0]</text>
 <text x="442.4" y="511.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="511.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">e /src/cart/CartPage.tsx </text>
+<text x="450.8" y="511.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:40:31 [vite] hmr      </text>
 <text x="660.8" y="511.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="669.2" y="511.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      0.46 kB            </text>
+<text x="669.2" y="511.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">       0.46 kB           </text>
 <text x="879.2" y="511.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="511.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">604 ms                   </text>
 <text x="1097.6" y="511.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="511.7" fill="#cdd6f4" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Zero Two                  </text>
 <text x="1358.0" y="511.7" fill="#ff0000" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
@@ -388,58 +387,59 @@
 <text x="1383.2" y="511.7" fill="#39e6a6" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1391.6" y="511.7" fill="#82b1ee" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
 <text x="1400.0" y="511.7" fill="#fdb8eb" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
-<text x="14.0" y="529.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders?pag</text>
+<text x="14.0" y="529.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders?   </text>
 <text x="224.0" y="529.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="529.7" fill="#f38ba8" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Invoice 1042 has no</text>
+<text x="232.4" y="529.7" fill="#f38ba8" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      Invoice 1042 has </text>
 <text x="442.4" y="529.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="529.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:40:31 [vite] hmr updat</text>
+<text x="450.8" y="529.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">update /src/cart/        </text>
 <text x="660.8" y="529.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="669.2" y="529.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">dist/assets/index-4f2a.cs</text>
+<text x="669.2" y="529.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">dist/assets/index-4f2a.  </text>
 <text x="879.2" y="529.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="887.6" y="529.7" fill="#cdd6f4" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ➜  Local:   </text>
+<text x="1005.2" y="529.7" fill="#cdd6f4" textLength="58.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">http://</text>
 <text x="1097.6" y="529.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="529.7" fill="#6c7086" textLength="336.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">────────────────────────────────────────</text>
-<text x="14.0" y="547.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">e=2 200 12 ms            </text>
+<text x="14.0" y="547.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">page=2 200 12 ms         </text>
 <text x="224.0" y="547.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="547.7" fill="#f38ba8" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> customer</text>
+<text x="232.4" y="547.7" fill="#f38ba8" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">no customer</text>
 <text x="442.4" y="547.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="547.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">e /src/cart/CartPage.tsx,</text>
+<text x="450.8" y="547.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">CartPage.tsx, /src/cart/ </text>
 <text x="660.8" y="547.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="669.2" y="547.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">s     2.10 kB            </text>
+<text x="669.2" y="547.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">css     2.10 kB          </text>
 <text x="879.2" y="547.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="547.7" fill="#cdd6f4" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ➜  Local:   </text>
-<text x="1005.2" y="547.7" fill="#cdd6f4" textLength="92.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">http://loca</text>
+<text x="887.6" y="547.7" fill="#cdd6f4" textLength="134.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">localhost:47303/</text>
 <text x="1097.6" y="547.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="547.7" fill="#6c7086" textLength="310.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Soothing pastels; also recolours the</text>
 <text x="14.0" y="565.7" fill="#94e2d5" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Shop.Orders.Api[0]</text>
 <text x="224.0" y="565.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="232.4" y="565.7" fill="#94e2d5" textLength="218.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">info: Shop.Billing.Api[0]│</text>
-<text x="450.8" y="565.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> /src/cart/cart.css      </text>
+<text x="450.8" y="565.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">cart.css                 </text>
 <text x="660.8" y="565.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="669.2" y="565.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">dist/assets/index-9c1e.js</text>
+<text x="669.2" y="565.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">dist/assets/index-9c1e.  </text>
 <text x="879.2" y="565.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="565.7" fill="#cdd6f4" textLength="100.8" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">lhost:47303/</text>
+<text x="887.6" y="565.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:40:55 [vite] hmr      </text>
 <text x="1097.6" y="565.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="565.7" fill="#6c7086" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> terminal background</text>
-<text x="14.0" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders/104</text>
+<text x="14.0" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/orders/   </text>
 <text x="224.0" y="583.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/invoices/1</text>
+<text x="232.4" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">      GET /api/invoices/ </text>
 <text x="442.4" y="583.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:41:02 [vite] page relo</text>
+<text x="450.8" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:41:02 [vite] page     </text>
 <text x="660.8" y="583.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="669.2" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">     61.37 kB            </text>
+<text x="669.2" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">js     61.37 kB          </text>
 <text x="879.2" y="583.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">09:40:55 [vite] hmr updat</text>
+<text x="887.6" y="583.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">update /src/reports/     </text>
 <text x="1097.6" y="583.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="583.7" fill="#6c7086" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ↑↓ Alt+jk preview · Esc undo</text>
-<text x="14.0" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">3 200 6 ms               </text>
+<text x="14.0" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1043 200 6 ms            </text>
 <text x="224.0" y="601.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
-<text x="232.4" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">041 200 5 ms             </text>
+<text x="232.4" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1041 200 5 ms            </text>
 <text x="442.4" y="601.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="450.8" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ad src/main.tsx          </text>
+<text x="450.8" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">reload src/main.tsx      </text>
 <text x="660.8" y="601.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="669.2" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">built in 1204ms.         </text>
 <text x="879.2" y="601.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="887.6" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">e /src/reports/Daily.tsx </text>
+<text x="887.6" y="601.7" fill="#cdd6f4" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Daily.tsx                </text>
 <text x="1097.6" y="601.7" fill="#cba6f7" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┃</text>
 <text x="1106.0" y="601.7" fill="#6c7086" textLength="252.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Enter keep · Tab this project</text>
 <text x="14.0" y="619.7" fill="#6c7086" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Catppuccin Mocha </text>
@@ -485,9 +485,9 @@
 <text x="14.0" y="709.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
 <text x="98.0" y="709.7" fill="#a6e3a1" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ Billing built in 9s (6 projects)</text>
 <text x="14.0" y="727.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
-<text x="98.0" y="727.7" fill="#94e2d5" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Starting Orders + Billing</text>
+<text x="98.0" y="727.7" fill="#94e2d5" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Starting Orders + Billing</text>
 <text x="14.0" y="745.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
-<text x="98.0" y="745.7" fill="#a6e3a1" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">● Orders is listening on :47201 - up in 4s</text>
+<text x="98.0" y="745.7" fill="#a6e3a1" textLength="369.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ● Orders is listening on :47201 - up in 4s</text>
 <text x="14.0" y="763.7" fill="#6c7086" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 09:41:07 </text>
-<text x="98.0" y="763.7" fill="#a6e3a1" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Ready in 38s</text>
+<text x="98.0" y="763.7" fill="#a6e3a1" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  Ready in 38s</text>
 </svg>

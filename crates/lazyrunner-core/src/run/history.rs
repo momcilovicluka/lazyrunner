@@ -30,10 +30,11 @@ pub enum Kind {
     NpmCi,
     Test,
     NpmInstall,
+    Task,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 5] = [Kind::Build, Kind::Start, Kind::NpmCi, Kind::NpmInstall, Kind::Test];
+    pub const ALL: [Kind; 6] = [Kind::Build, Kind::Start, Kind::NpmCi, Kind::NpmInstall, Kind::Test, Kind::Task];
 
     pub fn title(self) -> &'static str {
         match self {
@@ -42,6 +43,7 @@ impl Kind {
             Kind::NpmCi => "npm ci",
             Kind::NpmInstall => "npm install",
             Kind::Test => "Test suites",
+            Kind::Task => "Tasks",
         }
     }
 }
@@ -210,6 +212,14 @@ impl Durations {
             let _ = std::fs::remove_file(&temp);
         }
         written.map_err(|error| format!("couldn't write {} - {error}", self.path.display()))
+    }
+
+    /// How long a run of it usually takes: the median of its last successful ones, once it has one.
+    pub fn usual(&self, kind: Kind, key: &str) -> Option<f64> {
+        let item = self.item(kind, key)?;
+        let mut done: Vec<f64> =
+            item.runs.iter().rev().filter(|run| run.ok).map(|run| run.sec).take(TREND_BASE_RUNS).collect();
+        (!done.is_empty()).then(|| median(&mut done))
     }
 
     /// " · 18% slower than usual (36s)" for the log line of the run just recorded, when it was notably off.

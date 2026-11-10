@@ -1,4 +1,5 @@
-//! npm ci and npm install: whether an npm app's packages match its lock file, and installing them in the background.
+//! npm ci and npm install: whether an npm app's packages match its lock file, and installing them in the background;
+//! a command app's install (its `install`) the same way.
 
 use std::path::Path;
 use std::time::Instant;
@@ -14,14 +15,33 @@ use crate::run::child::Child;
 use crate::run::history::Kind;
 use crate::run::{Tag, format_duration, tools};
 
+/// What an install is called while it runs.
+const NPM_CI: &str = "npm ci";
+const NPM_INSTALL: &str = "npm install";
+const INSTALL: &str = "install";
+/// What makes a command app's `path` folder before its first install.
+const SETUP: &str = "setup";
+
 impl Controller {
     fn npm_ci_stamp(&self, key: &str) -> std::path::PathBuf {
         self.state_dir.join(format!("npm-ci.{key}.stamp.json"))
     }
 
+    /// What an app's install installs from, hashed: an npm app's package-lock.json, a command app's `installFrom`.
     fn lock_hash(&self, key: &str) -> Option<String> {
-        let AppKind::Npm { dir, .. } = &self.app(key)?.kind else { return None };
-        let text = std::fs::read_to_string(self.root.join(dir).join("package-lock.json")).ok()?;
+        let text = match &self.app(key)?.kind {
+            AppKind::Npm { dir, .. } => std::fs::read_to_string(self.root.join(dir).join("package-lock.json")).ok()?,
+            AppKind::Command(command) => {
+                let dir = self.root.join(&command.cwd);
+                let read = |file: &String| Some(format!("{file}\n{}", std::fs::read_to_string(dir.join(file)).ok()?));
+                let texts: Vec<String> = command.install_from.iter().filter_map(read).collect();
+                if texts.is_empty() {
+                    return None;
+                }
+                texts.join("\n")
+            }
+            AppKind::Dotnet { .. } => return None,
+        };
         Some(Sha256::digest(text.replace("\r\n", "\n").as_bytes()).iter().map(|b| format!("{b:02X}")).collect())
     }
 
@@ -61,6 +81,10 @@ impl Controller {
                     format!("{lock} changed since the last npm ci - press i to reinstall its packages"),
                     Hue::Yellow,
                 );
+            } else if let Some(command) = app.command() {
+                let (files, install) = (command.install_from.join(", "), command.install.join(" "));
+                let text = format!("{}: {files} changed since its last install - press i ({install})", app.name);
+                self.add_log(text, Hue::Yellow);
             }
         }
         self.lock_changed = changed;
@@ -76,15 +100,25 @@ impl Controller {
         self.install_packages(focused, false);
     }
 
-    /// npm ci (`clean`) or npm install, in the background.
+    /// npm ci (`clean`) or npm install, in the background; a command app's install either way.
     fn install_packages(&mut self, focused: Option<&str>, clean: bool) {
-        let what = if clean { "npm ci" } else { "npm install" };
         let Some(key) = self.npm_ci_key(focused) else {
             self.add_log(
-                "There is no npm app (the project has none, or lazyrunner.config.json turns them off).",
+                "Nothing here installs packages (no npm app, nor a command app with an install - or lazyrunner.config.json turns them off).",
                 Hue::Yellow,
             );
             return;
+        };
+        let installs = self.app(&key).is_some_and(|app| app.command().is_some());
+        let setup = self
+            .app(&key)
+            .and_then(|app| app.command())
+            .is_some_and(|command| !command.setup.is_empty() && tools::lacks_own_folders(&self.root, command));
+        let what = match (installs, clean) {
+            (true, _) if setup => SETUP,
+            (true, _) => INSTALL,
+            (false, true) => NPM_CI,
+            (false, false) => NPM_INSTALL,
         };
         if let Some(job) = &self.npm_ci {
             let name = self.app(&job.key).map(|app| app.name.clone()).unwrap_or_default();
@@ -92,9 +126,12 @@ impl Controller {
             return;
         }
         let app = self.app(&key).expect("a known app").clone();
-        let AppKind::Npm { dir, .. } = &app.kind else { return };
-        let folder = self.root.join(dir);
-        if clean && !folder.join("package-lock.json").is_file() {
+        let folder = match &app.kind {
+            AppKind::Npm { dir, .. } => self.root.join(dir),
+            AppKind::Command(command) => self.root.join(&command.cwd),
+            AppKind::Dotnet { .. } => return,
+        };
+        if clean && app.command().is_none() && !folder.join("package-lock.json").is_file() {
             let text =
                 format!("No package-lock.json in {} - npm ci needs one (npm install makes it).", folder.display());
             self.add_log(text, Hue::Yellow);
@@ -111,7 +148,12 @@ impl Controller {
         stop_nx_daemon(&folder);
         // node_modules is about to be rewritten: until it succeeds it isn't known to be in sync.
         let _ = std::fs::remove_file(self.npm_ci_stamp(&key));
-        let spec = if clean { self.commands.npm_ci(&folder) } else { self.commands.npm_install(&folder) };
+        let spec = match app.command() {
+            Some(command) if what == SETUP => tools::command_spec(&self.root, &app, &command.setup),
+            Some(command) => tools::command_spec(&self.root, &app, &command.install),
+            None if clean => self.commands.npm_ci(&folder),
+            None => self.commands.npm_install(&folder),
+        };
         let spawned = spec.and_then(|spec| {
             Ok(Child::spawn(
                 &spec,
@@ -143,11 +185,15 @@ impl Controller {
 
     /// Which app i installs: one whose lock file changed (the focused one if it is among them), else the focused
     /// one, else one whose node_modules is missing, else the first.
-    /// The app i reinstalls: one whose package-lock.json changed (the focused one first), else the focused npm app,
-    /// else one without node_modules, else the first.
+    /// The app i reinstalls: the focused command app that installs, else one whose package-lock.json changed (the
+    /// focused one first), else the focused npm app, else one without node_modules, else the first.
     pub fn npm_ci_key(&self, focused: Option<&str>) -> Option<String> {
         let keys: Vec<String> =
             self.apps.iter().filter(|app| app.traits().installs).map(|app| app.key.clone()).collect();
+        let command = |key: &&str| self.app(key).is_some_and(|app| app.command().is_some() && app.traits().installs);
+        if let Some(key) = focused.filter(command) {
+            return Some(key.to_string());
+        }
         if !self.lock_changed.is_empty() {
             return Some(
                 focused
@@ -203,6 +249,7 @@ impl Controller {
         let waiting =
             if job.start_after { format!(" - {name} was waiting for it and stays stopped") } else { String::new() };
         match end {
+            NpmCiEnd::Ok if what == SETUP => self.after_setup(&key, seconds, job.start_after),
             NpmCiEnd::Cancelled => {
                 let text = format!("■ {what} cancelled - node_modules may be incomplete, press i again");
                 self.pane(&key, &text, Hue::Yellow);
@@ -231,6 +278,26 @@ impl Controller {
                     self.start(Some(&[key]), false);
                 }
             }
+        }
+    }
+}
+
+impl Controller {
+    /// A command app's setup went fine: its install runs next - unless the setup didn't make its `path` folder.
+    fn after_setup(&mut self, key: &str, seconds: f64, start_after: bool) {
+        let Some(command) = self.app(key).and_then(|app| app.command()).cloned() else { return };
+        if tools::lacks_own_folders(&self.root, &command) {
+            let folders: Vec<&str> = tools::own_folders(&command).into_iter().map(String::as_str).collect();
+            let text =
+                format!("✗ {} ran, but {} isn't there - see its output", command.setup.join(" "), folders.join(" or "));
+            self.pane(key, &text, Hue::Red);
+            self.add_log(text, Hue::Red);
+            return;
+        }
+        self.pane(key, &format!("✓ {SETUP} done in {}", format_duration(seconds)), Hue::Green);
+        self.install_packages(Some(key), true);
+        if let Some(next) = self.npm_ci.as_mut() {
+            next.start_after |= start_after;
         }
     }
 }

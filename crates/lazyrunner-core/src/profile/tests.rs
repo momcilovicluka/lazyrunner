@@ -32,7 +32,7 @@ fn keys(project: &Project) -> Vec<&str> {
 fn variants(project: &Project, key: &str) -> Vec<Variant> {
     match &project.app(key).unwrap().kind {
         AppKind::Npm { variants, .. } => variants.clone(),
-        AppKind::Dotnet { .. } => panic!("{key} is an npm app"),
+        AppKind::Dotnet { .. } | AppKind::Command(_) => panic!("{key} is an npm app"),
     }
 }
 
@@ -76,7 +76,7 @@ fn each_app_type_has_its_traits() {
     let temp = TempDir::new("traits");
     let project = import(&sample_profile(), &dirs(&temp)).unwrap();
     let with = |trait_of: fn(&apptypes::Traits) -> bool| -> Vec<&str> {
-        project.apps.iter().filter(|app| trait_of(app.traits())).map(|app| app.key.as_str()).collect()
+        project.apps.iter().filter(|app| trait_of(&app.traits())).map(|app| app.key.as_str()).collect()
     };
     assert_eq!(with(|t| t.builds), ["orders", "billing"]);
     assert_eq!(with(|t| t.installs), ["shop", "docs", "console"]);
@@ -124,7 +124,7 @@ fn broken_profiles_get_one_clear_message_naming_the_field() {
         (
             "unknown type",
             Box::new(|d| d["apps"][1]["type"] = json!("python")),
-            "apps[1] (billing).type must be 'dotnet' or 'npm'",
+            "apps[1] (billing).type must be 'dotnet', 'npm', 'command' or 'compose'",
             false,
         ),
         (
@@ -531,4 +531,225 @@ fn a_branch_that_changes_the_profile_is_noticed() {
     );
     let gone = describe(&running, &active, Ok(None), true).unwrap();
     assert!(gone.text.starts_with("No profile matches this checkout any more"));
+}
+
+fn command_profile(apps: Value) -> Value {
+    json!({ "schemaVersion": 1, "id": "cmd", "name": "Commands", "detect": { "anyFile": ["go.mod"] }, "watch": ["src"], "apps": apps })
+}
+
+#[test]
+fn a_command_app_runs_text_or_arguments_and_is_up_as_its_ready_says() {
+    let temp = TempDir::new("command-app");
+    let file = temp.join("profile.json");
+    let apps = json!([
+        { "key": "pricing", "name": "Pricing", "type": "command", "run": "uvicorn \"main:app\" --port {port}",
+          "cwd": "services/pricing", "port": 8000, "build": ["uv", "build"], "watch": ["**/*.py"], "errors": ["^ERROR"],
+          "frames": "File \"(?P<file>[^\"]+)\", line (?P<line>\\d+)" },
+        { "key": "queue", "name": "Queue", "type": "command", "run": ["azurite", "--silent"],
+          "ready": { "line": "successfully listens" }, "install": "npm ci" },
+        { "key": "api", "name": "API", "type": "command", "run": "go run .", "port": 8080, "ready": { "http": "/health" } }
+    ]);
+    save(&command_profile(apps), &file);
+    let project = import(&file, &dirs(&temp)).unwrap();
+    let command = |key: &str| project.app(key).and_then(App::command).cloned().unwrap();
+    let pricing = command("pricing");
+    assert_eq!(pricing.run, ["uvicorn", "main:app", "--port", "{port}"], "text, split; a quoted part one argument");
+    assert_eq!((pricing.cwd.as_str(), pricing.ready.clone()), (native("services/pricing").as_str(), Ready::Port(8000)));
+    assert_eq!(pricing.build, ["uv", "build"]);
+    assert_eq!(command("queue").ready, Ready::Line("successfully listens".into()));
+    assert_eq!((command("api").ready, command("api").port), (Ready::Http("/health".into()), Some(8080)));
+    let traits = |key: &str| project.app(key).unwrap().traits();
+    assert_eq!(
+        (traits("pricing").name, traits("pricing").builds, traits("pricing").installs),
+        (TYPE_COMMAND, true, false)
+    );
+    assert_eq!((traits("queue").builds, traits("queue").installs), (false, true));
+    assert!(
+        schema_errors(&command_profile(json!([{ "key": "a", "name": "A", "type": "command", "run": ["x"] }])))
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_compose_app_runs_docker_compose_up_for_its_services_and_is_up_once_they_are() {
+    let temp = TempDir::new("compose-app");
+    let file = temp.join("profile.json");
+    let apps = json!([
+        { "key": "infra", "name": "Infra", "type": "compose", "cwd": "ops", "file": "compose.dev.yaml",
+          "services": ["db", "cache"], "env": { "DB_PORT": "5433" } },
+        { "key": "all", "name": "All", "type": "compose" }
+    ]);
+    save(&command_profile(apps.clone()), &file);
+    let project = import(&file, &dirs(&temp)).unwrap();
+    let infra = project.app("infra").unwrap();
+    let command = infra.command().unwrap();
+    assert_eq!(command.run.join(" "), "docker compose --ansi never -f compose.dev.yaml up db cache");
+    assert_eq!(
+        (command.cwd.as_str(), command.ready.clone(), command.port),
+        (native("ops").as_str(), Ready::Services, None)
+    );
+    assert_eq!((infra.traits().name, infra.traits().builds, infra.traits().installs), (TYPE_COMPOSE, false, false));
+    assert_eq!(project.app("all").and_then(App::command).unwrap().run.join(" "), "docker compose --ansi never up");
+    assert!(schema_errors(&command_profile(apps)).is_empty());
+    let problems = |app: Value| check::validate(&command_profile(json!([app])), true).join("\n");
+    let bad = problems(json!({ "key": "a", "name": "A", "type": "compose", "services": "db", "port": 1 }));
+    assert!(bad.contains("services must be a list of the compose file's services"), "{bad}");
+    assert!(bad.contains("port"), "a compose app has no port of its own: {bad}");
+}
+
+#[test]
+fn a_command_app_can_be_up_by_a_line_or_its_port_and_says_what_its_install_needs() {
+    let temp = TempDir::new("command-or-port");
+    let file = temp.join("profile.json");
+    let apps = json!([{ "key": "api", "name": "API", "type": "command", "run": "python app.py", "port": 8000,
+                        "ready": { "line": "Running on", "orPort": true }, "setup": "python -m venv .venv",
+                        "install": "python -m pip install -r requirements.txt", "installFrom": ["requirements.txt"] }]);
+    save(&command_profile(apps.clone()), &file);
+    let project = import(&file, &dirs(&temp)).unwrap();
+    let api = project.app("api").and_then(App::command).cloned().unwrap();
+    assert_eq!(api.ready, Ready::LineOrPort("Running on".into()));
+    assert_eq!(
+        (api.setup.join(" ").as_str(), api.install_from.as_slice()),
+        ("python -m venv .venv", ["requirements.txt".to_string()].as_slice())
+    );
+    assert!(schema_errors(&command_profile(apps)).is_empty());
+    let problems = |ready: Value| {
+        let app = json!({ "key": "a", "name": "A", "type": "command", "run": "x", "port": 1, "ready": ready });
+        check::validate(&command_profile(json!([app])), true).join("\n")
+    };
+    assert!(problems(json!({ "port": 1, "orPort": true })).contains("orPort goes with line"));
+    assert!(problems(json!({ "line": "up", "orPort": "yes" })).contains("orPort goes with line"));
+    assert!(problems(json!({ "line": "up", "orPort": true })).is_empty());
+}
+
+#[test]
+fn a_command_app_says_what_its_run_ready_and_patterns_need() {
+    let problems = |app: Value| {
+        let mut app = app;
+        app["key"] = json!("worker");
+        app["name"] = json!("Worker");
+        app["type"] = json!("command");
+        check::validate(&command_profile(json!([app])), true).join("\n")
+    };
+    assert!(problems(json!({ "run": "x" })).is_empty(), "{}", problems(json!({ "run": "x" })));
+    assert!(problems(json!({})).contains("apps[0] (worker).run must be a command: text, or a list of arguments"));
+    let both = problems(json!({ "run": "x", "ready": { "port": 1, "line": "up" } }));
+    assert!(both.contains("ready needs one of port, line or http"), "{both}");
+    let http = problems(json!({ "run": "x", "ready": { "http": "health" } }));
+    assert!(
+        http.contains("ready.http must be a path starting with /") && http.contains("needs the app's port"),
+        "{http}"
+    );
+    let frames = problems(json!({ "run": "x", "frames": "(?P<file>.+)" }));
+    assert!(frames.contains("frames needs a (?P<file>...) and a (?P<line>...) group"), "{frames}");
+    let errors = problems(json!({ "run": "x", "errors": ["("] }));
+    assert!(errors.contains("errors[0] must be a regular expression"), "{errors}");
+    assert!(problems(json!({ "run": "x", "rnu": "y" })).contains("rnu"), "an unknown field is named");
+}
+
+#[test]
+fn text_splits_into_arguments_at_spaces_a_quoted_part_staying_one() {
+    assert_eq!(load::split(r#"uvicorn "main:app x" --port 1"#), ["uvicorn", "main:app x", "--port", "1"]);
+    assert_eq!(load::split("  a   b "), ["a", "b"]);
+    assert_eq!(load::split(r#"a "" b"#), ["a", "", "b"]);
+}
+
+#[test]
+fn a_repo_profiles_command_app_gets_its_preset_by_whats_in_its_folder_and_one_without_is_offered_it() {
+    let temp = TempDir::new("preset-repo");
+    let repo = temp.join("repo");
+    write(repo.join("pricing/uv.lock"), "");
+    write(repo.join("pricing/main.py"), "");
+    write(repo.join("worker/requirements.txt"), "");
+    let apps = json!([
+        { "key": "pricing", "name": "Pricing", "type": "command", "preset": "python", "cwd": "pricing",
+          "env": { "APP_ENV": "dev" } },
+        { "key": "worker", "name": "Worker", "type": "command", "run": "python worker.py", "cwd": "worker" }
+    ]);
+    save(&command_profile(apps), &repo.join(REPO_PROFILE_FILE));
+    let found = find_project_profile(&repo, &dirs(&temp)).unwrap().unwrap();
+    let project = resolve(&found, &dirs(&temp)).unwrap();
+    let command = project.app("pricing").and_then(App::command).cloned().unwrap();
+    assert_eq!(
+        (command.run.clone(), command.install.clone()),
+        (vec!["python".to_string(), "main.py".into()], vec!["uv".to_string(), "sync".into()])
+    );
+    assert_eq!((command.preset.as_deref(), command.watch.clone()), (Some("python"), vec!["**/*.py".to_string()]));
+    assert_eq!(command.path, [".venv/Scripts", ".venv/bin"]);
+    assert!(command.frames.is_some() && command.tools.contains(&"uv".to_string()), "{command:?}");
+    let pricing = project.app("pricing").unwrap();
+    assert!(pricing.env.contains(&("APP_ENV".into(), "dev".into())), "{:?}", pricing.env);
+    assert!(pricing.env.iter().any(|(name, value)| name == "PYTHONUNBUFFERED" && value == "1"), "{:?}", pricing.env);
+    assert_eq!(pricing.nerd_icon.as_deref(), Some("\u{e73c}"));
+    let worker = project.app("worker").unwrap();
+    let offered = apptypes::setup_problems(&repo, worker, "apps[1] (worker)", &project.apps);
+    let said: Vec<&str> = offered.iter().map(|problem| problem.message.as_str()).collect();
+    assert!(
+        said.iter().any(|message| message.contains("looks like a Python project: \"preset\": \"python\"")),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn a_preset_without_a_run_here_a_port_never_given_and_a_broken_preset_are_each_said() {
+    let problems = |data: Value| check::validate(&data, true).join("\n");
+    let app = |extra: Value| {
+        let mut app = json!({ "key": "worker", "name": "Worker", "type": "command" });
+        for (name, value) in extra.as_object().unwrap() {
+            app[name] = value.clone();
+        }
+        command_profile(json!([app]))
+    };
+    let no_run = problems(app(json!({ "preset": "python" })));
+    assert!(no_run.contains("run is required: the python preset has no run for this folder"), "{no_run}");
+    let no_port = problems(app(json!({ "run": "x --port {port}" })));
+    assert!(no_port.contains("uses {port} but has no port"), "{no_port}");
+    assert!(!problems(app(json!({ "run": "x --port {port}", "port": 8000 }))).contains("{port}"));
+    let mut broken = app(json!({ "run": "x" }));
+    broken["presets"] = json!({ "go": { "bild": "go build", "options": [{ "when": { "anyFiel": ["go.mod"] } }] } });
+    let said = problems(broken);
+    assert!(said.contains("presets.go") && said.contains("bild") && said.contains("anyFiel"), "{said}");
+    let temp = TempDir::new("preset-unknown");
+    let file = temp.join("profile.json");
+    save(&app(json!({ "preset": "ruby", "run": "x" })), &file);
+    let error = import(&file, &dirs(&temp)).unwrap_err().to_string();
+    assert!(error.contains("preset 'ruby' is not a known preset"), "{error}");
+}
+
+#[test]
+fn tasks_load_as_commands_and_say_what_they_need() {
+    let temp = TempDir::new("tasks");
+    let file = temp.join("profile.json");
+    let mut profile = command_profile(json!([{ "key": "api", "name": "API", "type": "command", "run": "x" }]));
+    profile["tasks"] = json!([
+        { "key": "seed", "name": "Seed the database", "run": "python \"seed it.py\"", "cwd": "tools", "env": { "SEED": "demo" } },
+        { "key": "client", "name": "Regenerate the client", "run": ["npm", "run", "generate"] }
+    ]);
+    save(&profile, &file);
+    let project = import(&file, &dirs(&temp)).unwrap();
+    assert_eq!(project.tasks.len(), 2);
+    let seed = &project.tasks[0];
+    assert_eq!((seed.key.as_str(), seed.name.as_str()), ("seed", "Seed the database"));
+    assert_eq!(
+        (seed.run.clone(), seed.cwd.clone()),
+        (vec!["python".to_string(), "seed it.py".into()], native("tools"))
+    );
+    assert_eq!(seed.env, [("SEED".to_string(), "demo".to_string())]);
+    assert_eq!(project.tasks[1].run, ["npm", "run", "generate"]);
+    assert!(schema_errors(&profile).is_empty(), "{:?}", schema_errors(&profile));
+    profile["tasks"] = json!([
+        { "key": "seed", "name": "Seed", "run": "x" },
+        { "key": "seed", "name": "", "rnu": "y" },
+        "nope"
+    ]);
+    let said = check::validate(&profile, true).join("\n");
+    for expected in [
+        "tasks[1].key 'seed' is used twice",
+        "tasks[1].name is required",
+        "tasks[1].run must be a command",
+        "rnu",
+        "tasks[2] must be an object",
+    ] {
+        assert!(said.contains(expected), "{expected}: {said}");
+    }
 }

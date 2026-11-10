@@ -266,7 +266,7 @@ impl Controller {
             taken.push(app.key);
         }
         for (time, text, hue) in handover.log.into_iter().rev() {
-            self.log.push_front(LogEntry { time, text, hue });
+            self.log.push_front(LogEntry { time, text, hue, task: None });
         }
         self.update_metric_roots();
         if !taken.is_empty() {

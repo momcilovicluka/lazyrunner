@@ -821,6 +821,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             let profile = controller.project.path.clone();
             super::links::open_file(ui, controller, &profile, None, None);
         }
+        Run::Task(key) => controller.run_task(key),
         Run::ReloadProfile => {
             let start = controller.states.iter().any(|state| state.is_running());
             reopen(ui, controller, controller.root.clone(), start, "reloading the project profile");
@@ -901,7 +902,7 @@ fn open_app_page(ui: &Ui, controller: &mut Controller, key: &str) {
 fn open_focused(ui: &Ui, controller: &mut Controller, key: &str) {
     let Some(app) = controller.app(key).cloned() else { return };
     match &app.kind {
-        AppKind::Npm { .. } => open_app_page(ui, controller, key),
+        AppKind::Npm { .. } | AppKind::Command(_) => open_app_page(ui, controller, key),
         AppKind::Dotnet { swagger, .. } => {
             let url = format!("{}{}", app_url(controller, key), swagger.clone().unwrap_or_default());
             if open(ui, controller, &url) {

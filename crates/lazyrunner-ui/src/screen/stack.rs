@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use lazyrunner_core::profile::AppKind;
 use lazyrunner_core::run::app::{AppState, Status};
 use lazyrunner_core::run::calls;
-use lazyrunner_core::run::controller::Minute;
+use lazyrunner_core::run::controller::{Minute, compose};
 use lazyrunner_core::run::history::Kind;
 use lazyrunner_core::run::{Controller, format_duration};
 use unicode_width::UnicodeWidthStr;
@@ -164,9 +164,12 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
     let name = seg(format!("{icon} {}", app.name), if picked { C::White } else { C::Gray });
     let border = if picked { C::Cyan } else { super::columns::border(controller, index) };
     let target = Some(Target::Item(index));
+    let services = services_line(ui, controller, &app.key);
     if detail == 0 {
         let line = vec![seg(dot, color), seg(format!(" {word}{}", port.replace(" · ", "  ")), C::DarkGray)];
-        return graph::Node { lines: vec![vec![name], line], pad: 1, border, dashed: false, target, bare: false };
+        let mut lines = vec![vec![name], line];
+        lines.extend(services);
+        return graph::Node { lines, pad: 1, border, dashed: false, target, bare: false };
     }
     let running = matches!(state.status, Status::Running);
     let since = state
@@ -185,7 +188,7 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
     } else {
         minute(&controller.calls_last_minute(&app.key), "calls", "no calls (1 min)", "failed")
     };
-    let mut lines = vec![vec![name], first, vec![seg(load, C::DarkGray)], work];
+    let mut lines = vec![vec![name], first, vec![seg(load, C::DarkGray)], services.unwrap_or(work)];
     if detail >= 2 {
         lines.push(printed(state));
     }
@@ -203,11 +206,26 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
     graph::Node { lines, pad: 2, border, dashed: false, target, bare: false }
 }
 
-/// The database's box: its name; 1 its minute's commands and their time; 2 the slowest, and the requests that look
-/// like an N+1.
+/// A compose app's services, a dot each in its state's colour (a starting one breathing).
+fn services_line(ui: &Ui, controller: &Controller, key: &str) -> Option<Vec<Seg>> {
+    let services = controller.compose_services(key)?;
+    let dot = |at: usize, service: &lazyrunner_core::run::compose::Service| {
+        let gap = if at == 0 { "" } else { " " };
+        let text = format!("{gap}{} {}", compose::symbol(service.state), service.name);
+        seg(text, super::columns::service_color(ui, service.state))
+    };
+    Some(services.iter().enumerate().map(|(at, service)| dot(at, service)).collect())
+}
+
+/// The database's box: its name, and the compose service that runs it; 1 its minute's commands and their time; 2
+/// the slowest, and the requests that look like an N+1.
 fn database_node(ui: &Ui, controller: &Controller, picked: bool, detail: usize, index: usize) -> graph::Node {
     let label = controller.db_label.clone().unwrap_or_else(|| "database".into());
     let mut lines = vec![vec![seg(format!("{} {label}", icons::icon(ui.nerd, Icon::Database)), C::Gray)]];
+    if let Some((host, service)) = controller.database_service() {
+        let text = format!("{} {} · {}", compose::symbol(service.state), service.name, controller.apps[host].name);
+        lines.push(vec![seg(text, super::columns::service_color(ui, service.state))]);
+    }
     let minute = controller.database_minute();
     if detail >= 1 {
         lines.push(match minute.commands {
@@ -324,9 +342,24 @@ fn model(
         kept.push(edge);
     }
     let users = controller.database_users();
-    if !users.is_empty() {
+    let host = controller.database_service().map(|(host, _)| host);
+    if !users.is_empty() || host.is_some() {
         let commands: Vec<usize> = users.iter().map(|key| controller.database_commands(key)).collect();
         nodes.push(database_node(ui, controller, picked == count, detail, count));
+        if let Some(host) = host {
+            // The compose app the database runs in.
+            let label = String::new();
+            edges.push(graph::Edge {
+                from: host,
+                to: count,
+                color: C::DarkGray,
+                dashed: true,
+                label,
+                quiet: false,
+                top: false,
+            });
+            motions.push(Motion::default());
+        }
         for ((user, key), commands) in users.iter().filter_map(|key| Some((at(key)?, key))).zip(commands) {
             let label = if commands > 0 { format!("{commands}/min") } else { String::new() };
             let color = if commands > 0 { C::Gray } else { C::DarkGray };
@@ -352,7 +385,14 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             ui.focus = picked;
             ui.motion.flash(Spot::Title(picked), ui.now);
         }
-        "Enter" => controller.add_log("The database has no column.", lazyrunner_core::output::Hue::DarkGray),
+        "Enter" => match controller.database_service().map(|(host, _)| host) {
+            Some(host) => {
+                ui.overlay = None;
+                ui.focus = host; // the compose app it runs in
+                ui.motion.flash(Spot::Title(host), ui.now);
+            }
+            None => controller.add_log("The database has no column.", lazyrunner_core::output::Hue::DarkGray),
+        },
         "h" | "j" | "k" | "l" | "LeftArrow" | "DownArrow" | "UpArrow" | "RightArrow" => {
             let edges = controller.stack_edges();
             let model = model(ui, controller, (picked, opened), &edges, 0, &mut Dots::default());

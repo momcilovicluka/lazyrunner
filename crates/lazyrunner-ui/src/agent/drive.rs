@@ -144,12 +144,38 @@ pub fn set_setting(controller: &mut Controller, args: &Value) -> Result<String, 
     Ok(format!("set {} {}", toggle.key(), if on { "on" } else { "off" }))
 }
 
-/// npm ci (`clean`, the default) or npm install for an npm app.
+/// Runs one of the profile's tasks, by its key or name, in the background.
+pub fn run_task(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let Some(wanted) = args["task"].as_str() else {
+        return Err(("bad_args", "which task? (\"task\": its key or name, from get_status's tasks)".into()));
+    };
+    let named = |name: &str| name.eq_ignore_ascii_case(wanted);
+    let Some(task) = controller.tasks().iter().find(|task| named(&task.key) || named(&task.name)).cloned() else {
+        let known: Vec<&str> = controller.tasks().iter().map(|task| task.key.as_str()).collect();
+        let wanted = clean(wanted, CLIENT_CHARS);
+        return Err(("not_found", format!("no task '{wanted}' (there are: {})", known.join(", "))));
+    };
+    if controller.task_started(&task.key).is_some() {
+        return Err(("busy", format!("{} is already running - wait for task_done", task.name)));
+    }
+    controller.run_task(&task.key);
+    Ok(format!("started {} - wait for task_done", task.name))
+}
+
+/// npm ci (`clean`, the default) or npm install for an npm app; a command app's install.
 pub fn install_packages(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
     let app = &controller.apps[app_index(controller, args)?];
     let (key, name) = (app.key.clone(), app.name.clone());
+    if let Some(command) = app.command() {
+        if command.install.is_empty() {
+            return Err(("bad_args", format!("{name} has no install in its profile")));
+        }
+        let what = command.install.join(" ");
+        execute(controller, Command::NpmCi(key))?;
+        return Ok(format!("{what} for {name}"));
+    }
     if !matches!(app.kind, AppKind::Npm { .. }) {
-        return Err(("bad_args", format!("{name} isn't an npm app")));
+        return Err(("bad_args", format!("{name} isn't an npm app or a command app with an install")));
     }
     let fresh = args["clean"].as_bool().unwrap_or(true);
     execute(controller, if fresh { Command::NpmCi(key) } else { Command::NpmInstall(key) })?;

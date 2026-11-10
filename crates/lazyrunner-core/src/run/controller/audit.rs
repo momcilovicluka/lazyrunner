@@ -129,6 +129,8 @@ impl Controller {
     /// once.
     pub fn audit(&mut self, keys: Option<&[String]>) {
         let keys = keys.map_or_else(|| self.keys(), <[String]>::to_vec);
+        let keys: Vec<String> =
+            keys.into_iter().filter(|key| self.app(key).is_some_and(|app| app.command().is_none())).collect();
         let before = self.audits_left();
         if before == 0 {
             self.audit_retry.reset();

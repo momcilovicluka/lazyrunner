@@ -3,7 +3,8 @@
 //! the focused column, uppercase on every app. Safe actions also work while a build runs.
 
 use lazyrunner_core::config::Toggle;
-use lazyrunner_core::run::Controller;
+use lazyrunner_core::profile::Task;
+use lazyrunner_core::run::{Controller, format_duration};
 
 use super::Ui;
 
@@ -78,7 +79,14 @@ pub enum Run {
     ReloadProfile,
     /// , then P: the project profile in the editor.
     OpenProfile,
+    /// One of the profile's tasks, by its key.
+    Task(String),
 }
+
+/// A task's action key: not a key to press, the palette and agents run it.
+pub const TASK_KEY: &str = "task:";
+/// The palette's group of tasks.
+pub const TASKS_GROUP: &str = "Tasks";
 
 #[derive(Clone, Debug)]
 pub struct Action {
@@ -330,7 +338,27 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
     {
         ports.alt.push("!"); // with no port in the way, ! shows who holds them
     }
+    for task in controller.tasks() {
+        let (key, label) = (format!("{TASK_KEY}{}", task.key), format!("Run task: {}", task.name));
+        let hint = task_hint(ui, controller, task);
+        list.push(action(TASKS_GROUP, &key, &label, &hint, Run::Task(task.key.clone())).safe());
+    }
     list
+}
+
+/// What a task's row says beside it: how long it has run, else how its last run went, else what it runs.
+fn task_hint(ui: &Ui, controller: &Controller, task: &Task) -> String {
+    if let Some(started) = controller.task_started(&task.key) {
+        return format!("running {}", format_duration(ui.now.saturating_duration_since(started).as_secs_f64()));
+    }
+    match controller.task_result(&task.key) {
+        Some(result) if result.ok => format!("✓ {}", format_duration(result.seconds)),
+        Some(result) => {
+            let why = result.error.clone().unwrap_or_default();
+            format!("✗ {} · {why}", format_duration(result.seconds))
+        }
+        None => task.run.join(" "),
+    }
 }
 
 /// An on/off setting in the , menu: its letter there, and its label.

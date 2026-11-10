@@ -92,6 +92,7 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         let who = if ui.follow.client.is_empty() { "the agent" } else { ui.follow.client.as_str() };
         segs.push(seg(format!("   {} following {who}", icons::icon(ui.nerd, Icon::Watching)), C::Magenta));
     }
+    segs.extend(super::task_chips::chips(ui, controller));
     if let Some((at, of)) = ui.jumps.count() {
         segs.push(seg(format!("   {} {at}/{of}", icons::icon(ui.nerd, Icon::Back)), C::DarkCyan));
     }

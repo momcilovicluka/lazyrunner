@@ -167,7 +167,7 @@ impl Controller {
     /// without it builds - a project once, for the first app that builds it.
     fn find_contexts(&mut self) -> Vec<Context> {
         let path_key = |path: &Path| path.display().to_string().to_lowercase();
-        let dotnet: Vec<App> = self.apps.iter().filter(|app| app.traits().builds).cloned().collect();
+        let dotnet: Vec<App> = self.apps.iter().filter(|app| app.is_dotnet()).cloned().collect();
         let mut contexts = Vec::new();
         let mut claimed: HashSet<String> = HashSet::new();
         for app in dotnet.iter().filter(|app| app.migrations.is_some()) {

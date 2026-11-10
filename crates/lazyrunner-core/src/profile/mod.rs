@@ -11,6 +11,7 @@
 pub mod change;
 pub mod check;
 pub mod load;
+pub mod preset;
 #[cfg(test)]
 mod tests;
 pub mod trust;
@@ -24,6 +25,16 @@ pub use load::{Found, Known, find_project_profile, import, known_profiles, merge
 
 pub const SCHEMA_VERSION: i64 = 1;
 pub const REPO_PROFILE_FILE: &str = ".lazyrunner.json";
+/// An app's `"type"`.
+pub const TYPE_DOTNET: &str = "dotnet";
+pub const TYPE_NPM: &str = "npm";
+pub const TYPE_COMMAND: &str = "command";
+pub const TYPE_COMPOSE: &str = "compose";
+/// In a command app's commands and env, its port; and its folder.
+pub const PORT_PLACEHOLDER: &str = "{port}";
+pub const CWD_PLACEHOLDER: &str = "{cwd}";
+/// A `path` folder from the home folder (`~/.cargo/bin`) instead of the app's.
+pub const HOME_PREFIX: &str = "~/";
 
 /// Where a profile came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +91,90 @@ pub enum AppKind {
         dir: String,
         variants: Vec<Variant>,
     },
+    /// Any long-running command (`"type": "command"`, #56).
+    Command(Box<Command>),
+}
+
+/// How a command app counts as up.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Ready {
+    /// Once it has started: it has no `ready` and no port.
+    Started,
+    /// Once this port listens.
+    Port(u16),
+    /// Once a line of its output matches this pattern.
+    Line(String),
+    /// Once a line of its output matches this pattern, or its port listens (`"orPort": true`).
+    LineOrPort(String),
+    /// Once its port answers this path with a 2xx.
+    Http(String),
+    /// Once its compose services are running, and healthy when they have a healthcheck.
+    Services,
+}
+
+/// What runs Docker Compose, and its commands.
+pub const DOCKER: &str = "docker";
+pub const COMPOSE_UP: &str = "up";
+pub const COMPOSE_STOP: &str = "stop";
+pub const COMPOSE_PS: &str = "ps";
+pub const COMPOSE_CONFIG: &str = "config";
+/// The files Docker Compose reads when it's given none.
+pub const COMPOSE_FILES: [&str; 4] = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
+
+/// A compose app (`"type": "compose"`, #56): its compose file (Docker's own when `None`) and the services it runs
+/// (all when empty).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Compose {
+    pub file: Option<String>,
+    pub services: Vec<String>,
+}
+
+impl Compose {
+    /// `docker` arguments for compose's `verb`, with `options`, for its services.
+    pub fn args(&self, verb: &str, options: &[&str]) -> Vec<String> {
+        let mut args = vec!["compose".to_string(), "--ansi".into(), "never".into()];
+        if let Some(file) = &self.file {
+            args.extend(["-f".to_string(), file.clone()]);
+        }
+        args.push(verb.to_string());
+        args.extend(options.iter().map(|option| option.to_string()));
+        args.extend(self.services.iter().cloned());
+        args
+    }
+}
+
+/// A command app (#56): what it runs and where, its port, what builds and installs it, when it's up, what counts as
+/// its code, and what its errors, warnings and stack frames look like. Its commands are lists of arguments (a
+/// profile's text is split into them); `{port}` in them and in its env is its port.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Command {
+    pub run: Vec<String>,
+    /// From the repo root; empty for the root.
+    pub cwd: String,
+    pub port: Option<u16>,
+    /// Empty: nothing to build, nothing to install.
+    pub build: Vec<String>,
+    pub install: Vec<String>,
+    /// Runs before an install while none of its `path` folders is there (`python -m venv .venv`).
+    pub setup: Vec<String>,
+    /// The files its install installs from, from its `cwd`: when they change, its install is due.
+    pub install_from: Vec<String>,
+    pub ready: Ready,
+    /// Globs of its code, from its `cwd`.
+    pub watch: Vec<String>,
+    /// Patterns of an error line, and of a warning line.
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+    /// A pattern of a stack frame, with `file` and `line` (and `col`) groups.
+    pub frames: Option<String>,
+    /// The preset it was filled in from (#61).
+    pub preset: Option<String>,
+    /// Folders from its `cwd` put first on PATH when they exist, and where its programs are looked for first.
+    pub path: Vec<String>,
+    /// Programs the startup checklist shows with their versions.
+    pub tools: Vec<String>,
+    /// A compose app's file and services: its run is `docker compose up`.
+    pub compose: Option<Compose>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -117,6 +212,18 @@ pub struct Layer {
     pub must_not_reference: Vec<String>,
 }
 
+/// A one-off command run from the palette (`"tasks"`, #56): seed the database, regenerate a client. `run` as a command
+/// app's (text split into arguments, or a list of them), in `cwd` from the repo root, with `env` on top of
+/// lazyrunner's own.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Task {
+    pub key: String,
+    pub name: String,
+    pub run: Vec<String>,
+    pub cwd: String,
+    pub env: Vec<(String, String)>,
+}
+
 /// A loaded profile: checked and turned into what lazyrunner runs. Paths use this OS's separators.
 #[derive(Clone, Debug)]
 pub struct Project {
@@ -129,6 +236,8 @@ pub struct Project {
     pub apps: Vec<App>,
     /// The code map's rules (`"layers"`).
     pub layers: Vec<Layer>,
+    /// One-off commands (`"tasks"`).
+    pub tasks: Vec<Task>,
     pub root: Option<PathBuf>,
     pub source: Source,
     /// What trust is given to: the file as written.

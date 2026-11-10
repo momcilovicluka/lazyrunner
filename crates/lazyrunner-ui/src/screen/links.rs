@@ -43,10 +43,18 @@ fn app_folder(controller: &Controller, app: usize) -> Option<std::path::PathBuf>
     match &controller.apps.get(app)?.kind {
         AppKind::Npm { dir, .. } => Some(controller.root.join(dir)),
         AppKind::Dotnet { project, .. } => controller.root.join(project).parent().map(Path::to_path_buf),
+        AppKind::Command(command) => Some(controller.root.join(&command.cwd)),
     }
 }
 
-/// A file in the editor (`"editor"`), at a line and column when there are; the system's own app for it without one.
+/// A source file the system would run rather than open (a Python script).
+fn runnable(file: &Path) -> bool {
+    let extension = file.extension().map(|extension| extension.to_string_lossy().to_lowercase()).unwrap_or_default();
+    links::RUNNABLE.contains(&extension.as_str())
+}
+
+/// A file in the editor (`"editor"`), at a line and column when there are; the system's own app for it without one
+/// - its folder for a script the system would run.
 pub fn open_file(ui: &Ui, controller: &mut Controller, file: &Path, line: Option<u32>, column: Option<u32>) {
     let name = file.file_name().map_or_else(|| file.display().to_string(), |name| name.to_string_lossy().into_owned());
     let shown = line.map_or(name.clone(), |line| format!("{name}:{line}"));
@@ -66,6 +74,14 @@ pub fn open_file(ui: &Ui, controller: &mut Controller, file: &Path, line: Option
                 controller.add_log(format!("Opening {shown} in {by}"), Hue::DarkGray);
             } else {
                 controller.add_log(format!("✗ {by} didn't start (\"editor\": \"{editor}\")"), Hue::Red);
+            }
+        }
+        None if runnable(file) => {
+            if reveal(file) {
+                let text = format!("Showing {shown} in its folder - set \"editor\" to open it at its line");
+                controller.add_log(text, Hue::DarkGray);
+            } else {
+                controller.add_log(format!("✗ Couldn't show {shown} - set \"editor\" to open it"), Hue::Red);
             }
         }
         None if (ui.opener)(&file.display().to_string()) => {

@@ -10,11 +10,31 @@ use serde_json::{Map, Value, json};
 
 use super::{Note, Outcome, Severity, Tone, init_root, note, problems};
 use crate::apptypes::is_test_project;
-use crate::json::{self, field, field_ci, keys, text, truthy};
+use crate::json::{self, field, field_ci, keys, list, text, truthy};
 use crate::profile::{Found, ProfileDirs, REPO_PROFILE_FILE, Source};
 
-const SKIP_DIRS: [&str; 12] =
-    ["node_modules", "bin", "obj", ".git", ".vs", ".idea", "dist", "out", "build", "packages", "artifacts", "coverage"];
+const SKIP_DIRS: [&str; 16] = [
+    "node_modules",
+    "bin",
+    "obj",
+    ".git",
+    ".vs",
+    ".idea",
+    "dist",
+    "out",
+    "build",
+    "packages",
+    "artifacts",
+    "coverage",
+    ".venv",
+    "venv",
+    "target",
+    "__pycache__",
+];
+/// The port a command app found by init gets when its run needs one (`{port}`).
+const COMMAND_PORT: u16 = 8000;
+/// A compose app's name, after its folder's when it isn't the root.
+const COMPOSE_NAME: &str = "Services";
 const SCAN_DEPTH: usize = 6;
 /// The ports dev tools use when a script names none.
 const VITE_PORT: u16 = 5173;
@@ -26,9 +46,17 @@ fn file_name(path: &Path) -> String {
     path.file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned())
 }
 
-/// The files init looks at (solutions, projects and package.json), breadth first in name order, skipping build
-/// output, packages and the like.
+/// The files that mark a folder as one of lazyrunner's presets' (a `pyproject.toml`).
+fn preset_files() -> Vec<String> {
+    let presets = crate::profile::preset::bundled();
+    let files = presets.iter().flat_map(|preset| list(field(field(preset, "detect"), "anyFile")).into_iter().map(text));
+    files.map(|file| file.to_lowercase()).collect()
+}
+
+/// The files init looks at (solutions, projects, package.json and the presets' files), breadth first in name order,
+/// skipping build output, packages and the like.
 pub fn scaffold_files(root: &Path) -> Vec<PathBuf> {
+    let marks = preset_files();
     let mut files = Vec::new();
     let mut pending = VecDeque::from([(root.to_path_buf(), 0)]);
     while let Some((dir, level)) = pending.pop_front() {
@@ -46,7 +74,12 @@ pub fn scaffold_files(root: &Path) -> Vec<PathBuf> {
                 if !SKIP_DIRS.contains(&name.as_str()) && level < SCAN_DEPTH {
                     pending.push_back((path, level + 1));
                 }
-            } else if name.ends_with(".csproj") || name.ends_with(".sln") || name == "package.json" {
+            } else if name.ends_with(".csproj")
+                || name.ends_with(".sln")
+                || name == "package.json"
+                || marks.contains(&name)
+                || crate::profile::COMPOSE_FILES.contains(&name.as_str())
+            {
                 files.push(path);
             }
         }
@@ -167,7 +200,71 @@ pub fn find_candidates(root: &Path, files: &[PathBuf]) -> Candidates {
             found.apps.push(app);
         }
     }
+    let marks = preset_files();
+    let mut folders: Vec<&Path> = files
+        .iter()
+        .filter(|path| marks.contains(&file_name(path).to_lowercase()))
+        .filter_map(|path| path.parent())
+        .collect();
+    folders.dedup();
+    for folder in folders {
+        if let Some(app) = preset_candidate(root, folder, &mut found.notes) {
+            found.apps.push(app);
+        }
+    }
+    let composed = |path: &&PathBuf| crate::profile::COMPOSE_FILES.contains(&file_name(path).to_lowercase().as_str());
+    let mut folders: Vec<&Path> = files.iter().filter(composed).filter_map(|path| path.parent()).collect();
+    folders.dedup();
+    for (at, folder) in folders.into_iter().enumerate() {
+        found.apps.insert(at, compose_candidate(root, folder, &mut found.notes));
+    }
     found
+}
+
+/// A folder with a compose file: its services as a compose app, before the apps that likely use them.
+fn compose_candidate(root: &Path, dir: &Path, notes: &mut Vec<String>) -> Map<String, Value> {
+    let path = relative(root, dir);
+    let name = if path == "." { COMPOSE_NAME.to_string() } else { format!("{} {}", file_name(dir), COMPOSE_NAME) };
+    let mut app = Map::new();
+    app.insert("key".into(), json!(""));
+    app.insert("name".into(), json!(name));
+    app.insert("type".into(), json!(crate::profile::TYPE_COMPOSE));
+    if path != "." {
+        app.insert("cwd".into(), json!(path));
+    }
+    notes.push(format!("{path}: its compose file's services run as one app - name those it starts in \"services\""));
+    app
+}
+
+/// A folder that looks like one of lazyrunner's presets' (a Python project): a command app with that preset, when
+/// the preset knows how it runs there.
+fn preset_candidate(root: &Path, dir: &Path, notes: &mut Vec<String>) -> Option<Map<String, Value>> {
+    let preset = crate::profile::preset::looks_like(dir)?;
+    let (id, kind) = (text(field(&preset, "id")), text(field(&preset, "name")));
+    let path = relative(root, dir);
+    let mut app = Map::new();
+    app.insert("key".into(), json!(""));
+    let name = if path == "." { file_name(root) } else { file_name(dir) };
+    let mut chars = name.chars();
+    let name: String = chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default();
+    app.insert("name".into(), json!(name));
+    app.insert("type".into(), json!(crate::profile::TYPE_COMMAND));
+    app.insert("preset".into(), json!(id));
+    if path != "." {
+        app.insert("cwd".into(), json!(path));
+    }
+    let filled = crate::profile::preset::apply(&Value::Object(app.clone()), &preset, Some(dir));
+    let Some(run) = filled.get("run").filter(|run| !run.is_null()) else {
+        notes.push(format!(
+            "{path} looks like a {kind} project, but how it runs isn't clear - add it as a command app with \"preset\": \"{id}\" and its run"
+        ));
+        return None;
+    };
+    if crate::profile::load::words(run).join(" ").contains(crate::profile::PORT_PLACEHOLDER) {
+        app.insert("port".into(), json!(COMMAND_PORT));
+        notes.push(format!("{path}: port {COMMAND_PORT} for its {kind} server is a guess, check it"));
+    }
+    Some(app)
 }
 
 fn dotnet_candidate(
@@ -371,6 +468,40 @@ pub fn init(dir: Option<&Path>, save: bool, here: &Path, dirs: &ProfileDirs) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_python_folder_becomes_a_command_app_with_its_preset_and_one_whose_run_is_unclear_a_note() {
+        let repo = crate::testing::TempDir::new("init-python");
+        crate::testing::write(repo.join("services/pricing/manage.py"), "");
+        crate::testing::write(repo.join("services/pricing/requirements.txt"), "");
+        crate::testing::write(repo.join("tools/lib/pyproject.toml"), "");
+        crate::testing::write(repo.join("tools/lib/.venv/Lib/x/pyproject.toml"), "");
+        let (profile, notes) = scaffold(repo.path());
+        let apps: Vec<&Value> = profile["apps"].as_array().into_iter().flatten().collect();
+        assert_eq!(apps.len(), 1, "{apps:?}");
+        let pricing = apps[0];
+        assert_eq!((pricing["type"].as_str(), pricing["preset"].as_str()), (Some("command"), Some("python")));
+        assert_eq!(
+            (pricing["key"].as_str(), pricing["port"].as_u64()),
+            (Some("pricing"), Some(u64::from(COMMAND_PORT)))
+        );
+        assert!(pricing["cwd"].as_str().is_some_and(|cwd| cwd.ends_with("pricing")), "{pricing}");
+        assert!(notes.iter().any(|note| note.contains("lib looks like a Python project")), "{notes:?}");
+    }
+
+    #[test]
+    fn a_compose_file_becomes_a_compose_app_before_the_others() {
+        let repo = crate::testing::TempDir::new("init-compose");
+        crate::testing::write(repo.join("docker-compose.yml"), "services: {}\n");
+        crate::testing::write(repo.join("api/main.go"), "");
+        crate::testing::write(repo.join("api/go.mod"), "");
+        let (profile, notes) = scaffold(repo.path());
+        let apps: Vec<&Value> = profile["apps"].as_array().into_iter().flatten().collect();
+        let kinds: Vec<&str> = apps.iter().filter_map(|app| app["type"].as_str()).collect();
+        assert_eq!(kinds, ["compose", "command"], "{apps:?}");
+        assert_eq!((apps[0]["key"].as_str(), apps[0]["cwd"].as_str()), (Some("services"), None));
+        assert!(notes.iter().any(|note| note.contains("name those it starts in \"services\"")), "{notes:?}");
+    }
 
     #[test]
     fn keys_are_unique_lowercase_and_start_with_a_letter() {

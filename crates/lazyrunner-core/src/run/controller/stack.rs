@@ -90,7 +90,7 @@ impl Controller {
             .iter()
             .filter(|app| match &app.kind {
                 AppKind::Dotnet { project, .. } => uses_database(&self.root.join(project)),
-                AppKind::Npm { .. } => false,
+                AppKind::Npm { .. } | AppKind::Command(_) => false,
             })
             .map(|app| app.key.clone())
             .collect();

@@ -22,7 +22,7 @@ use crossterm::event::KeyEvent;
 use lazyrunner_core::apptypes;
 use lazyrunner_core::json;
 use lazyrunner_core::output::Hue;
-use lazyrunner_core::profile::{App, AppKind};
+use lazyrunner_core::profile::{App, AppKind, Ready};
 use lazyrunner_core::run::app::AppState;
 use lazyrunner_core::run::{Controller, secrets};
 use serde_json::Value;
@@ -100,8 +100,19 @@ struct Var {
 
 /// A line of the sheet.
 enum Row {
-    Heading { title: String, changed: bool },
-    Pair { key: String, value: String },
+    Heading {
+        title: String,
+        changed: bool,
+    },
+    Pair {
+        key: String,
+        value: String,
+    },
+    /// What's suggested, not set: dimmed until it is.
+    Suggested {
+        key: String,
+        value: String,
+    },
     Text(String),
     Var(Var),
 }
@@ -253,7 +264,7 @@ fn build(controller: &Controller, index: usize, only: bool) -> Vec<Row> {
     let changed = |path: &Path| started.is_some_and(|at| modified(path).is_some_and(|when| when > at));
     let launch = match &app.kind {
         AppKind::Dotnet { .. } => apptypes::launch_profile(&controller.root, app),
-        AppKind::Npm { .. } => None,
+        AppKind::Npm { .. } | AppKind::Command(_) => None,
     };
     let launch_vars: Vec<(String, String)> = launch
         .iter()
@@ -335,6 +346,40 @@ fn started_with(
                 rows.push(pair("script", &mode.script));
                 rows.push(pair("port", &mode.port.map_or("none (a watch build)".into(), |port| port.to_string())));
             }
+        }
+        AppKind::Command(command) => {
+            rows.push(heading("Profile", changed(&controller.project.path)));
+            let none = |words: &[String]| if words.is_empty() { "none".to_string() } else { words.join(" ") };
+            if let Some(preset) = &command.preset {
+                rows.push(pair("preset", preset));
+            } else if let Some(found) =
+                lazyrunner_core::profile::preset::looks_like(&controller.root.join(&command.cwd))
+                    .filter(|_| command.compose.is_none())
+            {
+                let id = lazyrunner_core::json::text(&found["id"]);
+                let value = format!("{id} - suggested: \"preset\": \"{id}\" in the profile sets it");
+                rows.push(Row::Suggested { key: "preset".into(), value });
+            }
+            rows.push(pair("run", &command.run.join(" ")));
+            if let Some(compose) = &command.compose {
+                let services =
+                    if compose.services.is_empty() { "all".to_string() } else { compose.services.join(", ") };
+                rows.push(pair("services", &services));
+                rows.push(pair("ready", "once its services run, healthy when they have a healthcheck"));
+                return rows;
+            }
+            rows.push(pair("build", &none(&command.build)));
+            rows.push(pair("install", &none(&command.install)));
+            rows.push(pair("port", &apptypes::command_port(command).map_or("none".into(), |port| port.to_string())));
+            let ready = match &command.ready {
+                Ready::Started => "once started".to_string(),
+                Ready::Port(port) => format!("once :{port} listens"),
+                Ready::Line(line) => format!("once a line matches {line}"),
+                Ready::LineOrPort(line) => format!("once a line matches {line}, or its port listens"),
+                Ready::Http(path) => format!("once {path} answers 2xx"),
+                Ready::Services => "once its services are up".to_string(),
+            };
+            rows.push(pair("ready", &ready));
         }
     }
     rows
@@ -450,6 +495,7 @@ fn copied(controller: &Controller, app: usize) -> String {
                 vec![format!("{title}{}", if changed { " (changed since it started)" } else { "" })]
             }
             Row::Pair { key, value } => vec![format!("  {key}: {value}")],
+            Row::Suggested { key, value } => vec![format!("  {key}: {value}")],
             Row::Text(text) => vec![format!("  {text}")],
             Row::Var(var) => {
                 let mut lines = vec![format!("  {}: {} [{}]", var.name, masked(&var), var.source.name())];
@@ -633,6 +679,13 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             }
             Row::Pair { key, value } => {
                 lines.push(vec![seg(format!("   {}", pad(&key, KEY_CELLS)), C::DarkGray), seg(value, C::White)]);
+            }
+            Row::Suggested { key, value } => {
+                let idea = icons::icon(ui.nerd, Icon::Idea);
+                lines.push(vec![
+                    seg(format!("   {}", pad(&key, KEY_CELLS)), C::DarkGray),
+                    seg(format!("{idea} {value}"), C::DarkGray),
+                ]);
             }
             Row::Var(var) => {
                 let this = var_at == selected;

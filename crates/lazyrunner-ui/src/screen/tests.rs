@@ -3917,3 +3917,174 @@ async fn a_title_fills_green_as_its_app_comes_up_and_drains_as_it_stops() {
     screen.ui.motion.enabled = false;
     assert_eq!(chip(&screen.ui, "orders", " Orders ".into(), C::White, C::DarkGray).len(), 1, "not with motion off");
 }
+
+#[tokio::test]
+async fn a_task_is_in_the_palette_runs_from_it_and_shows_in_the_header_and_to_agents() {
+    use lazyrunner_core::profile::Task;
+    let mut screen = screen("tasks", json!({}));
+    let (shell, flag, wait) =
+        if cfg!(windows) { ("cmd", "/C", "ping -n 30 127.0.0.1 >nul") } else { ("sh", "-c", "sleep 30") };
+    let run = vec![shell.to_string(), flag.to_string(), wait.to_string()];
+    let folder = std::env::temp_dir().display().to_string();
+    let task = Task { key: "seed".into(), name: "Seed the database".into(), run, cwd: folder, env: Vec::new() };
+    screen.controller.project.tasks.push(task);
+    screen.press(": s e e d");
+    let frame = screen.frame();
+    assert!(frame.contains("Run task: Seed the database"), "in the palette: {frame}");
+    screen.press("Enter");
+    assert!(screen.controller.task_started("seed").is_some(), "Enter runs it");
+    assert!(screen.frame().contains("▸ Seed the database"), "the header says it runs: {}", screen.frame());
+    let status = agent(&mut screen, "status", json!({}), None);
+    assert_eq!(status["result"]["tasks"][0]["running"], true, "{status}");
+    let again = agent(&mut screen, "run_task", json!({ "task": "Seed the database" }), None);
+    assert!(again.to_string().contains("already running"), "{again}");
+    let missing = agent(&mut screen, "run_task", json!({ "task": "nope" }), None);
+    assert!(missing.to_string().contains("no task 'nope' (there are: seed)"), "{missing}");
+}
+
+/// A screen whose first app is a compose app running db (postgres, up) and cache (starting).
+fn composed(label: &str) -> Screen {
+    use lazyrunner_core::profile::{AppKind, Command, Compose, Ready};
+    use lazyrunner_core::run::Event;
+    use lazyrunner_core::run::app::Status;
+    use lazyrunner_core::run::compose::{Service, State};
+    let mut screen = screen(label, json!({ "layout": "stacked" }));
+    let compose = Compose { file: None, services: vec!["db".into(), "cache".into()] };
+    let command = Command {
+        run: vec!["docker".into()],
+        cwd: String::new(),
+        port: None,
+        build: Vec::new(),
+        install: Vec::new(),
+        ready: Ready::Services,
+        watch: Vec::new(),
+        errors: Vec::new(),
+        warnings: Vec::new(),
+        frames: None,
+        preset: None,
+        path: Vec::new(),
+        tools: Vec::new(),
+        compose: Some(compose),
+        setup: Vec::new(),
+        install_from: Vec::new(),
+    };
+    screen.controller.apps[0].kind = AppKind::Command(Box::new(command));
+    let state = &mut screen.controller.states[0];
+    (state.status, state.generation) = (Status::Running, 1);
+    let service = |name: &str, state, image: &str| Service {
+        name: name.into(),
+        state,
+        detail: "running".into(),
+        ports: vec![5432],
+        image: image.into(),
+    };
+    let services = Ok(vec![service("cache", State::Starting, "redis:7"), service("db", State::Up, "postgres:16")]);
+    let key = screen.controller.apps[0].key.clone();
+    screen.controller.handle(Event::ComposeServices { key, generation: 1, services });
+    screen
+}
+
+#[tokio::test]
+async fn a_compose_apps_title_shows_its_services_and_agents_see_them() {
+    let mut screen = composed("compose");
+    let frame = screen.frame();
+    assert!(frame.contains("◌ cache ● db") || frame.contains(" ◌●"), "the title shows them: {frame}");
+    let status = agent(&mut screen, "status", json!({}), None);
+    let app = &status["result"]["apps"][0];
+    assert_eq!((app["kind"].as_str(), app["services"][1]["name"].as_str()), (Some("compose"), Some("db")), "{status}");
+    assert_eq!(app["services"][1]["ports"][0], 5432, "{status}");
+}
+
+#[tokio::test]
+async fn a_compose_apps_lines_get_a_gutter_per_service_and_its_database_is_the_stack_maps() {
+    use lazyrunner_core::run::{Event, Tag};
+    let mut screen = composed("compose-gutter");
+    let key = screen.controller.apps[0].key.clone();
+    for line in ["db-1     | listening on 5432", "db-1     | ready to accept connections", "cache-1  | booting"] {
+        let tag = Tag::App { key: key.clone(), generation: 1 };
+        screen.controller.handle(Event::Output { tag, line: line.into() });
+    }
+    let frame = screen.frame();
+    assert!(frame.contains("▎db listening on 5432") && frame.contains("▎ready to accept"), "{frame}");
+    assert!(frame.contains("▎cache booting") && !frame.contains("db-1     |"), "the prefix is gone: {frame}");
+    screen.press("K");
+    let map = screen.frame();
+    let name = screen.controller.apps[0].name.clone();
+    assert!(map.contains(&format!("● db · {name}")), "the database runs in it: {map}");
+}
+
+#[tokio::test]
+async fn a_failed_task_stays_in_the_header_until_its_clicked_away() {
+    use lazyrunner_core::profile::Task;
+    let mut screen = screen("task-chips", json!({}));
+    screen.controller.root = screen.temp.path().to_path_buf();
+    let (shell, flag, fail) = if cfg!(windows) {
+        ("cmd", "/C", "echo error: no database& exit /b 3")
+    } else {
+        ("sh", "-c", "echo error: no database; exit 3")
+    };
+    let run = vec![shell.to_string(), flag.to_string(), fail.to_string()];
+    let task = Task { key: "broken".into(), name: "Broken".into(), run, cwd: String::new(), env: Vec::new() };
+    screen.controller.project.tasks.push(task);
+    screen.controller.run_task("broken");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+    while screen.controller.task_started("broken").is_some() {
+        let event = tokio::time::timeout_at(deadline, screen.events.recv()).await.expect("done in time").unwrap();
+        screen.controller.handle(event);
+    }
+    assert!(screen.frame().contains("✗ Broken: error: no database"), "{}", screen.frame());
+    screen.click(Target::TaskResult(0));
+    assert!(!screen.frame().contains("✗ Broken: error"), "clicked away: {}", screen.frame());
+}
+
+/// A screen whose first app is a Python command app, in a real folder (the sheet looks in it).
+fn python_app(label: &str) -> Screen {
+    use lazyrunner_core::profile::{AppKind, Command, Ready};
+    let mut screen = screen(label, json!({ "layout": "stacked" }));
+    screen.controller.root = screen.temp.path().to_path_buf();
+    lazyrunner_core::testing::write(screen.temp.join("pricing/requirements.txt"), "flask\n");
+    let command = Command {
+        run: vec!["uvicorn".into(), "main:app".into()],
+        cwd: "pricing".into(),
+        port: None,
+        build: Vec::new(),
+        install: Vec::new(),
+        setup: Vec::new(),
+        install_from: Vec::new(),
+        ready: Ready::Started,
+        watch: Vec::new(),
+        errors: Vec::new(),
+        warnings: Vec::new(),
+        frames: None,
+        preset: None,
+        path: Vec::new(),
+        tools: Vec::new(),
+        compose: None,
+    };
+    screen.controller.apps[0].kind = AppKind::Command(Box::new(command));
+    screen.controller.apps[0].icon = None; // its own icon would win
+    screen
+}
+
+#[tokio::test]
+async fn a_command_apps_language_is_a_chip_without_nerd_font_icons_and_its_preset_is_suggested() {
+    let mut screen = python_app("language-chip");
+    let name = screen.controller.apps[0].name.clone();
+    assert!(screen.frame().contains(&format!("■ py {name}")), "{}", screen.frame());
+    screen.press("x e");
+    let sheet = screen.frame();
+    assert!(sheet.contains("python - suggested: \"preset\": \"python\" in the profile sets it"), "{sheet}");
+}
+
+#[tokio::test]
+async fn an_app_without_a_port_thats_up_is_running_not_a_watch_build() {
+    use lazyrunner_core::run::app::Status;
+    let mut screen = python_app("worker-up");
+    let worker = screen.controller.apps[0].kind.clone();
+    let docs = screen.controller.apps.iter().position(|app| app.key == "docs").unwrap(); // a watch build: no port
+    screen.controller.apps[docs].kind = worker;
+    let state = &mut screen.controller.states[docs];
+    (state.status, state.generation, state.up_generation, state.up_after) = (Status::Running, 1, Some(1), Some(2.0));
+    let frame = screen.frame();
+    assert!(frame.contains("● running") && !frame.contains("built, watching"), "{frame}");
+}

@@ -17,6 +17,11 @@ pub struct Fields {
     pub detect: &'static [&'static str],
     pub dotnet: &'static [&'static str],
     pub npm: &'static [&'static str],
+    pub command: &'static [&'static str],
+    pub compose: &'static [&'static str],
+    pub command_ready: &'static [&'static str],
+    pub preset: &'static [&'static str],
+    pub task: &'static [&'static str],
     pub variant: &'static [&'static str],
     pub when: &'static [&'static str],
     pub ready: &'static [&'static str],
@@ -24,7 +29,19 @@ pub struct Fields {
 }
 
 pub const FIELDS: Fields = Fields {
-    top: &["$schema", "schemaVersion", "extends", "id", "name", "detect", "watch", "apps", "layers"],
+    top: &[
+        "$schema",
+        "schemaVersion",
+        "extends",
+        "id",
+        "name",
+        "detect",
+        "watch",
+        "apps",
+        "layers",
+        "presets",
+        "tasks",
+    ],
     detect: &["anyFile"],
     dotnet: &[
         "key",
@@ -42,6 +59,53 @@ pub const FIELDS: Fields = Fields {
         "dependsOn",
     ],
     npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "env", "tests", "dependsOn"],
+    command: &[
+        "key",
+        "name",
+        "icon",
+        "nerdIcon",
+        "type",
+        "run",
+        "cwd",
+        "port",
+        "build",
+        "install",
+        "setup",
+        "installFrom",
+        "ready",
+        "watch",
+        "errors",
+        "warnings",
+        "frames",
+        "preset",
+        "path",
+        "tools",
+        "env",
+        "dependsOn",
+    ],
+    compose: &["key", "name", "icon", "nerdIcon", "type", "file", "cwd", "services", "env", "dependsOn"],
+    command_ready: &["port", "line", "http", "orPort"],
+    preset: &[
+        "id",
+        "name",
+        "nerdIcon",
+        "detect",
+        "tools",
+        "path",
+        "env",
+        "run",
+        "build",
+        "install",
+        "setup",
+        "installFrom",
+        "ready",
+        "watch",
+        "errors",
+        "warnings",
+        "frames",
+        "options",
+    ],
+    task: &["key", "name", "run", "cwd", "env"],
     variant: &["label", "when", "script", "port", "servedBy", "ready"],
     when: &["packageScript"],
     ready: &["file"],
@@ -50,9 +114,22 @@ pub const FIELDS: Fields = Fields {
 
 impl Fields {
     pub fn all(&self) -> Vec<&'static str> {
-        let mut all: Vec<&str> =
-            [self.top, self.detect, self.dotnet, self.npm, self.variant, self.when, self.ready, self.migrations]
-                .concat();
+        let mut all: Vec<&str> = [
+            self.top,
+            self.detect,
+            self.dotnet,
+            self.npm,
+            self.command,
+            self.compose,
+            self.command_ready,
+            self.preset,
+            self.task,
+            self.variant,
+            self.when,
+            self.ready,
+            self.migrations,
+        ]
+        .concat();
         all.sort_unstable();
         all.dedup();
         all
@@ -128,6 +205,8 @@ pub fn validate(data: &Value, in_repo: bool) -> Vec<String> {
         check_depends_on(app, &keys, &mut problems);
     }
     check_layers(field(data, "layers"), &mut problems);
+    check_presets(field(data, "presets"), &mut problems);
+    check_tasks(field(data, "tasks"), &mut problems);
     problems
 }
 
@@ -260,7 +339,253 @@ fn check_app<'a>(app: &'a Value, index: usize, keys: &mut HashMap<String, &'a Va
             known_fields(app, FIELDS.npm, &at, problems);
             check_npm_app(app, &at, problems);
         }
-        _ => problems.push(format!("{at}.type must be 'dotnet' or 'npm' (it is '{}')", text(field(app, "type")))),
+        Some(super::TYPE_COMMAND) => {
+            known_fields(app, FIELDS.command, &at, problems);
+            check_command_app(app, &at, problems);
+        }
+        Some(super::TYPE_COMPOSE) => {
+            known_fields(app, FIELDS.compose, &at, problems);
+            check_compose_app(app, &at, problems);
+        }
+        _ => {
+            let kind = text(field(app, "type"));
+            problems.push(format!("{at}.type must be 'dotnet', 'npm', 'command' or 'compose' (it is '{kind}')"));
+        }
+    }
+}
+
+fn is_port(value: &Value) -> bool {
+    is_integer(value) && value.as_i64().is_some_and(|port| (1..=65535).contains(&port))
+}
+
+/// A list of text, none of it empty.
+fn texts(value: &Value) -> bool {
+    value.as_array().is_some_and(|items| items.iter().all(|item| item.as_str().is_some_and(|item| !item.is_empty())))
+}
+
+/// A compose app: its file and folder are paths in the repo, its services names.
+fn check_compose_app(app: &Value, at: &str, problems: &mut Vec<String>) {
+    for name in ["file", "cwd"] {
+        let path = field(app, name);
+        if !path.is_null() {
+            relative_path(path, &format!("{at}.{name}"), problems);
+        }
+    }
+    let services = field(app, "services");
+    if !services.is_null() && !texts(services) {
+        problems.push(format!("{at}.services must be a list of the compose file's services, e.g. [\"db\", \"redis\"]"));
+    }
+}
+
+/// What a command's text looks like, in messages.
+const COMMAND_EXAMPLE: &str = "\"uvicorn main:app --port {port}\"";
+
+/// A command app: what it runs (text, or a list of arguments, or from its preset), where, its port - which `{port}`
+/// needs - and the rest as [`check_command_fields`] says.
+fn check_command_app(app: &Value, at: &str, problems: &mut Vec<String>) {
+    let preset = text(field(app, "preset"));
+    if field(app, "run").is_null() {
+        problems.push(if preset.is_empty() {
+            format!("{at}.run must be a command: text, or a list of arguments, e.g. {COMMAND_EXAMPLE}")
+        } else {
+            format!("{at}.run is required: the {preset} preset has no run for this folder - say what runs it")
+        });
+    }
+    if !field(app, "preset").is_null() && preset.trim().is_empty() {
+        problems.push(format!("{at}.preset must name a preset, e.g. 'python'"));
+    }
+    let cwd = field(app, "cwd");
+    if !cwd.is_null() {
+        relative_path(cwd, &format!("{at}.cwd"), problems);
+    }
+    let port = field(app, "port");
+    if !port.is_null() && !is_port(port) {
+        problems.push(format!("{at}.port must be a port number (1-65535)"));
+    }
+    let commands = ["run", "build", "install"].map(|name| super::load::words(field(app, name)).join(" "));
+    let env = field(app, "env").as_object().into_iter().flatten().filter_map(|(_, value)| value.as_str());
+    let uses_port = commands.iter().map(String::as_str).chain(env).any(|text| text.contains(super::PORT_PLACEHOLDER));
+    if uses_port && port.is_null() && field(field(app, "ready"), "port").is_null() {
+        problems.push(format!("{at} uses {} but has no port: add \"port\", e.g. 8000", super::PORT_PLACEHOLDER));
+    }
+    check_command_fields(app, at, true, problems);
+}
+
+/// A command app's fields as written, or a preset's (`app` false: its ready can't know a port yet): commands that are
+/// commands, its paths, lists that are lists, patterns that are patterns, a ready that says one thing.
+fn check_command_fields(app: &Value, at: &str, is_app: bool, problems: &mut Vec<String>) {
+    for name in ["run", "build", "install", "setup"] {
+        let value = field(app, name);
+        if value.is_null() || (name == "setup" && value.as_array().is_some_and(Vec::is_empty)) {
+            continue; // an empty setup: none, over a later option's
+        }
+        let command = (value.is_string() || texts(value)) && !super::load::words(value).is_empty();
+        if !command {
+            problems
+                .push(format!("{at}.{name} must be a command: text, or a list of arguments, e.g. {COMMAND_EXAMPLE}"));
+        }
+    }
+    check_ready(app, at, is_app, problems);
+    for name in ["path", "tools", "installFrom"] {
+        let value = field(app, name);
+        if !value.is_null() && !texts(value) {
+            problems.push(format!("{at}.{name} must be a list of text, e.g. [\".venv/Scripts\"]"));
+        }
+    }
+    for (index, folder) in list(field(app, "path")).into_iter().enumerate() {
+        relative_path(folder, &format!("{at}.path[{index}]"), problems);
+    }
+    for (index, file) in list(field(app, "installFrom")).into_iter().enumerate() {
+        relative_path(file, &format!("{at}.installFrom[{index}]"), problems);
+    }
+    for name in ["watch", "errors", "warnings"] {
+        let value = field(app, name);
+        if !value.is_null() && !texts(value) {
+            problems.push(format!("{at}.{name} must be a list of text, e.g. [\"**/*.py\"]"));
+        }
+    }
+    for name in ["errors", "warnings"] {
+        for (index, item) in list(field(app, name)).into_iter().enumerate() {
+            if let Some(Err(error)) = item.as_str().map(Regex::new) {
+                problems.push(format!("{at}.{name}[{index}] must be a regular expression: {error}"));
+            }
+        }
+    }
+    let frames = field(app, "frames");
+    if frames.is_null() {
+        return;
+    }
+    let groups = |pattern: &Regex| {
+        ["file", "line"].iter().all(|group| pattern.capture_names().flatten().any(|name| name == *group))
+    };
+    match frames.as_str().map(Regex::new) {
+        Some(Ok(pattern)) if groups(&pattern) => {}
+        Some(Ok(_)) => problems.push(format!("{at}.frames needs a (?P<file>...) and a (?P<line>...) group")),
+        Some(Err(error)) => problems.push(format!("{at}.frames must be a regular expression: {error}")),
+        None => problems.push(format!("{at}.frames must be a regular expression with file and line groups")),
+    }
+}
+
+/// The profile's tasks (`"tasks"`): each with a unique key, a name and a command to run; its folder and env as an app's.
+fn check_tasks(tasks: &Value, problems: &mut Vec<String>) {
+    if tasks.is_null() {
+        return;
+    }
+    let Some(tasks) = tasks.as_array() else {
+        problems.push("tasks must be a list, e.g. [{ \"key\": \"seed\", \"name\": \"Seed the database\", \"run\": \"python seed.py\" }]".into());
+        return;
+    };
+    let mut keys = std::collections::HashSet::new();
+    for (index, task) in tasks.iter().enumerate() {
+        let mut at = format!("tasks[{index}]");
+        if !task.is_object() {
+            problems.push(format!("{at} must be an object: its key, name and run"));
+            continue;
+        }
+        let key = text(field(task, "key"));
+        if !KEY.is_match(&key) {
+            problems.push(format!("{at}.key is required: lowercase letters and digits, e.g. seed"));
+        } else if !keys.insert(key.to_lowercase()) {
+            problems.push(format!("{at}.key '{key}' is used twice"));
+        } else {
+            at = format!("{at} ({key})");
+        }
+        known_fields(task, FIELDS.task, &at, problems);
+        if text(field(task, "name")).trim().is_empty() {
+            problems.push(format!("{at}.name is required: what the palette calls it"));
+        }
+        let run = field(task, "run");
+        if !((run.is_string() || texts(run)) && !super::load::words(run).is_empty()) {
+            problems.push(format!("{at}.run must be a command: text, or a list of arguments, e.g. \"python seed.py\""));
+        }
+        let cwd = field(task, "cwd");
+        if !cwd.is_null() {
+            relative_path(cwd, &format!("{at}.cwd"), problems);
+        }
+        let env = field(task, "env");
+        if !env.is_null() && !env.as_object().is_some_and(|vars| vars.values().all(Value::is_string)) {
+            problems.push(format!("{at}.env must name text values, e.g. {{ \"APP_ENV\": \"dev\" }}"));
+        }
+    }
+}
+
+/// The profile's own presets (`"presets"`): each a preset, as [`check_preset`] says.
+fn check_presets(presets: &Value, problems: &mut Vec<String>) {
+    if presets.is_null() {
+        return;
+    }
+    let Some(presets) = presets.as_object() else {
+        problems.push("presets must be an object: each preset by its name, e.g. { \"python\": { ... } }".into());
+        return;
+    };
+    for (name, preset) in presets {
+        check_preset(preset, &format!("presets.{name}"), problems);
+    }
+}
+
+/// A preset: the fields it fills in, as a command app's would be, and its options - each those fields and when it
+/// holds (a file in the app's folder, a program on PATH).
+pub(crate) fn check_preset(preset: &Value, at: &str, problems: &mut Vec<String>) {
+    if !preset.is_object() {
+        problems.push(format!("{at} must be an object: the fields it fills in"));
+        return;
+    }
+    known_fields(preset, FIELDS.preset, at, problems);
+    check_command_fields(preset, at, false, problems);
+    let option_fields: Vec<&str> = super::preset::FILLED.iter().copied().chain(["when"]).collect();
+    for (index, option) in list(field(preset, "options")).into_iter().enumerate() {
+        let oat = format!("{at}.options[{index}]");
+        if !option.is_object() {
+            problems.push(format!("{oat} must be an object: when it holds, and what it fills in"));
+            continue;
+        }
+        known_fields(option, &option_fields, &oat, problems);
+        let when = field(option, "when");
+        if when.is_object() {
+            known_fields(when, &super::preset::WHEN, &format!("{oat}.when"), problems);
+        }
+        check_command_fields(option, &oat, false, problems);
+    }
+}
+
+/// A command app's `ready`: one of a port, a line of its output (a pattern) or an HTTP path on its port.
+fn check_ready(app: &Value, at: &str, is_app: bool, problems: &mut Vec<String>) {
+    let ready = field(app, "ready");
+    if ready.is_null() {
+        return;
+    }
+    let rat = format!("{at}.ready");
+    let shapes = "{ \"port\": 8000 }, { \"line\": \"Uvicorn running on\" } or { \"http\": \"/health\" }";
+    if !ready.is_object() {
+        problems.push(format!("{rat} must be an object: {shapes}"));
+        return;
+    }
+    known_fields(ready, FIELDS.command_ready, &rat, problems);
+    if ["port", "line", "http"].iter().filter(|name| !field(ready, name).is_null()).count() != 1 {
+        problems.push(format!("{rat} needs one of port, line or http: {shapes}"));
+    }
+    let port = field(ready, "port");
+    if !port.is_null() && !is_port(port) {
+        problems.push(format!("{rat}.port must be a port number (1-65535)"));
+    }
+    let line = field(ready, "line");
+    if !line.is_null() {
+        match line.as_str().filter(|line| !line.is_empty()).map(Regex::new) {
+            Some(Ok(_)) => {}
+            Some(Err(error)) => problems.push(format!("{rat}.line must be a regular expression: {error}")),
+            None => problems.push(format!("{rat}.line must be text: what its output says once it's up")),
+        }
+    }
+    let or_port = field(ready, "orPort");
+    if !or_port.is_null() && (!or_port.is_boolean() || line.is_null()) {
+        problems.push(format!("{rat}.orPort goes with line: true, up once the line shows or the port listens"));
+    }
+    let http = field(ready, "http");
+    if !http.is_null() && !text(http).starts_with('/') {
+        problems.push(format!("{rat}.http must be a path starting with /, e.g. '/health'"));
+    }
+    if is_app && !http.is_null() && field(app, "port").is_null() {
+        problems.push(format!("{rat}.http needs the app's port: the path is asked of it"));
     }
 }
 

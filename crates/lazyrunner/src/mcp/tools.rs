@@ -87,7 +87,8 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "start_apps",
-            "Starts an app or every app (builds the .NET ones first when their code changed). Then wait for ready.",
+            "Starts an app or every app (builds the .NET ones and command apps with a build first when their code \
+             changed). Then wait for ready.",
             some_apps.clone(),
             &[],
             false,
@@ -102,8 +103,8 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "build",
-            "Builds an app or every .NET app without starting it (a running one stops first). Then wait for \
-             build_done and read get_errors when it failed.",
+            "Builds an app or every app that builds (.NET, a command app's build) without starting it (a running one \
+             stops first). Then wait for build_done and read get_errors when it failed.",
             some_apps,
             &[],
             false,
@@ -111,8 +112,8 @@ pub fn list(apps: &str) -> Vec<Value> {
         tool(
             "wait",
             "Waits until something is done, then says how it went: ready (no build or rebuild, no npm install, \
-             every started app answers), build_done (the builds that ran while waiting), tests_done or \
-             migrations_checked. At most timeout_sec (120, at most 600); call it again when it timed out.",
+             every started app answers), build_done (the builds that ran while waiting), tests_done, \
+             migrations_checked or task_done (no task runs; how the last ones went). At most timeout_sec (120, at most 600); call it again when it timed out.",
             json!({
                 "for": { "type": "string", "enum": WAITS },
                 "timeout_sec": { "type": "integer", "minimum": 1, "maximum": WAIT_MAX_SECS },
@@ -200,8 +201,18 @@ pub fn list(apps: &str) -> Vec<Value> {
             false,
         )),
         tool(
+            "run_task",
+            "Runs one of the profile's tasks (get_status lists them: key, name, running, last) in the background - \
+             a one-off command such as seeding the database. Its output goes to the panel's log. Then wait for \
+             task_done.",
+            json!({ "task": { "type": "string", "description": "The task's key or name" } }),
+            &["task"],
+            false,
+        ),
+        tool(
             "install_packages",
-            "npm ci (clean: true, the default) or npm install (clean: false) for an npm app. Then wait for ready.",
+            "npm ci (clean: true, the default) or npm install (clean: false) for an npm app; a command app's own \
+             install. Then wait for ready.",
             json!({ "app": app.clone(), "clean": { "type": "boolean" } }),
             &["app"],
             false,

@@ -5,17 +5,18 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 
 use super::child::Spec;
 use super::suites::{Runner, dotnet_filter, name_pattern};
 use crate::apptypes::{self, Mode};
-use crate::profile::{App, AppKind, join};
+use crate::profile::{
+    App, AppKind, CWD_PLACEHOLDER, Command as AppCommand, HOME_PREFIX, PORT_PLACEHOLDER, Task, join, native,
+};
 
-/// A program on PATH (with Windows' extensions: .exe, .cmd, ...).
-pub fn find_on_path(name: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    let extensions: Vec<String> = if cfg!(windows) {
+/// What a program's file name may end with: on Windows its extensions (.exe, .cmd, ...), elsewhere nothing.
+fn executable_extensions() -> Vec<String> {
+    if cfg!(windows) {
         std::env::var("PATHEXT")
             .unwrap_or_else(|_| ".EXE;.CMD;.BAT;.COM".into())
             .split(';')
@@ -23,10 +24,117 @@ pub fn find_on_path(name: &str) -> Option<PathBuf> {
             .collect()
     } else {
         vec![String::new()]
-    };
+    }
+}
+
+/// A program on PATH (with Windows' extensions: .exe, .cmd, ...).
+pub fn find_on_path(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    let extensions = executable_extensions();
     std::env::split_paths(&path).find_map(|dir| {
         extensions.iter().map(|extension| dir.join(format!("{name}{extension}"))).find(|candidate| candidate.is_file())
     })
+}
+
+/// A file as named, or with one of Windows' extensions.
+fn executable(path: &Path) -> Option<PathBuf> {
+    let mut extended = executable_extensions().into_iter().map(|extension| {
+        let mut file = path.as_os_str().to_os_string();
+        file.push(extension);
+        PathBuf::from(file)
+    });
+    path.is_file().then(|| path.to_path_buf()).or_else(|| extended.find(|candidate| candidate.is_file()))
+}
+
+/// A command's program: a path (from the command's folder) as written or with Windows' extensions; else in one of its
+/// `path` folders, else on PATH.
+pub fn program_path(dir: &Path, folders: &[PathBuf], name: &str) -> Option<PathBuf> {
+    if !name.contains(['/', '\\']) && !Path::new(name).is_absolute() {
+        return folders.iter().find_map(|folder| executable(&folder.join(name))).or_else(|| find_on_path(name));
+    }
+    executable(&dir.join(name))
+}
+
+/// The user's home folder.
+fn home() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(PathBuf::from)
+}
+
+/// A command app's folder, and the folders of its `path` that are there (`~/` ones from the home folder).
+pub fn command_folders(root: &Path, command: &AppCommand) -> (PathBuf, Vec<PathBuf>) {
+    let dir = root.join(&command.cwd);
+    let place = |folder: &String| match folder.strip_prefix(HOME_PREFIX) {
+        Some(rest) => home().map(|home| home.join(native(rest))),
+        None => Some(dir.join(native(folder))),
+    };
+    let folders = command.path.iter().filter_map(place).filter(|folder| folder.is_dir()).collect();
+    (dir, folders)
+}
+
+/// A command app's own `path` folders (not the home folder's): what its install or setup makes.
+pub fn own_folders(command: &AppCommand) -> Vec<&String> {
+    command.path.iter().filter(|folder| !folder.starts_with(HOME_PREFIX)).collect()
+}
+
+/// Whether none of a command app's own `path` folders is there yet (a `.venv` to make).
+pub fn lacks_own_folders(root: &Path, command: &AppCommand) -> bool {
+    let own = own_folders(command);
+    let dir = root.join(&command.cwd);
+    !own.is_empty() && !own.iter().any(|folder| dir.join(native(folder)).is_dir())
+}
+
+/// A command to start: its program found in `dir` or its `folders`, or on PATH (a PowerShell script run by
+/// PowerShell); `{cwd}` in it and in `env` the folder, `{port}` the port; the folders first on PATH.
+fn spec_in(
+    dir: PathBuf,
+    folders: &[PathBuf],
+    port: Option<u16>,
+    env: &[(String, String)],
+    words: &[String],
+) -> Result<Spec> {
+    let port = port.map(|port| port.to_string());
+    let folder = dir.display().to_string();
+    let fill = |word: &str| {
+        let word = word.replace(CWD_PLACEHOLDER, &folder);
+        port.as_ref().map_or_else(|| word.clone(), |port| word.replace(PORT_PLACEHOLDER, port))
+    };
+    let Some((first, rest)) = words.split_first() else { bail!("there is no command to run") };
+    let found = program_path(&dir, folders, first)
+        .ok_or_else(|| anyhow!("{first} was not found on PATH or in {}", dir.display()))?;
+    let mut args: Vec<OsString> = rest.iter().map(|word| fill(word).into()).collect();
+    let script = found.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("ps1"));
+    let program = if script {
+        let mut before: Vec<OsString> =
+            ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"].map(OsString::from).to_vec();
+        before.push(found.into_os_string());
+        args.splice(0..0, before);
+        find_on_path("pwsh").or_else(|| find_on_path("powershell")).unwrap_or_else(|| "powershell".into())
+    } else {
+        found
+    };
+    let mut vars: Vec<(OsString, OsString)> =
+        env.iter().map(|(name, value)| (name.into(), fill(value).into())).collect();
+    let has_path = env.iter().any(|(name, _)| name.eq_ignore_ascii_case("PATH"));
+    if !folders.is_empty() && !has_path {
+        let current = std::env::var_os("PATH").unwrap_or_default();
+        let all = folders.iter().cloned().chain(std::env::split_paths(&current));
+        if let Ok(joined) = std::env::join_paths(all) {
+            vars.push(("PATH".into(), joined));
+        }
+    }
+    Ok(Spec { program, args, dir, env: vars })
+}
+
+/// A command app's command (its run, build or install) to start, in its folder with its port, env and `path`.
+pub fn command_spec(root: &Path, app: &App, words: &[String]) -> Result<Spec> {
+    let Some(command) = app.command() else { bail!("{} isn't a command app", app.name) };
+    let (dir, folders) = command_folders(root, command);
+    spec_in(dir, &folders, apptypes::command_port(command), &app.env, words)
+}
+
+/// A task's command to start, in its folder with its env.
+pub fn task_spec(root: &Path, task: &Task) -> Result<Spec> {
+    spec_in(root.join(&task.cwd), &[], None, &task.env, &task.run)
 }
 
 /// How to run npm: on Windows `node npm-cli.js` (npm.cmd adds a cmd.exe layer), else `npm`.
@@ -127,6 +235,10 @@ pub fn server_command(root: &Path, app: &App, active: &[App]) -> Result<ServerCo
                 ),
                 script: None,
             })
+        }
+        AppKind::Command(command) => {
+            let spec = command_spec(root, app, &command.run)?;
+            Ok(ServerCommand { spec, label: command.run.join(" "), script: None })
         }
         AppKind::Npm { dir, .. } => {
             let Some(mode) = apptypes::mode(root, app, active) else {
@@ -329,9 +441,103 @@ pub fn running_in(name: &str, dirs: &[&Path]) -> bool {
 }
 
 #[cfg(test)]
+mod home_tests {
+    use super::*;
+
+    #[test]
+    fn a_path_folder_from_home_is_looked_for_there_and_isnt_one_an_install_makes() {
+        let temp = crate::testing::TempDir::new("path-home");
+        let command = AppCommand {
+            run: vec!["x".into()],
+            cwd: String::new(),
+            port: None,
+            build: Vec::new(),
+            install: Vec::new(),
+            setup: Vec::new(),
+            install_from: Vec::new(),
+            ready: crate::profile::Ready::Started,
+            watch: Vec::new(),
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            frames: None,
+            preset: None,
+            path: vec!["~/.".into(), ".venv/Scripts".into()],
+            tools: Vec::new(),
+            compose: None,
+        };
+        let (_, folders) = command_folders(temp.path(), &command);
+        assert_eq!(folders, [home().unwrap().join(".")], "the home folder's, the .venv isn't made yet");
+        assert_eq!(own_folders(&command), [".venv/Scripts"]);
+        assert!(lacks_own_folders(temp.path(), &command));
+        std::fs::create_dir_all(temp.join(".venv/Scripts")).unwrap();
+        assert!(!lacks_own_folders(temp.path(), &command));
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::testing::{TempDir, write};
+
+    fn command_app(run: &[&str]) -> App {
+        let command = crate::profile::Command {
+            run: run.iter().map(|word| word.to_string()).collect(),
+            cwd: "svc".into(),
+            port: Some(8123),
+            build: Vec::new(),
+            install: Vec::new(),
+            ready: crate::profile::Ready::Port(8123),
+            watch: Vec::new(),
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            frames: None,
+            preset: None,
+            path: vec![".venv/Scripts".into()],
+            tools: Vec::new(),
+            compose: None,
+            setup: Vec::new(),
+            install_from: Vec::new(),
+        };
+        App {
+            key: "svc".into(),
+            name: "Svc".into(),
+            icon: None,
+            nerd_icon: None,
+            kind: AppKind::Command(Box::new(command)),
+            tests: Vec::new(),
+            migrations: None,
+            env: vec![("APP_URL".into(), "http://localhost:{port}".into())],
+            depends_on: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_command_apps_program_is_found_from_its_folder_and_its_port_fills_in() {
+        let temp = TempDir::new("command-spec");
+        let tool = if cfg!(windows) { "svc/bin/tool.exe" } else { "svc/bin/tool" };
+        write(temp.join(tool), "");
+        let app = command_app(&["bin/tool", "--port", "{port}"]);
+        let spec = command_spec(temp.path(), &app, &app.command().unwrap().run).unwrap();
+        assert_eq!(spec.program, temp.join(tool), "by its path from its folder, with Windows' extension");
+        assert_eq!(spec.args, ["--port", "8123"].map(OsString::from));
+        assert_eq!(spec.dir, temp.join("svc"));
+        assert_eq!(spec.env, [(OsString::from("APP_URL"), OsString::from("http://localhost:8123"))]);
+        write(temp.join("svc/start.ps1"), "");
+        let script = command_app(&["./start.ps1", "-Fast"]);
+        let spec = command_spec(temp.path(), &script, &script.command().unwrap().run).unwrap();
+        assert!(spec.args.contains(&OsString::from("-File")) && spec.args.last() == Some(&OsString::from("-Fast")));
+        let venv = if cfg!(windows) { "svc/.venv/Scripts/uvicorn.exe" } else { "svc/.venv/Scripts/uvicorn" };
+        write(temp.join(venv), "");
+        let uvicorn = command_app(&["uvicorn", "--root", "{cwd}"]);
+        let spec = command_spec(temp.path(), &uvicorn, &uvicorn.command().unwrap().run).unwrap();
+        assert_eq!(spec.program, temp.join(venv), "a path folder first");
+        assert_eq!(spec.args[1], temp.join("svc").into_os_string(), "{{cwd}}: its folder");
+        let path = spec.env.iter().find(|(name, _)| name == "PATH").map(|(_, value)| value.clone()).unwrap_or_default();
+        assert!(std::env::split_paths(&path).next() == Some(temp.join("svc").join(".venv/Scripts")), "{path:?}");
+        let missing = command_app(&["no-such-tool-anywhere"]);
+        let error = command_spec(temp.path(), &missing, &missing.command().unwrap().run).unwrap_err().to_string();
+        assert!(error.contains("no-such-tool-anywhere was not found"), "{error}");
+    }
 
     #[test]
     fn an_npm_app_without_dependencies_needs_no_node_modules() {

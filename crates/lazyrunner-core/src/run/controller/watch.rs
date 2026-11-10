@@ -10,7 +10,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::{Controller, Probe};
 use crate::config::Toggle;
 use crate::output::Hue;
-use crate::profile::{self, AppKind, trust};
+use crate::profile::{self, AppKind, Ready, trust};
 use crate::run::app::{Status, push_history};
 use crate::run::history::Kind;
 use crate::run::net::{self, Listening, ProbeResult};
@@ -155,11 +155,13 @@ impl Controller {
         self.tick_impact(now);
         self.expire_calls(now);
         self.tick_code(now);
+        self.tick_compose(now);
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {
                 self.update_branch(now);
                 self.test_code_change(now);
+                self.test_command_changes(now);
             }
             for state in &mut self.states {
                 state.flush_log();
@@ -194,16 +196,33 @@ impl Controller {
         self.update_metric_roots();
     }
 
-    /// Up: listening on its port; a watch build has no port, so it is up once it has written its ready file.
+    /// Whether app `index`'s port listens in a snapshot asked for after it started (an earlier one can still show
+    /// the old server).
+    fn listens(&self, index: usize) -> bool {
+        let Some(port) = self.port(&self.apps[index].key) else { return false };
+        let fresh =
+            self.listening_at.zip(self.states[index].started_at).is_some_and(|(snapshot, started)| snapshot >= started);
+        fresh && self.listening.contains(port)
+    }
+
+    /// Up: listening on its port; a watch build has no port, so it is up once it has written its ready file; a
+    /// command app as its `ready` says - once started, its port, a line of its output, or a 2xx from its path.
     fn is_ready(&self, index: usize) -> bool {
         let key = &self.apps[index].key;
-        if let Some(port) = self.port(key) {
-            // Only a snapshot asked for after the start counts: an earlier one can still show the old server.
-            let fresh = self
-                .listening_at
-                .zip(self.states[index].started_at)
-                .is_some_and(|(snapshot, started)| snapshot >= started);
-            return fresh && self.listening.contains(port);
+        if let Some(command) = self.apps[index].command() {
+            let state = &self.states[index];
+            let answered = |probe: &Probe| probe.last.is_some_and(|last| last.ok && (200..300).contains(&last.code));
+            return match &command.ready {
+                Ready::Started => true,
+                Ready::Port(_) => self.listens(index),
+                Ready::Line(_) => state.ready_line == Some(state.generation),
+                Ready::LineOrPort(_) => state.ready_line == Some(state.generation) || self.listens(index),
+                Ready::Http(_) => self.listens(index) && self.probes.get(key).is_some_and(answered),
+                Ready::Services => self.compose_up(key),
+            };
+        }
+        if self.port(key).is_some() {
+            return self.listens(index);
         }
         let (Some(mode), AppKind::Npm { dir, .. }) = (self.mode(key), &self.apps[index].kind) else { return false };
         let Some(ready) = &mode.ready_file else { return false };
@@ -234,6 +253,7 @@ impl Controller {
             let name = self.apps[index].name.clone();
             let what = match self.port(&key) {
                 Some(port) => format!("is listening on :{port}"),
+                None if self.apps[index].command().is_some() => "is up".to_string(),
                 None => {
                     let server = self.mode(&key).and_then(|mode| mode.served_by.clone()).unwrap_or_default();
                     let server_name = self.app(&server).map(|app| app.name.clone()).unwrap_or(server.clone());
@@ -454,7 +474,7 @@ impl Controller {
     pub fn rebuild_pending(&self) -> bool {
         self.code.count != self.code.handled
             && self.setting(Toggle::RestartOnCodeChange)
-            && self.apps.iter().any(|app| app.traits().builds && self.is_running(&app.key))
+            && self.apps.iter().any(|app| app.is_dotnet() && self.is_running(&app.key))
     }
 
     /// restartOnCodeChange: once saving has been quiet for a moment, rebuild and restart the running apps that build.
@@ -473,7 +493,7 @@ impl Controller {
         let apis: Vec<String> = self
             .apps
             .iter()
-            .filter(|app| app.traits().builds && self.is_running(&app.key))
+            .filter(|app| app.is_dotnet() && self.is_running(&app.key))
             .map(|app| app.key.clone())
             .collect();
         if !apis.is_empty() {
@@ -484,6 +504,25 @@ impl Controller {
                 .and_then(|file| file.file_name())
                 .map_or(String::new(), |name| name.to_string_lossy().into_owned());
             self.restart(&format!("code changed: {file}"), Some(&apis), false);
+        }
+    }
+
+    /// restartOnCodeChange for command apps: once saving a command app's code (its `watch`) has been quiet for a
+    /// moment, it restarts if it runs - built first when it builds.
+    fn test_command_changes(&mut self, now: Instant) {
+        let settled: Vec<(String, PathBuf)> = self
+            .command_changes
+            .iter()
+            .filter(|(_, (at, _))| now.saturating_duration_since(*at) >= CODE_SETTLE)
+            .map(|(key, (_, path))| (key.clone(), path.clone()))
+            .collect();
+        for (key, path) in settled {
+            self.command_changes.remove(&key);
+            if !self.setting(Toggle::RestartOnCodeChange) || !self.is_running(&key) {
+                continue;
+            }
+            let file = path.file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
+            self.restart(&format!("code changed: {file}"), Some(&[key]), false);
         }
     }
 
@@ -533,6 +572,10 @@ impl Controller {
 pub(super) fn probe_path(app: &crate::profile::App) -> String {
     match &app.kind {
         AppKind::Dotnet { swagger: Some(swagger), .. } => format!("{swagger}/index.html"),
+        AppKind::Command(command) => match &command.ready {
+            Ready::Http(path) => path.clone(),
+            _ => "/".into(),
+        },
         _ => "/".into(),
     }
 }

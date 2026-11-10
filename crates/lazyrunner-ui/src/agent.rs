@@ -74,7 +74,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "actions" => Ok(drive::actions(ui, controller)),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
         | "run_action" | "press_keys" | "switch_database" | "install_packages" | "apply_migrations"
-        | "kill_port_holder" | "set_setting") => {
+        | "kill_port_holder" | "set_setting" | "run_task") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
@@ -126,7 +126,7 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
             json!({
                 "key": app.key,
                 "name": app.name,
-                "kind": if app.traits().builds { "dotnet" } else { "npm" },
+                "kind": app.traits().name,
                 "status": state.status.name(),
                 "up": state.is_up(),
                 "port": port,
@@ -136,6 +136,12 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
                 "lines": state.output.total(),
                 "build_errors": controller.failed_build_errors.get(&app.key).map(Vec::len),
                 "env_overrides": env_overrides(controller, &app.key),
+                "services": controller.compose_services(&app.key).map(|services| {
+                    services
+                        .iter()
+                        .map(|service| json!({ "name": service.name, "state": service.detail, "ports": service.ports }))
+                        .collect::<Vec<_>>()
+                }),
             })
         })
         .collect();
@@ -162,6 +168,7 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
             "migrations": controller.migrations_active(),
         },
         "apps": apps,
+        "tasks": tasks(controller),
         "tests": {
             "passed": totals.passed,
             "failed": totals.failed,
@@ -173,6 +180,22 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
         "ui": ui_block(ui, controller),
         "log": controller.log.iter().rev().take(STATUS_LOG).rev().map(|entry| entry.text.clone()).collect::<Vec<_>>(),
     })
+}
+
+/// The profile's tasks: each its key and name, whether it runs, and how its last run went.
+fn tasks(controller: &Controller) -> Vec<Value> {
+    let tenths = |seconds: f64| (seconds * 10.0).round() / 10.0;
+    controller
+        .tasks()
+        .iter()
+        .map(|task| {
+            let last = controller
+                .task_result(&task.key)
+                .map(|result| json!({ "ok": result.ok, "seconds": tenths(result.seconds), "error": result.error }));
+            let running = controller.task_started(&task.key).is_some();
+            json!({ "key": task.key, "name": task.name, "running": running, "last": last })
+        })
+        .collect()
 }
 
 /// The app a question or action names (`"app"`), by its key or its name.
@@ -891,6 +914,7 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
         "apply_migrations" => drive::apply_migrations(controller, args)?,
         "kill_port_holder" => drive::kill_port_holder(controller, args)?,
         "set_setting" => drive::set_setting(controller, args)?,
+        "run_task" => drive::run_task(controller, args)?,
         _ => check_migrations(controller, args)?,
     };
     // Said once it's done: a refused action leaves no line.

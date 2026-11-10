@@ -13,7 +13,7 @@ use regex::Regex;
 use super::child::Child;
 use super::{diff, requests};
 use crate::output::{Hue, LevelFilter, Output};
-use crate::profile::App;
+use crate::profile::{App, Command, Ready};
 
 /// Lines each column keeps.
 /// Requests whose scoped lines are kept until they finish, the newest (one that never finishes is forgotten).
@@ -104,6 +104,52 @@ pub struct AppState {
     pub run_from: u64,
     /// The app's run before this one, as `Alt+d` compares with it.
     pub previous: Option<diff::Digest>,
+    /// The run (its generation) whose output said a command app is up (its `ready.line`).
+    pub ready_line: Option<u64>,
+    /// That line's number, and when it came: the column outlines it a moment.
+    pub ready_at: Option<(u64, Instant)>,
+    /// A command app's own patterns.
+    patterns: Patterns,
+}
+
+/// What a command app's patterns are compiled from: its errors, warnings, frames and ready line.
+type PatternSources = (Vec<String>, Vec<String>, Option<String>, Option<String>);
+
+/// A command app's own patterns, compiled once (and again when its profile changes them): what an error and a
+/// warning line look like, a stack frame, and the line that says it's up.
+#[derive(Default)]
+struct Patterns {
+    from: Option<PatternSources>,
+    errors: Vec<Regex>,
+    warnings: Vec<Regex>,
+    frames: Option<Regex>,
+    ready: Option<Regex>,
+}
+
+impl Patterns {
+    fn update(&mut self, command: &Command) {
+        let ready = match &command.ready {
+            Ready::Line(line) | Ready::LineOrPort(line) => Some(line.as_str()),
+            _ => None,
+        };
+        let same = self.from.as_ref().is_some_and(|(errors, warnings, frames, line)| {
+            *errors == command.errors
+                && *warnings == command.warnings
+                && *frames == command.frames
+                && line.as_deref() == ready
+        });
+        if same {
+            return;
+        }
+        let compile = |patterns: &[String]| patterns.iter().filter_map(|pattern| Regex::new(pattern).ok()).collect();
+        self.errors = compile(&command.errors);
+        self.warnings = compile(&command.warnings);
+        self.frames = command.frames.as_deref().and_then(|pattern| Regex::new(pattern).ok());
+        self.ready = ready.and_then(|pattern| Regex::new(pattern).ok());
+        let from =
+            (command.errors.clone(), command.warnings.clone(), command.frames.clone(), ready.map(str::to_string));
+        self.from = Some(from);
+    }
 }
 
 impl AppState {
@@ -146,6 +192,9 @@ impl AppState {
             up_after: None,
             run_from: 0,
             previous: None,
+            ready_line: None,
+            ready_at: None,
+            patterns: Patterns::default(),
         }
     }
 
@@ -231,6 +280,15 @@ impl AppState {
     /// the log file only, and a finished request comes back (for the requests view).
     pub fn receive(&mut self, app: &App, raw: &str, now: Instant) -> Option<requests::Finished> {
         let text = crate::output::strip_ansi(raw).replace('\t', "    ");
+        if let Some(command) = app.command() {
+            self.patterns.update(command);
+            if self.patterns.ready.as_ref().is_some_and(|ready| ready.is_match(&text)) {
+                if self.ready_line != Some(self.generation) {
+                    self.ready_at = Some((self.output.total() + 1, now));
+                }
+                self.ready_line = Some(self.generation);
+            }
+        }
         if self.outgoing.hook_line(&self.key, &text, now) {
             return None; // the Node hook's line for a call: for the stack map, not the column
         }
@@ -317,6 +375,14 @@ impl AppState {
     }
 
     fn hue_of(&mut self, app: &App, text: &str) -> Hue {
+        if app.command().is_some() {
+            if self.patterns.errors.iter().any(|error| error.is_match(text)) {
+                return Hue::Red;
+            }
+            if self.patterns.warnings.iter().any(|warning| warning.is_match(text)) {
+                return Hue::Yellow;
+            }
+        }
         // ASP.NET's console logger: "info: Category[id]", then indented lines of the same entry.
         if let Some(found) = LEVEL.captures(text) {
             self.last_level = found[1].to_lowercase();
@@ -364,6 +430,11 @@ impl AppState {
 }
 
 impl AppState {
+    /// A command app's stack frame pattern (`frames`), once its output has started.
+    pub fn frames(&self) -> Option<&Regex> {
+        self.patterns.frames.as_ref()
+    }
+
     /// A run another lazyrunner handed over starts at its ▶ header among the lines it passed on, else at the oldest.
     pub fn find_run_start(&mut self) {
         let len = self.output.len();
@@ -432,6 +503,46 @@ mod tests {
             env: Vec::new(),
             depends_on: Vec::new(),
         }
+    }
+
+    #[test]
+    fn a_command_apps_own_patterns_colour_count_and_say_when_its_up() {
+        let command = crate::profile::Command {
+            run: vec!["worker".into()],
+            cwd: String::new(),
+            port: None,
+            build: Vec::new(),
+            install: Vec::new(),
+            ready: crate::profile::Ready::Line("^Worker ready".into()),
+            watch: Vec::new(),
+            errors: vec!["^BOOM".into()],
+            warnings: vec!["^careful".into()],
+            frames: Some(r"at (?P<file>\S+\.py):(?P<line>\d+)".into()),
+            preset: None,
+            path: Vec::new(),
+            tools: Vec::new(),
+            compose: None,
+            setup: Vec::new(),
+            install_from: Vec::new(),
+        };
+        let worker = App { kind: AppKind::Command(Box::new(command)), ..app(false) };
+        let mut state = AppState::new("a");
+        state.reset_for_start();
+        let now = Instant::now();
+        for line in ["starting", "BOOM it broke", "careful now"] {
+            state.receive(&worker, line, now);
+        }
+        assert_eq!((state.errors, state.warnings, state.ready_line), (1, 1, None));
+        state.receive(&worker, "Worker ready on 8000", now);
+        assert_eq!(state.ready_line, Some(state.generation));
+        let (number, _) = state.ready_at.unwrap();
+        assert_eq!(
+            state.output.numbered(number, number).next().map(|line| line.text.as_str()),
+            Some("Worker ready on 8000")
+        );
+        state.receive(&worker, "Worker ready again", now);
+        assert_eq!(state.ready_at.map(|(at, _)| at), Some(number), "the first one this run");
+        assert!(state.frames().is_some_and(|frames| frames.is_match("at app/main.py:3")));
     }
 
     fn hues(app: &App, lines: &[&str]) -> (Vec<Hue>, AppState) {

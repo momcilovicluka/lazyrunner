@@ -125,12 +125,13 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             "y" | "Enter" => {
                 let now = ui.now;
                 let key = picked.as_ref().map(|row| row.key.clone());
+                let port = picked.as_ref().map(|row| row.port);
                 with(ui, |_, confirm, _, stopping| {
                     *confirm = false;
                     *stopping = key.clone().map(|key| (key, now));
                 });
-                if let Some(key) = key {
-                    controller.free_port(&key);
+                if let (Some(key), Some(port)) = (key, port) {
+                    controller.free_port(&key, port);
                 }
             }
             "n" | "Escape" | "q" => with(ui, |_, confirm, _, _| *confirm = false),

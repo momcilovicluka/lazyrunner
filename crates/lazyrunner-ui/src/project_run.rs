@@ -106,6 +106,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
     }
     let mut outside = Outside::new(!options.headless);
     let mut mouse = MouseCapture::new(!options.headless);
+    let _focus_reports = crate::terminal::FocusReports::new(!options.headless);
     mouse.set(controller.setting(Toggle::Mouse));
     for note in &options.notes {
         controller.add_log(note.clone(), Hue::Yellow);
@@ -161,6 +162,8 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                     dirty = true;
                     urgent = true;
                 }
+                Some(Ok(Event::FocusGained)) => ui.terminal_focused = Some(true),
+                Some(Ok(Event::FocusLost)) => ui.terminal_focused = Some(false),
                 Some(Ok(Event::Resize(..))) => {
                     dirty = true;
                     urgent = true;
@@ -283,7 +286,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 dirty = true;
             }
         }
-        notify(&mut controller, options.headless);
+        notify(&mut controller, options.headless, ui.terminal_focused);
         if std::mem::take(&mut ui.git_tool_wanted) && git_tool.is_none() {
             match open_git_tool(&mut controller, &mut opened_beside) {
                 Some(tool) => {
@@ -591,13 +594,19 @@ fn log_whats_new(controller: &mut Controller, entries: &[changelog::Entry]) {
     }
 }
 
+/// Whether a notification shows: on, with a terminal, and while you're elsewhere - a terminal that doesn't say
+/// whether it has the focus counts as elsewhere.
+fn notifies(headless: bool, on: bool, focused: Option<bool>) -> bool {
+    !headless && on && focused != Some(true)
+}
+
 /// Desktop notifications for what happened while you were elsewhere ("notifications": false turns them off).
-fn notify(controller: &mut Controller, headless: bool) {
+fn notify(controller: &mut Controller, headless: bool, focused: Option<bool>) {
     if controller.notifications.is_empty() {
         return;
     }
     let notifications = std::mem::take(&mut controller.notifications);
-    if headless || !controller.setting(Toggle::Notifications) {
+    if !notifies(headless, controller.setting(Toggle::Notifications), focused) {
         return;
     }
     for (title, message) in notifications {
@@ -804,4 +813,16 @@ fn control(
     };
     let _ = request.reply.send(answer);
     false
+}
+
+#[cfg(test)]
+mod notify_tests {
+    use super::*;
+
+    #[test]
+    fn a_notification_shows_while_youre_elsewhere() {
+        assert!(notifies(false, true, Some(false)) && notifies(false, true, None), "elsewhere, or it can't tell");
+        assert!(!notifies(false, true, Some(true)), "you're looking at it");
+        assert!(!notifies(true, true, None) && !notifies(false, false, None));
+    }
 }

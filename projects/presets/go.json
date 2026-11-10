@@ -1,0 +1,17 @@
+{
+  "id": "go",
+  "name": "Go",
+  "nerdIcon": "",
+  "detect": { "anyFile": ["go.mod"] },
+  "tools": ["go"],
+  "install": "go mod download",
+  "installFrom": ["go.mod", "go.sum"],
+  "build": "go build ./...",
+  "watch": ["**/*.go", "go.mod", "go.sum"],
+  "errors": ["^panic: ", "^fatal error: ", "level=(error|fatal|ERROR|FATAL)\\b", "\"level\":\"(error|fatal)\"", "\\b(ERROR|FATAL)\\b"],
+  "warnings": ["level=(warn|warning|WARN)\\b", "\"level\":\"warn", "\\bWARN(ING)?\\b"],
+  "frames": "(?P<file>(?:[A-Za-z]:)?[^\\s:]+\\.go):(?P<line>\\d+)(?::(?P<col>\\d+))?",
+  "options": [
+    { "when": { "anyFile": ["main.go"] }, "run": "go run ." }
+  ]
+}

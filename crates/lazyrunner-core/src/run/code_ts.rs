@@ -59,7 +59,7 @@ fn workspaces(root: &Path, apps: &[App]) -> Vec<(PathBuf, String)> {
     apps.iter()
         .filter_map(|app| match &app.kind {
             AppKind::Npm { dir, .. } => Some((root.join(dir), app.key.clone())),
-            AppKind::Dotnet { .. } => None,
+            AppKind::Dotnet { .. } | AppKind::Command(_) => None,
         })
         .filter(|(workspace, _)| workspace.is_dir() && seen.insert(same(workspace)))
         .collect()

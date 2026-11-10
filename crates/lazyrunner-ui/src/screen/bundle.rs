@@ -69,7 +69,7 @@ fn about(ui: &Ui, controller: &Controller, size: (u16, u16)) -> String {
         "apps:".to_string(),
     ];
     for (app, state) in controller.apps.iter().zip(&controller.states) {
-        let kind = if app.traits().builds { "dotnet" } else { "npm" };
+        let kind = app.traits().name;
         let up = if state.is_up() { ", up" } else { "" };
         lines.push(format!(
             "  {} ({kind}): {}{up}, {} errors, {} warnings",
@@ -126,6 +126,7 @@ pub fn checklist_report(ui: &Ui, controller: &Controller, list: &Checklist) -> S
         let place = match &app.kind {
             AppKind::Dotnet { project, .. } => project,
             AppKind::Npm { dir, .. } => dir,
+            AppKind::Command(command) => &command.cwd,
         };
         lines.push(format!("| {} | {port} | {} |", cell(&app.name), cell(place)));
     }

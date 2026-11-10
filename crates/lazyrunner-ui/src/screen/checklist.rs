@@ -101,11 +101,13 @@ pub struct Row {
     pub settled: Option<(Instant, bool)>,
     /// When its check last finished.
     pub done_at: Option<Instant>,
+    /// The language of the command app it's about: its icon, or its chip.
+    pub language: Option<&'static str>,
 }
 
 impl Row {
     fn new(kind: Kind) -> Self {
-        Self { kind, started: None, took: None, fixing: None, settled: None, done_at: None }
+        Self { kind, started: None, took: None, fixing: None, settled: None, done_at: None, language: None }
     }
 }
 
@@ -202,7 +204,8 @@ impl Checklist {
             .iter()
             .map(|check| Item { name: check.name.clone(), status: Status::Pending, detail: String::new() })
             .collect();
-        let rows: Vec<Row> = checks.iter().map(|check| Row::new(check.kind.clone())).collect();
+        let rows: Vec<Row> =
+            checks.iter().map(|check| Row { language: check.language, ..Row::new(check.kind.clone()) }).collect();
         let first = first_drawn(&rows);
         let background: Vec<bool> = checks.iter().map(|check| check.background).collect();
         let done = vec![false; checks.len()];

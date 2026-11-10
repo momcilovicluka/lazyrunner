@@ -11,7 +11,8 @@
 
 **Run your entire local development stack from one terminal.**
 
-lazyrunner is a Rust terminal UI for running .NET APIs and npm frontends side by side. It builds what changed, starts
+lazyrunner is a Rust terminal UI for running .NET APIs, npm frontends and any other command - a Python, Go or Rust
+service, a queue emulator, a script - side by side. It builds what changed, starts
 everything on the right ports, tells you when each app is up, and keeps live logs in columns you can scroll, search
 and zoom.
 
@@ -87,6 +88,10 @@ CPU and memory; below them the panel with the branch, the database, the keys tha
   </tr>
 </table>
 
+![Beside the .NET and npm apps a Python app - a traceback with its library frames dimmed and its own ones bright - and
+Docker Compose services in one column, each service with a gutter of its own colour and its state in the
+title](docs/screenshots/languages.svg)
+
 - **.NET apps** are built with `dotnet build` (one at a time, skipped when nothing changed) and run with their launch
   profile; the port comes from `launchSettings.json`.
 - **npm apps** run their dev server or watch build; which script runs can differ per branch.
@@ -155,6 +160,8 @@ profile), and how to write a profile for any repo - written so an LLM can follow
 - **.NET API + React/Vite frontend**: one `dotnet` app and one `npm` app variant (`dev`, `port`).
 - **Multi-service backend**: multiple `dotnet` apps in one profile, each with its own launch profile and port.
 - **Frontend watch build served by API**: an `npm` watch variant with `servedBy` and `ready.file`.
+- **Anything else**: a `command` app - a Python, Go or Rust service, a queue emulator, a script - with its `run`, and
+  as much of `port`, `build`, `install`, `ready` and `watch` as it needs (below).
 
 See [projects/README.md](projects/README.md) for full examples and recipes.
 
@@ -347,7 +354,7 @@ focused app's build or take it out of the queue, and `q`.
 - **A scrollbar** on the right of a column with more output than fits shows where the lines on screen are; it is
   bright while the column is scrolled back (`G` follows new output again).
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
-  crash, and a slow start finishing.
+  crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none.
 - **After "Ready"**, the log shows a startup timeline per app.
 
 ## Startup checklist
@@ -826,10 +833,140 @@ Automatic restarts leave them alone, since `npm run` watches its own files - unl
 change). Both stop the app first and start it again after, and pause the test suites that run from its folder. Once
 you've installed from lazyrunner, it warns when `package-lock.json` changes.
 
+## Command apps
+
+`"type": "command"` runs any long-running command as a column, with what .NET and npm apps get, each optional:
+
+```json
+{ "key": "pricing", "name": "Pricing", "type": "command", "cwd": "services/pricing",
+  "run": "uvicorn main:app --port {port}", "port": 8000, "install": "uv sync",
+  "ready": { "line": "Uvicorn running on" }, "watch": ["**/*.py"],
+  "errors": ["^ERROR", "Traceback"], "frames": "File \"(?P<file>[^\"]+)\", line (?P<line>\\d+)" }
+```
+
+- **`run`** is text split into arguments at spaces (a `"quoted part"` stays one) or a list of arguments - no shell. Its
+  program is found on PATH, or by its path from `cwd` (`.venv/Scripts/python`, with Windows' extensions); a `.ps1`
+  runs in PowerShell. `{port}` in it, in `build`, `install` and `env` is the app's `port`, which the ports view (`P`)
+  and port conflicts see as they do the other apps'.
+- **`build`** runs before a start and on `b`, one build at a time with the .NET ones, and is skipped when nothing in
+  `cwd` changed since its last good build (as git sees the folder). Its title shows a bar against its usual build
+  time; cargo's `Compiling x` lines move it too, once a build has counted them.
+- **`install`** is its `npm ci`: `i` runs it. **`setup`** runs before it while none of its `path` folders is there -
+  `python -m venv .venv`, so pip installs into the project's own environment. **`installFrom`** names the files it
+  installs from (`uv.lock`): when they change since lazyrunner's last install, the startup checklist's packages row
+  and the panel say it's due, as they do for a `package-lock.json`.
+- **`ready`** says when it counts as up: `{ "port": 8000 }`, a line of its output (`{ "line": "Uvicorn running on" }`,
+  a regular expression) or a 2xx from a path on its port (`{ "http": "/health" }`); `"orPort": true` with a line
+  makes it up at the line or once its port listens, whichever comes first. Without it, once its `port` listens, or
+  once it has started when it has none. The line that made it up is outlined green in its column for a
+  few seconds: what lazyrunner took as "up".
+- **`watch`** globs name its code (from `cwd`; `**` any folders): with restart on code change, saving one restarts it,
+  built first when it builds. Virtual environments, `node_modules`, `target`, `bin`, `obj` and caches never count.
+- **`errors`** and **`warnings`** are regular expressions that colour and count its lines; **`frames`** turns its
+  stack frames into links that open the editor at the line (`file`, `line` and `col` groups). Go's and Rust's
+  `file.go:42` and `src/main.rs:42:5` are links without it. A library's frames - site-packages, Python's and Go's own
+  sources, Go's module cache, the cargo registry - are dimmed, so the app's own stand out. Without an `"editor"`, a
+  Python file opens in its folder rather than being run.
+- **`path`** folders (from `cwd`, or from your home folder with `~/`) go first on PATH when they exist, and its
+  programs are looked for there first; **`tools`** are shown in the startup checklist as capsules (`python 3.12.1 ·
+  uv 0.5.1`), and one that's missing says how to get it (`winget install astral-sh.uv`).
+- Stopping takes down its whole process tree (a reloader's children, `cargo run`'s binary). The startup checklist
+  says whether its programs are found, with its language's icon - or, without Nerd Font icons, its chip (`py`, `go`,
+  `rs`, `js`), which its title shows too (`■ py Pricing`).
+
+**Presets** fill a command app in for its language: `"preset": "python"` gives it each field it leaves out, chosen by
+what's in its folder. For Python:
+
+- **Install**: `uv sync` with a `uv.lock` (or a `pyproject.toml` and uv on PATH), else `pip install -r requirements.txt`
+  into a `.venv` it makes first (`python -m venv .venv`). Its `uv.lock`, `pyproject.toml` or `requirements.txt` is
+  what it installs from, so the checklist says when an install is due.
+- **Run**: `python manage.py runserver 127.0.0.1:{port}` for Django, else `python main.py` or `python app.py`.
+- **Its `.venv`**: first on PATH (`path`), with `VIRTUAL_ENV` set - never an activation script - so `uvicorn` or
+  `python` are the ones installed in it. `PYTHONUNBUFFERED=1`, so its output shows as it's printed.
+- **Up** once it says it's serving (uvicorn's, Flask's, Django's line) or its port listens, whichever comes first.
+- **Its code** is `**/*.py`; `ERROR`/`CRITICAL` lines and the exception line a traceback ends with (`ValueError: ...`)
+  are errors - one per traceback, marked where it says what went wrong - and its stack frames
+  (`File "app/api.py", line 12`) links; the startup checklist shows its Python's version (and uv's).
+
+```json
+{ "key": "pricing", "name": "Pricing", "type": "command", "preset": "python", "cwd": "services/pricing",
+  "run": "uvicorn main:app --port {port}", "port": 8000 }
+```
+
+`"preset": "go"` installs with `go mod download`, builds with `go build ./...` (before a start, skipped when nothing
+changed) and runs `go run .` where there's a `main.go`; `*.go`, `go.mod` and `go.sum` are its code, and `panic:`,
+`fatal error:` and `level=error` lines (slog's text or JSON) its errors. `"preset": "rust"` builds with `cargo build`
+and runs `cargo run` where there's a `src/main.rs`, with `RUST_BACKTRACE=1` so a panic says where; `*.rs` and its
+`Cargo.toml`s are its code (not `Cargo.lock`, which a build may rewrite), and `error[E…]:`, `panicked at` and `ERROR`
+lines its errors; `cargo` is looked for in `~/.cargo/bin` too. Their versions (`go version`, `cargo --version`) are
+in the startup checklist.
+
+Anything set by hand wins (`env` merges, the app's own on top). Presets are data - `projects/presets/*.json` - and
+you can add or replace them: a `presets` folder beside your profiles (`java.json`), or a profile's own `"presets"`.
+`lazyrunner profile init` adds a command app with its preset for a folder that looks like one (a `pyproject.toml`,
+`requirements.txt`, `manage.py`, `go.mod` or `Cargo.toml`), and `profile check` suggests the preset for a command app
+without one - as does its start sheet (`x`, `e`), dimmed, until it's set.
+
+Not for a command app yet, .NET and npm only: the stack map's calls, the code map, migrations, requests (`H`) and test
+suites (`T`).
+
+## Compose apps
+
+Services in Docker Compose - the database, a cache, a queue - run as one app with `"type": "compose"`:
+
+```json
+{ "key": "infra", "name": "Infra", "type": "compose", "services": ["db", "redis"] }
+```
+
+Starting it runs `docker compose up` for its `services` (all the file's without them) in its `cwd`, with Docker's own
+compose file there - `compose.yaml` or `docker-compose.yml` and its override - or the one `file` names. Its column
+shows their output, error and warning lines coloured and counted, and its title each service's state: `● db` up,
+`◌ redis` starting, `✗` unhealthy or exited with an error, `✓` a one-off (migrations, a seed) that did its job. It is
+up once each runs - healthy, when it has a healthcheck - so the apps after it start against a database that answers.
+A service whose state changes says so in the column (`● db: running (healthy)`), and a starting one's dot breathes.
+Compose's `db-1  |` prefix becomes a thin `▎` gutter in the service's colour, its name shown where the service changes,
+so the interleaved lines are told apart and the column keeps its width.
+
+Stopping it stops its services (`docker compose stop`, in the background; a start waits for it), and quitting
+lazyrunner does too. The ports its services publish (as `docker compose config` says) are in the ports view and port
+conflicts: one another program holds stops its start, as for any app - but one Docker itself holds is its own
+services, running from before, and is never killed. `env`, and the start sheet's overrides, go to `docker compose`
+(the compose file's `${VARIABLES}`). The startup checklist says whether
+Docker is running, and `profile check` whether its compose file is there; `lazyrunner profile init` adds a compose app
+for a folder with a compose file, before the other apps. Agents see each service's state, and the ports it publishes,
+in `get_status`. On the stack map (`K`) its box lists its services, and a database service (postgres, SQL Server,
+MySQL, MariaDB, MongoDB...) is the database box, with a dashed line to the app it runs in - Enter on it goes to that
+app's column.
+
+## Tasks
+
+One-off commands beside the apps - seed the database, regenerate a client - go in the profile's `"tasks"`:
+
+```json
+"tasks": [
+  { "key": "seed", "name": "Seed the database", "run": "python seed.py", "cwd": "tools" },
+  { "key": "client", "name": "Regenerate the API client", "run": ["npm", "run", "generate"], "cwd": "web" }
+]
+```
+
+`:` then its name runs one (`Run task: Seed the database`), in the background; the palette says beside it how its
+last run went (`✓ 12s`, `✗ 3s · its error`) or how long it has run. Its output goes to the panel's log between
+`╭─ ▸ Seed the database` and its result - `╰─ ✓ Seed the database in 11.8s`, with how that compares to its usual
+time, or `╰─ ✗ … failed after 3s: ` and its first error line. Once it passes its output folds away - the result line
+says how many lines, and lazyrunner's log file keeps them; a failure keeps them. While one runs, the panel's header
+shows it with a spinner and how long it has run (`▸ Seed the database 7s`), and once it has passed before a bar
+against its usual time (`▰▰▱▱ ⧗ 12s`), as the terminal tab's and taskbar's progress does. One that passes glints
+green there and goes; one that fails pulses red and stays with its first error line until it's clicked away. One that
+took over 10 seconds says when it's done with a notification, and the durations (`D`) keep its times. `run` is a command as a command app's (no shell; its program on PATH or by its path
+from `cwd`, a `.ps1` through PowerShell). Agents run one with `run_task` and wait for `task_done`; `get_status`
+lists them, running or with their last result. The hooks get `task.passed` and `task.failed`.
+
 ## Nerd Font icons
 
 lazyrunner draws Nerd Font icons in its chrome (`nerdIcons`, on by default; `, i` turns them off). An app's title bar
-shows the .NET logo, or for an npm app its framework's - Angular, React or Vue, by its package.json - else Node.js's;
+shows the .NET logo, or for an npm app its framework's - Angular, React or Vue, by its package.json - else Node.js's,
+for a command app its language's by the program it runs (Python, Go, Rust, Node.js; else a terminal), and for a
+compose app Docker's;
 the status line a git branch and a database; the tests, requests and migrations views a flask, an exchange and a
 database, and check, cross, warning, minus and clock marks for passed, failed, errors, skipped and queued (the startup
 checklist's marks too, and an icon for each check). A column says up, watching, stopped or exited with play, eye, stop
@@ -885,7 +1022,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `autoRestartOnBranchChange` | `false` | Restart when the git branch changes |
 | `skipUnchangedBuilds` | `true` | Skip `dotnet build` when nothing in the watched folder changed since the last build |
 | `restartOnCodeChange` | `false` | Rebuild + restart the running .NET apps when code changes |
-| `notifications` | `true` | Desktop notifications |
+| `notifications` | `true` | Desktop notifications (none while the terminal has the focus) |
 | `startupChecklist` | `true` | The startup checklist |
 | `panelLogLines` | `5` | How many recent events the panel shows |
 | `theme` | `default` | A theme's id (a built-in one, or a file in `themes` without `.json`) |
@@ -925,7 +1062,7 @@ as a hook runs a command on your machine:
 ```
 
 The events: `app.up`, `app.crashed`, `build.passed`, `build.failed`, `tests.green`, `tests.red`,
-`migrations.applied` and `update.installed`; `"app"` narrows an app or build event to one app. A hook runs in the
+`migrations.applied`, `update.installed`, `task.passed` and `task.failed`; `"app"` narrows an app or build event to one app. A hook runs in the
 background through the shell (`cmd` on Windows, `sh` elsewhere), in the project's folder, with what happened in
 `LAZYRUNNER_EVENT`, `LAZYRUNNER_PROJECT`, `LAZYRUNNER_APP` and `LAZYRUNNER_DETAILS`. One that fails, or still runs
 after 60 s (then it's stopped), says so in the log: `▸ hook tests.red (notify.ps1): exit 1`. A project's section

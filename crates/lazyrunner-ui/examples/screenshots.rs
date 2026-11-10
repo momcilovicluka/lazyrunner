@@ -39,8 +39,9 @@ async fn main() {
         .nth(1)
         .map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/screenshots"), PathBuf::from);
     std::fs::create_dir_all(&out).expect("the screenshots folder");
-    let scenes: [(&str, Scene, (u16, u16)); 9] = [
+    let scenes: [(&str, Scene, (u16, u16)); 10] = [
         ("overview", overview, SIZE),
+        ("languages", languages, SIZE),
         ("palette", palette, SIZE),
         ("durations", durations, SIZE),
         ("themes", themes, SIZE),
@@ -127,6 +128,98 @@ fn banner() -> String {
 type Scene = fn(&mut Demo);
 
 fn overview(_: &mut Demo) {}
+
+/// A Python app and Docker Compose services beside the .NET and npm apps: Docs becomes Infra (postgres, redis and
+/// rabbitmq, a gutter each), Console becomes Pricing (uvicorn, a traceback with its library frames dimmed).
+fn languages(demo: &mut Demo) {
+    use lazyrunner_core::profile::{AppKind, Command, Compose, Ready};
+    use lazyrunner_core::run::compose::{Service, State};
+    use lazyrunner_core::run::{Event, Tag};
+    let command = |run: &[&str], frames: Option<&str>, errors: &[&str], compose: Option<Compose>| Command {
+        run: run.iter().map(|word| word.to_string()).collect(),
+        cwd: String::new(),
+        port: None,
+        build: Vec::new(),
+        install: Vec::new(),
+        setup: Vec::new(),
+        install_from: Vec::new(),
+        ready: Ready::Started,
+        watch: Vec::new(),
+        errors: errors.iter().map(|error| error.to_string()).collect(),
+        warnings: Vec::new(),
+        frames: frames.map(str::to_string),
+        preset: None,
+        path: Vec::new(),
+        tools: Vec::new(),
+        compose,
+    };
+    let python = command(
+        &["uvicorn", "pricing.api:app", "--port", "8000"],
+        Some(r#"File "(?P<file>[^"]+)", line (?P<line>\d+)"#),
+        &[r"^[A-Za-z_][\w.]*(Error|Exception)(: |$)", r"\b(ERROR|CRITICAL)\b"],
+        None,
+    );
+    let services = Compose { file: None, services: Vec::new() };
+    let infra = command(&["docker", "compose", "up"], None, &[r"(?i)\b(error|fatal)\b"], Some(services));
+    for (index, name, kind) in [(4, "Pricing", python), (3, "Infra", infra)] {
+        let app = &mut demo.controller.apps[index];
+        (app.name, app.icon, app.kind) = (name.into(), None, AppKind::Command(Box::new(kind)));
+        let state = &mut demo.controller.states[index];
+        state.output.clear();
+        (state.errors, state.warnings) = (0, 0);
+    }
+    let said = |demo: &mut Demo, index: usize, lines: &[&str]| {
+        let key = demo.controller.apps[index].key.clone();
+        for line in lines {
+            let tag = Tag::App { key: key.clone(), generation: 1 };
+            demo.controller.handle(Event::Output { tag, line: line.to_string() });
+        }
+    };
+    said(demo, 4, PRICING);
+    said(demo, 3, INFRA);
+    let service = |name: &str, state, detail: &str, image: &str| Service {
+        name: name.into(),
+        state,
+        detail: detail.into(),
+        ports: Vec::new(),
+        image: image.into(),
+    };
+    let polled = vec![
+        service("cache", State::Up, "running (healthy)", "redis:7"),
+        service("db", State::Up, "running (healthy)", "postgres:16"),
+        service("queue", State::Starting, "running (starting)", "rabbitmq:3-management"),
+    ];
+    let key = demo.controller.apps[3].key.clone();
+    demo.controller.handle(Event::ComposeServices { key, generation: 1, services: Ok(polled) });
+}
+
+const PRICING: &[&str] = &[
+    "INFO:     Started server process [8124]",
+    "INFO:     Waiting for application startup.",
+    "INFO:     Application startup complete.",
+    "INFO:     Uvicorn running on http://127.0.0.1:8000",
+    "INFO:     127.0.0.1:52144 - \"GET /prices/basket HTTP/1.1\" 200 OK",
+    "ERROR:    Exception in ASGI application",
+    "Traceback (most recent call last):",
+    "  File \"C:\\work\\shop\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 74, in app",
+    "  File \"C:\\work\\shop\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 301, in run",
+    "  File \"C:\\work\\shop\\pricing\\api.py\", line 31, in quote",
+    "    return rules.apply(basket)",
+    "  File \"C:\\work\\shop\\pricing\\rules.py\", line 12, in apply",
+    "    raise ValueError(f\"no price rule for SKU {sku}\")",
+    "ValueError: no price rule for SKU 4711",
+];
+
+const INFRA: &[&str] = &[
+    "Attaching to cache-1, db-1, queue-1",
+    "db-1     | PostgreSQL init process complete; ready for start up.",
+    "db-1     | LOG:  database system is ready to accept connections",
+    "cache-1  | * Ready to accept connections tcp",
+    "queue-1  | Starting RabbitMQ 3.13.7 on Erlang 26.2.5",
+    "queue-1  | Enabling plugins on node rabbit@queue: rabbitmq_management",
+    "db-1     | LOG:  checkpoint starting: time",
+    "queue-1  | Server startup complete; 3 plugins started.",
+];
 
 fn palette(demo: &mut Demo) {
     demo.ui.overlay = Some(Overlay::Palette { query: "start".into(), index: 0 });
@@ -403,7 +496,7 @@ impl Demo {
             ("● Orders is listening on :47201 - up in 4s", Hue::Green),
             ("Ready in 38s", Hue::Green),
         ] {
-            self.controller.log.push_back(LogEntry { time: "09:41:07".into(), text: text.into(), hue });
+            self.controller.log.push_back(LogEntry { time: "09:41:07".into(), text: text.into(), hue, task: None });
         }
     }
 

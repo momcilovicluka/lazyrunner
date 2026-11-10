@@ -75,13 +75,30 @@ impl Summary {
     }
 }
 
-/// The escape sequences for the tab: its progress and its title ("lazyrunner · ShopLocal · ● all up (5)").
+/// A running task's tab progress: how far it is against its usual time ("1;40"), else busy without a figure ("3;0").
+pub fn task_progress(seconds: f64, usual: Option<f64>) -> String {
+    match usual.filter(|usual| *usual > 0.0) {
+        Some(usual) => format!("1;{}", (seconds / usual * 100.0).clamp(1.0, 99.0) as u32),
+        None => "3;0".into(),
+    }
+}
+
+/// The escape sequences for the tab: its progress and its title ("lazyrunner · ShopLocal · ● all up (5)"). While a
+/// task runs and nothing else is going on, the progress is the task's.
 pub fn tab_sequence(controller: &Controller, summary: &Summary) -> String {
+    let quiet = matches!(summary.progress, "0;0" | "1;100");
+    let task = controller
+        .tasks_running()
+        .into_iter()
+        .next()
+        .filter(|_| quiet)
+        .map(|(task, started)| task_progress(started.elapsed().as_secs_f64(), controller.task_usual(&task.key)));
+    let progress = task.unwrap_or_else(|| summary.progress.to_string());
     let database = controller
         .db_label
         .as_ref()
         .map_or(String::new(), |label| format!("{} · ", label.split(" @ ").next().unwrap_or(label)));
-    format!("\x1b]9;4;{}\x1b\\\x1b]0;lazyrunner · {database}{}\x07", summary.progress, summary.line(false))
+    format!("\x1b]9;4;{progress}\x1b\\\x1b]0;lazyrunner · {database}{}\x07", summary.line(false))
 }
 
 /// Puts the tab back as it was: no progress.

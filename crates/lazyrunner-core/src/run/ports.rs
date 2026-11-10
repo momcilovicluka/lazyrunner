@@ -80,7 +80,8 @@ impl Ports {
             return;
         }
         self.remember(&listening.commands);
-        let mut old: HashMap<String, Port> = self.rows.drain(..).map(|row| (row.key.clone(), row)).collect();
+        let mut old: HashMap<(String, u16), Port> =
+            self.rows.drain(..).map(|row| ((row.key.clone(), row.port), row)).collect();
         for (key, port, running) in wanted {
             let owner = listening.ports.get(port);
             let holding = match (owner, running) {
@@ -94,7 +95,7 @@ impl Ports {
                 name: owner.name.clone(),
                 command: self.commands.get(&owner.pid).cloned(),
             });
-            let mut row = match old.remove(key).filter(|row| row.port == *port) {
+            let mut row = match old.remove(&(key.clone(), *port)) {
                 Some(mut row) => {
                     let pid = |holder: &Option<Holder>| holder.as_ref().map(|holder| holder.pid);
                     if row.holding != holding {

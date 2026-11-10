@@ -9,7 +9,8 @@ use crate::json::{field, list, text, truthy};
 
 pub const START_MARKER: &str = "<!-- reference: made from profile.schema.json (LAZYRUNNER_WRITE_REFERENCE=1 cargo test -p lazyrunner-core reference) - change the schema, not this -->";
 pub const END_MARKER: &str = "<!-- end of reference -->";
-const APP_PARTS: [&str; 4] = ["dotnetApp", "npmApp", "serveVariant", "buildVariant"];
+const APP_PARTS: [&str; 8] =
+    ["dotnetApp", "npmApp", "serveVariant", "buildVariant", "commandApp", "composeApp", "preset", "task"];
 
 pub fn reference(schema: &Value) -> String {
     let defs = field(schema, "$defs");
@@ -82,6 +83,7 @@ fn type_name(node: &Value) -> String {
     if let Some(name) = ref_name(node) {
         return match name {
             "relativePath" => "path",
+            "command" => "text or list",
             "appKey" => "app key",
             "icon" | "nerdIcon" => "character",
             _ => "object",

@@ -40,7 +40,7 @@ impl Controller {
     /// U, u, and `lazyrunner start`: starts `only` (all when `None`) that isn't running, building first what needs it.
     pub fn start(&mut self, only: Option<&[String]>, force_build: bool) {
         debug_assert!(self.building.is_some() || !self.build_only, "b's flag outlives its builds");
-        if self.wait_for_ports(only, force_build) {
+        if self.wait_for_ports(only, force_build) || self.wait_for_compose_stops(only, force_build) {
             return;
         }
         if self.building.is_some() {
@@ -239,6 +239,7 @@ impl Controller {
         let now = (self.now)();
         self.remember_run(index);
         self.states[index].reset_for_start();
+        self.probes.remove(key);
         let app = self.apps[index].clone();
         let command = self
             .commands
@@ -300,12 +301,14 @@ impl Controller {
     /// Whether anything else holds a port these apps need (each said in the log).
     fn find_port_conflicts(&mut self, keys: &[String]) -> bool {
         let listening = Listening::now();
+        // A compose app's port held by Docker is its own services, running from before: not a conflict.
         self.conflicts = keys
             .iter()
-            .filter_map(|key| {
-                let port = self.port(key)?;
+            .flat_map(|key| self.app_ports(key).into_iter().map(move |port| (key, port)))
+            .filter_map(|(key, port)| {
                 let owner = listening.ports.get(&port)?;
-                Some(Conflict { key: key.clone(), port, pid: owner.pid, name: owner.name.clone() })
+                let docker = self.is_compose(key) && crate::run::compose::is_docker_process(&owner.name);
+                (!docker).then(|| Conflict { key: key.clone(), port, pid: owner.pid, name: owner.name.clone() })
             })
             .collect();
         for conflict in self.conflicts.clone() {
@@ -336,10 +339,11 @@ impl Controller {
             .keys()
             .into_iter()
             .filter(|key| !self.is_running(key))
-            .filter_map(|key| {
-                let port = self.port(&key)?;
+            .flat_map(|key| self.app_ports(&key).into_iter().map(move |port| (key.clone(), port)))
+            .filter_map(|(key, port)| {
                 let owner = listening.ports.get(&port)?;
-                Some(Conflict { key, port, pid: owner.pid, name: owner.name.clone() })
+                let docker = crate::run::compose::is_docker_process(&owner.name);
+                (!docker).then(|| Conflict { key, port, pid: owner.pid, name: owner.name.clone() })
             })
             .collect();
         self.kill_conflicts(conflicts);
@@ -347,8 +351,7 @@ impl Controller {
 
     /// The port map's `!`: kills what holds app `key`'s port while the app isn't running (if it still holds it -
     /// never the app itself), and starts nothing.
-    pub fn free_port(&mut self, key: &str) {
-        let Some(port) = self.port(key) else { return };
+    pub fn free_port(&mut self, key: &str, port: u16) {
         if self.is_running(key) {
             let name = self.app(key).map_or_else(|| key.to_string(), |app| app.name.clone());
             self.add_log(format!("Port {port} is {name}'s own - s stops it"), Hue::DarkGray);
@@ -358,6 +361,11 @@ impl Controller {
             self.add_log(format!("Port {port} is free now"), Hue::DarkGray);
             return;
         };
+        if crate::run::compose::is_docker_process(&owner.name) {
+            let text = format!("Port {port} is Docker's ({}) - stop the container that publishes it", owner.name);
+            self.add_log(text, Hue::Yellow);
+            return;
+        }
         self.kill_conflicts(vec![Conflict { key: key.to_string(), port, pid: owner.pid, name: owner.name }]);
         self.request_listening(true);
     }

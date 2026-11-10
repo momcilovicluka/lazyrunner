@@ -23,8 +23,9 @@ fn pattern(regex: &str) -> Regex {
 pub fn fingerprint(root: &Path, source_dir: &str) -> Option<String> {
     let tree = git(root, &["rev-parse", &format!("HEAD:{}", source_dir.replace('\\', "/"))])?;
     let mut parts = vec![tree];
+    let within = if source_dir.is_empty() { "." } else { source_dir };
     let changes =
-        git(root, &["--no-optional-locks", "status", "--porcelain=v1", "-uall", "--", source_dir]).unwrap_or_default();
+        git(root, &["--no-optional-locks", "status", "--porcelain=v1", "-uall", "--", within]).unwrap_or_default();
     static BUILD_OUTPUT: LazyLock<Regex> = LazyLock::new(|| pattern(r"(?i)[\\/](bin|obj)[\\/]"));
     for line in changes.lines().filter(|line| line.len() > 3 && !BUILD_OUTPUT.is_match(line)) {
         let path = line[3..].rsplit(" -> ").next().unwrap_or_default().trim_matches('"');
@@ -97,6 +98,34 @@ pub fn save_stamp(state: &Path, root: &Path, key: &str, project: &str, fingerpri
         "outputTicks": output_ticks(root, project).to_string(),
     });
     let _ = crate::config::write(&stamp_path(state, key), &stamp);
+}
+
+/// Whether a command app's last good build is of these sources (its folder's fingerprint).
+pub fn is_command_up_to_date(state: &Path, root: &Path, key: &str, fingerprint: Option<&str>) -> bool {
+    let Some(fingerprint) = fingerprint else { return false };
+    let Some(stamp) = json::read(&stamp_path(state, key)) else { return false };
+    json::text(json::field(&stamp, "root")) == root.display().to_string()
+        && json::text(json::field(&stamp, "fingerprint")) == fingerprint
+}
+
+pub fn save_command_stamp(state: &Path, root: &Path, key: &str, fingerprint: Option<&str>) {
+    let Some(fingerprint) = fingerprint else { return };
+    let stamp = json!({ "root": root.display().to_string(), "fingerprint": fingerprint });
+    let _ = crate::config::write(&stamp_path(state, key), &stamp);
+}
+
+/// A tool's last lines that say something, as what went wrong when it says no errors the way dotnet does.
+/// A unit a command app's build compiles: cargo's `Compiling serde v1.0.210`.
+static COMPILING: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*Compiling \S+ v\d").expect("a valid pattern"));
+
+/// Whether a build line says it compiles one more unit (its bar moves on).
+pub fn compiles(line: &str) -> bool {
+    COMPILING.is_match(line)
+}
+
+pub fn last_lines(lines: &[String], count: usize) -> Vec<String> {
+    let said: Vec<&String> = lines.iter().filter(|line| !crate::output::strip_ansi(line).trim().is_empty()).collect();
+    said[said.len().saturating_sub(count)..].iter().map(|line| (*line).clone()).collect()
 }
 
 /// How many projects a build compiles.
@@ -244,6 +273,13 @@ impl Timings {
 mod tests {
     use super::*;
     use crate::testing::{TempDir, write};
+
+    #[test]
+    fn cargos_compiling_lines_count_its_units() {
+        assert!(compiles("   Compiling serde v1.0.210") && compiles("Compiling shop-api v0.1.0 (C:\\work\\shop)"));
+        assert!(!compiles("    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.12s"));
+        assert!(!compiles("warning: Compiling is slow today"));
+    }
 
     #[test]
     fn compiler_messages_lose_their_path_and_project() {

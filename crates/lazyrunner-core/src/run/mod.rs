@@ -13,6 +13,7 @@ pub mod child;
 pub mod code;
 mod code_ts;
 pub mod command;
+pub mod compose;
 pub mod controller;
 pub mod diff;
 pub mod history;
@@ -47,6 +48,11 @@ pub enum Tag {
         job: u64,
     },
     NpmCi {
+        key: String,
+        job: u64,
+    },
+    /// A task's run (`"tasks"`).
+    Task {
         key: String,
         job: u64,
     },
@@ -87,6 +93,11 @@ pub enum Event {
     FileChanged(PathBuf),
     /// A file saved in a watched npm or Nx test suite's folder (test watch).
     TestFileChanged(PathBuf),
+    /// A command app's code (its `watch`) was saved.
+    CommandFileChanged {
+        key: String,
+        path: PathBuf,
+    },
     /// The test suites found (T), with their last results.
     Suites(Vec<suites::Suite>),
     /// What changes affect, each suite's, looked at in the background (#78).
@@ -113,6 +124,17 @@ pub enum Event {
     AuditInstalled {
         key: String,
         result: Result<(), String>,
+    },
+    /// A compose app's services, polled for its run `generation`, or why they couldn't be.
+    ComposeServices {
+        key: String,
+        generation: u64,
+        services: Result<Vec<compose::Service>, String>,
+    },
+    /// The ports a compose app's services publish, as its compose file says, or why they couldn't be read.
+    ComposePorts {
+        key: String,
+        ports: Result<Vec<u16>, String>,
     },
     /// A hook that didn't go well: its event, its command, and what went wrong.
     HookFailed {

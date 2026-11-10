@@ -55,6 +55,8 @@ pub enum Target {
     Reveal(usize),
     /// The panel's chip of a stopped app's port that something else took: a click opens the port map on it.
     Ports,
+    /// A failed task's chip in the panel's header, by its place in the profile's tasks: a click puts it away.
+    TaskResult(usize),
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -212,6 +214,11 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
         Some(Target::RunNews(index)) => super::diff::open_news(ui, controller, index),
         Some(Target::Ports) => super::ports::open_taken(ui, controller),
+        Some(Target::TaskResult(index)) => {
+            if let Some(key) = controller.tasks().get(index).map(|task| task.key.clone()) {
+                controller.dismiss_task_result(&key);
+            }
+        }
         Some(Target::Reveal(link)) => {
             if link_click(ui, controller, modified) {
                 super::bundle::reveal(ui, controller, link);

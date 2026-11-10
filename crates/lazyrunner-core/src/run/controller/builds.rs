@@ -7,12 +7,13 @@ use super::start::clock;
 use super::{Controller, ToolJob};
 use crate::config::Toggle;
 use crate::output::Hue;
-use crate::profile::AppKind;
+use crate::profile::{App, AppKind, Command};
 use crate::run::Tag;
 use crate::run::build::{self, ToolLine};
-use crate::run::child::Child;
+use crate::run::child::{Child, Spec};
 use crate::run::diff;
 use crate::run::history::Kind;
+use crate::run::tools;
 
 /// A failed build's errors shown in the panel's log (o opens the full log).
 const MAX_BUILD_ERROR_LINES: usize = 6;
@@ -20,6 +21,9 @@ const MAX_BUILD_ERROR_LINES: usize = 6;
 const MAX_NEW_WARNINGS: usize = 5;
 /// `y` copies at most this many errors of a failed build.
 const MAX_COPIED_BUILD_ERRORS: usize = 200;
+/// What a build is called while it runs.
+const DOTNET_BUILD: &str = "dotnet build";
+const COMMAND_BUILD: &str = "build";
 
 impl Controller {
     /// b, B: a full build (never skipped) that leaves the apps stopped; u / U then start them without building
@@ -130,6 +134,9 @@ impl Controller {
 
     fn build_app(&mut self, key: &str) -> BuildStep {
         let app = self.app(key).expect("a known app").clone();
+        if let Some(command) = app.command() {
+            return self.build_command_app(&app, command);
+        }
         let AppKind::Dotnet { project, .. } = &app.kind else { return BuildStep::Skipped };
         let skip = self.setting(Toggle::SkipUnchangedBuilds)
             && build::is_up_to_date(&self.state_dir, &self.root, key, project, self.fingerprint.as_deref());
@@ -150,14 +157,45 @@ impl Controller {
         self.pane(key, &format!("──── ⚙ {} · dotnet build {file} ────", clock()), Hue::Cyan);
         self.failed_build_errors.remove(key);
         let total = build::project_count(&self.root.join(project));
+        self.spawn_build(&app, &spec, total, DOTNET_BUILD)
+    }
+
+    /// A command app's build (`build`): skipped when nothing in its folder changed since its last good build.
+    fn build_command_app(&mut self, app: &App, command: &Command) -> BuildStep {
+        let key = app.key.as_str();
+        let fingerprint = build::fingerprint(&self.root, &command.cwd);
+        let skip = self.setting(Toggle::SkipUnchangedBuilds)
+            && build::is_command_up_to_date(&self.state_dir, &self.root, key, fingerprint.as_deref());
+        if !self.force_build && skip {
+            let text = format!("✓ {} unchanged since its last build - skipped (b / B force a full build)", app.name);
+            self.add_log(text, Hue::Green);
+            return BuildStep::Skipped;
+        }
+        if self.force_build {
+            build::remove_stamp(&self.state_dir, key);
+        }
+        let spec = match tools::command_spec(&self.root, app, &command.build) {
+            Ok(spec) => spec,
+            Err(error) => {
+                self.pane(key, &format!("✗ {error}"), Hue::Red);
+                self.add_log(format!("✗ {} build failed: {error}", app.name), Hue::Red);
+                return BuildStep::Failed;
+            }
+        };
+        self.command_fingerprints.insert(key.to_string(), fingerprint);
+        self.pane(key, &format!("──── ⚙ {} · {} ────", clock(), command.build.join(" ")), Hue::Cyan);
+        self.failed_build_errors.remove(key);
+        let units = self.build_units.get(&app.key).copied().unwrap_or(0);
+        self.spawn_build(app, &spec, units, COMMAND_BUILD)
+    }
+
+    /// Starts an app's build: `total` the projects it compiles (0: it doesn't say).
+    fn spawn_build(&mut self, app: &App, spec: &Spec, total: usize, what: &'static str) -> BuildStep {
+        let key = app.key.as_str();
         self.next_job += 1;
         let id = self.next_job;
-        match Child::spawn(
-            &spec,
-            Tag::Build { key: key.to_string(), job: id },
-            self.events.clone(),
-            self.guard.as_ref(),
-        ) {
+        match Child::spawn(spec, Tag::Build { key: key.to_string(), job: id }, self.events.clone(), self.guard.as_ref())
+        {
             Ok(child) => {
                 let started = (self.now)();
                 if let Some(since) = self.since_start() {
@@ -173,13 +211,13 @@ impl Controller {
                     total,
                     warnings: 0,
                     start_after: false,
-                    what: "dotnet build",
+                    what,
                 });
                 BuildStep::Started
             }
             Err(error) => {
                 self.pane(key, &format!("✗ {error}"), Hue::Red);
-                self.add_log(format!("✗ {} build failed: dotnet couldn't start ({error})", app.name), Hue::Red);
+                self.add_log(format!("✗ {} build failed: {what} couldn't start ({error})", app.name), Hue::Red);
                 BuildStep::Failed
             }
         }
@@ -189,7 +227,11 @@ impl Controller {
         let Some(job) = self.building.as_mut().filter(|job| job.key == key && job.id == id) else { return };
         job.lines.push(line.to_string());
         let text = crate::output::strip_ansi(line);
-        match build::tool_line(&text, true) {
+        let dotnet = job.what == DOTNET_BUILD;
+        if !dotnet && build::compiles(&text) {
+            job.done += 1;
+        }
+        match build::tool_line(&text, dotnet) {
             ToolLine::Warning => job.warnings += 1,
             ToolLine::Built(project) => {
                 job.done += 1;
@@ -216,6 +258,11 @@ impl Controller {
             self.record_duration(Kind::Build, key, seconds, false);
             self.pane(key, &format!("✗ build failed after {whole}s"), Hue::Red);
             let errors = build::errors(&job.lines);
+            let errors = if errors.is_empty() && app.command().is_some() {
+                build::last_lines(&job.lines, MAX_BUILD_ERROR_LINES)
+            } else {
+                errors
+            };
             let full: Vec<String> = errors
                 .iter()
                 .map(|line| crate::output::strip_ansi(line).trim().to_string())
@@ -237,8 +284,19 @@ impl Controller {
             self.build_failed();
             return;
         }
-        if let AppKind::Dotnet { project, .. } = &app.kind {
-            build::save_stamp(&self.state_dir, &self.root, key, project, self.fingerprint.as_deref());
+        match &app.kind {
+            AppKind::Dotnet { project, .. } => {
+                build::save_stamp(&self.state_dir, &self.root, key, project, self.fingerprint.as_deref());
+            }
+            AppKind::Command(_) => {
+                if job.done > 0 {
+                    let most = self.build_units.entry(key.to_string()).or_default();
+                    *most = (*most).max(job.done);
+                }
+                let fingerprint = self.command_fingerprints.remove(key).flatten();
+                build::save_command_stamp(&self.state_dir, &self.root, key, fingerprint.as_deref());
+            }
+            AppKind::Npm { .. } => {}
         }
         self.timings.add("build", key, seconds);
         let note = self.record_duration(Kind::Build, key, seconds, true);
@@ -250,7 +308,11 @@ impl Controller {
             (count, Some(change)) if change != 0 => format!(", {count} warnings ({change:+})"),
             (count, _) => format!(", {count} warnings"),
         };
-        let summary = format!("built in {whole}s ({} projects{counted}){note}", job.done);
+        let summary = if app.command().is_some() {
+            format!("built in {whole}s{counted}{note}")
+        } else {
+            format!("built in {whole}s ({} projects{counted}){note}", job.done)
+        };
         self.pane(key, &format!("✓ {summary}"), Hue::Green);
         for warning in new.iter().take(MAX_NEW_WARNINGS) {
             self.pane(key, &format!("  ▲ {}", build::format_error(warning)), Hue::Yellow);

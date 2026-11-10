@@ -1,6 +1,7 @@
 //! Links in output: URLs, and places in files - a build error's `Orders.cs(12,5)`, a .NET stack frame's
-//! `in C:\src\Orders.cs:line 42`, a node or jest frame's `src/cart.ts:12:5` - so a click can open them: a URL in the
-//! browser, a file at its line in the editor (`"editor"`).
+//! `in C:\src\Orders.cs:line 42`, a node, jest, Go or Rust frame's `src/cart.ts:12:5`, and a command app's own
+//! frames (its `frames` pattern) - so a click can open them: a URL in the browser, a file at its line in the editor
+//! (`"editor"`).
 
 use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
@@ -31,7 +32,9 @@ const SEARCH_BUDGET: usize = 20_000;
 /// Lines longer than this aren't looked through for links (minified output, base64).
 const LONGEST_SCANNED: usize = 2_000;
 /// The files a link may name: source, markup, styles, data and text - never anything the system would run.
-const EXTENSIONS: &str = "cs|fs|vb|cshtml|razor|xaml|csproj|props|targets|ts|tsx|js|jsx|mjs|cjs|vue|svelte|css|scss|less|html|json|xml|yml|yaml|md|sql|txt|config|log";
+const EXTENSIONS: &str = "cs|fs|vb|cshtml|razor|xaml|csproj|props|targets|ts|tsx|js|jsx|mjs|cjs|vue|svelte|css|scss|less|html|json|xml|yml|yaml|md|sql|txt|config|log|py|pyi|go|rs|java|kt|kts|scala|rb|php|swift|dart|ex|exs|erl|lua|c|h|cc|cpp|hpp|toml|gradle|ini|cfg";
+/// Source files the system would run, not open, when there's no editor to open them in.
+pub const RUNNABLE: [&str; 6] = ["py", "rb", "php", "lua", "exs", "erl"];
 
 fn pattern(regex: &str) -> Regex {
     Regex::new(regex).expect("a valid pattern")
@@ -53,6 +56,43 @@ static COLONS: LazyLock<Regex> = LazyLock::new(|| {
 
 /// The links in `text`, in order, none overlapping (a URL first, then the earliest place in a file).
 pub fn find(text: &str) -> Vec<Link> {
+    find_with(text, None)
+}
+
+/// The links in `text`, an app's own `frames` pattern (its `file`, `line` and `col` groups) first among the places.
+/// Where a stack frame's file is a library's, not the app's own: site-packages, Python's and Go's own sources, Go's
+/// module cache, the cargo registry, Rust's standard library.
+const LIBRARY_PATHS: [&str; 12] = [
+    "site-packages",
+    "dist-packages",
+    "<frozen ",
+    "/lib/python",
+    "/go/src/",
+    "\\go\\src\\",
+    "/pkg/mod/",
+    "\\pkg\\mod\\",
+    ".cargo/registry",
+    ".cargo\\registry",
+    "/rustc/",
+    ".rustup",
+];
+
+/// Whether a stack frame's file is a library's (dimmed, the app's own frames bright).
+pub fn is_library(path: &str) -> bool {
+    let path = path.to_lowercase();
+    let windows_python = path.contains("\\lib\\") && path.contains("python");
+    windows_python || LIBRARY_PATHS.iter().any(|library| path.contains(library))
+}
+
+/// Whether a line is a stack frame (by `frames`) in a library's file.
+pub fn library_frame(text: &str, frames: Option<&Regex>) -> bool {
+    let file = frames
+        .and_then(|frames| frames.captures(text))
+        .and_then(|found| found.name("file").map(|file| file.as_str().to_string()));
+    file.is_some_and(|file| is_library(&file))
+}
+
+pub fn find_with(text: &str, frames: Option<&Regex>) -> Vec<Link> {
     if text.len() > LONGEST_SCANNED {
         return Vec::new();
     }
@@ -67,6 +107,16 @@ pub fn find(text: &str) -> Vec<Link> {
                 target: Target::Url(trimmed.into()),
             })
         }));
+    }
+    for found in frames.into_iter().flat_map(|frames| frames.captures_iter(text)) {
+        let (Some(whole), Some(path)) = (found.get(0), found.name("file")) else { continue };
+        let file = path.as_str().trim();
+        if !openable(file) || links.iter().any(|link| path.start() < link.end && whole.end() > link.start) {
+            continue;
+        }
+        let number = |name| found.name(name).and_then(|value| value.as_str().parse().ok());
+        let target = Target::File { path: file.into(), line: number("line"), column: number("col") };
+        links.push(Link { start: path.start(), end: whole.end(), target });
     }
     if !(text.contains('.') && (text.contains('(') || text.contains(':'))) {
         return links;
@@ -200,12 +250,43 @@ mod tests {
     use super::*;
     use crate::testing::{TempDir, write};
 
+    #[test]
+    fn a_librarys_frame_is_told_from_the_apps_own() {
+        let python = Regex::new(r#"File "(?P<file>[^"]+)", line (?P<line>\d+)"#).unwrap();
+        let own = r#"  File "C:\work\shop\app\api.py", line 12, in handler"#;
+        let theirs = r#"  File "C:\work\shop\.venv\Lib\site-packages\starlette\routing.py", line 74, in app"#;
+        let stdlib = r#"  File "C:\Python312\Lib\asyncio\runners.py", line 118, in run"#;
+        assert!(!library_frame(own, Some(&python)));
+        assert!(library_frame(theirs, Some(&python)) && library_frame(stdlib, Some(&python)));
+        let go = Regex::new(r"(?P<file>(?:[A-Za-z]:)?[^\s:]+\.go):(?P<line>\d+)").unwrap();
+        assert!(library_frame("\tC:/Program Files/Go/src/runtime/panic.go:770 +0x132", Some(&go)));
+        assert!(library_frame("\t/home/me/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/context.go:174", Some(&go)));
+        assert!(!library_frame("\t/src/api/handler.go:42 +0x1d", Some(&go)));
+        assert!(is_library(
+            "/home/me/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.40.0/src/runtime.rs"
+        ));
+        assert!(!library_frame("nothing to see", Some(&go)) && !library_frame(own, None));
+    }
+
     fn targets(text: &str) -> Vec<(String, Target)> {
         find(text).into_iter().map(|link| (text[link.start..link.end].to_string(), link.target)).collect()
     }
 
     fn file(path: &str, line: u32, column: Option<u32>) -> Target {
         Target::File { path: path.into(), line: Some(line), column }
+    }
+
+    #[test]
+    fn a_command_apps_frames_and_other_languages_places_are_links() {
+        let python = Regex::new(r#"File "(?P<file>[^"]+)", line (?P<line>\d+)"#).unwrap();
+        let text = r#"  File "app/api.py", line 12, in handler"#;
+        let found: Vec<Target> = find_with(text, Some(&python)).into_iter().map(|link| link.target).collect();
+        assert_eq!(found, [file("app/api.py", 12, None)]);
+        assert_eq!(
+            targets("  --> src/main.rs:42:5"),
+            [("src/main.rs:42:5".to_string(), file("src/main.rs", 42, Some(5)))]
+        );
+        assert_eq!(targets("\t/src/api/handler.go:42 +0x1d")[0].1, file("/src/api/handler.go", 42, None));
     }
 
     #[test]
