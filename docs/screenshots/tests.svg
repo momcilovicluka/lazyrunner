@@ -10,53 +10,53 @@
 <text x="198.8" y="61.7" fill="#f38ba8" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ 7   ✗ 1   – 1</text>
 <text x="350.0" y="61.7" fill="#1e1e2e" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> all </text>
 <text x="392.0" y="61.7" fill="#6c7086" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> failed  flaky  affected </text>
-<text x="14.0" y="79.7" fill="#6c7086" textLength="1428.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> j k choose · 1-9 an app · &lt; &gt; first / last · r run it (a side or an app: all of it) · R run all · Alt+r run the affected · l its tests · f / F failed again · Alt+f flaky</text>
-<text x="14.0" y="97.7" fill="#89dceb" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Backend · dotnet test                             </text>
-<text x="442.4" y="97.7" fill="#f38ba8" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1 failed</text>
-<text x="518.0" y="97.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="97.7" fill="#ffffff" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Orders.Tests</text>
-<text x="635.6" y="97.7" fill="#6c7086" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   .NET · dotnet test</text>
-<text x="14.0" y="115.7" fill="#94e2d5" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 1 Orders                                          </text>
+<text x="14.0" y="79.7" fill="#6c7086" textLength="1310.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> j k choose · 1-9 an app · &lt; &gt; first / last · r run it (a side or an app: all of it) · R run all · Alt+r run the affected · l its tests · f / F failed again</text>
+<text x="14.0" y="97.7" fill="#6c7086" textLength="1150.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Alt+f flaky again · [ ] a run · a / A watch · v all / failed / flaky / affected · / filter · s stop · o log · y copy failures · Esc back</text>
+<text x="14.0" y="115.7" fill="#89dceb" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Backend · dotnet test                             </text>
 <text x="442.4" y="115.7" fill="#f38ba8" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1 failed</text>
 <text x="518.0" y="115.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="115.7" fill="#f38ba8" textLength="537.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ 3 passed   ✗ 1 failed   – 1 skipped   · last run 09:38:52 · 6s</text>
-<rect x="14.0" y="120.0" width="504.0" height="18" fill="#cba6f7"/>
-<text x="14.0" y="133.7" fill="#1e1e2e" textLength="504.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ▸ ✗ Orders.Tests                                   ✓3 ×1 </text>
+<text x="534.8" y="115.7" fill="#ffffff" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Orders.Tests</text>
+<text x="635.6" y="115.7" fill="#6c7086" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   .NET · dotnet test</text>
+<text x="14.0" y="133.7" fill="#94e2d5" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 1 Orders                                          </text>
+<text x="442.4" y="133.7" fill="#f38ba8" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">1 failed</text>
 <text x="518.0" y="133.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="14.0" y="151.7" fill="#94e2d5" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 2 Billing                                         </text>
-<text x="442.4" y="151.7" fill="#a6e3a1" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 passed</text>
+<text x="534.8" y="133.7" fill="#f38ba8" textLength="537.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓ 3 passed   ✗ 1 failed   – 1 skipped   · last run 09:38:52 · 6s</text>
+<rect x="14.0" y="138.0" width="504.0" height="18" fill="#cba6f7"/>
+<text x="14.0" y="151.7" fill="#1e1e2e" textLength="504.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">   ▸ ✗ Orders.Tests                                   ✓3 ×1 </text>
 <text x="518.0" y="151.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="151.7" fill="#f38ba8" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">FAILURES 1</text>
-<text x="47.6" y="169.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
-<text x="72.8" y="169.7" fill="#cdd6f4" textLength="420.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Billing.Tests                                     </text>
-<text x="492.8" y="169.7" fill="#a6e3a1" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓2</text>
+<text x="14.0" y="169.7" fill="#94e2d5" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 2 Billing                                         </text>
+<text x="442.4" y="169.7" fill="#a6e3a1" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 passed</text>
 <text x="518.0" y="169.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="169.7" fill="#f38ba8" textLength="520.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✗ Orders.Tests.CartTests.Totals(quantity: 2, price: 3) (41 ms)</text>
-<text x="14.0" y="187.7" fill="#89dceb" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Frontend · vitest · nx test                       </text>
-<text x="442.4" y="187.7" fill="#a6e3a1" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 passed</text>
+<text x="534.8" y="169.7" fill="#f38ba8" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">FAILURES 1</text>
+<text x="47.6" y="187.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
+<text x="72.8" y="187.7" fill="#cdd6f4" textLength="420.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Billing.Tests                                     </text>
+<text x="492.8" y="187.7" fill="#a6e3a1" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓2</text>
 <text x="518.0" y="187.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="187.7" fill="#cdd6f4" textLength="907.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Assert.Equal() Failure: Values differ                                                                   </text>
-<text x="14.0" y="205.7" fill="#94e2d5" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 3 Shop                                            </text>
+<text x="534.8" y="187.7" fill="#f38ba8" textLength="520.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✗ Orders.Tests.CartTests.Totals(quantity: 2, price: 3) (41 ms)</text>
+<text x="14.0" y="205.7" fill="#89dceb" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Frontend · vitest · nx test                       </text>
 <text x="442.4" y="205.7" fill="#a6e3a1" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 passed</text>
 <text x="518.0" y="205.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="205.7" fill="#cdd6f4" textLength="907.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Expected: 6                                                                                             </text>
-<text x="47.6" y="223.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
-<text x="72.8" y="223.7" fill="#cdd6f4" textLength="420.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Shop                                              </text>
-<text x="492.8" y="223.7" fill="#a6e3a1" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓2</text>
+<text x="534.8" y="205.7" fill="#cdd6f4" textLength="907.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Assert.Equal() Failure: Values differ                                                                   </text>
+<text x="14.0" y="223.7" fill="#94e2d5" textLength="428.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> 3 Shop                                            </text>
+<text x="442.4" y="223.7" fill="#a6e3a1" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">2 passed</text>
 <text x="518.0" y="223.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="223.7" fill="#cdd6f4" textLength="907.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Actual:   5                                                                                             </text>
-<text x="14.0" y="241.7" fill="#6c7086" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">     1 project without test files</text>
+<text x="534.8" y="223.7" fill="#cdd6f4" textLength="907.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Expected: 6                                                                                             </text>
+<text x="47.6" y="241.7" fill="#a6e3a1" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ✓ </text>
+<text x="72.8" y="241.7" fill="#cdd6f4" textLength="420.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Shop                                              </text>
+<text x="492.8" y="241.7" fill="#a6e3a1" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓2</text>
 <text x="518.0" y="241.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="568.4" y="241.7" fill="#6c7086" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">at Shop.Orders.Tests.CartTests.Totals(Int32 quantity, Decimal price) in </text>
-<text x="1173.2" y="241.7" fill="#6c7086" textLength="252.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">/work/shop/tests/Orders.Tests/</text>
+<text x="534.8" y="241.7" fill="#cdd6f4" textLength="907.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Actual:   5                                                                                             </text>
+<text x="14.0" y="259.7" fill="#6c7086" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">     1 project without test files</text>
 <text x="518.0" y="259.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="568.4" y="259.7" fill="#6c7086" textLength="168.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">CartTests.cs:line 42</text>
+<text x="568.4" y="259.7" fill="#6c7086" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">at Shop.Orders.Tests.CartTests.Totals(Int32 quantity, Decimal price) in </text>
+<text x="1173.2" y="259.7" fill="#6c7086" textLength="252.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">/work/shop/tests/Orders.Tests/</text>
 <text x="518.0" y="277.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="568.4" y="277.7" fill="#6c7086" textLength="168.0" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">CartTests.cs:line 42</text>
 <text x="518.0" y="295.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="534.8" y="295.7" fill="#89dceb" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Skipped (1):</text>
 <text x="518.0" y="313.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
-<text x="551.6" y="313.7" fill="#6c7086" textLength="386.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">– Orders.Tests.CheckoutTests.RetriesThePayment</text>
+<text x="534.8" y="313.7" fill="#89dceb" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Skipped (1):</text>
 <text x="518.0" y="331.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
+<text x="551.6" y="331.7" fill="#6c7086" textLength="386.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">– Orders.Tests.CheckoutTests.RetriesThePayment</text>
 <text x="518.0" y="349.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="518.0" y="367.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="518.0" y="385.7" fill="#cba6f7" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>

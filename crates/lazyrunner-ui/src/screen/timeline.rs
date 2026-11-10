@@ -324,7 +324,8 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, height: usize) -> Ve
     let Some(Overlay::Timeline(view)) = &ui.overlay else { return Vec::new() };
     let lines = lines_of(controller, view);
     let all = rows_of(controller, &lines);
-    let body = height.saturating_sub(2);
+    let keys = super::viewbar::keys(hint(view), cells);
+    let body = height.saturating_sub(1 + keys.len());
     let scroll = view.scroll.min(all.len().saturating_sub(1));
     let end = all.len().saturating_sub(scroll);
     let start = end.saturating_sub(body);
@@ -345,7 +346,8 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, height: usize) -> Ve
         });
     }
     drawn.resize_with(body, || fit(Vec::new(), inner));
-    let mut out = vec![header(ui, controller, view, lines.len(), cells), super::viewbar::keys(ui, hint(view), cells)];
+    let mut out = vec![header(ui, controller, view, lines.len(), cells)];
+    out.extend(keys);
     out.extend(drawn.into_iter().enumerate().map(|(at, row)| match &strip {
         Some(strip) => row.into_iter().chain(strip.get(at).into_iter().flatten().cloned()).collect(),
         None => row,

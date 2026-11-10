@@ -627,7 +627,7 @@ fn header(ui: &Ui, controller: &Controller, view: &View, shown: Option<&Shown>, 
 }
 
 /// Under the keys, how the map is shown: the edges hidden as implied, the test projects hidden, its scale, Nx asked.
-fn notes(ui: &Ui, controller: &Controller, view: &View, shown: Option<&Shown>, width: usize) -> Vec<Seg> {
+fn notes(controller: &Controller, view: &View, shown: Option<&Shown>, width: usize) -> Vec<Vec<Seg>> {
     let mut notes = Vec::new();
     let hidden = shown.map_or(0, |shown| shown.hidden);
     if hidden > 0 {
@@ -645,10 +645,16 @@ fn notes(ui: &Ui, controller: &Controller, view: &View, shown: Option<&Shown>, w
         notes.push("asking Nx…".into());
     }
     if notes.is_empty() {
-        return Vec::new();
+        return vec![Vec::new()];
     }
-    ui.scrolling_row(vec![seg(format!(" {}", notes.join(" · ")), C::DarkGray)], 0, width)
+    super::seg::wrap(&[seg(format!(" {}", notes.join(" · ")), C::DarkGray)], width, 1, NOTE_ROWS)
 }
+
+/// The rows the notes under the keys take at most, and each of the picked box's lines under the map (#90: they wrap
+/// instead of scrolling), the rows after a line's first indented.
+const NOTE_ROWS: usize = 2;
+const DETAIL_ROWS: usize = 3;
+const DETAIL_INDENT: usize = 3;
 
 /// The rules the picked part breaks or is broken by, and what only Nx knows it's linked to.
 fn rules(map: &CodeMap, at: usize) -> Vec<Seg> {
@@ -690,7 +696,7 @@ fn names(map: &CodeMap, shown: &Shown, at: usize) -> Vec<Seg> {
 
 /// Under the map, the picked box: what it depends on and what uses it (how many, and by name), what a change to it
 /// affects, its path and tags, the rules it breaks.
-fn details(ui: &Ui, controller: &Controller, map: &CodeMap, shown: &Shown, width: usize) -> Vec<Vec<Seg>> {
+fn details(controller: &Controller, map: &CodeMap, shown: &Shown, width: usize) -> Vec<Vec<Seg>> {
     let Some(at) = shown.picked else { return Vec::new() };
     let part = &map.parts[at];
     let (uses, uses_all) = (map.reach(at, true, false).len(), map.reach(at, true, true).len());
@@ -722,10 +728,11 @@ fn details(ui: &Ui, controller: &Controller, map: &CodeMap, shown: &Shown, width
     if !part.tags.is_empty() {
         second.push(seg(format!(" · tags {}", part.tags.join(", ")), C::DarkGray));
     }
-    let mut lines = vec![ui.scrolling_row(first, 1, width), ui.scrolling_row(second, 1, width)];
+    let mut lines = super::seg::wrap(&first, width, DETAIL_INDENT, DETAIL_ROWS);
+    lines.extend(super::seg::wrap(&second, width, DETAIL_INDENT, DETAIL_ROWS));
     for extra in [names(map, shown, at), rules(map, at)] {
         if !extra.is_empty() {
-            lines.push(ui.scrolling_row(extra, 0, width));
+            lines.extend(super::seg::wrap(&extra, width, DETAIL_INDENT, DETAIL_ROWS));
         }
     }
     lines
@@ -739,11 +746,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let hint = " h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z \
                 zoom · r implied edges · t tests · a all projects · c cycles · o open · y copy path · Tab the map · Esc \
                 back";
-    let mut lines = vec![
-        header(ui, controller, &current, shown.as_ref(), width),
-        super::viewbar::keys(ui, hint, width),
-        notes(ui, controller, &current, shown.as_ref(), width),
-    ];
+    let mut lines = vec![header(ui, controller, &current, shown.as_ref(), width)];
+    lines.extend(super::viewbar::keys(hint, width));
+    lines.extend(notes(controller, &current, shown.as_ref(), width));
     let (Some(map), Some(shown)) = (map, shown) else {
         lines.resize(rows, Vec::new());
         return lines.into_iter().map(|line| aim(line, Target::Box)).collect();
@@ -752,7 +757,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         lines.extend(super::code_search::rows(ui, map, &current, width));
         lines.push(Vec::new());
     }
-    let below = details(ui, controller, map, &shown, width);
+    let below = details(controller, map, &shown, width);
     let room = width.saturating_sub(2);
     let map_rows = rows.saturating_sub(lines.len() + below.len() + 1).max(3);
     let (drawn, fits) = code_draw::fitting(ui, map, &shown, &current, (room, map_rows));

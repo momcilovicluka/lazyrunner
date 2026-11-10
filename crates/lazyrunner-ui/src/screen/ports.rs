@@ -539,18 +539,18 @@ fn bands(controller: &Controller, room: usize) -> Vec<Vec<Seg>> {
 }
 
 /// The keys, under the header as in the other views - or, while `!` asks, the question: the keys first.
-fn keys(ui: &Ui, state: &View, picked: Option<&Port>, cells: usize) -> Vec<Seg> {
+fn keys(state: &View, picked: Option<&Port>, cells: usize) -> Vec<Vec<Seg>> {
     let Some(row) = picked.filter(|row| state.confirm && row.holding == Holding::Other) else {
         let keys = " j k move · ! stops the holder · Enter its column · w opens it · r reads again · y copies the fix · \
                     Esc closes";
-        return super::viewbar::keys(ui, keys, cells);
+        return super::viewbar::keys(keys, cells);
     };
     let who = row
         .holder
         .as_ref()
         .map_or("what holds it".to_string(), |holder| format!("{} (PID {})", holder.name, holder.pid));
     let text = format!(" y stops {who}, which holds {} · n doesn't ", row.port);
-    vec![on(pad(&text, cells), C::Black, C::Yellow)]
+    vec![vec![on(pad(&text, cells), C::Black, C::Yellow)]]
 }
 
 /// The line under the strip: what `y` copied, the first conflict, or that all is well.
@@ -593,7 +593,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let index = state.index.min(list.len().saturating_sub(1));
     let bar = ui.motion.bar(index, ui.now);
     let columns = columns(cells);
-    let mut lines = vec![header(ui, controller), keys(ui, &state, list.get(index).copied(), cells), Vec::new()];
+    let mut lines = vec![header(ui, controller)];
+    lines.extend(keys(&state, list.get(index).copied(), cells));
+    lines.push(Vec::new());
     lines.extend(overview(ui, map, state.opened));
     lines.extend([status(ui, controller, &state), Vec::new(), titles(&columns)]);
     if list.is_empty() {

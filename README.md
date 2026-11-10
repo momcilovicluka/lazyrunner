@@ -290,8 +290,10 @@ update right there (`u`: what the check is doing, then how it ended, under its l
 as the startup checklist does). Its logo shimmers in rainbow colours over a flowing rule (still with reduced motion), with Nerd Font icons
 when they're on.
 
-Every full-screen view - requests, tests, migrations, audit, ports, the timeline, durations - starts the same way: its
-name in a chip, then its keys on the row under it; keys that don't fit scroll sideways rather than being cut off. A
+Every full-screen view - requests, tests, migrations, audit, ports, the stack and code maps, the timeline, durations -
+starts the same way: its name in a chip, then its keys under it, on as many rows as they need - wrapped between keys,
+so each key stays in one place, all of them there at a glance. The code map's lines under the map (what the picked
+part uses and what uses it) wrap the same way. A
 column's title that doesn't fit leaves out the app's port before its state, and a long output line wraps at a space or
 punctuation when one is near the edge, so words and paths stay whole.
 

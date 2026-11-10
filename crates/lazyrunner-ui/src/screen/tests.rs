@@ -1917,7 +1917,7 @@ async fn the_code_map_shows_what_depends_on_what_goes_inside_a_project_and_finds
     assert!(frame.contains("→ uses Orders.Core, Shared.Kernel"), "by name: {frame}");
     insta::assert_snapshot!(frame);
     screen.press("r");
-    assert!(!screen.frame().contains("implied edge"), "r shows them: {}", screen.frame());
+    assert!(!screen.frame().contains("implied edges hidden"), "r shows them: {}", screen.frame());
     screen.press("r t");
     assert!(screen.frame().contains("tests hidden") && !screen.frame().contains("Orders.Tests"), "{}", screen.frame());
     screen.press("t z");
@@ -1973,7 +1973,7 @@ async fn the_code_map_shows_what_depends_on_what_goes_inside_a_project_and_finds
     assert!(matches!(screen.ui.overlay, Some(Overlay::Code(_))), "Esc leaves the graph first");
     screen.press("Backspace");
 
-    let small = screen.render(60, 30);
+    let small = screen.render(60, 33); // the keys take four rows at this width
     assert!(small.contains("╭────────────────────╮"), "too big for the room: a minimap: {small}");
 
     let answer = agent(&mut screen, "dependencies", json!({ "part": "Orders.Core", "direction": "used_by" }), None);
@@ -4196,4 +4196,19 @@ async fn an_agent_at_work_while_the_terminal_is_in_the_background_says_so_once()
     screen.ui.follow.notified = false; // you came back (FocusGained)
     agent(&mut screen, "durations", json!({}), None);
     assert_eq!(said(&screen), 2, "away again: said again");
+}
+
+/// #90: a view's keys wrap onto rows of their own instead of scrolling sideways - all of them there at a glance.
+#[tokio::test]
+async fn a_views_keys_wrap_and_stay_put_instead_of_scrolling() {
+    let mut screen = screen("keys-wrap", json!({}));
+    screen.press("K");
+    let first = screen.render(60, 30);
+    for key in ["h j k l choose an app", "Enter its column", "c its code", "Tab the code map", "Esc back"] {
+        assert!(first.contains(key), "{key}: {first}");
+    }
+    screen.ui.now += Duration::from_secs(3);
+    let later = screen.render(60, 30);
+    let keys = |frame: &str| frame.lines().take(4).map(str::to_string).collect::<Vec<_>>();
+    assert_eq!(keys(&first), keys(&later), "nothing scrolls");
 }

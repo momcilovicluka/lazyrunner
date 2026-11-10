@@ -3,7 +3,8 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
  ⋈ STACK    Map  Code    4 .NET · 3 TypeScript projects · 1 cycle · 1 rule break
- h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom · r
+ h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom
+ r implied edges · t tests · a all projects · c cycles · o open · y copy path · Tab the map · Esc back
  2 implied edges hidden (r)
   ╭──────────────╮
   │ ■ Orders.Api │────╮
@@ -19,7 +20,6 @@ expression: frame
                             │                                 ╰──────╯             │
                             │                                                      │
                             ╰──────────────────────────────────────────────────────╯
-
 
 
  Orders.Api   app · depends on 2 (2 in all) · used by 0 (0 in all)
