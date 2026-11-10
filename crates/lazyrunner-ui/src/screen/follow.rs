@@ -252,6 +252,14 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             open_view(ui, controller, "changelog", Run::Changelog);
             Some("read the changelog".to_string())
         }
+        "build_map" => {
+            let key = result["key"].as_str()?.to_string();
+            if !matches!(ui.overlay, Some(Overlay::Code(_))) {
+                ui.overlay = None;
+            }
+            super::code::open_build(ui, controller, key);
+            Some(format!("read {}'s build", result["app"].as_str().unwrap_or_default()))
+        }
         _ => result["doing"].as_str().map(str::to_string),
     }
 }

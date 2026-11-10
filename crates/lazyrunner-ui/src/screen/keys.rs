@@ -92,7 +92,7 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
 fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     let name = match key_name(&key) {
         // The Alt+letters that are actions of their own (a search's Alt+r and Alt+c are the search's).
-        name if matches!(name.as_str(), "d" | "f") && key.modifiers == KeyModifiers::ALT => format!("Alt+{name}"),
+        name if matches!(name.as_str(), "d" | "f" | "b") && key.modifiers == KeyModifiers::ALT => format!("Alt+{name}"),
         name => name,
     };
     if name == "Ctrl+C" {
@@ -769,6 +769,18 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Launch => super::launch::open(ui, controller),
         Run::Timeline => super::timeline::open(ui),
         Run::Diff => super::diff::toggle(ui, controller),
+        Run::BuildMap => {
+            let focused = controller.apps.get(ui.focus).map(|app| app.key.clone());
+            match controller.build_run_key(focused.as_deref()) {
+                Some(key) => {
+                    if !matches!(ui.overlay, Some(Overlay::Code(_))) {
+                        ui.overlay = None;
+                    }
+                    super::code::open_build(ui, controller, key);
+                }
+                None => controller.add_log(super::code::NO_BUILD, Hue::DarkGray),
+            }
+        }
         Run::LevelFilter => {
             let Some(state) = controller.states.get(ui.focus) else { return };
             let (key, filter) = (state.key.clone(), state.filter.next());

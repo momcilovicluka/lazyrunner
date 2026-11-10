@@ -3,7 +3,8 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: masked(screen.frame())
 ---
  ⧗ DURATIONS   5 items · slowed down most: Api ▲ +1150%
- j k choose · g G first / last · Esc closes · usual = median of the earlier successful runs · red = failed
+ j k choose · g G first / last · Enter a build's map · Esc closes
+ usual = median of the earlier successful runs · red = failed
 
 Builds                        runs      last    usual           │  API · Builds
   Api                         ▁▁▁▇     2m05s      10s  ▲ +1150% │  last 2m05s · usual 10s · ▲ +1150% · 4 runs
@@ -22,7 +23,6 @@ npm ci                        runs      last    usual           │        █
                                                                 │  dd Mon hh:mm      10s  ✓
                                                                 │  dd Mon hh:mm      10s  ✓
                                                                 │  dd Mon hh:mm      10s  ✓
-                                                                │
                                                                 │
                                                                 │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -34,8 +34,8 @@ const DETAIL_WIDTH: usize = 44;
 const CHART_ROWS: usize = 6;
 const GROW: Duration = Duration::from_millis(200);
 const DETAIL_FIXED: usize = 7;
-const KEYS: &str =
-    " j k choose · g G first / last · Esc closes · usual = median of the earlier successful runs · red = failed";
+const KEYS: &str = " j k choose · g G first / last · Enter a build's map · Esc closes · usual = median of the earlier successful runs · \
+     red = failed";
 
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
     if controller.durations.is_empty() {
@@ -52,9 +52,13 @@ fn items(controller: &Controller) -> Vec<(Kind, &Item)> {
 }
 
 /// j k choose an item, g G (Home End) the first and the last, Esc q D close.
-pub fn key(ui: &mut Ui, controller: &Controller, name: &str) {
+pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     if matches!(name, "Escape" | "q" | "D") {
         ui.overlay = None;
+        return;
+    }
+    if name == "Enter" {
+        open_build(ui, controller);
         return;
     }
     let count = items(controller).len();
@@ -73,6 +77,24 @@ pub fn key(ui: &mut Ui, controller: &Controller, name: &str) {
     if to != *index {
         (*index, *picked) = (to, now);
     }
+}
+
+/// Enter on a build (or a project built): its app's build as a map, as it was kept.
+fn open_build(ui: &mut Ui, controller: &mut Controller) {
+    let Some(Overlay::Durations { index, .. }) = &ui.overlay else { return };
+    let Some((kind, item)) = items(controller).get(*index).map(|(kind, item)| (*kind, (*item).clone())) else { return };
+    let app = match kind {
+        Kind::Build => item.key.clone(),
+        Kind::Project => item.key.split('/').next().unwrap_or_default().to_string(),
+        _ => return,
+    };
+    if controller.build_run(&app).is_none() {
+        controller
+            .add_log(format!("No build map of {} kept yet: its next build makes one.", item.label), Hue::DarkGray);
+        return;
+    }
+    ui.overlay = None;
+    super::code::open_build(ui, controller, app);
 }
 
 /// A click on an item picks it.

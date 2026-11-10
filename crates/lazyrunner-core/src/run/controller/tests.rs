@@ -450,6 +450,22 @@ mod scripted {
     }
 
     #[tokio::test]
+    async fn a_dotnet_builds_map_marks_its_projects_done_keeps_the_build_and_times_each_project() {
+        let (_temp, mut controller, mut events) = scripted("build-map", vec![]);
+        let key = "orders".to_string();
+        controller.build_only(Some(std::slice::from_ref(&key)));
+        run_until(&mut controller, &mut events, |controller| controller.building.is_none()).await;
+        let run = controller.build_run(&key).expect("a build map").clone();
+        assert!(!run.running() && run.ok == Some(true), "{run:?}");
+        let main = run.critical_path().last().map(|&at| run.projects[at].name.clone());
+        assert!(main.is_some_and(|name| name.starts_with("Orders")), "the app's project was done last: {run:?}");
+        assert!(crate::run::build_map::load(&controller.state_dir, &key).is_some(), "kept for next time");
+        let timed = controller.durations.grouped().iter().any(|(kind, _)| *kind == crate::run::history::Kind::Project);
+        assert!(timed, "each project's own time in the durations");
+        assert_eq!(controller.build_run_key(None), Some(key));
+    }
+
+    #[tokio::test]
     async fn a_failed_build_starts_nothing_and_says_how_to_go_on() {
         let (_temp, mut sample, mut events) = scripted("scripted-failed", vec!["Orders"]);
         sample.start(Some(&keys(&["orders", "billing"])), false);

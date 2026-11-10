@@ -250,6 +250,7 @@ at once while the palette wipes away.
 | `,` `A` then `z` | **Diagnostics zip**, in the About box under Report a bug: what to attach to a bug report - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`diagnostics`); the log says where, and Alt+click on its path there (a click with `l` off) shows it in its folder. Look over its logs before you share it |
 | `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`; marks and their notes go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
+| `Alt+b` | The build as a map: the Code tab's projects with the running build, else the last one, over them - each project's state and own time, the critical path in the accent colour (below, "The build map") |
 | `Alt+d` | What's new since the app's last run, in the focused column: the lines the last run printed too dim (times, durations, ports and ids don't count as a change), new ones keep their colour - `▲` before a new error or warning, `●` before any other new line - and the top row counts them: `+2 new errors · 3 fixed · 41 new lines` (`fixed?` until the app is up). `n` / `N` step through the new errors and warnings (the new lines when there are none); the rail marks only what's new and sends its ember only for a new error. The last run is kept when lazyrunner quits, so the first run after it compares too. `Enter` lists what was fixed: the last run's errors and warnings that didn't come back. A run with new errors puts a chip in the panel's header - `1 Orders +2 new errors` - whose number (or a click) opens that column this way, on the first of them. A good build says how its warnings changed since the last good one - `12 warnings (+3)` - and lists the new ones under it. `Alt+d` again shows all |
 | `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
 | `<` / `>` | The first / last: the oldest output and following new output again in a column, the first and last item in a list or box (as in lazygit) |
@@ -630,6 +631,17 @@ Nx links it to. Like the Map, the boxes say as much as fits. With motion on, a l
 out (shrinking), its edges draw in outwards from the picked box a step at a time, and focus dims what it's about to
 hide before it goes. `using`s are matched to projects by their namespaces, not by a compiler.
 
+**The build map** (`b` on the Code tab, `Alt+b` from anywhere, `Enter` on a build in the durations `D`): a .NET app's
+build over its projects - the running build, else its last. Each project the build compiles says how it's doing:
+queued, building (spinning), `✓` with its own time - from when the last project it references was done - `✗` failed,
+or not built when the build stopped first; projects the build doesn't have are dimmed. The **critical path** - the
+chain of references that decided how long the build took - is in the accent colour, and the row under the keys says
+`Orders built in 52s · critical path 38s of 52s` (or how far a running build is). Under the map the picked project
+says its time in this build against its usual, and whether it's on the critical path. Where it comes from: the
+`<ProjectReference>`s, and MSBuild's own `Project -> output.dll` lines, stamped as they arrive - no new tooling. Each
+project's own time goes into the durations (`D`, **Projects built**), so they say which project got slower; an app's
+last build is kept, so `D` opens it in the next session too. `b` again hides it.
+
 ## Requests (`H`)
 
 An API that logs through Serilog (or anything else that replaces ASP.NET's logging) to somewhere other than the
@@ -795,6 +807,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
 | `get_stack` | The stack map: which app calls which (seen and declared), each edge's calls, p95 and failures over the last minute, the apps that use the database, and the newest failed calls |
+| `get_build` | A .NET app's build as a map: each project's state, its own time against its usual, and the critical path - the running build, else the last |
 | `get_dependencies` | The code map: the apps and their projects, every project with how many it depends on and how many use it, the cycles and the links a rule doesn't allow; or for one app, project, namespace, folder, module, component or source file, what it depends on and what uses it, each with its depth and the way to it, its own parts, the rules it breaks and what only Nx links it to |
 | `get_durations` | The durations: builds, starts, installs, test suites and tasks - each one's last runs, its usual time and how the last compares |
 | `get_timeline` | The timeline: every app's output in the order it came, each line with how long ago and its app; one app, `grep`, errors only |

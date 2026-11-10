@@ -156,7 +156,9 @@ impl Controller {
         let file = Path::new(project).file_name().map_or(String::new(), |name| name.to_string_lossy().into_owned());
         self.pane(key, &format!("──── ⚙ {} · dotnet build {file} ────", clock()), Hue::Cyan);
         self.failed_build_errors.remove(key);
-        let total = build::project_count(&self.root.join(project));
+        let run = crate::run::build_map::BuildRun::new(key, &app.name, &self.root.join(project));
+        let total = run.projects.len();
+        self.build_runs.insert(key.to_string(), run);
         self.spawn_build(&app, &spec, total, DOTNET_BUILD)
     }
 
@@ -231,6 +233,14 @@ impl Controller {
         if !dotnet && build::compiles(&text) {
             job.done += 1;
         }
+        let seconds = ((self.now)() - job.started).as_secs_f64();
+        let run = self.build_runs.get_mut(key).filter(|run| dotnet && run.running());
+        if let Some(run) = run {
+            run.line(&text);
+            if let ToolLine::Built(project) = build::tool_line(&text, true) {
+                run.built(&project, seconds);
+            }
+        }
         match build::tool_line(&text, dotnet) {
             ToolLine::Warning => job.warnings += 1,
             ToolLine::Built(project) => {
@@ -241,12 +251,50 @@ impl Controller {
         }
     }
 
+    /// An app's build as a map: the running one, else its last (as it was kept).
+    pub fn build_run(&self, key: &str) -> Option<&crate::run::build_map::BuildRun> {
+        self.build_runs.get(key)
+    }
+
+    /// The app whose build runs, else the last one built - the build map's app when none is named.
+    pub fn build_run_key(&self, focused: Option<&str>) -> Option<String> {
+        let running = self.building.as_ref().map(|job| job.key.clone()).filter(|key| self.build_runs.contains_key(key));
+        let focused = focused.filter(|key| self.build_runs.contains_key(*key)).map(str::to_string);
+        let newest = || self.build_runs.values().max_by(|a, b| a.at.cmp(&b.at)).map(|run| run.key.clone());
+        running.or(focused).or_else(newest)
+    }
+
+    /// A build ended: its map's end kept (in the state folder, for the next session's `D`), and when it went fine each
+    /// project's own time in the durations - `D` says which project got slower.
+    fn finish_build_run(&mut self, key: &str, seconds: f64, ok: bool) {
+        let Some(run) = self.build_runs.get_mut(key).filter(|run| run.running()) else { return };
+        run.finish(seconds, ok);
+        let run = run.clone();
+        if ok {
+            for at in 0..run.projects.len() {
+                let Some(own) = run.own_seconds(at) else { continue };
+                let name = &run.projects[at].name;
+                self.record_duration_as(
+                    Kind::Project,
+                    &format!("{key}/{name}"),
+                    &format!("{name} ({})", run.app),
+                    own,
+                    true,
+                );
+            }
+        }
+        if let Some(why) = crate::run::build_map::save(&self.state_dir, &run) {
+            self.add_log(format!("! The build map isn't kept for next time ({why})"), Hue::Yellow);
+        }
+    }
+
     pub(super) fn build_exited(&mut self, key: &str, id: u64, code: Option<i32>) {
         if !self.building.as_ref().is_some_and(|job| job.key == key && job.id == id) {
             return; // a cancelled build
         }
         let job = self.building.take().expect("checked above");
         let seconds = ((self.now)() - job.started).as_secs_f64();
+        self.finish_build_run(key, seconds, code == Some(0));
         let log = self.state_dir.join(format!("build-{key}.log"));
         let _ = std::fs::write(&log, job.lines.join("\n") + "\n");
         if let Some(since) = self.since_start() {
@@ -345,6 +393,8 @@ impl Controller {
         let Some(job) = self.building.take() else { return };
         job.child.kill();
         let key = job.key.clone();
+        let seconds = ((self.now)() - job.started).as_secs_f64();
+        self.finish_build_run(&key, seconds, false);
         let name = self.app(&key).map(|app| app.name.clone()).unwrap_or_default();
         let _ = std::fs::write(self.state_dir.join(format!("build-{key}.log")), job.lines.join("\n") + "\n");
         self.pane(&key, "■ build cancelled", Hue::Yellow);

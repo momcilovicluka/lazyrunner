@@ -59,6 +59,8 @@ pub enum Run {
     Launch,
     Timeline,
     Diff,
+    /// Alt+b: the build as a map (#82).
+    BuildMap,
     Widen,
     Narrow,
     EqualWidths,
@@ -293,6 +295,8 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("View", "Alt+d", "What's new since the last run", "the rest dims; n N step through it", Run::Diff)
             .safe()
             .focused(),
+        action("View", "Alt+b", "The build as a map", "its projects, their times, the critical path", Run::BuildMap)
+            .safe(),
         action("View", "+", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),
         action("View", "-", "Narrow the focused column", "shorter when the apps are stacked", Run::Narrow).safe(),
         action("View", "=", "Equal column widths", "", Run::EqualWidths).safe(),

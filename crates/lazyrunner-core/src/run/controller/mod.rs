@@ -278,6 +278,8 @@ pub struct Controller {
     composed: compose::Composed,
     /// The most units a command app's build has compiled in this session (cargo's `Compiling` lines): its bar's end.
     build_units: HashMap<String, usize>,
+    /// Each .NET app's build as a map (#82): the running one, else the last, kept across sessions.
+    pub build_runs: HashMap<String, crate::run::build_map::BuildRun>,
     task_results: HashMap<String, tasks::TaskResult>,
     metric_roots: Arc<Mutex<Vec<(String, u32)>>>,
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
@@ -313,6 +315,13 @@ impl Controller {
         let watcher = super::watcher::watch(&root.join(&project.source_dir), events.clone());
         let metric_roots = Arc::new(Mutex::new(Vec::new()));
         watch::spawn_metrics(Arc::clone(&metric_roots), events.clone());
+        let build_runs = project
+            .apps
+            .iter()
+            .filter(|app| app.is_dotnet())
+            .filter_map(|app| crate::run::build_map::load(&state_dir, &app.key))
+            .map(|run| (run.key.clone(), run))
+            .collect();
         let mut controller = Self {
             timings: Timings::load(&state_dir),
             durations: Durations::load(&state_dir),
@@ -414,6 +423,7 @@ impl Controller {
             task_jobs: Vec::new(),
             composed: compose::Composed::default(),
             build_units: HashMap::new(),
+            build_runs,
             task_results: HashMap::new(),
             metric_roots,
             commands: Arc::new(super::tools::Tools),

@@ -31,10 +31,13 @@ pub enum Kind {
     Test,
     NpmInstall,
     Task,
+    /// A project of a .NET build, its own time (keyed `app/Project`).
+    Project,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 6] = [Kind::Build, Kind::Start, Kind::NpmCi, Kind::NpmInstall, Kind::Test, Kind::Task];
+    pub const ALL: [Kind; 7] =
+        [Kind::Build, Kind::Project, Kind::Start, Kind::NpmCi, Kind::NpmInstall, Kind::Test, Kind::Task];
 
     pub fn title(self) -> &'static str {
         match self {
@@ -44,6 +47,7 @@ impl Kind {
             Kind::NpmInstall => "npm install",
             Kind::Test => "Test suites",
             Kind::Task => "Tasks",
+            Kind::Project => "Projects built",
         }
     }
 }

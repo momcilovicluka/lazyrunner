@@ -6,6 +6,7 @@
 pub mod app;
 pub mod audit;
 pub mod build;
+pub mod build_map;
 pub mod calls;
 pub mod cause;
 pub mod checks;
