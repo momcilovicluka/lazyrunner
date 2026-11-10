@@ -148,6 +148,49 @@ pub fn marks(controller: &Controller) -> Value {
     json!({ "marks": marks })
 }
 
+/// An app's build as a map (#82): the running one, else its last - each project's state, its own time and usual,
+/// and the critical path. Without `app`, the running build's, else the last one's.
+pub fn build(ui: &Ui, controller: &Controller, args: &Value) -> Answer {
+    let wanted = match args["app"].as_str() {
+        Some(_) => Some(controller.apps[super::app_index(controller, args)?].key.clone()),
+        None => controller.build_run_key(controller.apps.get(ui.focus).map(|app| app.key.as_str())),
+    };
+    let Some(run) = wanted.as_deref().and_then(|key| controller.build_run(key)) else {
+        return Err(("not_found", "no build to show yet: a .NET app's build makes one (build)".into()));
+    };
+    let critical = run.critical_path();
+    let projects: Vec<Value> = (0..run.projects.len())
+        .map(|at| {
+            let project = &run.projects[at];
+            let usual = controller
+                .durations
+                .usual(lazyrunner_core::run::history::Kind::Project, &format!("{}/{}", run.key, project.name));
+            json!({
+                "name": project.name,
+                "state": format!("{:?}", run.state(at)).to_lowercase(),
+                "own_seconds": run.own_seconds(at).map(tenths),
+                "done_at": project.done_at.map(tenths),
+                "usual_seconds": usual.map(tenths),
+                "critical": critical.contains(&at),
+            })
+        })
+        .collect();
+    let path: Vec<&str> = critical.iter().map(|&at| run.projects[at].name.as_str()).collect();
+    Ok(json!({
+        "key": run.key,
+        "app": run.app,
+        "at": run.at,
+        "running": run.running(),
+        "ok": run.ok,
+        "seconds": run.seconds.map(tenths),
+        "built": run.done(),
+        "projects_count": run.projects.len(),
+        "critical_path": path,
+        "critical_seconds": run.critical_seconds().map(tenths),
+        "projects": projects,
+    }))
+}
+
 /// The changelog: what the newest versions changed (`count` of them), and the version that runs.
 pub fn changelog(args: &Value) -> Value {
     let count =

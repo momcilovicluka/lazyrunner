@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.79.0] - 2026-11-10
+
+### Added
+- The build as a map (`Alt+b`; `b` on the code map's Code tab; `Enter` on a build in `D`): a .NET app's build over the code map's projects - the running one, else its last. Each project the build compiles is queued, building (spinning), done with its own time (from when what it references was done), failed, or not built; the critical path - the chain of references that decided how long the build took - is in the accent colour, and a row under the keys says `Orders built in 52s · critical path 38s of 52s` or how far a running build is. The picked project says its time against its usual and whether it's on the critical path. It reads the project references and MSBuild's `Project -> output.dll` lines as they arrive, nothing new to install. Each project's own time goes into the durations (`D`, Projects built), and an app's last build is kept for the next session. Agents read it with `get_build`, and following one shows it (closes #82)
+
 ## [1.78.1] - 2026-11-10
 
 ### Fixed

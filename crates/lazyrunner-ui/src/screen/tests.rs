@@ -4212,3 +4212,60 @@ async fn a_views_keys_wrap_and_stay_put_instead_of_scrolling() {
     let keys = |frame: &str| frame.lines().take(4).map(str::to_string).collect::<Vec<_>>();
     assert_eq!(keys(&first), keys(&later), "nothing scrolls");
 }
+
+/// #82: the build as a layer over the code map's projects - each one's state and time, the critical path - from Alt+b,
+/// b on the Code tab, and an agent's get_build.
+#[tokio::test]
+async fn the_build_shows_over_the_code_maps_projects_with_its_critical_path() {
+    use lazyrunner_core::run::build_map::{BuildRun, ProjectRun};
+    let mut screen = screen("build-map", json!({ "layout": "stacked" }));
+    with_code(&mut screen);
+    screen.press("Alt+b");
+    assert!(screen.last_log().contains("No build to show yet"), "{}", screen.last_log());
+    let project = |name: &str, folder: &str, references: Vec<usize>, done_at: Option<f64>| ProjectRun {
+        name: name.into(),
+        path: PathBuf::from(format!("/work/sample/{folder}/{name}/{name}.csproj")),
+        references,
+        done_at,
+        failed: false,
+    };
+    let run = BuildRun {
+        key: "orders".into(),
+        app: "Orders".into(),
+        at: "2026-11-10T09:41:07+01:00".into(),
+        projects: vec![
+            project("Orders.Api", "src", vec![1], None),
+            project("Orders.Core", "src", vec![2], None),
+            project("Shared.Kernel", "src", Vec::new(), Some(4.0)),
+        ],
+        seconds: None,
+        ok: None,
+    };
+    screen.controller.build_runs.insert("orders".into(), run);
+    screen.press("Alt+b");
+    let frame = screen.frame();
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Code(_))), "the code map: {frame}");
+    assert!(frame.contains("building Orders 1/3"), "the build in the header: {frame}");
+    assert!(frame.contains("✓ 4.0s") && frame.contains("building") && frame.contains("queued"), "{frame}");
+    let built = screen.controller.build_runs.get_mut("orders").unwrap();
+    built.built("Orders.Core", 9.0);
+    built.built("Orders.Api", 11.0);
+    built.finish(12.0, true);
+    let frame = screen.frame();
+    assert!(frame.contains("Orders built in 12s · critical path 11s of 12s"), "{frame}");
+    assert!(frame.contains("✓ 5.0s"), "Orders.Core's own time, from Shared.Kernel's end: {frame}");
+
+    let answer = agent(&mut screen, "build_map", json!({ "app": "Orders" }), None);
+    assert_eq!(answer["result"]["critical_path"], json!(["Shared.Kernel", "Orders.Core", "Orders.Api"]), "{answer}");
+    assert_eq!(answer["result"]["projects"][1]["own_seconds"], 5.0, "{answer}");
+    screen.press("b");
+    assert!(!screen.frame().contains("critical path"), "b hides it: {}", screen.frame());
+    screen.press("Esc");
+    screen.controller.durations.add(lazyrunner_core::run::history::Kind::Build, "orders", "Orders", 12.0, true);
+    screen.press("D Enter");
+    let code = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Code(view)) => view.build.clone(),
+        _ => None,
+    };
+    assert_eq!(code(&screen).as_deref(), Some("orders"), "Enter on a build in D: its map");
+}

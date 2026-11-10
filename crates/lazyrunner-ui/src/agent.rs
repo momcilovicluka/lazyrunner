@@ -79,6 +79,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "checks" => Ok(views::checks(ui, controller, args)),
         "marks" => Ok(views::marks(controller)),
         "changelog" => Ok(views::changelog(args)),
+        "build_map" => views::build(ui, controller, args),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
         | "run_action" | "press_keys" | "switch_database" | "install_packages" | "apply_migrations"
         | "kill_port_holder" | "set_setting" | "run_task") => {

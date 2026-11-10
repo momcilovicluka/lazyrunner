@@ -10,7 +10,10 @@ use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
+use lazyrunner_core::run::build_map::{BuildRun, ProjectState};
 use lazyrunner_core::run::code::{CodeMap, Kind, Link, Part, STACK, Stack, TOP_FOLDER};
+use lazyrunner_core::run::history::Kind as Timed;
+use lazyrunner_core::run::{Controller, format_duration};
 
 use super::Ui;
 use super::code::{PULSE, Scale, Shown, View, Zoom, distances, moving, progress, since};
@@ -127,6 +130,84 @@ fn has(part: &Part) -> String {
     }
 }
 
+/// The build over the projects (#82): the build, its critical path (its projects' places in it), the spinner's frame.
+pub(super) struct Layer<'a> {
+    pub run: &'a BuildRun,
+    pub critical: Vec<usize>,
+    pub spinner: &'a str,
+}
+
+/// A time as the build map says it: tenths under ten seconds.
+fn took(seconds: f64) -> String {
+    if seconds < 10.0 { format!("{seconds:.1}s") } else { format_duration(seconds) }
+}
+
+/// A project's state in the build: its mark, what the box says, its colour.
+fn build_state(layer: &Layer, at: usize) -> (&'static str, String, C) {
+    match layer.run.state(at) {
+        ProjectState::Done => {
+            let own = layer.run.own_seconds(at).map_or(String::new(), took);
+            ("✓", format!("✓ {own}"), C::Green)
+        }
+        ProjectState::Building => ("◌", format!("{} building", layer.spinner), C::Yellow),
+        ProjectState::Queued => ("·", "· queued".into(), C::DarkGray),
+        ProjectState::Failed => ("✗", "✗ failed".into(), C::Red),
+        ProjectState::Skipped => ("–", "– not built".into(), C::DarkGray),
+    }
+}
+
+/// The header's say on the build: how far a running one is, how long a done one took and its critical path.
+pub(super) fn build_summary(ui: &Ui, run: &BuildRun) -> Vec<Seg> {
+    let mut segs = summary_of(ui, run);
+    segs.push(seg(" · b hides it", C::DarkGray));
+    segs
+}
+
+fn summary_of(ui: &Ui, run: &BuildRun) -> Vec<Seg> {
+    let hammer = icons::icon(ui.nerd, Icon::Hammer);
+    let (total, done) = (run.projects.len(), run.done());
+    let critical =
+        run.critical_seconds().map_or(String::new(), |seconds| format!(" · critical path {}", took(seconds)));
+    match (run.seconds, run.ok) {
+        (None, _) => vec![seg(format!(" {hammer} building {} {done}/{total}{critical}", run.app), C::Yellow)],
+        (Some(seconds), Some(true)) => {
+            let of = if critical.is_empty() { String::new() } else { format!(" of {}", took(seconds)) };
+            vec![seg(format!(" {hammer} {} built in {}{critical}{of}", run.app, took(seconds)), C::Magenta)]
+        }
+        (Some(seconds), _) => {
+            vec![seg(
+                format!(" {hammer} {} build failed after {} ({done}/{total} built)", run.app, took(seconds)),
+                C::Red,
+            )]
+        }
+    }
+}
+
+/// Under the map, the picked project in the build: its own time against its usual, or how it failed.
+pub(super) fn build_details(controller: &Controller, layer: &Layer, part: &Part, width: usize) -> Vec<Vec<Seg>> {
+    let Some(at) = layer.run.at_path(&part.path) else {
+        let text = format!(" {} isn't in {}'s build", part.name, layer.run.app);
+        return vec![super::columns::fit(vec![seg(text, C::DarkGray)], width)];
+    };
+    let (_, said, color) = build_state(layer, at);
+    let key = format!("{}/{}", layer.run.key, layer.run.projects[at].name);
+    let usual = controller.durations.usual(Timed::Project, &key);
+    let mut text = format!(" ⚒ in this build: {said}");
+    if let (Some(own), Some(usual)) = (layer.run.own_seconds(at), usual) {
+        let change = if usual > 0.0 { (own - usual) / usual } else { 0.0 };
+        let mark = match () {
+            _ if change >= 0.15 => " ▲",
+            _ if change <= -0.15 => " ▼",
+            _ => "",
+        };
+        text.push_str(&format!(" · usual {}{mark}", took(usual)));
+    }
+    if layer.critical.contains(&at) {
+        text.push_str(" · on the critical path");
+    }
+    vec![super::columns::fit(vec![seg(text, color)], width)]
+}
+
 /// What sets a box apart: picked, in a cycle, about to be hidden by focus, outside the level.
 #[derive(Clone, Copy)]
 struct Marks {
@@ -149,13 +230,26 @@ fn bare(part: &Part, text: String, marks: Marks) -> graph::Node {
 
 /// A part's box, saying as much as `look` lets it: 0 its name; 1 what it is (and where, outside the level); 2 its
 /// files and what it has; 3 how many it uses and are using it.
-fn node(ui: &Ui, map: &CodeMap, at: usize, marks: Marks, look: Look) -> graph::Node {
+fn node(ui: &Ui, map: &CodeMap, at: usize, marks: Marks, look: Look, layer: Option<&Layer>) -> graph::Node {
     let part = &map.parts[at];
     let name = match look.short {
         Some(most) if !marks.picked => short(&part.name, most),
         _ => part.name.clone(),
     };
-    let text = format!("{} {name}", icon(ui.nerd, part));
+    // The build over the projects: each of its projects' state; a project the build hasn't, dim.
+    let built = layer.filter(|_| part.inside.is_none()).map(|layer| (layer, layer.run.at_path(&part.path)));
+    let marks = match built {
+        Some((_, None)) => Marks { dim: true, ..marks },
+        _ => marks,
+    };
+    let state = built.and_then(|(layer, place)| Some((layer, place?))).map(|(layer, place)| {
+        let (mark, said, color) = build_state(layer, place);
+        (mark, said, color, layer.critical.contains(&place))
+    });
+    let text = match (&state, look.bare) {
+        (Some((mark, ..)), true) => format!("{mark} {} {name}", icon(ui.nerd, part)),
+        _ => format!("{} {name}", icon(ui.nerd, part)),
+    };
     if look.bare {
         return bare(part, text, marks);
     }
@@ -193,6 +287,16 @@ fn node(ui: &Ui, map: &CodeMap, at: usize, marks: Marks, look: Look) -> graph::N
         let (uses, used) = (map.reach(at, true, false).len(), map.reach(at, false, false).len());
         lines.push(vec![seg(format!("uses {uses} · used by {used}"), C::DarkGray)]);
     }
+    let mut border = border;
+    if let Some((_, said, color, critical)) = state {
+        lines.insert(1, vec![seg(said, color)]);
+        border = match () {
+            _ if marks.picked => border,
+            _ if color == C::Red || color == C::Yellow => color,
+            _ if critical => C::Magenta,
+            _ => border,
+        };
+    }
     let pad = if look.detail == 0 { 1 } else { 2 };
     let dashed = part.kind == Kind::Tests || marks.outside;
     graph::Node { lines, pad, border, dashed, target: None, bare: false }
@@ -222,7 +326,22 @@ fn edge_color(map: &CodeMap, shown: &Shown, link: &Link) -> C {
 }
 
 /// The map's edges and their motion: the links, and on the apps' level the projects two apps share.
-fn edges(ui: &Ui, map: &CodeMap, shown: &Shown, view: &View, look: Look) -> (Vec<graph::Edge>, Vec<Motion>) {
+fn edges(
+    ui: &Ui,
+    map: &CodeMap,
+    shown: &Shown,
+    view: &View,
+    look: Look,
+    layer: Option<&Layer>,
+) -> (Vec<graph::Edge>, Vec<Motion>) {
+    // The critical path's links: a project and the reference on it it waited for.
+    let critical = |from: usize, to: usize| {
+        layer.is_some_and(|layer| {
+            let place = |at: usize| layer.run.at_path(&map.parts[at].path);
+            let (Some(from), Some(to)) = (place(from), place(to)) else { return false };
+            layer.critical.windows(2).any(|pair| (pair[0], pair[1]) == (to, from) || (pair[0], pair[1]) == (from, to))
+        })
+    };
     let index = |at: usize| shown.parts.iter().position(|&part| part == at);
     let far = steps(shown);
     let elapsed = if moving(ui) { since(ui, view) } else { PULSE };
@@ -236,10 +355,11 @@ fn edges(ui: &Ui, map: &CodeMap, shown: &Shown, view: &View, look: Look) -> (Vec
     let mut motions = Vec::new();
     for link in &shown.links {
         let (Some(from), Some(to)) = (index(link.from), index(link.to)) else { continue };
-        let color = edge_color(map, shown, link);
+        let on_path = critical(link.from, link.to);
+        let color = if on_path { C::Magenta } else { edge_color(map, shown, link) };
         let broken = map.breaks.iter().any(|broken| broken.from == link.from && broken.to == link.to);
         let label = if broken { "✗".to_string() } else { String::new() };
-        let top = touches(link.from, link.to);
+        let top = touches(link.from, link.to) || on_path;
         let dashed = link.lazy || link.implicit;
         edges.push(graph::Edge { from, to, color, dashed, label, quiet: look.bare && !top, top });
         let flash = (color == C::Red && pulse).then_some(C::White);
@@ -257,7 +377,15 @@ fn edges(ui: &Ui, map: &CodeMap, shown: &Shown, view: &View, look: Look) -> (Vec
 }
 
 /// The map's boxes and lines as `look` has them; `zooming` while they grow or shrink as the level changes.
-pub(super) fn drawn(ui: &Ui, map: &CodeMap, shown: &Shown, view: &View, look: Look, zooming: bool) -> Map {
+pub(super) fn drawn(
+    ui: &Ui,
+    map: &CodeMap,
+    shown: &Shown,
+    view: &View,
+    look: Look,
+    zooming: bool,
+    layer: Option<&Layer>,
+) -> Map {
     let cyclic = |at: usize| shown.cycles.iter().any(|cycle| cycle.contains(&at));
     let inner = view.inside.as_deref().filter(|inside| *inside != STACK);
     let outside = |at: usize| inner.is_some_and(|inside| map.parts[at].inside.as_deref() != Some(inside));
@@ -281,7 +409,7 @@ pub(super) fn drawn(ui: &Ui, map: &CodeMap, shown: &Shown, view: &View, look: Lo
                 dim: shown.dim.contains(&at),
                 outside: outside(at),
             };
-            let mut node = node(ui, map, at, marks, Look { detail, ..look });
+            let mut node = node(ui, map, at, marks, Look { detail, ..look }, layer);
             if !look.bare {
                 node.pad = match view.zoom {
                     Zoom::In if zooming => (node.pad as f64 * grown).round() as usize,
@@ -292,26 +420,34 @@ pub(super) fn drawn(ui: &Ui, map: &CodeMap, shown: &Shown, view: &View, look: Lo
             node
         })
         .collect();
-    let (edges, motions) = edges(ui, map, shown, view, look);
+    let (edges, motions) = edges(ui, map, shown, view, look, layer);
     Map::draw(&nodes, &edges, &motions)
 }
 
 /// The map as its scale has it - at the normal one with as much in its boxes as fits the room, names cut when nothing
 /// does - and whether it fits.
-pub(super) fn fitting(ui: &Ui, map: &CodeMap, shown: &Shown, view: &View, (room, rows): (usize, usize)) -> (Map, bool) {
+pub(super) fn fitting(
+    ui: &Ui,
+    map: &CodeMap,
+    shown: &Shown,
+    view: &View,
+    (room, rows): (usize, usize),
+    layer: Option<&Layer>,
+) -> (Map, bool) {
     let fits = |drawn: &Map| drawn.layout.width <= room && drawn.layout.height < rows;
     let look = match view.scale {
         Scale::Normal => {
             let full = |detail: usize| Look { detail, short: None, bare: false };
-            let found = (0..=DETAIL_MOST).rev().map(full).find(|&look| fits(&drawn(ui, map, shown, view, look, false)));
+            let found =
+                (0..=DETAIL_MOST).rev().map(full).find(|&look| fits(&drawn(ui, map, shown, view, look, false, layer)));
             found.unwrap_or(Look { detail: 0, short: Some(LONGEST), bare: false })
         }
         scale => Look::of(scale),
     };
-    let settled = drawn(ui, map, shown, view, look, false);
+    let settled = drawn(ui, map, shown, view, look, false, layer);
     let fit = fits(&settled);
     let zooming = moving(ui) && view.zoom != Zoom::Still && since(ui, view) < ZOOM;
-    (if zooming { drawn(ui, map, shown, view, look, true) } else { settled }, fit)
+    (if zooming { drawn(ui, map, shown, view, look, true, layer) } else { settled }, fit)
 }
 
 /// The minimap beside the map's first rows, the map's rows `room` wide beside it and the full width under it.

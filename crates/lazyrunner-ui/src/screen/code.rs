@@ -32,6 +32,10 @@ use super::seg::{Seg, aim, on, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
+/// What `b` and `Alt+b` say when no .NET app has built yet.
+pub(super) const NO_BUILD: &str =
+    "No build to show yet: the build map shows a .NET app's build once it has run one (b builds the focused app).";
+
 /// A level with more boxes than this opens focused on one.
 const FOCUS_ABOVE: usize = 24;
 /// What focus hides shows dimmed this long first.
@@ -96,6 +100,8 @@ pub struct View {
     pub zoom: Zoom,
     /// Whether this level has been looked at: a map without apps opens on its projects, a big level focused.
     pub sized: bool,
+    /// The app whose build shows over the projects (#82), by its key: `b`, `Alt+b`.
+    pub build: Option<String>,
 }
 
 /// The Code tab: on the apps, or on `app`'s projects when one is given.
@@ -118,6 +124,7 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, app: Option<String>) {
         changed: ui.now,
         zoom: Zoom::In,
         sized: false,
+        build: None,
     };
     ui.overlay = Some(Overlay::Code(Box::new(view)));
 }
@@ -375,6 +382,22 @@ fn go(ui: &mut Ui, (inside, app): (Option<String>, Option<String>), picked: Opti
     }
 }
 
+/// The Code tab on app `key`'s projects with its build over them (#82): the running build, else its last.
+pub fn open_build(ui: &mut Ui, controller: &mut Controller, key: String) {
+    let showing = view(ui).is_some_and(|view| view.build.as_deref() == Some(key.as_str()));
+    if showing {
+        return;
+    }
+    if view(ui).is_none() {
+        open(ui, controller, Some(key.clone()));
+    } else {
+        go(ui, (None, Some(key.clone())), None, Zoom::In);
+    }
+    if let Some(view) = view_mut(ui) {
+        view.build = Some(key);
+    }
+}
+
 /// Shows part `at`'s graph on its level: all it depends on and all that depends on it.
 pub(super) fn show_graph(ui: &mut Ui, map: &CodeMap, at: usize) {
     let part = &map.parts[at];
@@ -482,6 +505,10 @@ fn back(ui: &mut Ui, map: &CodeMap, current: &View) {
 
 /// The keys that move about the map.
 fn map_key(ui: &mut Ui, controller: &mut Controller, name: &str, current: &View) -> bool {
+    if name == "b" {
+        build_key(ui, controller, current);
+        return true;
+    }
     let Some(map) = controller.code_map() else {
         return matches!(name, "Enter" | "Backspace" | "f" | "c" | "a" | "g" | "r" | "t" | "z" | "Z");
     };
@@ -490,7 +517,7 @@ fn map_key(ui: &mut Ui, controller: &mut Controller, name: &str, current: &View)
     let id = |at: usize| map.parts[at].id.clone();
     match name {
         "h" | "j" | "k" | "l" | "LeftArrow" | "DownArrow" | "UpArrow" | "RightArrow" => {
-            let drawn = code_draw::drawn(ui, map, &shown, current, Look::of(current.scale), false);
+            let drawn = code_draw::drawn(ui, map, &shown, current, Look::of(current.scale), false, None);
             let at = picked.and_then(|at| shown.parts.iter().position(|&part| part == at)).unwrap_or(0);
             let next = graph::step(&drawn.layout, at, name);
             let next = shown.parts.get(next).map(|&at| id(at));
@@ -541,6 +568,18 @@ fn map_key(ui: &mut Ui, controller: &mut Controller, name: &str, current: &View)
     true
 }
 
+/// `b`: the build over the projects - the app's on, the running build's or the last one's - or off again.
+fn build_key(ui: &mut Ui, controller: &mut Controller, current: &View) {
+    if current.build.is_some() {
+        change(ui, Zoom::Still, |view| view.build = None);
+        return;
+    }
+    match controller.build_run_key(current.app.as_deref()) {
+        Some(key) => open_build(ui, controller, key),
+        None => controller.add_log(NO_BUILD, Hue::DarkGray),
+    }
+}
+
 /// A click picks a box; a double click goes inside it.
 pub fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool) -> bool {
     let Some(current) = view(ui).cloned() else { return false };
@@ -561,7 +600,8 @@ pub fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, d
 /// Whether the tab moves: a level zooming, focus fading, its edges drawing in, a cycle's pulse.
 pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     let Some(view) = view(ui) else { return false };
-    moving(ui) && (controller.reading_code() || since(ui, view) < PULSE)
+    let building = view.build.as_deref().and_then(|key| controller.build_run(key)).is_some_and(|run| run.running());
+    moving(ui) && (controller.reading_code() || since(ui, view) < PULSE || building)
 }
 
 /// What the level is, for the header: the apps, an app's projects, all of them, or the parts of one.
@@ -744,10 +784,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let map = controller.code_map();
     let shown = map.map(|map| shown(ui, map, &current));
     let hint = " h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z \
-                zoom · r implied edges · t tests · a all projects · c cycles · o open · y copy path · Tab the map · Esc \
-                back";
+                zoom · r implied edges · t tests · a all projects · c cycles · b the build · o open · y copy path · Tab \
+                the map · Esc back";
     let mut lines = vec![header(ui, controller, &current, shown.as_ref(), width)];
     lines.extend(super::viewbar::keys(hint, width));
+    if let Some(run) = current.build.as_deref().and_then(|key| controller.build_run(key)) {
+        lines.push(super::columns::fit(code_draw::build_summary(ui, run), width));
+    }
     lines.extend(notes(controller, &current, shown.as_ref(), width));
     let (Some(map), Some(shown)) = (map, shown) else {
         lines.resize(rows, Vec::new());
@@ -757,10 +800,16 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         lines.extend(super::code_search::rows(ui, map, &current, width));
         lines.push(Vec::new());
     }
-    let below = details(controller, map, &shown, width);
+    let run = current.build.as_deref().and_then(|key| controller.build_run(key));
+    let layer =
+        run.map(|run| code_draw::Layer { run, critical: run.critical_path(), spinner: super::columns::spinner(ui) });
+    let mut below = details(controller, map, &shown, width);
+    if let (Some(layer), Some(at)) = (&layer, shown.picked) {
+        below.splice(0..0, code_draw::build_details(controller, layer, &map.parts[at], width));
+    }
     let room = width.saturating_sub(2);
     let map_rows = rows.saturating_sub(lines.len() + below.len() + 1).max(3);
-    let (drawn, fits) = code_draw::fitting(ui, map, &shown, &current, (room, map_rows));
+    let (drawn, fits) = code_draw::fitting(ui, map, &shown, &current, (room, map_rows), layer.as_ref());
     let mini = !fits && room > MINI.0 * 2 && map_rows >= MINI.1;
     let seen = if mini { room.saturating_sub(MINI.0 + 1) } else { room };
     let picked = shown.picked.and_then(|at| shown.parts.iter().position(|&part| part == at));

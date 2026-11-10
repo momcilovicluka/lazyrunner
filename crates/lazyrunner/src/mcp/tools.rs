@@ -354,6 +354,16 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "get_build",
+            "A .NET app's build as a map (Alt+b): the projects it compiles, each one's state (queued, building, done, \
+             failed, skipped), its own time (from when what it references was done) against its usual, and the \
+             critical path - the chain of references that decided how long the build took. The running build, else \
+             the app's last; without app, the running one's, else the newest.",
+            json!({ "app": { "type": "string" } }),
+            &[],
+            true,
+        ),
+        tool(
             "get_changelog",
             "What the newest lazyrunner versions changed (count of them, 3 by default), and the version that runs - \
              to know what lazyrunner can do.",

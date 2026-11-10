@@ -80,6 +80,8 @@ pub enum Icon {
     /// A command app in Python, in Go.
     Python,
     Go,
+    /// The build map (#82).
+    Hammer,
     Clipboard,
     Copy,
     Hourglass,
@@ -189,6 +191,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Faster, true) => "\u{f063}", // arrow down
         (Icon::Docker, false) => "■",
         (Icon::Python | Icon::Go, false) => "■",
+        (Icon::Hammer, false) => "⚒",
+        (Icon::Hammer, true) => "\u{f0ad}", // wrench
         (Icon::Python, true) => "\u{e73c}", // Python
         (Icon::Go, true) => "\u{e724}",     // Go
         (Icon::Tasks, false) => "▸",
@@ -375,6 +379,7 @@ mod tests {
             Icon::Tasks,
             Icon::Python,
             Icon::Go,
+            Icon::Hammer,
             Icon::Bookmark,
             Icon::Lock,
             Icon::Pencil,

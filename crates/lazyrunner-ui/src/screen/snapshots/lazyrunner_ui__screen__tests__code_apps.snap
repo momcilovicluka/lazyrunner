@@ -4,7 +4,8 @@ expression: frame
 ---
  ⋈ STACK    Map  Code    2 apps
  h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom
- r implied edges · t tests · a all projects · c cycles · o open · y copy path · Tab the map · Esc back
+ r implied edges · t tests · a all projects · c cycles · b the build · o open · y copy path · Tab the map
+ Esc back
 
   ╭─────────────────────────╮               ╭─────────────────────────╮
   │  ■ Orders               │               │  ▲ Shop                 │
@@ -12,7 +13,6 @@ expression: frame
   │  12 files · 3 projects  │┄┄┄1 shared┄┄┄▶│  12 files · 3 projects  │
   │  uses 0 · used by 0     │               │  uses 0 · used by 0     │
   ╰─────────────────────────╯               ╰─────────────────────────╯
-
 
 
 
