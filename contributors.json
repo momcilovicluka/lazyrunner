@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09",
+  "updated": "2026-11-10",
   "people": [
     {
       "login": "momcilovicluka",
@@ -15,9 +15,9 @@
       "name": "Ognjen Maričić",
       "role": "",
       "prs": 3,
-      "bugs": 10,
+      "bugs": 11,
       "ideas": 16,
-      "issues": 26
+      "issues": 27
     }
   ]
 }
