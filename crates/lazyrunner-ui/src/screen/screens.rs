@@ -92,7 +92,7 @@ impl Screen {
     /// The screen open, if one is: the Code tab is the stack's.
     pub fn of(overlay: Option<&Overlay>) -> Option<Self> {
         Some(match overlay? {
-            Overlay::Stack { .. } | Overlay::Code(_) | Overlay::Health { .. } => Self::Stack,
+            Overlay::Stack { .. } | Overlay::Code(_) | Overlay::Health { .. } | Overlay::Flame(_) => Self::Stack,
             Overlay::Requests(_) => Self::Requests,
             Overlay::Migrations { .. } => Self::Migrations,
             Overlay::Audit { .. } => Self::Audit,
@@ -140,6 +140,7 @@ fn typing(ui: &Ui) -> bool {
         Some(Overlay::Timeline(view)) => view.typing,
         Some(Overlay::Tests { .. }) => ui.tests_typing,
         Some(Overlay::Code(_)) => super::code::typing(ui),
+        Some(Overlay::Flame(_)) => super::flame::typing(ui),
         _ => false,
     }
 }
@@ -204,6 +205,7 @@ fn looked_at(ui: &Ui, controller: &Controller) -> Option<usize> {
             _ => None,
         },
         Some(Overlay::Ports { .. }) => super::ports::picked_app(ui, controller),
+        Some(Overlay::Flame(view)) => Some(view.app.clone()),
         _ => None,
     };
     key.as_deref().and_then(place)

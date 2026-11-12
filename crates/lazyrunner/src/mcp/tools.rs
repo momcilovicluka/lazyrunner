@@ -287,6 +287,26 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "profile_app",
+            "Samples a running app's CPU for a few seconds (10 by default) - a .NET app with dotnet-trace (dotnet \
+             tool install -g dotnet-trace), an npm app with Node's own inspector - while you make the slow request, \
+             then keeps the capture and opens its flame chart; wait for profile_done, then get_profile.",
+            json!({
+                "app": { "type": "string", "description": "The app's key or name." },
+                "seconds": { "type": "integer", "minimum": 3, "maximum": 120 }
+            }),
+            &["app"],
+            false,
+        ),
+        tool(
+            "get_profile",
+            "An app's newest CPU capture (profile_app): its time on the CPU, the top frames by self time (and in all \
+             they called), the split by namespace, and how each top frame changed since the capture before.",
+            json!({ "app": { "type": "string", "description": "The app's key or name." } }),
+            &["app"],
+            true,
+        ),
+        tool(
             "get_health",
             "The stack's health (K, then Tab to Health): each app's p95 latency and 5xx rate over the last minute \
              (.NET apps whose requests are logged), its memory, CPU and memory growth, each against its target (the \

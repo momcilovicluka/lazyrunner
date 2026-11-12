@@ -81,6 +81,11 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             controller.acknowledge_alerts(&key);
             return true;
         }
+        "p" if picked < apps => {
+            let key = controller.apps[picked].key.clone();
+            super::flame::start(ui, controller, &key);
+            return true;
+        }
         "a" => return true,
         "Enter" => {
             enter(ui, controller, picked);

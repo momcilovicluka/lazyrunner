@@ -41,6 +41,8 @@ pub enum Icon {
     Health,
     Alert,
     Acknowledged,
+    /// A hot frame in a flame chart (#83).
+    Fire,
     Rust,
     /// The command palette's groups.
     Run,
@@ -170,6 +172,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Alert, true) => "\u{f0f3}", // bell
         (Icon::Acknowledged, false) => "!",
         (Icon::Acknowledged, true) => "\u{f1f6}", // bell slash
+        (Icon::Fire, false) => "▲",
+        (Icon::Fire, true) => "\u{f06d}", // fire
         (Icon::Rust, false) => "⚙",
         (Icon::Rust, true) => "\u{e7a8}", // Rust
         (Icon::Run, false) => "▸",
@@ -377,6 +381,7 @@ mod tests {
             Icon::Health,
             Icon::Alert,
             Icon::Acknowledged,
+            Icon::Fire,
             Icon::Rust,
             Icon::Run,
             Icon::Tools,

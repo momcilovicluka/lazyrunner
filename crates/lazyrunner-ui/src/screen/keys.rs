@@ -92,7 +92,9 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
 fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     let name = match key_name(&key) {
         // The Alt+letters that are actions of their own (a search's Alt+r and Alt+c are the search's).
-        name if matches!(name.as_str(), "d" | "f" | "b") && key.modifiers == KeyModifiers::ALT => format!("Alt+{name}"),
+        name if matches!(name.as_str(), "d" | "f" | "b" | "p") && key.modifiers == KeyModifiers::ALT => {
+            format!("Alt+{name}")
+        }
         name => name,
     };
     if name == "Ctrl+C" {
@@ -562,6 +564,11 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Flame(_)) => {
+            if !super::flame::key(ui, controller, name, key) {
+                from_view(ui, controller, name);
+            }
+        }
         Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
@@ -777,6 +784,11 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Launch => super::launch::open(ui, controller),
         Run::Timeline => super::timeline::open(ui),
         Run::Diff => super::diff::toggle(ui, controller),
+        Run::Profile if controller.profiling.is_some() => controller.stop_profile(),
+        Run::Profile => {
+            let key = controller.apps.get(ui.focus).map(|app| app.key.clone()).unwrap_or_default();
+            super::flame::start(ui, controller, &key);
+        }
         Run::BuildMap => {
             let focused = controller.apps.get(ui.focus).map(|app| app.key.clone());
             match controller.build_run_key(focused.as_deref()) {

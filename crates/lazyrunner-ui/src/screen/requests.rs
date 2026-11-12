@@ -275,6 +275,12 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             let view = view.clone();
             copy_row(ui, controller, &view);
         }
+        "f" if view.tab == Tab::Requests => {
+            let Some(app) = shown(view, controller).get(view.index).map(|request| request.app.clone()) else {
+                return true;
+            };
+            super::flame::start(ui, controller, &app);
+        }
         "m" if view.tab == Tab::Requests => {
             let Some(seq) = shown(view, controller).get(view.index).map(|request| request.seq) else { return true };
             let marked = view.baseline != Some(seq);
@@ -984,7 +990,7 @@ fn hint(view: &View, controller: &Controller) -> String {
         ),
         (Tab::Requests, filtered) => format!(
             " {} · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · y copy (curl…) · \
-             m baseline · p send again · w open · o log · c clear · Esc back",
+             m baseline · f profile its app · p send again · w open · o log · c clear · Esc back",
             if filtered { "h endpoints" } else { "Tab requests/endpoints" }
         ),
     }

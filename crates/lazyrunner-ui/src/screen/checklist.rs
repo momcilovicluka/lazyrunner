@@ -56,6 +56,8 @@ pub enum Fix {
     Winnat,
     /// The audit view (A), once the checklist closes.
     Audit,
+    /// Install dotnet-trace, for Alt+p's profiles (#83).
+    DotnetTrace,
 }
 
 impl Fix {
@@ -73,6 +75,7 @@ impl Fix {
             Self::Database => "pick another database (`d`)".into(),
             Self::Winnat => format!("`{WINNAT}` in an elevated terminal"),
             Self::Audit => "see them and fix them in the audit view (`A`)".into(),
+            Self::DotnetTrace => format!("`{}`", lazyrunner_core::run::profile::INSTALL),
         }
     }
 
@@ -85,6 +88,7 @@ impl Fix {
             Self::Database => "f picks a database",
             Self::Winnat => "f copies the fix",
             Self::Audit => "f opens the audit",
+            Self::DotnetTrace => "f installs it",
         }
     }
 }
@@ -385,6 +389,9 @@ impl Checklist {
             (Kind::Database, Status::Warn) if item.detail.contains("nothing answers") => Some(Fix::Database),
             (Kind::Update, Status::Warn | Status::Fail) => Some(Fix::Retry),
             (Kind::Audit, Status::Warn) => Some(Fix::Audit),
+            (Kind::Tool, Status::Skip) if item.detail.contains(lazyrunner_core::run::profile::INSTALL) => {
+                Some(Fix::DotnetTrace)
+            }
             _ => None,
         }
     }
@@ -409,6 +416,11 @@ impl Checklist {
                 }
                 self.rows[index].fixing = Some(fix);
                 self.check_again(controller, &[index]);
+            }
+            Fix::DotnetTrace => {
+                controller.install_trace();
+                self.items[index].detail = "installing…".into();
+                self.rows[index].fixing = Some(fix);
             }
             Fix::Database | Fix::Winnat | Fix::Audit => {}
         }
@@ -536,6 +548,18 @@ impl Checklist {
     }
 
     /// npm ci running for a check: its last line on the check's; once it's done, the check runs again.
+    /// dotnet-trace's install done: its line is checked again.
+    fn follow_install(&mut self, controller: &Controller) {
+        let installed: Vec<usize> = (0..self.rows.len())
+            .filter(|&index| self.rows[index].fixing == Some(Fix::DotnetTrace))
+            .filter(|&index| !matches!(self.items[index].status, Status::Pending | Status::Running))
+            .filter(|_| !controller.installing_trace)
+            .collect();
+        if !installed.is_empty() {
+            self.check_again(controller, &installed);
+        }
+    }
+
     fn follow_npm_ci(&mut self, controller: &Controller) {
         let mut done = Vec::new();
         for index in 0..self.rows.len() {
@@ -701,6 +725,7 @@ impl Checklist {
         }
         self.receive_again(now);
         self.follow_npm_ci(controller);
+        self.follow_install(controller);
         self.next_fix(controller);
         if self.skip {
             self.finish_unfinished(Status::Skip, "skipped");

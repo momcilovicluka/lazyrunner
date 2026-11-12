@@ -250,6 +250,7 @@ at once while the palette wipes away.
 | `,` `A` then `z` | **Diagnostics zip**, in the About box under Report a bug: what to attach to a bug report - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`diagnostics`); the log says where, and Alt+click on its path there (a click with `l` off) shows it in its folder. Look over its logs before you share it |
 | `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`; marks and their notes go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
+| `Alt+p` | Profile the focused .NET or npm app's CPU for 10 s, then its flame chart (below, "Profiling"); `Alt+p` again stops it. On an app that isn't running, its last captures |
 | `Alt+b` | The build as a map: the Code tab's projects with the running build, else the last one, over them - each project's state and own time, the critical path in the accent colour; `w` follows what's compiling, `B` shows the build's projects alone (below, "The build map") |
 | `Alt+d` | What's new since the app's last run, in the focused column: the lines the last run printed too dim (times, durations, ports and ids don't count as a change), new ones keep their colour - `▲` before a new error or warning, `●` before any other new line - and the top row counts them: `+2 new errors · 3 fixed · 41 new lines` (`fixed?` until the app is up). `n` / `N` step through the new errors and warnings (the new lines when there are none); the rail marks only what's new and sends its ember only for a new error. The last run is kept when lazyrunner quits, so the first run after it compares too. `Enter` lists what was fixed: the last run's errors and warnings that didn't come back. A run with new errors puts a chip in the panel's header - `1 Orders +2 new errors` - whose number (or a click) opens that column this way, on the first of them. A good build says how its warnings changed since the last good one - `12 warnings (+3)` - and lists the new ones under it. `Alt+d` again shows all |
 | `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
@@ -678,6 +679,25 @@ its column. The targets come from the profile, per app, else p95 1000 ms, 5% 5xx
 `path` is the app's own health endpoint, which the response-time probe asks for instead of the Swagger page; with
 `expectedStatus` another answer counts as not responding.
 
+**Profiling** (`Alt+p`, or `p` on a Health card or a Map box, or `f` on a request in `H`): where an app's CPU time
+goes. lazyrunner samples the running app - the process holding its port, not `dotnet run` or `npm` - for 10 s while it
+keeps serving, so you can make the slow request meanwhile; its title says `◉ profiling` with a bar filling, and
+`Alt+p` again stops it. A .NET app is sampled with `dotnet-trace`; an npm app samples itself with Node's own inspector,
+through the hook lazyrunner already loads into it (an app started before this version needs a restart first), and its
+frames know their file and line. A request whose timeline spent much of its time `in the app` says `f` profiles it.
+`+` and `-` in the chart change how long a capture runs (`"profileSeconds"`, 3 to 120). The capture opens as a drill-down of the Stack screen, a flame chart: the call tree from the bottom up, each
+frame as wide as its time on the CPU (every thread's, merged) and coloured by its namespace - the same colour in every
+capture - a hot frame (5% or more in itself) marked `▲`. Above it the time split by namespace (`Shop.Pricing 41% ·
+Microsoft.EntityFrameworkCore 22% …`), beside it (or under it) the top frames by self time. `h` `j` `k` `l` move
+between frames (`k` up into a callee, `j` down to the caller), `Enter` zooms into one, `Backspace` out, `/` finds
+frames by name (the rest dim), `o` opens a frame's type's file (`Quote.cs` for `Shop.Pricing.Quote.Total`), `y`
+copies the top frames, `p` profiles again, `Esc` goes back. It blooms upward as it opens, a row at a time, and the hot
+frames - tinted warm - pulse once; zooming glides the frame to the full width, and the breadcrumb of where you've
+zoomed lights its new step (none of it with reduced motion). The last 10 captures of each app are kept in the state
+folder: `[` `]` step through them, and `c` compares one with the one before - frames that gained self time warm, those
+that lost it cool, `▲ +180 ms` / `▼ −40 ms` in the top frames. dotnet-trace is a .NET global tool: the startup
+checklist says when it's missing, and `f` on its line installs it (`dotnet tool install -g dotnet-trace`).
+
 ## Requests (`H`)
 
 An API that logs through Serilog (or anything else that replaces ASP.NET's logging) to somewhere other than the
@@ -858,6 +878,8 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
 | `get_stack` | The stack map: which app calls which (seen and declared), each edge's calls, p95 and failures over the last minute, the apps that use the database, and the newest failed calls |
+| `profile_app` | Samples a running .NET app's CPU (dotnet-trace) or an npm app's (Node's inspector) for 10 s, or `seconds`, and keeps the capture; `wait` for `profile_done` |
+| `get_profile` | An app's newest CPU capture: its time on the CPU, the top frames by self time, the split by namespace, and how each top frame changed since the capture before |
 | `get_health` | The Health tab: each app's p95, 5xx rate, memory, CPU and memory growth against its targets, its breaches and how long each has lasted, and the alerts; `get_status` lists the alerts too |
 | `get_build` | A .NET app's build as a map: each project's state, its own time against its usual, and the critical path - the running build, else the last |
 | `get_dependencies` | The code map: the apps and their projects, every project with how many it depends on and how many use it, the cycles and the links a rule doesn't allow; or for one app, project, namespace, folder, module, component or source file, what it depends on and what uses it, each with its depth and the way to it, its own parts, the rules it breaks and what only Nx links it to |

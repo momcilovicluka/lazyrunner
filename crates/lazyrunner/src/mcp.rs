@@ -32,7 +32,7 @@ const WAIT_DEFAULT_SECS: u64 = 120;
 const WAIT_MAX_SECS: u64 = 600;
 /// What a tool answers at most; more is cut, with a note to ask for less.
 const MAX_ANSWER_CHARS: usize = 60_000;
-const WAITS: [&str; 5] = ["ready", "build_done", "tests_done", "migrations_checked", "task_done"];
+const WAITS: [&str; 6] = ["ready", "build_done", "tests_done", "migrations_checked", "task_done", "profile_done"];
 const NOT_OPEN: &str = "not_running: lazyrunner isn't open - ask the user to open it in the project's folder (run \
                         lazyrunner in a terminal there), then try again.";
 const ELEVATED: &str = "elevated: lazyrunner runs as Administrator and this agent doesn't, and Windows doesn't let a \
@@ -281,6 +281,8 @@ impl<C: Channel> Server<C> {
             "get_test_results" if !args["suite"].is_string() => Err("bad_args: which suite? (list_tests)".into()),
             "get_test_results" => self.agent("tests", args).await,
             "run_tests" => self.agent("run_tests", args).await,
+            "profile_app" => self.agent("profile", args).await,
+            "get_profile" => self.agent("profile_view", args).await,
             "stop_tests" => self.agent("stop_tests", json!({})).await,
             "get_migrations" => self.agent("migrations", json!({})).await,
             "get_audit" => self.agent("audit", json!({})).await,
@@ -413,6 +415,7 @@ fn done(condition: &str, status: &Value, built: &HashSet<String>) -> Option<Stri
             Some(format!("tests: {} passed, {} failed, {} skipped", tests["passed"], tests["failed"], tests["skipped"]))
         }
         "migrations_checked" if busy["migrations"] != true => Some("migrations checked (get_migrations)".into()),
+        "profile_done" if busy["profiling"] != true => Some("the capture is done (get_profile)".into()),
         "task_done"
             if status["tasks"].as_array().is_none_or(|tasks| tasks.iter().all(|task| task["running"] != true)) =>
         {
@@ -622,7 +625,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 38));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 40));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);

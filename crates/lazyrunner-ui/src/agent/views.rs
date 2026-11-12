@@ -300,3 +300,49 @@ pub fn compare(
         "rows": rows,
     })
 }
+
+/// An app's newest CPU capture (#83): its time on the CPU, the top frames by self time, the split by namespace, and
+/// how each top frame changed since the capture before.
+pub fn profile(controller: &Controller, key: &str) -> Answer {
+    use lazyrunner_core::run::profile::short;
+    let kept = controller.profiles_of(key);
+    let Some(newest) = kept.last() else {
+        let why = "no capture of it yet: profile_app samples it (then wait for profile_done)";
+        return Err(("not_found", why.into()));
+    };
+    let before = kept.len().checked_sub(2).and_then(|at| kept.get(at));
+    let changes = before.map(|before| newest.compare(before));
+    let total = newest.total().max(f64::EPSILON);
+    let top: Vec<Value> = newest
+        .top(15)
+        .iter()
+        .map(|hot| {
+            let change = changes.as_ref().map(|changes| changes.get(&hot.name).copied().unwrap_or(0.0).round());
+            json!({
+                "frame": hot.name,
+                "short": short(&hot.name),
+                "self_ms": hot.own.round(),
+                "self_share": (hot.own / total * 1000.0).round() / 1000.0,
+                "total_ms": hot.total.round(),
+                "change_ms": change,
+            })
+        })
+        .collect();
+    let namespaces: Vec<Value> = newest
+        .namespaces()
+        .iter()
+        .take(10)
+        .map(|(space, ms)| json!({ "namespace": space, "self_ms": ms.round(), "share": (ms / total * 1000.0).round() / 1000.0 }))
+        .collect();
+    Ok(json!({
+        "app": key,
+        "at": newest.at,
+        "seconds": newest.seconds,
+        "cpu_ms": total.round(),
+        "captures_kept": kept.len(),
+        "top_frames": top,
+        "namespaces": namespaces,
+        "compared_with": before.map(|before| before.at.clone()),
+        "note": "Sampled with dotnet-trace: each thread's time on the CPU, merged into one call tree. self_ms is time in the frame itself, total_ms in it and all it called; change_ms is against the capture before.",
+    }))
+}

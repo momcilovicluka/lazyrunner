@@ -21,6 +21,9 @@ const TOOK: usize = 10;
 const LEAST_BAR: usize = 12;
 /// The fewest requests of an endpoint its p95 is drawn from.
 const USUAL: usize = 5;
+/// Time in the app itself worth profiling (#83): this many ms, and this share of the request.
+const IN_THE_APP_MS: f64 = 100.0;
+const IN_THE_APP_SHARE: f64 = 0.3;
 /// An axis tick at least this many cells from the last.
 const TICK_ROOM: usize = 8;
 /// The ghost of the baseline's bar, the time no line accounts for, the endpoint's p95, a comb's tooth and its spine.
@@ -211,6 +214,14 @@ pub(super) fn timeline(
         lines.push(row(vec![seg("in the app", C::DarkYellow)], gaps, fall.unaccounted));
     }
     lines.push(axis(&scale));
+    if fall.unaccounted >= IN_THE_APP_MS && fall.unaccounted >= fall.ms * IN_THE_APP_SHARE {
+        let name = controller.app(&request.app).map_or(request.app.as_str(), |app| app.name.as_str());
+        let text = format!(
+            "◉ f profiles {name}: {:.0} ms of it ran in the app itself, where no line says what",
+            fall.unaccounted
+        );
+        lines.push(super::columns::fit(vec![seg(text, C::Magenta)], width));
+    }
     if let Some(exception) = exception {
         let text = format!("{} at {:.0} ms: {}", icons::icon(nerd, Icon::Fail), exception.start, exception.label);
         lines.push(super::columns::fit(vec![seg(text, C::Red)], width));

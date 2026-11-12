@@ -24,6 +24,7 @@ pub mod impact;
 pub mod migrations;
 pub mod net;
 pub mod ports;
+pub mod profile;
 pub mod requests;
 pub mod secrets;
 pub mod suites;
@@ -144,6 +145,15 @@ pub enum Event {
         event: String,
         run: String,
         problem: String,
+    },
+    /// A CPU capture (#83) is done, or why there's none.
+    Profiled {
+        key: String,
+        result: Result<Box<profile::Profile>, String>,
+    },
+    /// dotnet-trace's install (the startup checklist's fix) is done.
+    TraceInstalled {
+        result: Result<(), String>,
     },
 }
 

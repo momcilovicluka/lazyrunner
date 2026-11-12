@@ -218,6 +218,13 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             }
             Some("read the stack map".to_string())
         }
+        "profile_view" => {
+            let app = app_of(controller, &args["app"]).map(|app| controller.apps[app].key.clone());
+            if let Some(app) = app {
+                super::flame::open(ui, controller, &app);
+            }
+            Some("read a profile".to_string())
+        }
         "health" => {
             if ui.overlay.as_ref().map(|overlay| overlay.kind()) != Some("health") {
                 ui.overlay = None;

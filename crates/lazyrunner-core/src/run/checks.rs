@@ -205,6 +205,16 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
             Some(version) => (Status::Ok, version),
             None => (Status::Fail, "dotnet not found on PATH".into()),
         }));
+        checks.push(check(Kind::Tool, "dotnet-trace", || match crate::run::profile::tool() {
+            Some(path) => (Status::Ok, tool_version(&path, &["--version"]).unwrap_or_else(|| "installed".into())),
+            None => (
+                Status::Skip,
+                format!(
+                    "not installed - Alt+p profiles an app with it; f installs it ({})",
+                    crate::run::profile::INSTALL
+                ),
+            ),
+        }));
     }
     if controller.apps.iter().any(|app| matches!(app.kind, AppKind::Npm { .. })) {
         checks.push(check(Kind::Tool, "Node.js / npm", || {

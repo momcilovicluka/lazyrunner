@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.83.0] - 2026-11-12
+
+### Added
+- Profiling: `Alt+p` (or `p` on a Health card or a Map box, or `f` on a request in `H` - whose timeline says so when much of its time was in the app) samples a running app's CPU for 10 s (`+` `-` in the chart, `"profileSeconds"`) - a .NET app with dotnet-trace, an npm app with Node's own inspector through lazyrunner's hook (its frames with their file and line) - the process holding its port, while it keeps serving, its title saying `◉ profiling` as a bar fills, `Alt+p` again stopping it. The capture opens as a drill-down of `K`: a flame chart of every thread's time on the CPU, frames coloured by namespace and the hot ones marked, the split by namespace above it and the top frames by self time beside it; `h j k l` move, `Enter` / `Backspace` zoom, `/` finds, `o` opens a frame's file, `y` copies the top frames; it blooms upward as it opens, hot frames tinted warm pulse once, zooming glides with a breadcrumb. The last 10 captures of each app are kept: `[` `]` step through them and `c` compares one with the one before (`▲ +180 ms`). The startup checklist says when dotnet-trace is missing and `f` installs it; an agent profiles with `profile_app` (`wait` for `profile_done`) and reads `get_profile` (closes #83)
+
 ## [1.82.0] - 2026-11-12
 
 ### Added
