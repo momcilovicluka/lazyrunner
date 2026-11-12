@@ -13,10 +13,11 @@ use super::{ProfileDirs, TYPE_COMMAND, native};
 use crate::json::{field, list, text};
 
 /// lazyrunner's own presets.
-const BUNDLED: [&str; 3] = [
+const BUNDLED: [&str; 4] = [
     include_str!("../../../../projects/presets/python.json"),
     include_str!("../../../../projects/presets/go.json"),
     include_str!("../../../../projects/presets/rust.json"),
+    include_str!("../../../../projects/presets/java.json"),
 ];
 /// The fields a preset, and each of its options, fills in.
 pub const FILLED: [&str; 14] = [
@@ -35,8 +36,9 @@ pub const FILLED: [&str; 14] = [
     "env",
     "nerdIcon",
 ];
-/// What an option says besides those: when it holds - a file in the app's folder (any of them), a program on PATH.
-pub const WHEN: [&str; 2] = ["anyFile", "program"];
+/// What an option says besides those: when it holds - a file in the app's folder (any of them), a program on PATH, a
+/// file that says something (`{ "pom.xml": "spring-boot-maven-plugin" }`, any of them).
+pub const WHEN: [&str; 3] = ["anyFile", "program", "anyFileContains"];
 /// The folder of your profiles that holds your presets.
 const PRESETS_FOLDER: &str = "presets";
 
@@ -87,7 +89,13 @@ fn holds(when: &Value, folder: Option<&Path>) -> bool {
     let there =
         files.is_empty() || folder.is_some_and(|folder| files.iter().any(|file| folder.join(text(file)).exists()));
     let program = field(when, "program");
-    there && (program.is_null() || crate::run::tools::find_on_path(&text(program)).is_some())
+    let says = |(file, wanted): (&String, &Value)| {
+        folder.is_some_and(|folder| {
+            std::fs::read_to_string(folder.join(native(file))).is_ok_and(|content| content.contains(&text(wanted)))
+        })
+    };
+    let contains = field(when, "anyFileContains").as_object().is_none_or(|files| files.iter().any(says));
+    there && contains && (program.is_null() || crate::run::tools::find_on_path(&text(program)).is_some())
 }
 
 /// A command app with its preset filled in: each field it leaves out comes from the first of the preset's options
@@ -235,6 +243,58 @@ mod tests {
     }
 
     #[test]
+    fn javas_patterns_know_an_exception_its_frames_and_springs_and_quarkus_ready_lines() {
+        let (error, warning, frames) = says("java");
+        assert!(error("java.lang.IllegalStateException: no price rule") && error("Exception in thread \"main\" x"));
+        assert!(error("2026-11-10T09:41:07.123+01:00 ERROR 8124 --- [main] o.s.boot.SpringApplication : failed"));
+        assert!(error("[ERROR] Failed to execute goal") && warning("[WARNING] deprecated"));
+        assert!(!error("Caused by: java.sql.SQLException: closed"), "the exception line counts, once a trace");
+        assert!(!error("\tat com.shop.Pricing.quote(Pricing.java:42)") && !error("2026 INFO 8124 --- started"));
+        let frame = frames.captures("\tat com.shop.Pricing.quote(Pricing.java:42)").unwrap();
+        assert_eq!((&frame["file"], &frame["line"]), ("Pricing.java", "42"));
+        assert!(frames.captures("\tat java.base/java.lang.Thread.run(Thread.java:1583)").is_some());
+        let java = bundled().into_iter().find(|preset| text(field(preset, "id")) == "java").unwrap();
+        let ready = regex::Regex::new(&text(&java["ready"]["line"])).unwrap();
+        for said in [
+            "Started PricingApplication in 3.21 seconds (process running for 3.6)",
+            "Tomcat started on port 8080 (http) with context path '/'",
+            "pricing 1.0.0 on JVM (powered by Quarkus 3.8.1) started in 1.2s. Listening on: http://localhost:8080",
+        ] {
+            assert!(ready.is_match(said), "{said}");
+        }
+    }
+
+    #[test]
+    fn java_runs_by_its_wrapper_and_its_framework_and_quarkus_reloads_by_itself() {
+        let temp = TempDir::new("preset-java");
+        let spring = "<project><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>";
+        write(temp.join("pricing/pom.xml"), spring);
+        write(temp.join("pricing/mvnw"), "");
+        write(temp.join("pricing/mvnw.cmd"), "");
+        write(temp.join("quotes/build.gradle.kts"), "plugins { id(\"io.quarkus\") }");
+        write(temp.join("lib/pom.xml"), "<project/>");
+        let app = json!({ "key": "a", "type": "command" });
+        let java = bundled().into_iter().find(|preset| text(field(preset, "id")) == "java").unwrap();
+        let pricing = apply(&app, &java, Some(&temp.join("pricing")));
+        assert_eq!(
+            (pricing["run"].as_str(), pricing["build"].as_str()),
+            (Some("./mvnw spring-boot:run"), Some("./mvnw -q compile"))
+        );
+        assert_eq!(pricing["installFrom"], json!(["pom.xml"]));
+        assert!(pricing["watch"].as_array().is_some_and(|watch| !watch.is_empty()), "Spring restarts on a save");
+        let quotes = apply(&app, &java, Some(&temp.join("quotes")));
+        assert_eq!(
+            (quotes["run"].as_str(), quotes["build"].as_str()),
+            (Some("gradle quarkusDev"), Some("gradle -q classes"))
+        );
+        assert_eq!(quotes["watch"], json!([]), "Quarkus' dev mode reloads by itself");
+        assert_eq!(quotes["tools"], json!(["java", "gradle"]));
+        let library = apply(&app, &java, Some(&temp.join("lib")));
+        assert!(library["run"].is_null() && library["build"] == "mvn -q compile", "a library: built, not run");
+        assert_eq!(looks_like(&temp.join("quotes")).map(|preset| text(field(&preset, "id"))), Some("java".into()));
+    }
+
+    #[test]
     fn go_and_rust_run_where_they_have_a_main_and_build_first() {
         let temp = TempDir::new("preset-go-rust");
         write(temp.join("api/go.mod"), "");
@@ -311,7 +371,7 @@ mod tests {
         let (data, problems) = apply_all(&profile, None, &dirs);
         assert_eq!(data["apps"][0]["run"], "custom");
         assert_eq!(data["apps"][1]["build"], "go build -tags dev ./...", "yours, not lazyrunner's");
-        assert_eq!(problems, ["apps[2] (c).preset 'ruby' is not a known preset (there are: go, python, rust)"]);
+        assert_eq!(problems, ["apps[2] (c).preset 'ruby' is not a known preset (there are: go, java, python, rust)"]);
         assert!(looks_like(temp.path()).is_none());
         write(temp.join("requirements.txt"), "");
         assert_eq!(looks_like(temp.path()).map(|preset| text(field(&preset, "id"))), Some("python".into()));

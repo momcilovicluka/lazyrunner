@@ -23,7 +23,7 @@ use lazyrunner_core::run::ports::{CELLS, Holder, Holding, Port, Ports, TAKEN_AFT
 
 use super::checklist::WINNAT;
 use super::columns::{fit, spinner};
-use super::icons::{self, Icon};
+use super::icons;
 use super::motion::COPY_FLASH;
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg, take_cells, width};
@@ -70,6 +70,12 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, port: Option<u16>) {
 pub fn open_taken(ui: &mut Ui, controller: &mut Controller) {
     let port = controller.port_map().taken(ui.now).first().map(|row| row.port);
     open(ui, controller, port);
+}
+
+/// The app whose port is picked in the view, by its key.
+pub(super) fn picked_app(ui: &Ui, controller: &Controller) -> Option<String> {
+    let Some(Overlay::Ports { index, .. }) = &ui.overlay else { return None };
+    shown(controller.port_map()).get(*index).map(|row| row.key.clone())
 }
 
 /// The ports as the table lists them: the conflicts first, then the rest in the apps' order.
@@ -469,10 +475,9 @@ fn conflicts(others: usize) -> String {
 }
 
 /// The first row: the view, the project, its conflicts, what it does.
-fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
+fn header(controller: &Controller) -> Vec<Seg> {
     let (wanted, others, _) = controller.port_map().summary();
     vec![
-        super::viewbar::chip(ui.nerd, Icon::Plug, "Ports"),
         seg(format!("  {}", controller.project.name), C::White),
         if others > 0 { seg(format!("  {}", conflicts(others)), C::Red) } else { seg("  no conflicts", C::Green) },
         seg(format!("  {wanted} tracked · who really holds each port"), C::DarkGray),
@@ -593,7 +598,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let index = state.index.min(list.len().saturating_sub(1));
     let bar = ui.motion.bar(index, ui.now);
     let columns = columns(cells);
-    let mut lines = vec![header(ui, controller)];
+    let mut lines = vec![header(controller)];
     lines.extend(keys(&state, list.get(index).copied(), cells));
     lines.push(Vec::new());
     lines.extend(overview(ui, map, state.opened));

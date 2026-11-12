@@ -2,10 +2,11 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
- ⋈ STACK    Map  Code    4 .NET · 3 TypeScript projects · 1 cycle · 1 rule break
+ ⋈ STACK   H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline
+ Map  Code    4 .NET · 3 TypeScript projects · 1 cycle · 1 rule break
  h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom
- r implied edges · t tests · a all projects · c cycles · b the build · o open · y copy path · Tab the map
- Esc back
+ r implied edges · t tests · a all projects · c cycles · b the build (w follow it · B it alone) · o open
+ y copy path · Tab the map · Esc back
  2 implied edges hidden (r)
   ╭──────────────╮                                                                      ╭────────────────────╮
   │ ■ Orders.Api │────╮                                                                 │■■■■···■■■■■········│
@@ -20,7 +21,6 @@ expression: frame
   ╰────────╯                │    ╰────────╯           ╰──────▶│ ▲ ui │─────────────╮
                             │                                 ╰──────╯             │
                             │                                                      │
-                            ╰──────────────────────────────────────────────────────╯
 
  Orders.Api   app · depends on 2 (2 in all) · used by 0 (0 in all)
  a change here affects 0 projects, 0 test projects · src/Orders.Api/Orders.Api.csproj

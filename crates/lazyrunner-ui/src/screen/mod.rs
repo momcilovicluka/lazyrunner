@@ -38,6 +38,7 @@ pub mod rail_density;
 pub mod rail_motion;
 pub mod reload;
 pub mod requests;
+pub mod screens;
 pub mod seen;
 pub mod seg;
 pub mod sheet;
@@ -753,7 +754,16 @@ pub(super) fn reveal(rows: Vec<Vec<Seg>>, opened: f64) -> Vec<Vec<Seg>> {
         .collect()
 }
 
+/// The body: a full screen under the bar of screens, else what's open over the columns, else the columns.
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let screen = screens::Screen::of(ui.overlay.as_ref()).filter(|_| ui.picker.is_none());
+    let Some(screen) = screen else { return under_bar(ui, controller, width, rows) };
+    let mut lines = vec![screens::bar(ui, screen, width)];
+    lines.extend(under_bar(ui, controller, width, rows.saturating_sub(1)));
+    lines
+}
+
+fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     match &ui.overlay {
         Some(Overlay::Checklist(_)) => return overlays::checklist(ui, width, rows),
         _ if ui.picker.is_some() => return overlays::picker(ui, width, rows),

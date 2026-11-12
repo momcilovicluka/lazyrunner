@@ -1,0 +1,26 @@
+{
+  "id": "java",
+  "name": "Java",
+  "nerdIcon": "",
+  "detect": { "anyFile": ["pom.xml", "build.gradle", "build.gradle.kts"] },
+  "tools": ["java"],
+  "watch": ["src/**/*.java", "src/**/*.kt", "src/main/resources/**", "pom.xml", "build.gradle", "build.gradle.kts"],
+  "ready": { "line": "(Started \\S+ in [\\d.]+ seconds|Listening on: https?://|(Tomcat|Netty|Jetty|Undertow) started on port)", "orPort": true },
+  "errors": ["\\b(ERROR|SEVERE|FATAL)\\b", "^Exception in thread ", "^([a-z][\\w$]*\\.)+[A-Z][\\w$]*(Exception|Error)(: |$)"],
+  "warnings": ["\\bWARN(ING)?\\b"],
+  "frames": "\\bat [\\w$./<>@-]+\\((?P<file>[\\w$-]+\\.(?:java|kt|kts|scala|groovy)):(?P<line>\\d+)\\)",
+  "options": [
+    { "when": { "anyFile": ["mvnw", "mvnw.cmd"], "anyFileContains": { "pom.xml": "spring-boot-maven-plugin" } }, "run": "./mvnw spring-boot:run" },
+    { "when": { "anyFile": ["mvnw", "mvnw.cmd"], "anyFileContains": { "pom.xml": "quarkus-maven-plugin" } }, "run": "./mvnw quarkus:dev", "watch": [] },
+    { "when": { "anyFile": ["gradlew", "gradlew.bat"], "anyFileContains": { "build.gradle": "org.springframework.boot", "build.gradle.kts": "org.springframework.boot" } }, "run": "./gradlew bootRun" },
+    { "when": { "anyFile": ["gradlew", "gradlew.bat"], "anyFileContains": { "build.gradle": "io.quarkus", "build.gradle.kts": "io.quarkus" } }, "run": "./gradlew quarkusDev", "watch": [] },
+    { "when": { "anyFileContains": { "pom.xml": "spring-boot-maven-plugin" } }, "run": "mvn spring-boot:run" },
+    { "when": { "anyFileContains": { "pom.xml": "quarkus-maven-plugin" } }, "run": "mvn quarkus:dev", "watch": [] },
+    { "when": { "anyFileContains": { "build.gradle": "org.springframework.boot", "build.gradle.kts": "org.springframework.boot" } }, "run": "gradle bootRun" },
+    { "when": { "anyFileContains": { "build.gradle": "io.quarkus", "build.gradle.kts": "io.quarkus" } }, "run": "gradle quarkusDev", "watch": [] },
+    { "when": { "anyFile": ["mvnw", "mvnw.cmd"] }, "install": "./mvnw -q dependency:go-offline", "build": "./mvnw -q compile", "installFrom": ["pom.xml"] },
+    { "when": { "anyFile": ["gradlew", "gradlew.bat"] }, "install": "./gradlew -q dependencies", "build": "./gradlew -q classes", "installFrom": ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradle.lockfile"] },
+    { "when": { "anyFile": ["pom.xml"] }, "install": "mvn -q dependency:go-offline", "build": "mvn -q compile", "installFrom": ["pom.xml"], "tools": ["java", "mvn"] },
+    { "when": { "anyFile": ["build.gradle", "build.gradle.kts"] }, "install": "gradle -q dependencies", "build": "gradle -q classes", "installFrom": ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradle.lockfile"], "tools": ["java", "gradle"] }
+  ]
+}

@@ -556,7 +556,7 @@ fn cut(text: &str, cells: usize) -> String {
 }
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let (cursor, nerd) = (ui.cursor(), ui.nerd);
+    let cursor = ui.cursor();
     let Some(Overlay::Requests(view)) = &ui.overlay else { return Vec::new() };
     let keys = super::viewbar::keys(&hint(view, controller), width);
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return Vec::new() };
@@ -568,7 +568,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         }
     }
     let height = rows.saturating_sub(3 + keys.len());
-    let mut out = vec![header(view, controller, &list, width, cursor, nerd)];
+    let mut out = vec![header(view, controller, &list, width, cursor)];
     out.extend(keys);
     let least = if view.tab == Tab::Requests { REQUEST_FIXED } else { ENDPOINT_FIXED } + LIST_PATH;
     let side_width = (width * LIST_SHARE / 20).max(least);
@@ -903,7 +903,7 @@ fn endpoint_details(
     lines
 }
 
-fn header(view: &View, controller: &Controller, list: &[&Request], width: usize, cursor: &str, nerd: bool) -> Vec<Seg> {
+fn header(view: &View, controller: &Controller, list: &[&Request], width: usize, cursor: &str) -> Vec<Seg> {
     let errors = list.iter().filter(|request| request.status >= 400).count();
     let avg =
         if list.is_empty() { 0.0 } else { list.iter().map(|request| request.ms).sum::<f64>() / list.len() as f64 };
@@ -920,7 +920,7 @@ fn header(view: &View, controller: &Controller, list: &[&Request], width: usize,
     if let Some((app, method, endpoint)) = &view.endpoint {
         filters.push(format!("{method} {endpoint} · {}", app_name(controller, app)));
     }
-    let mut segs = vec![super::viewbar::chip(nerd, Icon::Requests, "Requests"), seg("  ", C::Gray)];
+    let mut segs = Vec::new();
     for (tab, label) in [(Tab::Requests, " requests "), (Tab::Endpoints, " endpoints ")] {
         segs.push(if view.tab == tab { on(label, C::FocusText, C::FocusBack) } else { seg(label, C::DarkGray) });
     }

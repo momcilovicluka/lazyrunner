@@ -27,7 +27,7 @@ use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::audit::{self, AppAudit, Package, Severity};
 
 use super::columns::{chunk, fit, spinner};
-use super::icons::{self, Icon};
+use super::icons;
 use super::motion::COPY_FLASH;
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg, width};
@@ -348,10 +348,7 @@ fn spin(ui: &Ui) -> &str {
 /// The view's first row: the project, what the scans found (a count pulsing as a scan adds to it), and what's
 /// installing or scanning - with the batch counted off - or when the last scan was, coloured by its age.
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
-    let mut header = vec![
-        super::viewbar::chip(ui.nerd, Icon::Shield, "Audit"),
-        seg(format!("  {}", controller.project.name), C::White),
-    ];
+    let mut header = vec![seg(format!("  {}", controller.project.name), C::White)];
     let scans = controller.audits();
     let all: Vec<&Package> = scans.values().flat_map(|scan| &scan.packages).collect();
     let fresh: Vec<&AppAudit> = controller

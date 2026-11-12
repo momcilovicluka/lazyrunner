@@ -117,12 +117,17 @@ fn check(kind: Kind, name: impl Into<String>, run: impl FnOnce() -> Outcome + Se
 }
 
 /// The first line a tool prints for `args`, when it runs and succeeds.
+/// The line of a tool's version output that has the version: the first with a digit (Gradle's starts with a rule).
+pub fn version_line(output: &str) -> Option<String> {
+    output.lines().map(str::trim).find(|line| line.chars().any(|c| c.is_ascii_digit())).map(str::to_string)
+}
+
 fn tool_version(program: &PathBuf, args: &[&str]) -> Option<String> {
     let mut child = Command::new(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .ok()?;
     let started = Instant::now();
@@ -139,13 +144,12 @@ fn tool_version(program: &PathBuf, args: &[&str]) -> Option<String> {
     };
     let mut output = String::new();
     child.stdout.take()?.read_to_string(&mut output).ok()?;
-    status
-        .success()
-        .then_some(output)?
-        .lines()
-        .next()
-        .map(|line| line.trim().to_string())
-        .filter(|line| !line.is_empty())
+    let mut errors = String::new();
+    if let Some(mut stderr) = child.stderr.take() {
+        let _ = stderr.read_to_string(&mut errors);
+    }
+    // `java -version` (Java 8) says it on stderr.
+    status.success().then(|| version_line(&output).or_else(|| version_line(&errors)))?
 }
 
 fn version_of(tool: &str) -> Option<String> {
@@ -355,7 +359,10 @@ fn audit_report(scans: &[(String, crate::run::audit::AppAudit)]) -> Outcome {
 /// A command app's programs - its tools (with their versions), what it runs, builds and installs with - each found in
 /// its `path` folders, on PATH or in its folder.
 /// How to get a tool a command app needs, when it's missing (on Windows, which lazyrunner's releases are for).
-const HOW_TO_GET: [(&str, &str); 7] = [
+const HOW_TO_GET: [(&str, &str); 10] = [
+    ("java", "winget install Microsoft.OpenJDK.21"),
+    ("mvn", "the project's ./mvnw, or maven.apache.org/download"),
+    ("gradle", "the project's ./gradlew, or gradle.org/install"),
     ("python", "winget install Python.Python.3.12"),
     ("uv", "winget install astral-sh.uv"),
     ("go", "winget install GoLang.Go"),
@@ -507,6 +514,13 @@ mod tests {
         assert_eq!(capsule("uv", "uv 0.5.1 (f399a5271 2024-11-08)"), "uv 0.5.1");
         assert_eq!(capsule("tool", "no version here"), "no version here");
         assert_eq!(missing_tools(&["uv", "azurite"]), "uv (winget install astral-sh.uv), azurite");
+        assert_eq!(
+            version_line("\n------------\nGradle 8.5\n------------"),
+            Some("Gradle 8.5".into()),
+            "past its rule"
+        );
+        assert_eq!(capsule("java", "openjdk 21.0.1 2023-10-17"), "java 21.0.1");
+        assert_eq!(capsule("mvn", "Apache Maven 3.9.6 (bc0240f3)"), "mvn 3.9.6");
     }
 
     #[test]

@@ -22,11 +22,11 @@ use crossterm::event::KeyEvent;
 
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::build_map::{BuildRun, ProjectState};
 use lazyrunner_core::run::code::{CodeMap, Kind, Link, STACK, Stack};
 
 use super::code_draw::{self, Look, MINI};
 use super::graph;
-use super::icons::Icon;
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, seg};
 use super::theme::C;
@@ -35,6 +35,8 @@ use super::{Overlay, Ui};
 /// What `b` and `Alt+b` say when no .NET app has built yet.
 pub(super) const NO_BUILD: &str =
     "No build to show yet: the build map shows a .NET app's build once it has run one (b builds the focused app).";
+/// What `w` says when the build is over.
+const NOTHING_BUILDING: &str = "Nothing is building now: w follows a build while it runs.";
 
 /// A level with more boxes than this opens focused on one.
 const FOCUS_ABOVE: usize = 24;
@@ -102,6 +104,11 @@ pub struct View {
     pub sized: bool,
     /// The app whose build shows over the projects (#82), by its key: `b`, `Alt+b`.
     pub build: Option<String>,
+    /// `w`: the picked box follows what builds, and what was picked before, to go back to once the build is over.
+    pub following: bool,
+    pub before_follow: Option<Option<String>>,
+    /// `B`: the build's projects alone, by their ids - kept up with the build.
+    pub only: Option<BTreeSet<String>>,
 }
 
 /// The Code tab: on the apps, or on `app`'s projects when one is given.
@@ -125,6 +132,9 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, app: Option<String>) {
         zoom: Zoom::In,
         sized: false,
         build: None,
+        following: false,
+        before_follow: None,
+        only: None,
     };
     ui.overlay = Some(Overlay::Code(Box::new(view)));
 }
@@ -268,15 +278,19 @@ fn shares(map: &CodeMap, parts: &[usize], links: &[Link]) -> Vec<(usize, usize, 
     shared
 }
 
-/// The level's parts and links: an app's projects alone when it's on one, the test projects hidden when they are.
+/// The level's parts and links: an app's projects alone when it's on one - the build's alone for `B` - the test
+/// projects hidden when they are.
 fn level(map: &CodeMap, view: &View) -> (Vec<usize>, Vec<Link>) {
     let (mut parts, links) = map.level(view.inside.as_deref());
-    if let Some(app) = view.app.as_deref().filter(|_| view.inside.is_none()) {
+    if let Some(app) = view.app.as_deref().filter(|_| view.inside.is_none() && view.only.is_none()) {
         let mine = map.app_projects(app);
         parts.retain(|at| mine.contains(at));
     }
     if view.hide_tests {
         parts.retain(|&at| map.parts[at].kind != Kind::Tests);
+    }
+    if let Some(only) = view.only.as_ref().filter(|_| view.inside.is_none()) {
+        parts.retain(|&at| only.contains(&map.parts[at].id));
     }
     let links = links.into_iter().filter(|link| parts.contains(&link.from) && parts.contains(&link.to)).collect();
     (parts, links)
@@ -351,10 +365,14 @@ fn first(map: &CodeMap, parts: &[usize]) -> Option<usize> {
     parts.iter().copied().find(|&at| map.parts[at].kind == Kind::App).or_else(|| parts.first().copied())
 }
 
-/// Takes a level's first look: a map without apps opens on its projects, a big level focused.
+/// Takes a level's first look: a map without apps opens on its projects, a big level focused. Keeps up with the build.
 fn settle(ui: &mut Ui, controller: &Controller) {
     let Some(map) = controller.code_map() else { return };
+    let run = view(ui).and_then(|view| view.build.as_deref()).and_then(|key| controller.build_run(key));
     let Some(view) = view_mut(ui) else { return };
+    if let Some(run) = run {
+        keep_up(map, run, view);
+    }
     if view.sized {
         return;
     }
@@ -365,6 +383,47 @@ fn settle(ui: &mut Ui, controller: &Controller) {
     if view.focus.is_none() && view.trace.is_none() && level(map, view).0.len() > FOCUS_ABOVE {
         view.focus = Some(1);
     }
+}
+
+/// The build's projects for `B`, and while following, the picked box on a project compiling now - kept while it
+/// compiles, then the one that could start first - and once the build is over, back on the box picked before.
+fn keep_up(map: &CodeMap, run: &BuildRun, view: &mut View) {
+    let in_build = |at: usize| run.at_path(&map.parts[at].path);
+    if view.only.is_some() {
+        let projects = (0..map.parts.len()).filter(|&at| map.parts[at].inside.is_none() && in_build(at).is_some());
+        view.only = Some(projects.map(|at| map.parts[at].id.clone()).collect());
+    }
+    if !view.following {
+        return;
+    }
+    if !run.running() {
+        view.following = false;
+        if let Some(before) = view.before_follow.take() {
+            view.picked = before;
+        }
+        return;
+    }
+    let picked = view.picked.as_deref().and_then(|id| map.find(id));
+    if picked.and_then(in_build).is_some_and(|project| run.state(project) == ProjectState::Building) {
+        return;
+    }
+    let parts = level(map, view).0;
+    let next =
+        run.building().into_iter().find_map(|project| parts.iter().copied().find(|&at| in_build(at) == Some(project)));
+    if let Some(at) = next {
+        view.picked = Some(map.parts[at].id.clone());
+    }
+}
+
+/// Starts following the build: onto the projects, remembering the picked box.
+fn start_following(ui: &mut Ui) {
+    let now = ui.now;
+    let Some(view) = view_mut(ui) else { return };
+    if view.inside.is_some() || view.trace.is_some() {
+        (view.inside, view.trace, view.sized) = (None, None, false);
+        moved(view, now, Zoom::Out);
+    }
+    (view.following, view.before_follow) = (true, Some(view.picked.clone()));
 }
 
 /// A change the map moves for: `zoom` its way, edges drawing in again.
@@ -382,7 +441,7 @@ fn go(ui: &mut Ui, (inside, app): (Option<String>, Option<String>), picked: Opti
     }
 }
 
-/// The Code tab on app `key`'s projects with its build over them (#82): the running build, else its last.
+/// The Code tab on app `key`'s projects with its build over them (#82): the running build, followed, else its last.
 pub fn open_build(ui: &mut Ui, controller: &mut Controller, key: String) {
     let showing = view(ui).is_some_and(|view| view.build.as_deref() == Some(key.as_str()));
     if showing {
@@ -393,8 +452,12 @@ pub fn open_build(ui: &mut Ui, controller: &mut Controller, key: String) {
     } else {
         go(ui, (None, Some(key.clone())), None, Zoom::In);
     }
+    let running = controller.build_run(&key).is_some_and(BuildRun::running);
     if let Some(view) = view_mut(ui) {
         view.build = Some(key);
+    }
+    if running {
+        start_following(ui);
     }
 }
 
@@ -505,9 +568,23 @@ fn back(ui: &mut Ui, map: &CodeMap, current: &View) {
 
 /// The keys that move about the map.
 fn map_key(ui: &mut Ui, controller: &mut Controller, name: &str, current: &View) -> bool {
-    if name == "b" {
-        build_key(ui, controller, current);
-        return true;
+    match name {
+        "b" => build_key(ui, controller, current),
+        "w" => follow_key(ui, controller, current),
+        "B" => only_key(ui, controller, current),
+        _ => return moving_key(ui, controller, name, current),
+    }
+    true
+}
+
+/// The keys moving about the map by hand stop following the build.
+const BY_HAND: [&str; 13] =
+    ["h", "j", "k", "l", "LeftArrow", "DownArrow", "UpArrow", "RightArrow", "Enter", "Backspace", "a", "g", "c"];
+
+/// The keys that move about the map.
+fn moving_key(ui: &mut Ui, controller: &mut Controller, name: &str, current: &View) -> bool {
+    if current.following && BY_HAND.contains(&name) {
+        stop_following(ui);
     }
     let Some(map) = controller.code_map() else {
         return matches!(name, "Enter" | "Backspace" | "f" | "c" | "a" | "g" | "r" | "t" | "z" | "Z");
@@ -568,10 +645,56 @@ fn map_key(ui: &mut Ui, controller: &mut Controller, name: &str, current: &View)
     true
 }
 
+fn stop_following(ui: &mut Ui) {
+    if let Some(view) = view_mut(ui) {
+        (view.following, view.before_follow) = (false, None);
+    }
+}
+
+/// The build `w` and `B` are about: the one showing, else the app's on, the running build's or the last one's.
+fn build_for(controller: &mut Controller, current: &View) -> Option<String> {
+    let key = current.build.clone().or_else(|| controller.build_run_key(current.app.as_deref()));
+    if key.is_none() {
+        controller.add_log(NO_BUILD, Hue::DarkGray);
+    }
+    key
+}
+
+/// `w`: the picked box follows what builds - the project compiling now, the next once it's done - and goes back to
+/// where it was once the build is over; or stops following.
+fn follow_key(ui: &mut Ui, controller: &mut Controller, current: &View) {
+    if current.following {
+        stop_following(ui);
+        return;
+    }
+    let Some(key) = build_for(controller, current) else { return };
+    if !controller.build_run(&key).is_some_and(BuildRun::running) {
+        controller.add_log(NOTHING_BUILDING, Hue::DarkGray);
+        return;
+    }
+    open_build(ui, controller, key);
+    start_following(ui);
+}
+
+/// `B`: the build's projects alone - the ones built, building and still to build, with their links - or everything
+/// again.
+fn only_key(ui: &mut Ui, controller: &mut Controller, current: &View) {
+    if current.only.is_some() {
+        change(ui, Zoom::In, |view| view.only = None);
+        return;
+    }
+    let Some(key) = build_for(controller, current) else { return };
+    open_build(ui, controller, key);
+    change(ui, Zoom::Out, |view| {
+        (view.inside, view.trace, view.focus) = (None, None, None);
+        view.only = Some(BTreeSet::new());
+    });
+}
+
 /// `b`: the build over the projects - the app's on, the running build's or the last one's - or off again.
 fn build_key(ui: &mut Ui, controller: &mut Controller, current: &View) {
     if current.build.is_some() {
-        change(ui, Zoom::Still, |view| view.build = None);
+        change(ui, Zoom::Still, |view| (view.build, view.only, view.following) = (None, None, false));
         return;
     }
     match controller.build_run_key(current.app.as_deref()) {
@@ -588,7 +711,7 @@ pub fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, d
     let shown = shown(ui, map, &current);
     let id = shown.parts.get(index).map(|&at| map.parts[at].id.clone());
     if let Some(view) = view_mut(ui) {
-        view.picked = id.clone();
+        (view.picked, view.following) = (id.clone(), false);
     }
     if double {
         let picked = View { picked: id, ..current };
@@ -631,13 +754,7 @@ fn summary(map: &CodeMap, view: &View, parts: &[usize]) -> String {
 
 /// The header: the tabs, the level, then what the map has and how it's shown.
 fn header(ui: &Ui, controller: &Controller, view: &View, shown: Option<&Shown>, width: usize) -> Vec<Seg> {
-    let mut segs = vec![
-        super::viewbar::chip(ui.nerd, Icon::Stack, "Stack"),
-        seg("  ", C::Gray),
-        seg(" Map ", C::DarkGray),
-        on(" Code ", C::FocusText, C::FocusBack),
-        seg("   ", C::Gray),
-    ];
+    let mut segs = vec![seg(" Map ", C::DarkGray), on(" Code ", C::FocusText, C::FocusBack), seg("   ", C::Gray)];
     let (Some(map), Some(shown)) = (controller.code_map(), shown) else {
         segs.push(seg("reading the code…", C::Yellow));
         return super::columns::fit(segs, width);
@@ -675,6 +792,9 @@ fn notes(controller: &Controller, view: &View, shown: Option<&Shown>, width: usi
     }
     if view.hide_tests {
         notes.push("tests hidden (t)".into());
+    }
+    if view.only.is_some() {
+        notes.push("only the build's projects (B)".into());
     }
     match view.scale {
         Scale::Normal => {}
@@ -784,12 +904,12 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let map = controller.code_map();
     let shown = map.map(|map| shown(ui, map, &current));
     let hint = " h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z \
-                zoom · r implied edges · t tests · a all projects · c cycles · b the build · o open · y copy path · Tab \
-                the map · Esc back";
+                zoom · r implied edges · t tests · a all projects · c cycles · b the build (w follow it · B it alone) · o \
+                open · y copy path · Tab the map · Esc back";
     let mut lines = vec![header(ui, controller, &current, shown.as_ref(), width)];
     lines.extend(super::viewbar::keys(hint, width));
     if let Some(run) = current.build.as_deref().and_then(|key| controller.build_run(key)) {
-        lines.push(super::columns::fit(code_draw::build_summary(ui, run), width));
+        lines.push(super::columns::fit(code_draw::build_summary(ui, run, &current), width));
     }
     lines.extend(notes(controller, &current, shown.as_ref(), width));
     let (Some(map), Some(shown)) = (map, shown) else {

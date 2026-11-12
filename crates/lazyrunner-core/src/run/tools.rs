@@ -36,14 +36,16 @@ pub fn find_on_path(name: &str) -> Option<PathBuf> {
     })
 }
 
-/// A file as named, or with one of Windows' extensions.
+/// A file as named, or with one of Windows' extensions - on Windows those first: a name without an extension there is
+/// a shell script beside its `.cmd` (`mvnw` and `mvnw.cmd`), which Windows can't run.
 fn executable(path: &Path) -> Option<PathBuf> {
     let mut extended = executable_extensions().into_iter().map(|extension| {
         let mut file = path.as_os_str().to_os_string();
         file.push(extension);
         PathBuf::from(file)
     });
-    path.is_file().then(|| path.to_path_buf()).or_else(|| extended.find(|candidate| candidate.is_file()))
+    let as_named = || (!cfg!(windows) || path.extension().is_some()) && path.is_file();
+    extended.find(|candidate| candidate.is_file()).or_else(|| as_named().then(|| path.to_path_buf()))
 }
 
 /// A command's program: a path (from the command's folder) as written or with Windows' extensions; else in one of its
@@ -443,6 +445,16 @@ pub fn running_in(name: &str, dirs: &[&Path]) -> bool {
 #[cfg(test)]
 mod home_tests {
     use super::*;
+
+    #[test]
+    fn a_wrapper_is_its_cmd_on_windows_and_itself_elsewhere() {
+        let temp = crate::testing::TempDir::new("wrapper");
+        crate::testing::write(temp.join("mvnw"), "#!/bin/sh");
+        crate::testing::write(temp.join("mvnw.cmd"), "@echo off");
+        let found = program_path(temp.path(), &[], "./mvnw").expect("the wrapper");
+        let name = found.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default();
+        assert_eq!(name, if cfg!(windows) { "mvnw.cmd" } else { "mvnw" });
+    }
 
     #[test]
     fn a_path_folder_from_home_is_looked_for_there_and_isnt_one_an_install_makes() {

@@ -504,6 +504,17 @@ mod tests {
     }
 
     #[test]
+    fn a_spring_boot_folder_becomes_a_java_command_app() {
+        let repo = crate::testing::TempDir::new("init-java");
+        let pom = "<project><build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build></project>";
+        crate::testing::write(repo.join("services/pricing/pom.xml"), pom);
+        let (profile, _) = scaffold(repo.path());
+        let apps: Vec<&Value> = profile["apps"].as_array().into_iter().flatten().collect();
+        assert_eq!(apps.len(), 1, "{apps:?}");
+        assert_eq!((apps[0]["preset"].as_str(), apps[0]["key"].as_str()), (Some("java"), Some("pricing")));
+    }
+
+    #[test]
     fn keys_are_unique_lowercase_and_start_with_a_letter() {
         let mut taken = HashSet::new();
         assert_eq!(app_key("Orders", &mut taken), "orders");

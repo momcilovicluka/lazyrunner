@@ -303,7 +303,6 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     };
     let db = controller.db_label.clone().unwrap_or_else(|| "n/a".into());
     let header = vec![
-        super::viewbar::chip(nerd, Icon::Migrations, "Migrations"),
         seg("   database ", C::DarkGray),
         seg(db, C::Yellow),
         seg(working, C::Yellow),

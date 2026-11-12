@@ -85,12 +85,14 @@ impl Default for Cell {
 }
 
 /// How an edge gets from its source to its target: a lane (a gap, its place in it) beside its source, one beside its
-/// target, and a row under the boxes. Along its source's row it needs only the last; along its target's, only the
-/// first; around the boxes, all three.
+/// target, and a row between them. Along its source's row it needs only the last; along its target's, only the
+/// first; otherwise both lanes and a `channel` - the nearest row no box between its ends is on - or, when there's
+/// none, a row under the boxes (`bus`).
 #[derive(Clone, Copy, Debug, Default)]
 struct Way {
     first: Option<(usize, usize)>,
     last: Option<(usize, usize)>,
+    channel: Option<usize>,
     bus: Option<usize>,
 }
 
@@ -224,10 +226,24 @@ fn ways(
             column <= from || column >= to || row < ys[node] || row >= ys[node] + sizes[node].1
         })
     };
+    // No box of a column from `lo` to `hi`, both included, on `row`.
+    let clear = |row: usize, lo: usize, hi: usize| {
+        (0..columns.len()).all(|node| {
+            let column = columns[node];
+            column < lo || column > hi || row < ys[node] || row >= ys[node] + sizes[node].1
+        })
+    };
+    let below = (0..columns.len()).map(|node| ys[node] + sizes[node].1).max().unwrap_or(0);
     let mut taken = vec![0; count + 1];
     let mut labels = vec![0; count + 1];
     // The rows under the boxes, each with the gaps its edges span: edges whose spans don't meet share one.
     let mut buses: Vec<Vec<(usize, usize)>> = Vec::new();
+    // The rows between the boxes a stretch runs along, with the gaps it spans: another's may share a row only where
+    // their spans don't meet, so two lines never run on top of each other.
+    let mut along: Vec<(usize, (usize, usize))> = Vec::new();
+    let meets = |along: &[(usize, (usize, usize))], row: usize, (lo, hi): (usize, usize)| {
+        along.iter().any(|&(taken, (a, b))| taken == row && !(b < lo || hi < a))
+    };
     let mut lane = |gap: usize| {
         taken[gap] += 1;
         (gap, taken[gap] - 1)
@@ -240,21 +256,38 @@ fn ways(
         let (from, to) = (columns[edge.from], columns[edge.to]);
         let (sy, ty) = (ys[edge.from] + ends[at].0, ys[edge.to] + ends[at].1);
         let label = edge.label.width() + 1;
+        let span = ((from + 1).min(to), (from + 1).max(to));
+        // The columns its stretch between the lanes crosses: those between its ends, or going back, its ends' too.
+        let crossed = if to > from { (from + 1, to.saturating_sub(1)) } else { (to, from) };
+        let middle = (sy + ty) / 2;
+        // A row between the boxes, no farther than the first row under them: a way round, not a detour.
+        let channel = || {
+            let mut rows: Vec<usize> =
+                (0..below).filter(|&row| row.abs_diff(middle) <= (below + 1).abs_diff(middle)).collect();
+            rows.sort_by_key(|&row| (row.abs_diff(middle), row));
+            rows.into_iter()
+                .find(|&row| (crossed.0 > crossed.1 || clear(row, crossed.0, crossed.1)) && !meets(&along, row, span))
+        };
         ways[at] = if to > from && free(sy, from, to) {
             labels[to] = labels[to].max(label);
+            along.push((sy, span));
             Way { last: Some(lane(to)), ..Way::default() }
         } else if to > from && free(ty, from, to) {
+            along.push((ty, span));
             Way { first: Some(lane(from + 1)), ..Way::default() }
+        } else if let Some(row) = channel() {
+            labels[to] = labels[to].max(label);
+            along.push((row, span));
+            Way { first: Some(lane(from + 1)), last: Some(lane(to)), channel: Some(row), bus: None }
         } else {
             labels[to] = labels[to].max(label);
-            let span = ((from + 1).min(to), (from + 1).max(to));
             let apart = |spans: &Vec<(usize, usize)>| spans.iter().all(|&(a, b)| b < span.0 || span.1 < a);
             let bus = buses.iter().position(apart).unwrap_or(buses.len());
             if bus == buses.len() {
                 buses.push(Vec::new());
             }
             buses[bus].push(span);
-            Way { first: Some(lane(from + 1)), last: Some(lane(to)), bus: Some(bus) }
+            Way { first: Some(lane(from + 1)), last: Some(lane(to)), channel: None, bus: Some(bus) }
         };
     }
     (ways, taken, labels, buses.len())
@@ -353,9 +386,8 @@ fn route(layout: &Layout, edge: &Edge, at: usize) -> Option<Route> {
     let (sy, ty) = (from.y + layout.ends[at].0, to.y + layout.ends[at].1);
     let (start, end) = ((from.x + from.w, sy), (to.x.checked_sub(1)?, ty));
     let way = layout.ways[at];
-    let points = match (way.first, way.last, way.bus) {
-        (Some(first), Some(last), Some(bus)) => {
-            let row = layout.below + 1 + 2 * bus;
+    let points = match (way.first, way.last, way.channel.or(way.bus.map(|bus| layout.below + 1 + 2 * bus))) {
+        (Some(first), Some(last), Some(row)) => {
             vec![start, (x(first), sy), (x(first), row), (x(last), row), (x(last), ty), end]
         }
         (_, Some(last), None) => vec![start, (x(last), sy), (x(last), ty), end],
@@ -672,6 +704,19 @@ mod tests {
         ];
         assert_eq!(drawn.trim_end(), expected.join("\n"), "out of B's right side, under, into A's left side");
         assert_eq!(map.layout.columns, [0, 1]);
+    }
+
+    #[test]
+    fn an_edge_blocked_on_both_its_rows_runs_between_the_boxes_not_under_them_all() {
+        // Api -> Core and Api -> Data stack in the middle column; Core -> Web; Api -> Web skips the middle column, Core
+        // in the way on its rows: it runs along the row between Core and Data.
+        let nodes = [node("Api"), node("Core"), node("Data"), node("Web")];
+        let edges = [edge(0, 1, ""), edge(0, 2, ""), edge(1, 3, ""), edge(0, 3, "")];
+        let layout = layout(&nodes, &edges);
+        let core = layout.boxes[1];
+        assert_eq!(layout.ways[3].bus, None, "not under every box");
+        assert_eq!(layout.ways[3].channel, Some(core.y + core.h), "the row between Core and Data");
+        assert_eq!(layout.height, layout.below, "no row under the boxes is needed");
     }
 
     #[test]

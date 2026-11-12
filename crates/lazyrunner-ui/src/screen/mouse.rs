@@ -57,6 +57,8 @@ pub enum Target {
     Ports,
     /// A failed task's chip in the panel's header, by its place in the profile's tasks: a click puts it away.
     TaskResult(usize),
+    /// A screen's name in the bar over every screen: a click goes there.
+    Screen(super::screens::Screen),
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -172,6 +174,10 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         if !matches!(target, Some(Target::Item(_) | Target::Box)) {
             ui.picker = None;
         }
+        return;
+    }
+    if let Some(Target::Screen(screen)) = target {
+        super::screens::go(ui, controller, screen);
         return;
     }
     if super::suites::click(ui, controller, target, double)

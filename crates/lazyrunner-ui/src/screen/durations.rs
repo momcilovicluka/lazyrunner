@@ -256,7 +256,7 @@ fn details(ui: &Ui, kind: Kind, item: &Item, width: usize, room: usize, picked: 
 
 /// The header: the view, how many items, and the one that got the most slower.
 fn header(all: &[(Kind, &Item)], nerd: bool) -> Vec<Seg> {
-    let mut segs = vec![super::viewbar::chip(nerd, Icon::Hourglass, "Durations")];
+    let mut segs = Vec::new();
     let plural = if all.len() == 1 { "" } else { "s" };
     segs.push(seg(format!("  {} item{plural}", all.len()), C::Gray));
     let slower = all

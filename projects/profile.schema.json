@@ -222,7 +222,7 @@
           "items": {
             "type": "object", "additionalProperties": false,
             "properties": {
-              "when": { "type": "object", "additionalProperties": false, "properties": { "anyFile": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "program": { "type": "string", "minLength": 1 } } },
+              "when": { "type": "object", "additionalProperties": false, "properties": { "anyFile": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "program": { "type": "string", "minLength": 1 }, "anyFileContains": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 }, "description": "Holds when one of these files, from the app's folder, has its text (a plugin, a dependency)." } } },
               "run": { "$ref": "#/$defs/command" }, "build": { "$ref": "#/$defs/command" }, "install": { "$ref": "#/$defs/command" },
               "setup": { "oneOf": [{ "$ref": "#/$defs/command" }, { "type": "array", "maxItems": 0 }] }, "installFrom": { "type": "array", "items": { "type": "string" } },
               "ready": { "type": "object" }, "watch": { "type": "array", "items": { "type": "string" } }, "errors": { "type": "array", "items": { "type": "string" } },
