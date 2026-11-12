@@ -602,7 +602,7 @@ async fn cut_off_labels_scroll_sideways_several_at_once() {
 async fn changelog_view() {
     let mut screen = screen("snap-changelog", json!({}));
     let lines = (1..=40).map(|n| Line { text: format!("  • change {n}"), hue: Hue::Gray }).collect();
-    screen.ui.overlay = Some(Overlay::Changelog { lines, top: 0 });
+    screen.ui.overlay = Some(Overlay::Changelog { lines, top: 0, seen: None });
     screen.press("j j");
     insta::assert_snapshot!(screen.frame());
     screen.press("q");

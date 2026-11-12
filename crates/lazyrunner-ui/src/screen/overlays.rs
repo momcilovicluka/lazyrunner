@@ -110,11 +110,6 @@ fn switch(label: &str) -> Option<(bool, &str)> {
     label.strip_prefix("[x] ").map(|rest| (true, rest)).or_else(|| label.strip_prefix("[ ] ").map(|rest| (false, rest)))
 }
 
-/// A selected item: the whole line in the highlight colours.
-fn selected(text: &str, inner: usize) -> Vec<Seg> {
-    vec![on(pad(text, inner), C::Black, C::Cyan)]
-}
-
 /// A selected item in parts (key, label, hint): when it doesn't fit, only its tail scrolls (`Ui::scrolling_parts`).
 fn selected_parts(ui: &Ui, parts: &[&str], inner: usize) -> Vec<Seg> {
     vec![on(ui.scrolling_parts(parts, inner), C::Black, C::Cyan)]
@@ -124,84 +119,6 @@ fn selected_parts(ui: &Ui, parts: &[&str], inner: usize) -> Vec<Seg> {
 /// terminal has.
 pub fn fit_inner(cells: usize, usual: usize, widest: usize) -> usize {
     cells.saturating_sub(8).min(usual.max(widest)).max(20)
-}
-
-pub fn picker(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let cursor = ui.cursor();
-    let Some(picker) = ui.picker.as_mut() else { return Vec::new() };
-    let entries = picker.entries();
-    let (key, group_size) =
-        picker.groups.get(picker.group).map_or((String::new(), 0), |(key, entries)| (key.clone(), entries.len()));
-    let inner = cells.saturating_sub(8).clamp(20, 96);
-    let visible = entries.len().min(rows.saturating_sub(8)).max(1);
-    if picker.index < picker.top {
-        picker.top = picker.index;
-    }
-    if picker.index >= picker.top + visible {
-        picker.top = picker.index + 1 - visible;
-    }
-    let mut lines =
-        vec![vec![seg(format!("secrets.json · {group_size} connection strings · active one marked ●"), C::DarkGray)]];
-    if picker.filtering || !picker.filter.is_empty() {
-        let cursor = if picker.filtering { cursor } else { " " };
-        lines.push(vec![
-            seg("/ ", C::Cyan),
-            seg(picker.filter.clone(), C::White),
-            seg(cursor, C::Cyan),
-            seg(format!("  {} shown", entries.len()), C::DarkGray),
-        ]);
-    }
-    if entries.is_empty() {
-        lines.push(vec![seg("  nothing matches", C::DarkGray)]);
-    }
-    for (index, entry) in entries.iter().enumerate().skip(picker.top).take(visible) {
-        let marker = if entry.active { '●' } else { ' ' };
-        let text = format!(" {marker} {}{}", entry.label, if entry.active { "   (active)" } else { "" });
-        let line = if index == picker.index {
-            selected(&text, inner)
-        } else {
-            vec![seg(pad(&text, inner), if entry.active { C::Green } else { C::Gray })]
-        };
-        lines.push(aim(line, Target::Item(index)));
-    }
-    let group_info = if picker.groups.len() > 1 {
-        format!("  ({}/{}, h l other keys)", picker.group + 1, picker.groups.len())
-    } else {
-        String::new()
-    };
-    if let Some(name) = &picker.new_name {
-        lines.push(vec![
-            seg("+ new database (copy of the selected one): ", C::Cyan),
-            seg(name.clone(), C::White),
-            seg(cursor, C::Cyan),
-        ]);
-        return boxed(
-            &icons::titled(ui.nerd, Icon::Database, &format!("Database · {key}")),
-            lines,
-            "type the database name · Enter adds it (inactive) · Esc cancels",
-            cells,
-            rows,
-            96,
-        );
-    }
-    let more = if entries.len() > visible {
-        format!("  ({}-{} of {})", picker.top + 1, picker.top + visible, entries.len())
-    } else {
-        String::new()
-    };
-    let footer = if picker.filtering {
-        "type to filter · Enter keeps it · Esc clears it".to_string()
-    } else {
-        format!("j k choose · Enter switch + restart the APIs · n new · y copy row · / filter · Esc close{more}")
-    };
-    boxed(
-        &icons::titled(ui.nerd, Icon::Database, &format!("Database · {key}{group_info}")),
-        lines,
-        &footer,
-        cells,
-        rows,
-        96,
-    )
 }
 
 /// The items of the x menu or the , settings.
@@ -388,9 +305,36 @@ fn column_digits(count: usize) -> String {
 
 /// The key reference: every action by group, lowercase and uppercase twins on one line, then navigation, in as many
 /// columns as the height needs.
+/// The key reference's keys: `/` filters it (`Enter` keeps the filter, `Esc` clears it), any other key closes it.
+pub fn help_key(ui: &mut Ui, name: &str, key: &crossterm::event::KeyEvent) {
+    if ui.help_typing {
+        match name {
+            "Escape" => (ui.help_filter, ui.help_typing) = (String::new(), false),
+            "Enter" => ui.help_typing = false,
+            "Backspace" => {
+                ui.help_filter.pop();
+            }
+            _ => ui.help_filter.extend(super::keys::typed(key)),
+        }
+        return;
+    }
+    if name == "/" {
+        (ui.help_typing, ui.help_filter) = (true, String::new());
+        return;
+    }
+    ui.help_filter.clear();
+    ui.overlay = None;
+}
+
+/// The groups' colours for their keys.
+const GROUP_COLORS: [C; 6] = [C::Yellow, C::Green, C::Magenta, C::Cyan, C::Blue, C::DarkYellow];
+/// The keys used most this session, listed at most.
+const MOST_USED: usize = 6;
+
 pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let color = std::cell::Cell::new(C::Yellow);
     let entry =
-        |keys: &str, label: &str| vec![seg(format!("  {keys:<12}"), C::Yellow), seg(label.to_string(), C::Gray)];
+        |keys: &str, label: &str| vec![seg(format!("  {keys:<12}"), color.get()), seg(label.to_string(), C::Gray)];
     let all = actions::actions(ui, controller);
     let mut groups: Vec<&str> = Vec::new();
     for action in &all {
@@ -399,7 +343,17 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         }
     }
     let mut entries: Vec<Vec<Seg>> = Vec::new();
-    for group in groups {
+    let mut used: Vec<(&String, &usize)> = ui.key_counts.iter().collect();
+    used.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+    if !used.is_empty() {
+        entries.push(vec![seg("You use most", C::White)]);
+        for (key, count) in used.into_iter().take(MOST_USED) {
+            let label = all.iter().find(|action| &action.key == key).map_or("", |action| action.label.as_str());
+            entries.push(entry(key, &format!("{label} ×{count}")));
+        }
+    }
+    for (place, group) in groups.into_iter().enumerate() {
+        color.set(GROUP_COLORS[place % GROUP_COLORS.len()]);
         entries.push(vec![seg(group, C::Cyan)]);
         for action in all.iter().filter(|action| action.group == group) {
             let key = action.key.as_str();
@@ -433,6 +387,7 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             }
         }
     }
+    color.set(C::Yellow);
     entries.push(vec![seg("Navigate", C::Cyan)]);
     let digits = column_digits(controller.apps.len());
     for (keys, label) in [
@@ -444,6 +399,14 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         ("n N Esc", "search: older / newer / clear"),
     ] {
         entries.push(entry(keys, label));
+    }
+    if !ui.help_filter.is_empty() {
+        let wanted = ui.help_filter.to_lowercase();
+        let text = |entry: &Vec<Seg>| entry.iter().map(|part| part.text.to_lowercase()).collect::<String>();
+        entries.retain(|entry| entry.len() > 1 && text(entry).contains(&wanted));
+        if entries.is_empty() {
+            entries.push(vec![seg(format!("No key matches '{}'.", ui.help_filter), C::DarkGray)]);
+        }
     }
     let columns = entries.len().div_ceil(rows.saturating_sub(4).max(1)).max(2);
     let per_column = entries.len().div_ceil(columns);
@@ -464,7 +427,12 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         })
         .collect();
     let inner = widths.iter().sum::<usize>().saturating_sub(4);
-    let footer = "any key closes · : searches every command · lowercase = focused app, uppercase = all apps or a tool";
+    let typing = format!("/{}{} · Enter keeps it · Esc clears it", ui.help_filter, ui.cursor());
+    let footer = if ui.help_typing {
+        typing.as_str()
+    } else {
+        "/ filters · any key closes · : searches every command · lowercase = focused app, uppercase = all apps or a tool"
+    };
     boxed(
         &icons::titled(ui.nerd, Icon::Keyboard, &format!("Keys · lazyrunner v{VERSION}")),
         lines,
@@ -960,12 +928,30 @@ fn group_icon(group: Group) -> Icon {
 }
 
 pub fn changelog(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let Some(Overlay::Changelog { lines, top }) = &mut ui.overlay else { return Vec::new() };
+    let Some(Overlay::Changelog { lines, top, seen }) = &mut ui.overlay else { return Vec::new() };
+    let seen = seen.as_deref().and_then(changelog::version);
     let wrapped = changelog::wrap(lines, cells.saturating_sub(8).clamp(20, 90));
     let visible = rows.saturating_sub(4).max(1);
     *top = (*top).min(wrapped.len().saturating_sub(visible));
-    let shown: Vec<Vec<Seg>> =
-        wrapped.iter().skip(*top).take(visible).map(|line| vec![seg(line.text.clone(), hue_color(line.hue))]).collect();
+    // A rail down the side: a dot per version, what's newer than the version it was last opened at lit.
+    let mut newer = seen.is_some();
+    let marked: Vec<Vec<Seg>> = wrapped
+        .iter()
+        .map(|line| {
+            let heading = changelog::version(&line.text);
+            if let (Some(version), Some(seen)) = (heading, seen) {
+                newer = version > seen;
+            }
+            let (mark, color) = match (heading.is_some(), newer) {
+                (true, true) => ("● ", C::Yellow),
+                (true, false) => ("● ", C::DarkCyan),
+                (false, true) => ("┃ ", C::Yellow),
+                (false, false) => ("│ ", C::DarkGray),
+            };
+            vec![seg(mark, color), seg(line.text.clone(), hue_color(line.hue))]
+        })
+        .collect();
+    let shown: Vec<Vec<Seg>> = marked.into_iter().skip(*top).take(visible).collect();
     let more = if wrapped.len() > visible {
         format!("{}-{} of {} · j k scroll · ", *top + 1, *top + shown.len(), wrapped.len())
     } else {
@@ -974,7 +960,7 @@ pub fn changelog(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     boxed(
         &icons::titled(ui.nerd, Icon::Changelog, &format!("lazyrunner v{VERSION} · changelog")),
         shown,
-        &format!("{more}Esc closes"),
+        &format!("{more}{}Esc closes", if seen.is_some() { "┃ new since you last looked · " } else { "" }),
         cells,
         rows,
         90,

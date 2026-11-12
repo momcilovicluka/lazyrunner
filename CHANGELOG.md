@@ -3,6 +3,19 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.86.0] - 2026-11-12
+
+### Added
+- The database picker is a screen of its own (`d`, in the bar of screens): each connection string with whether its server answers (checked as it opens, the dot breathing meanwhile) and how fast, the apps on it, its pending migrations and when you last switched to it.
+- A stopped column says the app's last start and build (against its usual) and its port - free, or who holds it - and its state breathes faintly.
+- The migrations view says what the picked migration (else the next pending one) does, from its file - `CreateTable Invoices`, `AddColumn Orders.Currency` - a drop or delete in red.
+- The About box counts this session up: builds (and failed), apps up, crashes, requests, test runs.
+- Audit's header ends with a severity bar for the whole stack and the outdated packages by major, minor and patch.
+- Marks show the lines around the picked one; the changelog has a rail of versions, what's new since you last opened it lit; the key reference filters (`/`), colours keys by group and lists the ones you use most.
+
+### Changed
+- Motion: a screen slides in from its side of the bar, the one it left lit a moment; figures (CPU, memory, the Health readings, the About counts) roll to their new values, a big change tinted green or red; a key that does nothing shakes the hints. None of it with reduced motion.
+
 ## [1.85.0] - 2026-11-12
 
 ### Added

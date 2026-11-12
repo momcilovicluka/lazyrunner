@@ -233,6 +233,56 @@ pub(super) fn go_to(ui: &mut Ui, controller: &mut Controller, app: usize, number
 }
 
 /// The marks box: each mark's app, how long ago its line came, and the line.
+/// A mark's row: its app, how long ago, its note and its line - the picked one lit (a note being typed yellow).
+fn mark_row(
+    ui: &Ui,
+    controller: &Controller,
+    (at, index): (usize, usize),
+    (app, number): (usize, u64),
+    (inner, writing): (usize, Option<&str>),
+) -> Vec<Seg> {
+    let name = pad(controller.apps.get(app).map_or("", |app| app.name.as_str()), NAME_CELLS);
+    let line = controller.states[app].output.numbered(number, number).next();
+    let (age, text) = match line {
+        Some(line) => {
+            let age = format_duration(ui.now.saturating_duration_since(line.born).as_secs_f64());
+            (format!("{age} ago"), line.text.trim().to_string())
+        }
+        None => (String::new(), "(gone from the buffer)".to_string()),
+    };
+    let lead = format!(" {name} {age:>9}  ");
+    let noted = controller.states[app].notes.get(&number).map_or(String::new(), |note| format!("{note} · "));
+    if at == index
+        && let Some(typing) = writing
+    {
+        return vec![on(pad(&format!("{lead}note: {typing}{}", ui.cursor()), inner), C::Black, C::Yellow)];
+    }
+    if at == index {
+        return vec![on(ui.scrolling_parts(&[&lead, &noted, &text], inner), C::Black, C::Cyan)];
+    }
+    vec![
+        seg(format!(" {name}"), C::Magenta),
+        seg(format!(" {age:>9}  "), C::DarkGray),
+        seg(noted, C::Yellow),
+        seg(text, if line.is_some() { C::White } else { C::DarkGray }),
+    ]
+}
+
+/// The lines around the picked mark, dim, so it reads in its place without jumping there.
+fn around(controller: &Controller, (app, number): (usize, u64), inner: usize) -> Vec<Vec<Seg>> {
+    let output = &controller.states[app].output;
+    let line = |number: u64| output.numbered(number, number).next().map(|line| line.text.trim().to_string());
+    let mut rows = Vec::new();
+    for (near, mark) in [(number.saturating_sub(1), "  ┆ before "), (number + 1, "  ┆ after  ")] {
+        if near != number
+            && let Some(text) = line(near)
+        {
+            rows.push(super::columns::fit(vec![seg(mark, C::DarkGray), seg(text, C::DarkGray)], inner));
+        }
+    }
+    rows
+}
+
 pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let marks = all(controller);
     let (index, writing) = match &ui.overlay {
@@ -243,33 +293,12 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
     let mut lines: Vec<Vec<Seg>> = marks
         .iter()
         .enumerate()
-        .map(|(at, &(app, number))| {
-            let name = pad(controller.apps.get(app).map_or("", |app| app.name.as_str()), NAME_CELLS);
-            let line = controller.states[app].output.numbered(number, number).next();
-            let (age, text) = match line {
-                Some(line) => {
-                    let age = format_duration(ui.now.saturating_duration_since(line.born).as_secs_f64());
-                    (format!("{age} ago"), line.text.trim().to_string())
-                }
-                None => (String::new(), "(gone from the buffer)".to_string()),
-            };
-            let lead = format!(" {name} {age:>9}  ");
-            let noted = controller.states[app].notes.get(&number).map_or(String::new(), |note| format!("{note} · "));
-            if at == index
-                && let Some(typing) = writing
-            {
-                return vec![on(pad(&format!("{lead}note: {typing}{}", ui.cursor()), inner), C::Black, C::Yellow)];
-            }
+        .flat_map(|(at, &(app, number))| {
+            let mut rows = vec![mark_row(ui, controller, (at, index), (app, number), (inner, writing))];
             if at == index {
-                vec![on(ui.scrolling_parts(&[&lead, &noted, &text], inner), C::Black, C::Cyan)]
-            } else {
-                vec![
-                    seg(format!(" {name}"), C::Magenta),
-                    seg(format!(" {age:>9}  "), C::DarkGray),
-                    seg(noted, C::Yellow),
-                    seg(text, if line.is_some() { C::White } else { C::DarkGray }),
-                ]
+                rows.extend(around(controller, (app, number), inner));
             }
+            rows
         })
         .collect();
     if marks.is_empty() {

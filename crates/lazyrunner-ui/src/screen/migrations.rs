@@ -421,9 +421,35 @@ fn details(
         let text = "The database's migration history couldn't be read - applied / pending is unknown.";
         lines.push(vec![seg(text, C::Yellow)]);
     }
+    lines.extend(steps(context, picking, width));
     lines.push(Vec::new());
     let room = height.saturating_sub(lines.len()).max(1);
     lines.extend(migrations_rail::rail(context, picking, look, width, room));
+    lines
+}
+
+/// The most steps of a migration listed.
+const MOST_STEPS: usize = 6;
+
+/// What the picked migration does - else the next pending one - from its file: its steps, a drop or delete red.
+fn steps(context: &Context, picking: Option<usize>, width: usize) -> Vec<Vec<Seg>> {
+    let pending = context.items.iter().position(|migration| migration.applied == Some(false));
+    let Some(migration) = picking.or(pending).and_then(|at| context.items.get(at)) else { return Vec::new() };
+    let steps = lazyrunner_core::run::migrations::steps(&context.project, &migration.id);
+    if steps.is_empty() {
+        return Vec::new();
+    }
+    let mut lines = vec![Vec::new(), vec![seg(format!("What {} does", migration.name), C::DarkCyan)]];
+    for step in steps.iter().take(MOST_STEPS) {
+        let (mark, color) = if step.destructive { ("✗ ", C::Red) } else { ("· ", C::Gray) };
+        lines.push(super::columns::fit(vec![seg(format!("{mark}{}", step.what), color)], width));
+    }
+    if steps.len() > MOST_STEPS {
+        lines.push(vec![seg(format!("… {} more", steps.len() - MOST_STEPS), C::DarkGray)]);
+    }
+    if steps.iter().any(|step| step.destructive) {
+        lines.push(vec![seg("it drops or deletes data: reverting it won't bring that back", C::Red)]);
+    }
     lines
 }
 

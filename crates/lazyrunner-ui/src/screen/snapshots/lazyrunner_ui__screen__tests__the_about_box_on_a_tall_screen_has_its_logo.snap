@@ -3,8 +3,6 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: "screen.render(SIZE.0, 44)"
 ---
 
-
-
                 ┌─ ✦ About lazyrunner ──────────────────────────────────────────────────────┐
                 │                                                                           │
                 │                  █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                  │
@@ -14,6 +12,10 @@ expression: "screen.render(SIZE.0, 44)"
                 │                                                                           │
                 │   ⇩ v<version> · released <date>    · windows x86_64 · running Sample       │
                 │   Runs a project's .NET and npm apps side by side.                        │
+                │                                                                           │
+                │   This session                                                            │
+                │    up 0s · 0 builds (0 failed) · 0 apps up                                │
+                │    0 crashes · 0 requests · 0 test runs                                   │
                 │                                                                           │
                 │   Core contributors                                                       │
                 │    • Luka Momčilović    creator · maintainer · @momcilovicluka            │
@@ -34,8 +36,6 @@ expression: "screen.render(SIZE.0, 44)"
                 │   made with ♥ and ⚙ Rust · lazyrunner License 1.1                         │
                 │ a letter, or j k + Enter · Esc closes                                     │
                 └───────────────────────────────────────────────────────────────────────────┘
-
-
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample

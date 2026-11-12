@@ -9,7 +9,7 @@ use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use lazyrunner_core::changelog;
 use lazyrunner_core::contributors;
 use lazyrunner_core::output::Hue;
-use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::{Controller, format_duration};
 use lazyrunner_core::update::{self, DEFAULT_REPO};
 use unicode_width::UnicodeWidthStr;
 
@@ -277,6 +277,10 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     }
     lines.push(Vec::new());
     lines.push(made_with(nerd, animated, tick));
+    let session = session(ui, controller);
+    if lines.len() + session.len() + 3 <= rows {
+        lines.splice(3..3, session);
+    }
     // A short terminal loses the logo first, then the blank line above the rest.
     let logo = logo(inner, animated, seconds);
     let borders = 3;
@@ -288,6 +292,34 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let sparkle = if animated { SPARKLES[(tick / 3) as usize % SPARKLES.len()] } else { SPARKLES[0] };
     let footer = "a letter, or j k + Enter · Esc closes";
     boxed(&format!("{sparkle} About lazyrunner"), lines, footer, cells, rows, inner)
+}
+
+/// This session in numbers, counting up as the box opens: how long lazyrunner has run, its builds (and failed ones),
+/// the apps up, crashes, requests served, test runs.
+fn session(ui: &mut Ui, controller: &Controller) -> Vec<Vec<Seg>> {
+    let count = |event: &str| controller.session.get(event).copied().unwrap_or(0) as f64;
+    let mut roll = |id: &str, value: f64| ui.roll(&format!("about:{id}"), value, true, false).0.round() as u64;
+    let up = format_duration(controller.session_started.elapsed().as_secs_f64());
+    let builds = roll("builds", count("build.passed") + count("build.failed"));
+    let failed = roll("failed", count("build.failed"));
+    let started = roll("up", count("app.up"));
+    let crashed = roll("crashes", count("app.crashed"));
+    let requests = roll("requests", controller.requests.seq as f64);
+    let tests = roll("tests", count("tests.green") + count("tests.red"));
+    vec![
+        vec![seg("  This session", C::DarkCyan)],
+        vec![
+            seg(format!("   up {up} · "), C::Gray),
+            seg(format!("{builds} builds"), C::Cyan),
+            seg(format!(" ({failed} failed) · "), if failed > 0 { C::Red } else { C::DarkGray }),
+            seg(format!("{started} apps up"), C::Green),
+        ],
+        vec![
+            seg(format!("   {crashed} crashes · "), if crashed > 0 { C::Red } else { C::DarkGray }),
+            seg(format!("{requests} requests · {tests} test runs"), C::Magenta),
+        ],
+        Vec::new(),
+    ]
 }
 
 /// The logo, centred, in rainbow colours flowing across it, a rainbow rule flowing the other way under it. Still:

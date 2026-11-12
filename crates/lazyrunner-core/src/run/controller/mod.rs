@@ -290,6 +290,9 @@ pub struct Controller {
     pub profiles: HashMap<String, Vec<crate::run::profile::Profile>>,
     pub last_profiled: Option<(String, Instant)>,
     pub installing_trace: bool,
+    /// What happened this session, by the hooks' event names (the About box counts them), and when it began.
+    pub session: HashMap<&'static str, usize>,
+    pub session_started: Instant,
     /// The spans the apps sent (#97), and the port lazyrunner receives them on.
     pub traces: crate::run::otlp::Traces,
     pub otlp_port: Option<u16>,
@@ -450,6 +453,8 @@ impl Controller {
             profiles,
             last_profiled: None,
             installing_trace: false,
+            session: HashMap::new(),
+            session_started: Instant::now(),
             traces: Default::default(),
             otlp_port,
             task_results: HashMap::new(),

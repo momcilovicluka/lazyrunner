@@ -12,6 +12,7 @@ pub mod code_draw;
 pub mod code_search;
 pub mod columns;
 pub mod copy;
+pub mod database;
 pub mod diff;
 pub mod durations;
 pub mod flame;
@@ -64,6 +65,20 @@ pub mod viewbar;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+
+/// A figure rolling to its value (`Ui::roll`).
+#[derive(Clone, Copy, Debug)]
+struct Roll {
+    shown: f64,
+    at: Instant,
+    target: f64,
+    changed: Option<(Instant, bool)>,
+}
+
+/// A change of more than this share is tinted (a figure's every small wobble isn't).
+const ROLL_SIGNIFICANT: f64 = 0.1;
+/// How long a changed figure stays tinted.
+const ROLL_TINT: std::time::Duration = std::time::Duration::from_millis(700);
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -158,6 +173,8 @@ pub enum Overlay {
     Changelog {
         lines: Vec<Line>,
         top: usize,
+        /// The version it was last opened at: what's newer is marked.
+        seen: Option<String>,
     },
     /// `D`: how long builds, starts and npm ci took over their last runs.
     /// `D`: the durations; the picked item, and when it was picked (its chart grows in).
@@ -387,6 +404,17 @@ pub struct Ui {
     pub health_sort: usize,
     /// The request whose timeline last opened, and when (its playhead sweeps from then, #97).
     pub waterfall_seen: Option<(u64, Instant)>,
+    /// The screen shown last frame, and the last switch: from which to which, when (the new one slides in).
+    pub last_screen: Option<screens::Screen>,
+    pub screen_change: Option<(screens::Screen, screens::Screen, Instant)>,
+    /// When a key did nothing: the hints shake once.
+    pub shake_at: Option<Instant>,
+    /// The key reference's filter (`/`), whether it's being typed, and how often each key ran an action this session.
+    pub help_filter: String,
+    /// The database screen's servers, answering or not (checked as it opens).
+    pub db_reach: Option<database::Reachability>,
+    pub help_typing: bool,
+    pub key_counts: HashMap<String, usize>,
     pub health_edit: Option<health::Editing>,
     /// The capture whose chart opened on its own (#83), by when it was done.
     pub profile_seen: Option<Instant>,
@@ -468,6 +496,9 @@ pub struct Ui {
     /// A key that ended the startup checklist: the loop runs it as soon as the checklist is gone.
     pub replay: Option<crossterm::event::KeyEvent>,
     bars: HashMap<String, (f64, Instant)>,
+    /// Figures rolling to their new values: what each shows, when it last moved, and when and which way it last
+    /// changed.
+    rolls: HashMap<String, Roll>,
 }
 
 impl Ui {
@@ -501,6 +532,13 @@ impl Ui {
             health_chart: 0,
             health_sort: 0,
             waterfall_seen: None,
+            last_screen: None,
+            screen_change: None,
+            shake_at: None,
+            help_filter: String::new(),
+            db_reach: None,
+            help_typing: false,
+            key_counts: HashMap::new(),
             health_edit: None,
             profile_seen: None,
             seen: seen::Seen::default(),
@@ -547,6 +585,7 @@ impl Ui {
             motion: motion::Motion::default(),
             replay: None,
             bars: HashMap::new(),
+            rolls: HashMap::new(),
         };
         let wanted = controller.config["theme"].as_str().unwrap_or("default").to_string();
         ui.set_theme(&wanted);
@@ -574,6 +613,37 @@ impl Ui {
         } else {
             found
         };
+    }
+
+    /// A figure rolling to `target` (half the way per tick, either way; from 0 the first time when `from_zero`), and
+    /// a tint for a moment after it changed: green when it got better, red when worse (`lower_is_better`).
+    pub fn roll(&mut self, id: &str, target: f64, from_zero: bool, lower_is_better: bool) -> (f64, Option<C>) {
+        let now = self.now;
+        let target = if target.is_finite() { target } else { 0.0 };
+        let start = if from_zero { 0.0 } else { target };
+        let roll =
+            self.rolls.entry(id.to_string()).or_insert(Roll { shown: start, at: now, target: start, changed: None });
+        if (target - roll.target).abs() > f64::EPSILON {
+            if (target - roll.target).abs() > roll.target.abs() * ROLL_SIGNIFICANT {
+                roll.changed = Some((now, (target < roll.target) == lower_is_better));
+            }
+            roll.target = target;
+        }
+        if self.reduced_motion || !self.motion.enabled {
+            roll.shown = target;
+        } else {
+            let steps = now.saturating_duration_since(roll.at).as_secs_f64() / ANIMATION_TICK.as_secs_f64();
+            roll.shown += (target - roll.shown) * (1.0 - 0.5f64.powf(steps.max(0.0)));
+            if (target - roll.shown).abs() < target.abs().max(1.0) * 0.004 {
+                roll.shown = target;
+            }
+        }
+        roll.at = now;
+        let tint = roll
+            .changed
+            .filter(|(at, _)| now.saturating_duration_since(*at) < ROLL_TINT && !self.reduced_motion)
+            .map(|(_, better)| if better { C::Green } else { C::Red });
+        (roll.shown, tint)
     }
 
     /// Glides a progress bar towards `target` (half the way per 100 ms, never backwards); `id` keeps its place.
@@ -665,6 +735,8 @@ impl Ui {
             || health::animating(self, controller)
             || flame::animating(self)
             || request_waterfall::animating(self)
+            || screens::animating(self)
+            || database::animating(self)
             || durations::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
@@ -797,17 +869,24 @@ pub(super) fn reveal(rows: Vec<Vec<Seg>>, opened: f64) -> Vec<Vec<Seg>> {
 /// The body: a full screen under the bar of screens, else what's open over the columns, else the columns.
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     flame::open_fresh(ui, controller);
-    let screen = screens::Screen::of(ui.overlay.as_ref()).filter(|_| ui.picker.is_none());
+    let screen = screens::current(ui);
+    if screen != ui.last_screen {
+        if let (Some(from), Some(to)) = (ui.last_screen, screen) {
+            ui.screen_change = Some((from, to, ui.now));
+        }
+        ui.last_screen = screen;
+    }
     let Some(screen) = screen else { return under_bar(ui, controller, width, rows) };
     let mut lines = vec![screens::bar(ui, screen, width)];
-    lines.extend(under_bar(ui, controller, width, rows.saturating_sub(1)));
+    let body = under_bar(ui, controller, width, rows.saturating_sub(1));
+    lines.extend(screens::slide(ui, body, width));
     lines
 }
 
 fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     match &ui.overlay {
         Some(Overlay::Checklist(_)) => return overlays::checklist(ui, width, rows),
-        _ if ui.picker.is_some() => return overlays::picker(ui, width, rows),
+        _ if ui.picker.is_some() => return database::rows(ui, controller, width, rows),
         Some(Overlay::Palette { .. }) => return palette::rows(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),

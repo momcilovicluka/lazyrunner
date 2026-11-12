@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: masked(screen.frame())
 ---
-  K Stack  H Requests  M Migrations  A Audit  T Tests  P Ports ⧗ DURATIONS   ~ Timeline
+  K Stack  H Requests  M Migrations  A Audit  T Tests  P Ports ⧗ DURATIONS   ~ Timeline  d Database
   5 items · slowed down most: Api ▲ +1150%
  j k choose · g G first / last · Enter a build's map · Esc closes
  usual = median of the earlier successful runs · red = failed

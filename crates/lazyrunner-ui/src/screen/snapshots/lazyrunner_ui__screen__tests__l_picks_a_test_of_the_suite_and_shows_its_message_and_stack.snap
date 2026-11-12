@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-  K Stack  H Requests  M Migrations   Audit ⚗ TESTS   P Ports  D Durations  ~ Timeline
+  K Stack  H Requests  M Migrations   Audit ⚗ TESTS   P Ports  D Durations  ~ Timeline  d Database
   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky  affected
  j k choose a test · r run it · a watch only it · y copy it · f failed again · s stop · h back to the suites
  Backend · dotnet test             1 failed │ Orders.Tests   3 tests · r runs the picked one

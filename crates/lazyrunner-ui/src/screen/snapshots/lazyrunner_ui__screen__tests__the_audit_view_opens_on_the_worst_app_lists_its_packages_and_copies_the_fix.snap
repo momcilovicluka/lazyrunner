@@ -2,8 +2,8 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
-  K Stack  H Requests  M Migrations ◈ AUDIT   T Tests  P Ports  D Durations  ~ Timeline
-  Sample  1 high  3 packages · last scan just now · 2 at once (+ -)
+  K Stack  H Requests  M Migrations ◈ AUDIT   T Tests  P Ports  D Durations  ~ Timeline  d Database
+  Sample  1 high  3 packages · last scan just now · 2 at once (+ -)  ▕████████████▏ 1 vulnerable  outdated 1 m
  i install · I install many · y copy · Enter advisory · e details · / filter · v vulnerable · r rescan
  h apps ·              Esc
  APPS                       │  PACKAGES · BILLING   / filter

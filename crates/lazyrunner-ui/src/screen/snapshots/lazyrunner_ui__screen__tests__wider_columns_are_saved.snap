@@ -11,13 +11,13 @@ expression: screen.frame()
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
+     not started yet        ┃                   │                   │                   │
                             ┃                   │                   │                   │
-      not started yet       ┃                   │                   │                   │
+     port 47201 · free      ┃ not started yet   │ not started yet   │  not started yet  │  not started yet
                             ┃                   │                   │                   │
-      u starts it           ┃  not started yet  │  not started yet  │  not started yet  │   not started yet
-      b builds it           ┃                   │                   │                   │
-      U starts all          ┃                   │                   │                   │
-                            ┃                   │                   │                   │
+     u starts it            ┃ port 47202 · free │ port 47301 · free │                   │  port 47303 · free
+     b builds it            ┃                   │                   │                   │
+     U starts all           ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │
                             ┃                   │                   │                   │

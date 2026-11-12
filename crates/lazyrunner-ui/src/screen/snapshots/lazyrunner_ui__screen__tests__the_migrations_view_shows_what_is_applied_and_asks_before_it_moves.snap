@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-  K Stack  H Requests ⛁ MIGRATIONS   A Audit  T Tests  P Ports  D Durations  ~ Timeline
+  K Stack  H Requests ⛁ MIGRATIONS   A Audit  T Tests  P Ports  D Durations  ~ Timeline  d Database
    database ShopLocal @ localhost   3 at once (+ -)
  j k choose · l its migrations · r check it · R find and check all · u apply pending · U everywhere · Esc back
  dotnet ef uses each app's last build (b rebuilds it) and its Development settings - the database d picks

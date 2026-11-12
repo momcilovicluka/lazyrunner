@@ -27,6 +27,81 @@ pub struct Migration {
     pub applied: Option<bool>,
 }
 
+/// What a migration's `Up()` does, a step each - `CreateTable Invoices`, `AddColumn Orders.Currency` - and whether
+/// the step loses data (a drop, a delete).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Step {
+    pub what: String,
+    pub destructive: bool,
+}
+
+/// How deep the migrations' file is looked for under the project's folder.
+const MIGRATION_DEPTH: usize = 6;
+
+/// Migration `id`'s steps, read from its file (`<id>.cs`) under `project`'s folder; none when it isn't found. Read once.
+pub fn steps(project: &Path, id: &str) -> Vec<Step> {
+    static READ: LazyLock<std::sync::Mutex<std::collections::HashMap<String, Vec<Step>>>> =
+        LazyLock::new(Default::default);
+    let key = format!("{}|{id}", project.display());
+    if let Some(known) = READ.lock().ok().and_then(|read| read.get(&key).cloned()) {
+        return known;
+    }
+    let folder = project.parent().unwrap_or(project);
+    let found =
+        find_file(folder, &format!("{id}.cs"), MIGRATION_DEPTH).and_then(|file| std::fs::read_to_string(file).ok());
+    let steps = found.map(|text| parse_steps(&text)).unwrap_or_default();
+    if let Ok(mut read) = READ.lock() {
+        read.insert(key, steps.clone());
+    }
+    steps
+}
+
+fn find_file(folder: &Path, name: &str, depth: usize) -> Option<PathBuf> {
+    let entries: Vec<PathBuf> = std::fs::read_dir(folder).ok()?.flatten().map(|entry| entry.path()).collect();
+    if let Some(file) = entries.iter().find(|path| path.file_name().is_some_and(|file| file == name)) {
+        return Some(file.clone());
+    }
+    let skipped = |path: &&PathBuf| {
+        path.file_name().is_some_and(|dir| matches!(dir.to_str(), Some("bin" | "obj" | "node_modules" | ".git")))
+    };
+    entries
+        .iter()
+        .filter(|path| path.is_dir() && !skipped(path))
+        .take(64)
+        .find_map(|dir| (depth > 0).then(|| find_file(dir, name, depth - 1)).flatten())
+}
+
+/// A migration's `Up()` as steps.
+pub fn parse_steps(text: &str) -> Vec<Step> {
+    static CALL: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"migrationBuilder\s*\.\s*(\w+)").expect("a valid pattern"));
+    static NAME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"name:\s*"([^"]+)""#).expect("a valid pattern"));
+    static TABLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"table:\s*"([^"]+)""#).expect("a valid pattern"));
+    let up = text.split("void Down(").next().unwrap_or(text);
+    let calls: Vec<(usize, String)> =
+        CALL.captures_iter(up).filter_map(|found| Some((found.get(0)?.start(), found[1].to_string()))).collect();
+    calls
+        .iter()
+        .enumerate()
+        .map(|(at, (start, call))| {
+            let end = calls.get(at + 1).map_or(up.len(), |(next, _)| *next);
+            let body = &up[*start..end];
+            let name = NAME.captures(body).map(|found| found[1].to_string());
+            let table = TABLE.captures(body).map(|found| found[1].to_string());
+            let target = match (table, name) {
+                (Some(table), Some(name)) => format!(" {table}.{name}"),
+                (None, Some(name)) => format!(" {name}"),
+                (Some(table), None) => format!(" {table}"),
+                (None, None) => String::new(),
+            };
+            Step {
+                what: format!("{call}{target}"),
+                destructive: call.starts_with("Drop") || call.starts_with("Delete"),
+            }
+        })
+        .collect()
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     Idle,
@@ -297,6 +372,26 @@ pub fn built(startup: &Path) -> bool {
     std::fs::read_dir(debug)
         .map(|entries| entries.flatten().any(|entry| entry.path().join(&dll).is_file()))
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod step_tests {
+    #[test]
+    fn a_migrations_up_reads_as_its_steps_drops_marked() {
+        let text = r#"
+            protected override void Up(MigrationBuilder migrationBuilder) {
+                migrationBuilder.CreateTable(name: "Invoices", columns: table => new { Id = table.Column<int>() });
+                migrationBuilder.AddColumn<string>(name: "Currency", table: "Orders", nullable: true);
+                migrationBuilder.DropIndex(name: "IX_Old", table: "Orders");
+            }
+            protected override void Down(MigrationBuilder migrationBuilder) {
+                migrationBuilder.DropTable(name: "Invoices");
+            }"#;
+        let steps = super::parse_steps(text);
+        let said: Vec<&str> = steps.iter().map(|step| step.what.as_str()).collect();
+        assert_eq!(said, ["CreateTable Invoices", "AddColumn Orders.Currency", "DropIndex Orders.IX_Old"]);
+        assert!(steps[2].destructive && !steps[0].destructive);
+    }
 }
 
 #[cfg(test)]

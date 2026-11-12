@@ -214,7 +214,7 @@ at once while the palette wipes away.
 
 | Key | Action |
 |-----|--------|
-| `d` | **Database picker**: switch the active connection string in the .NET apps' user secrets (below) |
+| `d` | **Database**: the connection strings in the .NET apps' user secrets, whether each server answers, and switching the active one (below) |
 | `i` | Install an npm app's packages in the background: `c` `npm ci`, `n` `npm install` (it stops the app first and starts it again after) |
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
@@ -248,7 +248,7 @@ at once while the palette wipes away.
 | the rail | A column with more lines than rows has a rail at its right edge in place of a scrollbar: a map of all its lines - errors red, warnings yellow, search matches cyan, marks magenta, the rest dim ticks - with a bracket on the lines on screen (`▼` while it follows new output). The rest is dotted by how fast the app logged it: a dotted line at its usual pace, fuller where it logged faster, brighter where a burst came. A click on the rail jumps there, a drag along it scrolls, and the pointer on a row previews the line it jumps to, over the column. A new error that lands off-screen sends an ember down the rail to its mark, which waits for it and then settles in; `G` sends a shimmer down the map from where the view was, then down the bracket to its `▼`, a search's jump pulses its row, and the rail's top end dims while the oldest lines drop out of the buffer (not with reduced motion) |
 | `H` `T` `M` `A` chips | What's new since a view was last open, in the panel's header: `H 3 new errors` (requests that failed since), `T 2 suites done · 1 red`, `M 1 pending` (a migration that appeared), `A 3 new findings · 1 critical` (what an audit scan found). The view's key or a click on the chip opens it on the first new thing; having it open clears the chip. While the audit or the migrations view is closed, what it does in the background has a chip too: `A ⠋ scanning 2 of 5`, `M ⠋ checking · 2 left` |
 | `,` `A` then `z` | **Diagnostics zip**, in the About box under Report a bug: what to attach to a bug report - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`diagnostics`); the log says where, and Alt+click on its path there (a click with `l` off) shows it in its folder. Look over its logs before you share it |
-| `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`; marks and their notes go when the app starts again |
+| `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`, and the list shows the picked mark's lines around it; marks and their notes go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
 | `Alt+p` | Profile the focused .NET or npm app's CPU for 10 s, then its flame chart (below, "Profiling"); `Alt+p` again stops it. On an app that isn't running, its last captures |
 | `Alt+b` | The build as a map: the Code tab's projects with the running build, else the last one, over them - each project's state and own time, the critical path in the accent colour; `w` follows what's compiling, `B` shows the build's projects alone (below, "The build map") |
@@ -259,7 +259,7 @@ at once while the palette wipes away.
 | `Ctrl+L` | Clear all columns and the panel log |
 | `Ctrl+R` | **Reload window**, like VS Code's: reads the settings and themes again, sets the terminal up again (screen, mouse, tab, colours) and repaints - with a little CRT show (none with reduced motion). The apps keep running. Handy after editing a setting or a theme by hand, or when the terminal got garbled |
 | `t` | Theme picker: preview each theme live, `Enter` keeps one (saved), `Esc` undoes; see [Themes](#themes) |
-| `?` | Key reference |
+| `?` | Key reference: each group in its own colour, the keys you use most first; `/` filters it |
 | `:` / `Ctrl+P` | Command palette: fuzzy-find any action or setting; `↑` `↓` (or `Alt+j` / `Alt+k`) choose. With nothing typed, the five you ran last come first (Recent) |
 
 **Settings (`,` then a letter)**, saved in `lazyrunner.config.json` (the letter highlights the setting it flips):
@@ -281,7 +281,7 @@ at once while the palette wipes away.
 | `i` | Nerd Font icons (on by default): the title bars, the status line, the views' headers and marks |
 | `o` | `M` checks the migrations against the database when it opens (off: `r` / `R` in it) |
 | `l` | Links in the output open on Alt+click (on by default; off: on a plain click) |
-| `c` | What's new: the changelog |
+| `c` | What's new: the changelog, with a rail of versions - the ones since you last opened it lit |
 | `A` | About lazyrunner (below) |
 
 **About lazyrunner** (`,` then `A`, or `:` about): the version and when it was released, who makes lazyrunner, and
@@ -290,7 +290,8 @@ license, a bug report with the version and OS already filled in, the diagnostics
 feature request or the source, or checks for an
 update right there (`u`: what the check is doing, then how it ended, under its link; an update it finds is installed,
 as the startup checklist does). Its logo shimmers in rainbow colours over a flowing rule (still with reduced motion), with Nerd Font icons
-when they're on.
+when they're on. On a tall enough terminal it counts this session up too: how long it has run, the builds (and how
+many failed), the apps started, the crashes, the requests and the test runs.
 
 Every full-screen view - requests, tests, migrations, audit, ports, the stack and code maps, the timeline, durations -
 starts the same way: its name in a chip, then its keys under it, on as many rows as they need - wrapped between keys,
@@ -320,13 +321,16 @@ for as long as it lasts: builds, starts, npm, tests and migrations have a spinne
 and with `restartOnCodeChange` a saved change counts down to the rebuild. None of it holds you up - a key acts at once,
 also during the startup checklist or the reload show, which it ends. Boxes grow to fit their longest row, and when
 a selected row is still too long for the terminal its hint scrolls sideways to show the rest, its key and label staying
-put. `, f` (reduced motion) turns it all
+put. A screen slides in from its side of the bar, figures (CPU, memory, Health's readings, About's counts) roll to
+their new values - a big change tinted green or red a moment - a stopped app's state breathes, and a key that does
+nothing shakes the hints. `, f` (reduced motion) turns it all
 off.
 
 A column's title moves as its app changes: coming up fills its chip green from the left, stopping drains the colour it
 had from the right, and a crash pulses it twice - a glance across the titles says what just happened where. An empty
-column says what its app is (`not started yet`, `stopped · started 10:42`, `exited · code 1`), the focused one what
-starts it too. The panel's log keeps each line's mark (`✓` `×` `!` `▸`) in a column of its own, the newest line slides
+column says what its app is (`not started yet`, `stopped · started 10:42`, `exited · code 1`) - a stopped one also its
+last start and build (against its usual) and whether its port is free or who holds it - the focused one what starts it
+too. The panel's log keeps each line's mark (`✓` `×` `!` `▸`) in a column of its own, the newest line slides
 in from the right, and a line too long for the panel scrolls sideways, its time and mark staying put. The settings
 (`,`) show as switches - a green `●` on, a dim `○` off - grouped under Startup, Running, Display and Integrations when
 there's room.
@@ -334,7 +338,7 @@ there's room.
 ### During a build
 
 .NET builds run one at a time; `R`, `B`, `r`, `b`, `U` and `!` wait for the current one (`S` cancels it). Everything
-else keeps working: the database picker, `npm ci` next to the build, starting an npm app, `s` to cancel just the
+else keeps working: the database screen, `npm ci` next to the build, starting an npm app, `s` to cancel just the
 focused app's build or take it out of the queue, and `q`.
 
 ## What it shows
@@ -361,7 +365,7 @@ focused app's build or take it out of the queue, and `q`.
   crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none.
 - **After "Ready"**, the log shows a startup timeline per app.
 - **The screens** - Stack `K`, Requests `H`, Migrations `M`, Audit `A`, Tests `T`, Ports `P`, Durations `D`, Timeline
-  `~` - each start with a bar naming them all with their keys, the open one lit (just the keys when the names don't
+  `~`, Database `d` - each start with a bar naming them all with their keys, the open one lit (just the keys when the names don't
   fit). Another screen's key, or a click on its name, goes there on the app the open one is looking at - the Map's
   picked box, the requests' app, the migrations' context, the audited app, the picked suite or port - with its column
   focused: `M` on the Map shows the picked app's migrations, `H` its requests alone. A screen's own key still closes
@@ -402,7 +406,7 @@ turn, and `i` ignores a problem for this run - it holds nothing and counts as sk
 | An npm app's packages missing, or `package-lock.json` changed | `npm ci` for it, its last line on the check's | yes |
 | A port another process holds | stops that process (only one that still holds it, never the system's) | no |
 | A port Windows reserved | copies `net stop winnat; net start winnat` for an elevated terminal | no |
-| The database server doesn't answer | the database picker, once the checklist closes | no |
+| The database server doesn't answer | the database screen, once the checklist closes | no |
 | The update check failed | checks again | yes |
 
 A fix that worked turns its edge green with a flash; one that didn't pulses red. At startup a failed check holds the
@@ -411,7 +415,7 @@ start until it's fixed or `Enter` starts anyway, and once nothing blocks it any 
 project and its apps with their ports and folders, each check's result and time, and what fixes the problems, with
 secrets masked as in the diagnostics zip.
 
-## Database picker (`d`)
+## Database (`d`)
 
 .NET apps that use user secrets read their connection strings from `secrets.json` in the user secrets folder
 (`%APPDATA%\Microsoft\UserSecrets\<id>\` on Windows, `~/.microsoft/usersecrets/<id>/` elsewhere). lazyrunner lists
@@ -420,6 +424,11 @@ and comments out (`//`) the others with the same key, checks the file is still v
 as `secrets.json.lazyrunner-backup`, and restarts the running .NET apps (no build needed). `n` adds an entry: a copy
 of the selected one with another database name; `y` copies the highlighted line as it is in the file,
 password included.
+
+It's a screen in the bar like the others, a row per connection string: whether its server answers - each is tried as
+the screen opens, `◌ checking` breathing meanwhile, then `● 12 ms` or `✗ no answer` (`– local` for LocalDB or a
+pipe) - the apps on the active one, how many migrations are pending on that database, and when you last switched to
+it. `/` filters, `h` `l` pick another key when there are several.
 
 ## lazygit (`L`)
 
@@ -470,6 +479,10 @@ says why, the rest of the way to the target left cracked (`⠅`). A history the 
 dashed, with `◌` nodes and no bead. With reduced motion the bead steps and nothing flows. Outside `M`, the status
 bar shows `○ 3` beside the database while migrations are pending on it.
 
+Under the contexts, **what it does**: the picked migration's steps (the next pending one's when none is picked), read
+from its file - `CreateTable Invoices`, `AddColumn Orders.Currency`, `CreateIndex` - a drop or a delete in red with a
+warning, so you see what applying it will change.
+
 ## Audit (`A`)
 
 `A` shows each app's packages that need a look, in three titled panes. **Apps**: each with its worst finding (`2 high`,
@@ -514,7 +527,8 @@ A column's title says `⚠ 2 high` while its app's last scan found something hig
 checklist's Vulnerabilities row says the same from the kept scans - it never scans itself - with `f` opening `A`. It
 moves (not with reduced motion): its rows come in one after another as it opens, the table dims while its app is
 scanned, the rows that changed light up as the scan lands, what it fixed flashes green, and a new high or critical
-finding pulses once; with reduced motion a changed row keeps an accent edge instead.
+finding pulses once; with reduced motion a changed row keeps an accent edge instead. The header ends with the whole
+stack at a glance: a severity bar (critical, high, moderate, low) and the outdated packages by major, minor and patch.
 
 ## Ports (`P`)
 

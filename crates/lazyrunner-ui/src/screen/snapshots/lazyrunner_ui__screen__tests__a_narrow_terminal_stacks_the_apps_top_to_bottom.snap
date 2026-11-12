@@ -15,7 +15,7 @@ Building...
 error: Billing.cs(3,1): something is off
  ■ Shop  :47301  ○ stopped ───────────────────────────────────────────────────────────────────────────────────
    dev server · dev
-                                               not started yet
+                                              not started yet
 
  ■ Docs   ○ stopped ──────────────────────────────────────────────────────────────────────────────────────────
    watch build · watch
@@ -23,7 +23,7 @@ error: Billing.cs(3,1): something is off
 
  ■ Console  :47303  ○ stopped ────────────────────────────────────────────────────────────────────────────────
    live · dev
-                                               not started yet
+                                              not started yet
 
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample

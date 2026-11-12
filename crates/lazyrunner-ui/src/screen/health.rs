@@ -268,7 +268,7 @@ fn tone(value: f64, target: f64) -> C {
 }
 
 /// A reading said with its mark: `△` near its target, `▲` over it; `-` without one.
-fn reading(controller: &Controller, index: usize, metric: Metric, label: &str) -> Vec<Seg> {
+fn reading(controller: &Controller, index: usize, metric: Metric, label: &str, rolled: &Rolled) -> Vec<Seg> {
     let label = seg(format!("{label} "), C::DarkGray);
     match controller.reading(index, metric) {
         Some((value, target)) => {
@@ -277,7 +277,8 @@ fn reading(controller: &Controller, index: usize, metric: Metric, label: &str) -
                 _ if value > target * NEAR => " △",
                 _ => "",
             };
-            vec![label, seg(format!("{}{mark}", metric.say(value)), tone(value, target))]
+            let (shown, tint) = rolled.get(&(index, metric)).copied().unwrap_or((value, None));
+            vec![label, seg(format!("{}{mark}", metric.say(shown)), tint.unwrap_or_else(|| tone(value, target)))]
         }
         None => vec![label, seg("-", C::DarkGray)],
     }
@@ -303,16 +304,19 @@ fn probe(controller: &Controller, index: usize) -> Vec<Seg> {
 }
 
 /// A card's readings in two lines: its CPU and memory; its p95, 5xx rate and requests a second.
-fn readings(controller: &Controller, index: usize) -> [Vec<Seg>; 2] {
-    let mut first = reading(controller, index, Metric::Cpu, "cpu");
+/// Each app's readings as they roll to their new values, and their tint a moment after one changed.
+type Rolled = std::collections::HashMap<(usize, Metric), (f64, Option<C>)>;
+
+fn readings(controller: &Controller, index: usize, rolled: &Rolled) -> [Vec<Seg>; 2] {
+    let mut first = reading(controller, index, Metric::Cpu, "cpu", rolled);
     first.push(seg("   ", C::Gray));
-    first.extend(reading(controller, index, Metric::Memory, "mem"));
+    first.extend(reading(controller, index, Metric::Memory, "mem", rolled));
     if !controller.apps[index].traits().counts_requests {
         return [first, vec![seg("no requests logged (not a .NET API)", C::DarkGray)]];
     }
-    let mut second = reading(controller, index, Metric::P95, "p95");
+    let mut second = reading(controller, index, Metric::P95, "p95", rolled);
     second.push(seg("  ", C::Gray));
-    second.extend(reading(controller, index, Metric::Errors, "5xx"));
+    second.extend(reading(controller, index, Metric::Errors, "5xx", rolled));
     let rate = controller.states[index].request_history.back().copied().unwrap_or(0.0);
     second.push(seg(format!("  {rate:.1} req/s"), C::Gray));
     [first, second]
@@ -437,7 +441,7 @@ fn border(ui: &Ui, controller: &Controller, index: usize, picked: bool) -> C {
 }
 
 /// App `index`'s card, `CARD` wide, its rows aimed at it.
-fn card(ui: &Ui, controller: &Controller, index: usize, picked: bool) -> Vec<Vec<Seg>> {
+fn card(ui: &Ui, controller: &Controller, (index, picked): (usize, bool), rolled: &Rolled) -> Vec<Vec<Seg>> {
     let app = &controller.apps[index];
     let edge = border(ui, controller, index, picked);
     let inner = CARD - 4;
@@ -447,7 +451,7 @@ fn card(ui: &Ui, controller: &Controller, index: usize, picked: bool) -> Vec<Vec
     let gap = inner.saturating_sub(width(&title) + width(&state_said));
     title.push(seg(" ".repeat(gap), C::Gray));
     title.extend(state_said);
-    let [first, second] = readings(controller, index);
+    let [first, second] = readings(controller, index, rolled);
     let mut lines = vec![title, first, second];
     lines.extend(chart_rows(ui, controller, index, inner));
     lines.push(state_line(ui, controller, index));
@@ -573,10 +577,20 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let across = ((card_cells.saturating_sub(1) + GAP) / (CARD + GAP)).max(1);
     ui.health_columns = across;
     let apps = controller.apps.len();
+    let mut rolled = Rolled::new();
+    for at in 0..apps {
+        for metric in Metric::ALL {
+            if let Some((value, _)) = controller.reading(at, metric) {
+                let id = format!("health:{}:{}", controller.apps[at].key, metric.name());
+                rolled.insert((at, metric), ui.roll(&id, value, false, true));
+            }
+        }
+    }
     let mut body: Vec<Vec<Seg>> = Vec::new();
     let mut picked_rows = 0..0;
     for (row, chunk) in order(controller, ui.health_sort).chunks(across).enumerate() {
-        let cards: Vec<Vec<Vec<Seg>>> = chunk.iter().map(|&at| card(ui, controller, at, at == picked)).collect();
+        let cards: Vec<Vec<Vec<Seg>>> =
+            chunk.iter().map(|&at| card(ui, controller, (at, at == picked), &rolled)).collect();
         if chunk.contains(&picked) {
             picked_rows = row * CARD_ROWS..(row + 1) * CARD_ROWS;
         }

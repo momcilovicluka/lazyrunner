@@ -24,7 +24,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>>
     let tag = if ui.theme.id != "default" || no_color() { format!(" {} ", ui.theme.name) } else { String::new() };
     rows.push(vec![seg("─".repeat(cells.saturating_sub(tag.chars().count())), C::DarkGray), seg(tag, C::DarkGray)]);
     rows.push(header(ui, controller));
-    rows.push(if ui.follow.on { super::follow::ticker(ui, cells) } else { hints(ui, controller, cells) });
+    rows.push(if ui.follow.on {
+        super::follow::ticker(ui, cells)
+    } else {
+        super::screens::shaken(ui, hints(ui, controller, cells))
+    });
     rows.push(ui.scrolling_row(notice(ui, controller), 0, cells));
     let count = controller.config["panelLogLines"]
         .as_u64()
