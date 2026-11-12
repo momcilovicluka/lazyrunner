@@ -332,6 +332,7 @@ impl AppState {
                 }
                 requests::Line::Finished(mut request) => {
                     self.in_flight.finish(&mut request, self.output.total());
+                    request.ended = Some(now);
                     if let Some(id) = self.scope.take() {
                         let numbers = self.untag(&id);
                         let lines = numbers.iter().filter_map(|number| self.output.numbered(*number, *number).next());

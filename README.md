@@ -708,6 +708,21 @@ those may be theirs, and the panel says so. An endpoint's: count and errors, ave
 p50, p95 and slowest, a sparkline of its latest times, its statuses, its slowest and its latest failing requests.
 Serilog's request log has no start line, so its requests come without their log lines.
 
+**Where its time went** (#38): under its log summary, a request's details draw its timeline from those lines and when
+each arrived - no setup. The request is a bar as long as it took (the `✗` where it logged an exception); under it each
+EF Core command, placed where its line came less how long it says it took, and each outbound call (HttpClient's
+`Start processing HTTP request` to its `End processing ... after 12 ms - 200`), with its SQL or URL; a query run over
+and over is one comb (`×14`); and `in the app`, hatched `░`, is the time no line accounts for - where the app's own
+code ran. The longest bar is amber, the endpoint's p95 a dotted `┊` line across all of them, an axis of milliseconds
+under them; the title says it in numbers: `Timeline  1204 ms in the database · 0 ms in calls · 326 ms in the app`. The
+lines arrive within milliseconds of being written, so it shows the order and the big blocks rather than exact times.
+
+**Comparing two** (`m`): `m` marks the selected request as the baseline (`★` on its row; `m` on it again unmarks it).
+Any other request's details then put the two side by side - status, time, protocol, what each sent and returned, its
+database commands, its log lines - what differs amber, what's the same dim, under a digest of whether it's worth
+reading (`4 rows differ · +180 ms · DB commands 6 → 8`), and its timeline draws the baseline's bars as `▒` ghosts
+behind its own on one scale, so a new slow span stands out.
+
 A request that runs the same query 10 times or more (its parameters aside) looks like an N+1 - a loop loading one row
 at a time: its row says `N+1`, its details show the query, how often and how long it ran, and its endpoint's say how
 many of its requests do it. lazyrunner sums a request's database commands up as it finishes, so they stay after its
@@ -834,7 +849,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_logs` | An app's output as one text, each line after its number: `since` (only what's new), `limit`, `grep`, `errors_only` |
 | `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
 | `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path, one endpoint - or summed up per endpoint (p50, p95, max); N+1s marked |
-| `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1) |
+| `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1), and its waterfall - each command and call where it ran, the exception's moment, the time in the app itself; with `baseline`, another request's id, the two compared row against row |
 | `get_screen` | The screen as you see it, as text |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |

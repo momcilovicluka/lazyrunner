@@ -76,6 +76,8 @@ pub struct View {
     pub endpoint_row: usize,
     /// y on a request: the box asking what to copy it as is open, on this choice.
     pub copying: Option<usize>,
+    /// `m`: the request others are compared with (#38), by its seq.
+    pub baseline: Option<u64>,
 }
 
 /// What `y` copies a request as.
@@ -118,6 +120,7 @@ impl Default for View {
             endpoint: None,
             endpoint_row: 0,
             copying: None,
+            baseline: None,
         }
     }
 }
@@ -271,6 +274,17 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "y" => {
             let view = view.clone();
             copy_row(ui, controller, &view);
+        }
+        "m" if view.tab == Tab::Requests => {
+            let Some(seq) = shown(view, controller).get(view.index).map(|request| request.seq) else { return true };
+            let marked = view.baseline != Some(seq);
+            view.baseline = marked.then_some(seq);
+            let text = if marked {
+                format!("★ #{seq} is the baseline: another request's details compare with it (m on it again unmarks).")
+            } else {
+                format!("#{seq} is no longer the baseline.")
+            };
+            controller.add_log(text, Hue::DarkGray);
         }
         "p" if view.tab == Tab::Requests => {
             let snapshot = view.clone();
@@ -585,7 +599,12 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         Tab::Requests if side => {
             view.index = view.index.min(list.len().saturating_sub(1));
             let left = request_rows(view, controller, &list, list_width, height + 1, ui.motion.looked_requests(ui.now));
-            let right = request_details(controller, list.get(view.index).copied(), panel.0, panel.1);
+            let picked = list.get(view.index).copied();
+            let baseline = view
+                .baseline
+                .filter(|seq| picked.is_none_or(|picked| picked.seq != *seq))
+                .and_then(|seq| controller.requests.items.iter().find(|request| request.seq == seq));
+            let right = request_details(controller, picked, baseline, ui.nerd, panel);
             out.extend(beside(left, right, list_width, panel));
         }
         Tab::Requests => {
@@ -712,7 +731,13 @@ fn body(content: &str, length: &str) -> String {
 }
 
 /// The selected request: what it was, how it compares with its endpoint, what it sent and returned, what it logged.
-fn request_details(controller: &Controller, request: Option<&Request>, width: usize, height: usize) -> Vec<Vec<Seg>> {
+fn request_details(
+    controller: &Controller,
+    request: Option<&Request>,
+    baseline: Option<&Request>,
+    nerd: bool,
+    (width, height): (usize, usize),
+) -> Vec<Vec<Seg>> {
     let Some(request) = request else { return vec![vec![seg("No request selected.", C::DarkGray)]] };
     let mut lines: Vec<Vec<Seg>> = wrap(&format!("{} {}", request.method, request.path), width, 3)
         .into_iter()
@@ -743,6 +768,9 @@ fn request_details(controller: &Controller, request: Option<&Request>, width: us
             seg(format!("{} requests · p50 {} · p95 {} ms · ", usual.count, ms(usual.p50), ms(usual.p95)), C::DarkGray),
             seg(verdict, color),
         ]);
+    }
+    if let Some(baseline) = baseline {
+        lines.extend(super::request_waterfall::compare(request, baseline, width));
     }
     lines.push(Vec::new());
     lines.push(vec![seg("sent      ", C::DarkGray), seg(body(&request.sent_content, &request.sent_length), C::Gray)]);
@@ -798,6 +826,7 @@ fn request_details(controller: &Controller, request: Option<&Request>, width: us
         let text = "Possibly mixed: other requests of the app ran meanwhile, some lines may be theirs.";
         lines.extend(words(text, width).into_iter().map(|line| vec![seg(line, C::Yellow)]));
     }
+    lines.extend(super::request_waterfall::timeline(nerd, controller, request, baseline, width));
     if expected == 0 {
         lines.push(vec![seg("It logged nothing.", C::DarkGray)]);
         return lines;
@@ -955,7 +984,7 @@ fn hint(view: &View, controller: &Controller) -> String {
         ),
         (Tab::Requests, filtered) => format!(
             " {} · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · y copy (curl…) · \
-             p send again · w open · o log · c clear · Esc back",
+             m baseline · p send again · w open · o log · c clear · Esc back",
             if filtered { "h endpoints" } else { "Tab requests/endpoints" }
         ),
     }
@@ -992,14 +1021,16 @@ fn request_rows(
         let tag = if n_plus_one { "  N+1" } else { "" };
         let path = cut(&request.path, path_cells.saturating_sub(tag.len()));
         let (method, status, took) = (&request.method, request.status, ms(request.ms));
-        let text = format!(" {time:<8}  {app}  {method:<6} {status:>6} {took:>7}  {path}{tag}");
+        let mark = if view.baseline == Some(request.seq) { "★" } else { " " };
+        let text = format!("{mark}{time:<8}  {app}  {method:<6} {status:>6} {took:>7}  {path}{tag}");
         let row = if index == view.index {
             vec![on(pad(&text, width), C::FocusText, C::FocusBack)]
         } else if looked.is_some_and(|read| read.contains(&request.seq)) {
             vec![on(pad(&text, width), C::Black, C::Magenta)]
         } else {
             vec![
-                seg(format!(" {time:<8}  {app}  {method:<6}"), C::DarkGray),
+                seg(mark, C::Yellow),
+                seg(format!("{time:<8}  {app}  {method:<6}"), C::DarkGray),
                 seg(format!(" {status:>6}"), status_color(status)),
                 seg(format!(" {took:>7}"), ms_color(request.ms)),
                 seg(format!("  {path}"), C::Gray),

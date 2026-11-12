@@ -30,6 +30,7 @@ pub mod suites;
 pub mod test_history;
 pub mod tools;
 pub mod watcher;
+pub mod waterfall;
 
 use std::path::PathBuf;
 

@@ -38,6 +38,7 @@ pub mod rail;
 pub mod rail_density;
 pub mod rail_motion;
 pub mod reload;
+pub mod request_waterfall;
 pub mod requests;
 pub mod screens;
 pub mod seen;

@@ -90,6 +90,8 @@ pub struct Finished {
     pub exact: Option<Vec<u64>>,
     /// Its EF Core commands, from the lines it logged (summed up as it finishes: the lines may be gone later).
     pub db: Option<DbSummary>,
+    /// When its finished line arrived: its waterfall (#38) places its lines from there back.
+    pub ended: Option<std::time::Instant>,
 }
 
 /// What a request did in the database: its EF Core commands - how many, their total and the slowest - and the query
@@ -320,6 +322,8 @@ pub struct Request {
     /// See [`Finished::exact`].
     pub exact: Option<Vec<u64>>,
     pub db: Option<DbSummary>,
+    /// See [`Finished::ended`].
+    pub ended: Option<std::time::Instant>,
 }
 
 /// The requests served, oldest first.
@@ -346,6 +350,7 @@ impl Requests {
             mixed,
             exact,
             db,
+            ended,
         } = request;
         let endpoint = endpoint(&path);
         let seq = self.seq;
@@ -367,6 +372,7 @@ impl Requests {
             mixed,
             exact,
             db,
+            ended,
         });
         while self.items.len() > MAX_REQUESTS {
             self.items.pop_front();

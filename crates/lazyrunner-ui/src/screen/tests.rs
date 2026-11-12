@@ -1438,7 +1438,7 @@ async fn a_requests_details_show_what_it_logged_its_queries_and_what_it_sent() {
     screen.press("H");
     assert!(!screen.render(160, 30).contains("Log  4 lines"), "the details stay closed until asked for");
     screen.press("Enter");
-    let frame = screen.render(160, 30);
+    let frame = screen.render(160, 44);
     assert!(frame.contains("500 Internal Server Error · 1530 ms"), "{frame}");
     assert!(frame.contains("Billing · 09:41:07 · HTTP/2"), "{frame}");
     assert!(frame.contains("sent      application/json · 86 bytes"), "{frame}");
@@ -1446,7 +1446,26 @@ async fn a_requests_details_show_what_it_logged_its_queries_and_what_it_sent() {
     assert!(frame.contains("DB 1 commands · 1204 ms · 79% of its time"), "{frame}");
     assert!(frame.contains("Possibly mixed"), "{frame}");
     assert!(frame.contains("  System.InvalidOperationException: Invoice 7"), "{frame}");
-    screen.press("j");
+    let timeline = [
+        "Timeline  1204 ms in the database · 0 ms in calls · 326 ms in the app",
+        "in the app",
+        "1204 ms",
+        "✗ at 1530 ms",
+    ];
+    for said in timeline {
+        assert!(frame.contains(said), "#38's timeline - {said}: {frame}");
+    }
+    let request = agent(&mut screen, "request", json!({ "id": 5, "baseline": 3 }), None);
+    assert_eq!(request["result"]["waterfall"]["spans"][0]["kind"], "db", "{request}");
+    assert_eq!(request["result"]["waterfall"]["in_the_app_ms"], 326.0, "{request}");
+    assert_eq!(request["result"]["compare"]["rows"][0]["differs"], false, "both 500s: {request}");
+    screen.press("m j");
+    let frame = screen.render(160, 44);
+    assert!(frame.contains("★09:41:07") && frame.contains("★ Against #5"), "m marks a baseline: {frame}");
+    assert!(frame.contains("rows differ · -1520 ms · DB commands 1 → 0"), "{frame}");
+    screen.press("k m j");
+    assert!(!screen.render(160, 44).contains("★ Against"), "m again unmarks it");
+    screen.press("k j");
     assert!(screen.render(160, 30).contains("Its log lines aren't known"), "a request without a start line");
     screen.press("Esc");
     assert!(!screen.render(160, 30).contains("Its log lines aren't known"), "Esc closes the details");
