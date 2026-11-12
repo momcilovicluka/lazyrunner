@@ -1,10 +1,10 @@
-//! The Stack screen's Health tab (#35): a card per app, in the profile's order - its p95, 5xx rate, memory and CPU
-//! against its targets, each with a braille sparkline, the target dotted across it and what's over it red - and under
-//! the cards the slowest endpoints over the last minutes, as bars with each app's p95 target ticked across. A breach
-//! fills a bar toward the alert; an alert stays red until it's acknowledged (`a`, amber) or the app recovers (a green
-//! glint).
+//! The Stack screen's Health tab (#35): the stack in a line - how many apps are healthy, warning, failing, and its
+//! last minute - its share of the machine's memory and CPU, then a card per app in the profile's order: its probe, its
+//! readings against its targets (`△` near one, `▲` over it) and a chart of its last minute - the same metric on every
+//! card (`v`), the target dotted across - beside the picked app's panel (its targets, slowest endpoints, alerts and
+//! last profile). Under them the slowest endpoints across the stack and the log of alerts. A breach fills a bar toward
+//! the alert; an alert stays red until it's acknowledged (`a`, amber) or the app recovers (a green glint).
 
-use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use lazyrunner_core::run::Controller;
@@ -12,6 +12,7 @@ use lazyrunner_core::run::format_duration;
 use lazyrunner_core::run::health::{Breach, Metric};
 use lazyrunner_core::run::requests::{Endpoint, endpoints};
 
+use super::health_draw::{self, Chart, Condition, NEAR};
 use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, seg, width};
@@ -21,9 +22,14 @@ use super::{Overlay, Ui};
 /// A card's width, its gap, and its rows (borders included).
 const CARD: usize = 40;
 const GAP: usize = 1;
-const CARD_ROWS: usize = 8;
-/// A sparkline's cells: two samples each.
-const SPARK: usize = 10;
+const CARD_ROWS: usize = 10;
+/// Seconds between a chart's samples.
+const SAMPLE_SECONDS: usize = 2;
+/// A card's chart's rows.
+const CHART_ROWS: usize = 3;
+/// The side panel's width, and the gap before it.
+const PANEL: usize = 46;
+const PANEL_GAP: usize = 2;
 /// How far back the slowest endpoints look.
 const ENDPOINTS_WINDOW: Duration = Duration::from_secs(5 * 60);
 /// The most endpoints listed, and their bars' cells.
@@ -34,9 +40,91 @@ const PULSE: Duration = Duration::from_millis(300);
 const PULSES: u32 = 2;
 /// The sustained-time bar's cells.
 const SUSTAINED: usize = 10;
-/// A reading this close to its target is amber.
-const NEAR: f64 = 0.8;
 const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
+
+/// The ways `s` orders the cards: the profile's order first (they don't move by themselves).
+pub const SORTS: [&str; 5] = ["the profile's order", "worst first", "cpu", "memory", "p95"];
+
+/// `,`: the picked app's targets being edited - which app, which of `TARGETS`, what's typed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Editing {
+    pub app: usize,
+    pub field: usize,
+    pub text: String,
+}
+
+/// The cards' order by `SORTS[sort]`: a metric's highest first, the worst condition first.
+pub fn order(controller: &Controller, sort: usize) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..controller.apps.len()).collect();
+    let rank = |condition: Condition| match condition {
+        Condition::Failing => 0,
+        Condition::Warning => 1,
+        Condition::Healthy => 2,
+        Condition::Stopped => 3,
+    };
+    let value = |at: usize, metric: Metric| controller.reading(at, metric).map_or(-1.0, |(value, _)| value);
+    match SORTS.get(sort).copied().unwrap_or_default() {
+        "worst first" => order.sort_by_key(|&at| rank(health_draw::condition(controller, at))),
+        "cpu" => order.sort_by(|&a, &b| value(b, Metric::Cpu).total_cmp(&value(a, Metric::Cpu))),
+        "memory" => order.sort_by(|&a, &b| value(b, Metric::Memory).total_cmp(&value(a, Metric::Memory))),
+        "p95" => order.sort_by(|&a, &b| value(b, Metric::P95).total_cmp(&value(a, Metric::P95))),
+        _ => {}
+    }
+    order
+}
+
+/// A target's value as `,` shows it to edit.
+fn target_text(controller: &Controller, app: usize, field: usize) -> String {
+    let (_, metric) = lazyrunner_core::run::controller::TARGETS[field];
+    let target = metric.target(&controller.apps[app].health);
+    if metric == Metric::Errors { format!("{target}") } else { format!("{target:.0}") }
+}
+
+/// Whether the tab takes typed text: a target being edited.
+pub fn typing(ui: &Ui) -> bool {
+    ui.health_edit.is_some()
+}
+
+/// The keys while a target is edited: `j` `k` another, digits, `Enter` saves it, `Esc` done.
+fn edit_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
+    let Some(mut editing) = ui.health_edit.clone() else { return false };
+    let fields = lazyrunner_core::run::controller::TARGETS.len();
+    match name {
+        "Escape" | "," => {
+            ui.health_edit = None;
+            return true;
+        }
+        "j" | "DownArrow" | "k" | "UpArrow" => {
+            let step = if matches!(name, "j" | "DownArrow") { 1 } else { fields - 1 };
+            editing.field = (editing.field + step) % fields;
+            editing.text = target_text(controller, editing.app, editing.field);
+        }
+        "Backspace" => {
+            editing.text.pop();
+        }
+        "Enter" => {
+            let (field, _) = lazyrunner_core::run::controller::TARGETS[editing.field];
+            let key = controller.apps[editing.app].key.clone();
+            match editing.text.trim().parse::<f64>() {
+                Ok(value) => {
+                    if let Err(why) = controller.set_health_target(&key, field, value) {
+                        controller.add_log(why, lazyrunner_core::output::Hue::Yellow);
+                    }
+                }
+                Err(_) => {
+                    controller.add_log(format!("{field}: a number, please"), lazyrunner_core::output::Hue::Yellow)
+                }
+            }
+            editing.text = target_text(controller, editing.app, editing.field);
+        }
+        typed if typed.len() == 1 && typed.chars().all(|ch| ch.is_ascii_digit() || ch == '.') => {
+            editing.text.push_str(typed)
+        }
+        _ => {}
+    }
+    ui.health_edit = Some(editing);
+    true
+}
 
 /// The Health tab, on the first app.
 pub fn open(ui: &mut Ui, _controller: &mut Controller) {
@@ -64,10 +152,25 @@ fn slowest(controller: &Controller) -> Vec<Endpoint> {
 /// The keys of the Health tab; false for one it doesn't use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     let Some((picked, opened)) = view(ui) else { return false };
+    if edit_key(ui, controller, name) {
+        return true;
+    }
     let apps = controller.apps.len();
     let count = apps + slowest(controller).len();
     let across = ui.health_columns.max(1);
+    let order = order(controller, ui.health_sort);
+    let picked_at = if picked < apps { order.iter().position(|&at| at == picked).unwrap_or(0) } else { picked };
     let next = match name {
+        "," if picked < apps => {
+            ui.health_edit = Some(Editing { app: picked, field: 0, text: target_text(controller, picked, 0) });
+            return true;
+        }
+        "s" => {
+            ui.health_sort = (ui.health_sort + 1) % SORTS.len();
+            controller
+                .add_log(format!("Health cards: {}", SORTS[ui.health_sort]), lazyrunner_core::output::Hue::DarkGray);
+            return true;
+        }
         "Escape" | "q" | "K" => {
             ui.overlay = None;
             return true;
@@ -87,25 +190,31 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             return true;
         }
         "a" => return true,
+        "v" => {
+            ui.health_chart = (ui.health_chart + 1) % Chart::ALL.len();
+            return true;
+        }
         "Enter" => {
             enter(ui, controller, picked);
             return true;
         }
-        "l" | "RightArrow" => picked + 1,
-        "h" | "LeftArrow" => picked.saturating_sub(1),
-        "j" | "DownArrow" if picked < apps => (picked + across).min(apps).min(count.saturating_sub(1)),
-        "j" | "DownArrow" => picked + 1,
-        "k" | "UpArrow" if picked > apps => picked - 1,
-        "k" | "UpArrow" if picked == apps => {
+        "l" | "RightArrow" => picked_at + 1,
+        "h" | "LeftArrow" => picked_at.saturating_sub(1),
+        "j" | "DownArrow" if picked_at < apps => (picked_at + across).min(apps).min(count.saturating_sub(1)),
+        "j" | "DownArrow" => picked_at + 1,
+        "k" | "UpArrow" if picked_at > apps => picked_at - 1,
+        "k" | "UpArrow" if picked_at == apps => {
             let last = apps.saturating_sub(1);
             last - last % across
         }
-        "k" | "UpArrow" => picked.saturating_sub(across),
+        "k" | "UpArrow" => picked_at.saturating_sub(across),
         "g" | "Home" | "<" => 0,
         "G" | "End" | ">" => count.saturating_sub(1),
         _ => return false,
     };
-    ui.overlay = Some(Overlay::Health { index: next.min(count.saturating_sub(1)), opened });
+    let next = next.min(count.saturating_sub(1));
+    let next = if next < apps { order[next] } else { next };
+    ui.overlay = Some(Overlay::Health { index: next, opened });
     true
 }
 
@@ -131,7 +240,10 @@ fn enter(ui: &mut Ui, controller: &mut Controller, picked: usize) {
 /// A click picks a card or an endpoint; a double click does what `Enter` does.
 pub fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, double: bool) -> bool {
     let Some((_, opened)) = view(ui) else { return false };
-    let Some(Target::Item(at)) = target else { return false };
+    let at = match target {
+        Some(Target::Item(at) | Target::Chart { app: at, .. }) => at,
+        _ => return false,
+    };
     ui.overlay = Some(Overlay::Health { index: at, opened });
     if double {
         enter(ui, controller, at);
@@ -146,36 +258,6 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
         && (!controller.health.breaches.is_empty() || !controller.health.recovered.is_empty())
 }
 
-/// A series as a braille sparkline, two samples a cell, scaled so its target sits three quarters up: the target dotted
-/// across where the line is under it, a cell over it red.
-fn braille(series: &[f32], target: f64) -> Vec<Seg> {
-    const LEFT: [u32; 4] = [0x40, 0x04, 0x02, 0x01];
-    const RIGHT: [u32; 4] = [0x80, 0x20, 0x10, 0x08];
-    let newest: Vec<f64> = series.iter().rev().take(SPARK * 2).rev().map(|&value| f64::from(value)).collect();
-    let top = newest.iter().copied().fold(target * 4.0 / 3.0, f64::max).max(f64::EPSILON);
-    let level = |value: f64| if value <= 0.0 { 0 } else { ((value / top * 4.0).ceil() as usize).clamp(1, 4) };
-    let line = ((target / top * 4.0).round() as usize).clamp(1, 4);
-    let padding = SPARK * 2 - newest.len();
-    let samples: Vec<Option<f64>> = std::iter::repeat_n(None, padding).chain(newest.into_iter().map(Some)).collect();
-    samples
-        .chunks(2)
-        .map(|pair| {
-            let mut bits = 0;
-            for (at, column) in [LEFT, RIGHT].iter().enumerate() {
-                let height = pair.get(at).copied().flatten().map_or(0, level);
-                bits |= column.iter().take(height).fold(0, |all, bit| all | bit);
-            }
-            let first = pair.first().copied().flatten().map_or(0, level);
-            if first < line {
-                bits |= LEFT[line - 1];
-            }
-            let over = pair.iter().flatten().any(|&value| value > target);
-            let glyph = char::from_u32(0x2800 + bits).unwrap_or(' ');
-            seg(glyph.to_string(), if over { C::Red } else { C::DarkCyan })
-        })
-        .collect()
-}
-
 /// How close a reading is to its target: red over it, amber near it.
 fn tone(value: f64, target: f64) -> C {
     match () {
@@ -185,23 +267,113 @@ fn tone(value: f64, target: f64) -> C {
     }
 }
 
-/// A card's line for one metric: its name, its reading, its sparkline and its target.
-fn metric_line(controller: &Controller, index: usize, metric: Metric, series: &[f32]) -> Vec<Seg> {
-    let app = &controller.apps[index];
-    let label = seg(format!("{:<7}", metric.name()), C::DarkGray);
-    let target = metric.target(&app.health);
-    let requests = matches!(metric, Metric::P95 | Metric::Errors);
-    if requests && !app.traits().counts_requests {
-        return vec![label, seg("no requests logged", C::DarkGray)];
+/// A reading said with its mark: `△` near its target, `▲` over it; `-` without one.
+fn reading(controller: &Controller, index: usize, metric: Metric, label: &str) -> Vec<Seg> {
+    let label = seg(format!("{label} "), C::DarkGray);
+    match controller.reading(index, metric) {
+        Some((value, target)) => {
+            let mark = match () {
+                _ if value > target => " ▲",
+                _ if value > target * NEAR => " △",
+                _ => "",
+            };
+            vec![label, seg(format!("{}{mark}", metric.say(value)), tone(value, target))]
+        }
+        None => vec![label, seg("-", C::DarkGray)],
     }
-    let Some((value, _)) = controller.reading(index, metric) else {
-        let why = if controller.states[index].is_up() { "no reading yet" } else { "-" };
-        return vec![label, seg(why, C::DarkGray)];
-    };
-    let mut line = vec![label, seg(format!("{:>7} ", metric.say(value)), tone(value, target))];
-    line.extend(braille(series, target));
-    line.push(seg(format!(" / {}", metric.say(target)), C::DarkGray));
-    line
+}
+
+/// A card's state after its name: its probe's answer, or that it's stopped or failed.
+fn probe(controller: &Controller, index: usize) -> Vec<Seg> {
+    let state = &controller.states[index];
+    match (state.is_up(), controller.last_probe(&controller.apps[index].key)) {
+        (true, Some(probe)) if probe.ok => vec![seg(format!("● up {} ms", probe.ms), C::Green)],
+        (true, Some(_)) => vec![seg("● not responding", C::Red)],
+        (true, None) => vec![seg("● up", C::Green)],
+        _ if matches!(
+            state.status,
+            lazyrunner_core::run::app::Status::Exited(_) | lazyrunner_core::run::app::Status::Error(_)
+        ) =>
+        {
+            vec![seg("✗ stopped with an error", C::Red)]
+        }
+        _ if state.is_running() => vec![seg("◌ starting", C::Yellow)],
+        _ => vec![seg("○ stopped", C::DarkGray)],
+    }
+}
+
+/// A card's readings in two lines: its CPU and memory; its p95, 5xx rate and requests a second.
+fn readings(controller: &Controller, index: usize) -> [Vec<Seg>; 2] {
+    let mut first = reading(controller, index, Metric::Cpu, "cpu");
+    first.push(seg("   ", C::Gray));
+    first.extend(reading(controller, index, Metric::Memory, "mem"));
+    if !controller.apps[index].traits().counts_requests {
+        return [first, vec![seg("no requests logged (not a .NET API)", C::DarkGray)]];
+    }
+    let mut second = reading(controller, index, Metric::P95, "p95");
+    second.push(seg("  ", C::Gray));
+    second.extend(reading(controller, index, Metric::Errors, "5xx"));
+    let rate = controller.states[index].request_history.back().copied().unwrap_or(0.0);
+    second.push(seg(format!("  {rate:.1} req/s"), C::Gray));
+    [first, second]
+}
+
+/// A card's chart of `chart` over its last minute, and the line under it.
+fn chart_rows(ui: &Ui, controller: &Controller, index: usize, inner: usize) -> Vec<Vec<Seg>> {
+    let chart = Chart::ALL[ui.health_chart % Chart::ALL.len()];
+    let caption = |extra: String| vec![seg(format!("{} · last 60 s{extra} · v another", chart.name()), C::DarkGray)];
+    match health_draw::series(controller, index, chart).filter(|(values, _)| !values.is_empty()) {
+        Some((values, target)) => {
+            let rows = health_draw::area(&values, target, (inner, CHART_ROWS), C::DarkCyan);
+            let mut rows: Vec<Vec<Seg>> = rows
+                .into_iter()
+                .map(|row| {
+                    row.into_iter()
+                        .enumerate()
+                        .map(|(cell, part)| part.at(Target::Chart { app: index, cell }))
+                        .collect()
+                })
+                .collect();
+            let hovered = match ui.hover {
+                Some(Target::Chart { app, cell }) if app == index => Some(cell),
+                _ => None,
+            };
+            match hovered {
+                Some(cell) => rows.push(moment(&values, target, chart, (cell, inner))),
+                None => {
+                    let target = target
+                        .zip(chart.metric())
+                        .map_or(String::new(), |(target, metric)| format!(" · ┄ {}", metric.say(target)));
+                    rows.push(caption(target));
+                }
+            }
+            rows
+        }
+        None => {
+            let why = if controller.states[index].is_up() { "no samples yet" } else { "not running" };
+            let mut rows: Vec<Vec<Seg>> = (0..CHART_ROWS).map(|_| Vec::new()).collect();
+            rows[CHART_ROWS / 2] = vec![seg(format!("{:^inner$}", format!("{} · {why}", chart.name())), C::DarkGray)];
+            rows.push(caption(String::new()));
+            rows
+        }
+    }
+}
+
+/// The reading under the pointer on a chart: its value against the target, and how long ago it was (samples are 2 s
+/// apart).
+fn moment(values: &[f32], target: Option<f64>, chart: Chart, (cell, cells): (usize, usize)) -> Vec<Seg> {
+    let at = (cell * 2 * values.len() / (cells * 2).max(1)).min(values.len().saturating_sub(1));
+    let value = f64::from(values[at]);
+    let ago = (values.len() - 1 - at) * SAMPLE_SECONDS;
+    let said = chart.metric().map_or_else(|| format!("{value:.1}/s"), |metric| metric.say(value));
+    let color = target.map_or(C::White, |target| tone(value, target));
+    let against =
+        target.zip(chart.metric()).map_or(String::new(), |(target, metric)| format!(" of {}", metric.say(target)));
+    vec![
+        seg(format!("{} ", chart.name()), C::DarkGray),
+        seg(said, color),
+        seg(format!("{against} · {ago} s ago"), C::DarkGray),
+    ]
 }
 
 /// The worst of an app's breaches: an open alert, an acknowledged one, then the breach nearest an alert.
@@ -257,6 +429,8 @@ fn border(ui: &Ui, controller: &Controller, index: usize, picked: bool) -> C {
         _ if picked => C::Cyan,
         _ if alerts.iter().any(|alert| !alert.acknowledged) => C::Red,
         _ if !alerts.is_empty() => C::Yellow,
+        _ if health_draw::condition(controller, index) == Condition::Failing => C::Red,
+        _ if health_draw::condition(controller, index) == Condition::Warning => C::DarkYellow,
         _ if Metric::ALL.iter().any(|&metric| controller.health.just_recovered(key, metric, now)) => C::Green,
         _ => C::DarkGray,
     }
@@ -264,26 +438,19 @@ fn border(ui: &Ui, controller: &Controller, index: usize, picked: bool) -> C {
 
 /// App `index`'s card, `CARD` wide, its rows aimed at it.
 fn card(ui: &Ui, controller: &Controller, index: usize, picked: bool) -> Vec<Vec<Seg>> {
-    let (app, state) = (&controller.apps[index], &controller.states[index]);
+    let app = &controller.apps[index];
     let edge = border(ui, controller, index, picked);
     let inner = CARD - 4;
-    let kept = |series: Option<&VecDeque<f32>>| series.map(|series| series.iter().copied().collect::<Vec<f32>>());
-    let p95 = kept(controller.health.p95.get(&app.key)).unwrap_or_default();
-    let errors = kept(controller.health.errors.get(&app.key)).unwrap_or_default();
     let icon = icons::app(ui.nerd, app, controller.framework(&app.key));
-    let (dot, dot_color) = if state.is_up() { ("●", C::Green) } else { ("○", C::DarkGray) };
     let mut title = vec![seg(format!("{icon} {}", app.name), if picked { C::White } else { C::Gray })];
-    let gap = inner.saturating_sub(width(&title) + 1);
+    let state_said = probe(controller, index);
+    let gap = inner.saturating_sub(width(&title) + width(&state_said));
     title.push(seg(" ".repeat(gap), C::Gray));
-    title.push(seg(dot, dot_color));
-    let lines = [
-        title,
-        metric_line(controller, index, Metric::P95, &p95),
-        metric_line(controller, index, Metric::Errors, &errors),
-        metric_line(controller, index, Metric::Memory, &kept(Some(&state.memory_history)).unwrap_or_default()),
-        metric_line(controller, index, Metric::Cpu, &kept(Some(&state.cpu_history)).unwrap_or_default()),
-        state_line(ui, controller, index),
-    ];
+    title.extend(state_said);
+    let [first, second] = readings(controller, index);
+    let mut lines = vec![title, first, second];
+    lines.extend(chart_rows(ui, controller, index, inner));
+    lines.push(state_line(ui, controller, index));
     let mut rows = vec![vec![seg(format!("╭{}╮", "─".repeat(CARD - 2)), edge)]];
     for line in lines {
         let mut row = vec![seg("│ ", edge)];
@@ -354,11 +521,27 @@ pub fn chip(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
     Some((text, if open { C::Red } else { C::Yellow }))
 }
 
-/// The header: the tabs, how many apps, the alerts.
+/// The header: the tabs, how many apps are healthy, warning, failing and stopped, the stack's last minute, the alerts.
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let mut segs = super::stack::tabs(super::stack::Tab::Health);
-    let apps = controller.apps.len();
-    segs.push(seg(format!("   {apps} app{}", if apps == 1 { "" } else { "s" }), C::DarkGray));
+    let count = |wanted: Condition| {
+        (0..controller.apps.len()).filter(|&at| health_draw::condition(controller, at) == wanted).count()
+    };
+    segs.push(seg(format!("   ● {} healthy", count(Condition::Healthy)), C::Green));
+    let warning = count(Condition::Warning);
+    segs.push(seg(format!(" · △ {warning} warning"), if warning > 0 { C::Yellow } else { C::DarkGray }));
+    let failing = count(Condition::Failing);
+    segs.push(seg(format!(" · ✗ {failing} failing"), if failing > 0 { C::Red } else { C::DarkGray }));
+    let stopped = count(Condition::Stopped);
+    if stopped > 0 {
+        segs.push(seg(format!(" · {stopped} stopped"), C::DarkGray));
+    }
+    if let Some(sort) = SORTS.get(ui.health_sort).filter(|_| ui.health_sort > 0) {
+        segs.push(seg(format!(" · sorted: {sort} (s)"), C::Cyan));
+    }
+    if let Some(minute) = health_draw::stack_minute(controller) {
+        segs.push(seg(format!("   {minute}"), C::Gray));
+    }
     let alerts: Vec<&Breach> = controller.health.alerts().collect();
     let open = alerts.iter().filter(|alert| !alert.acknowledged).count();
     match (alerts.len(), open) {
@@ -369,24 +552,30 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
             segs.push(seg(format!(" · {icon} {open} alert{}", if open == 1 { "" } else { "s" }), C::Red));
         }
     }
-    segs.push(seg(" · a reading over its target for a minute is an alert", C::DarkGray));
     segs
 }
 
 pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some((picked, _)) = view(ui) else { return Vec::new() };
-    let hint = " h j k l choose · a acknowledge its alerts · Enter its column, an endpoint's requests · Tab the map · \
-                Esc back";
+    let hint = if ui.health_edit.is_some() {
+        " j k another target · type a number · Enter saves it (on this machine) · Esc done"
+    } else {
+        " h j k l choose · v another chart · s sort · , its targets · a acknowledge its alerts · p profile it · Enter its \
+         column, an endpoint's requests · Tab the map · Esc back"
+    };
     let mut lines = vec![super::columns::fit(header(ui, controller), cells)];
     lines.extend(super::viewbar::keys(hint, cells));
+    lines.extend(health_draw::capacity(controller, (ui.machine_memory)(), cells));
     lines.push(Vec::new());
     let top = lines.len();
-    let across = ((cells.saturating_sub(1) + GAP) / (CARD + GAP)).max(1);
+    let side = cells > CARD + PANEL_GAP + PANEL;
+    let card_cells = if side { cells - PANEL_GAP - PANEL } else { cells };
+    let across = ((card_cells.saturating_sub(1) + GAP) / (CARD + GAP)).max(1);
     ui.health_columns = across;
     let apps = controller.apps.len();
     let mut body: Vec<Vec<Seg>> = Vec::new();
     let mut picked_rows = 0..0;
-    for (row, chunk) in (0..apps).collect::<Vec<_>>().chunks(across).enumerate() {
+    for (row, chunk) in order(controller, ui.health_sort).chunks(across).enumerate() {
         let cards: Vec<Vec<Vec<Seg>>> = chunk.iter().map(|&at| card(ui, controller, at, at == picked)).collect();
         if chunk.contains(&picked) {
             picked_rows = row * CARD_ROWS..(row + 1) * CARD_ROWS;
@@ -402,6 +591,26 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             body.push(joined);
         }
     }
+    let picked_app = picked.min(apps.saturating_sub(1));
+    let editing = ui
+        .health_edit
+        .as_ref()
+        .filter(|editing| editing.app == picked_app)
+        .map(|editing| (editing.field, editing.text.as_str()));
+    let panel = if apps > 0 { health_draw::panel(controller, picked_app, ui.now, PANEL, editing) } else { Vec::new() };
+    if side {
+        let height = body.len().max(panel.len());
+        body.resize(height, Vec::new());
+        for (row, line) in body.iter_mut().enumerate() {
+            let mut joined = super::columns::fit(std::mem::take(line), card_cells);
+            joined.push(seg(" ".repeat(PANEL_GAP), C::Gray));
+            joined.extend(panel.get(row).cloned().unwrap_or_default());
+            *line = joined;
+        }
+    } else {
+        body.push(Vec::new());
+        body.extend(panel);
+    }
     let list = slowest(controller);
     body.push(Vec::new());
     body.push(vec![seg(" SLOWEST ENDPOINTS · p95 over the last 5 minutes, ┊ its app's target", C::DarkGray)]);
@@ -413,6 +622,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         picked_rows = at..at + 1;
     }
     body.extend(endpoint_rows(controller, &list, apps, picked, cells));
+    body.push(Vec::new());
+    body.extend(health_draw::log(controller, cells));
     let room = rows.saturating_sub(top);
     let from = picked_rows.end.saturating_sub(room).min(picked_rows.start);
     lines.extend(body.into_iter().skip(from).take(room));

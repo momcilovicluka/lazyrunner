@@ -3,36 +3,36 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
  ⋈ STACK   H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline
- Map  Code  Health    5 apps · ! 1 alert · a reading over its target for a minute is an alert
- h j k l choose · a acknowledge its alerts · Enter its column, an endpoint's requests · Tab the map · Esc back
+ Map  Code  Health    ● 0 healthy · △ 0 warning · ✗ 1 failing · 4 stopped   p95 565 ms · 0.3 req/s · 0.0% 5xx · ! 1 alert
+ h j k l choose · v another chart · s sort · , its targets · a acknowledge its alerts · p profile it
+ Enter its column, an endpoint's requests · Tab the map · Esc back
+ memory ▕█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▏ 2.9 GB of 16.0 GB · 13.1 GB free
+ cpu    ▕██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▏ 12% of the machine · 88% headroom
+         ■ Orders  ■ Billing
 
- ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮
- │ ◆ Orders                           ● │ │ ■ Billing                          ○ │ │ ■ Shop                             ○ │
- │ p95     565 ms ⠂⠂⠂⠂⠂⠂⠂⠂⠂⠂ / 1000 ms  │ │ p95    -                             │ │ p95    no requests logged            │
- │ 5xx       0.0% ⠂⠂⠂⠂⠂⠂⠂⠂⠂⠂ / 5.0%     │ │ 5xx    -                             │ │ 5xx    no requests logged            │
- │ memory 3000 MB ⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿ / 2048 MB  │ │ memory -                             │ │ memory -                             │
- │ cpu        12% ⣂⣂⣂⣂⣂⣂⣂⣂⣂⣂ / 90%      │ │ cpu    -                             │ │ cpu    -                             │
- │ ! memory 3000 MB for 1m30s (a)       │ │ not running                          │ │ not running                          │
- ╰──────────────────────────────────────╯ ╰──────────────────────────────────────╯ ╰──────────────────────────────────────╯
- ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮
- │ ■ Docs                             ○ │ │ ■ Console                          ○ │
- │ p95    no requests logged            │ │ p95    no requests logged            │
- │ 5xx    no requests logged            │ │ 5xx    no requests logged            │
- │ memory -                             │ │ memory -                             │
- │ cpu    -                             │ │ cpu    -                             │
+ ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮   Orders · targets
+ │ ◆ Orders                        ● up │ │ ■ Billing                 ◌ starting │                     target       now
+ │ cpu 12%   mem 3000 MB ▲              │ │ cpu -   mem -                        │   p95              1000 ms    565 ms ✓
+ │ p95 565 ms  5xx 0.0%  0.0 req/s      │ │ p95 -  5xx -  0.0 req/s              │   5xx                 5.0%      0.0% ✓
+ │ ⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀⡀⠀ │ │                                      │   memory           2048 MB   3000 MB ✗
+ │ ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ │ │          cpu · not running           │   cpu                  90%       12% ✓
+ │ ⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀ │ │                                      │   memory growth       +20%      +53% ✗
+ │ cpu · last 60 s · ┄ 90% · v another  │ │ cpu · last 60 s · v another          │
+ │ ! memory 3000 MB for 1m30s (a)       │ │ not running                          │   SLOWEST ENDPOINTS · 5 min
+ ╰──────────────────────────────────────╯ ╰──────────────────────────────────────╯   GET /api/orders               565 ms    0 err
+ ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮   GET /api/invoices/{id}        530 ms    0 err
+ │ ■ Shop                     ○ stopped │ │ ■ Docs                     ○ stopped │   GET /api/orders/{id}          495 ms    0 err
+ │ cpu -   mem -                        │ │ cpu -   mem -                        │
+ │ no requests logged (not a .NET API)  │ │ no requests logged (not a .NET API)  │   ALERTS
+ │                                      │ │                                      │   ! memory > 2048 MB for 1m30s · a acknowledges
+ │          cpu · not running           │ │          cpu · not running           │
+ │                                      │ │                                      │   PROFILE
+ │ cpu · last 60 s · v another          │ │ cpu · last 60 s · v another          │   p profiles its CPU
  │ not running                          │ │ not running                          │
  ╰──────────────────────────────────────╯ ╰──────────────────────────────────────╯
-
- SLOWEST ENDPOINTS · p95 over the last 5 minutes, ┊ its app's target
- Orders     GET    /api/orders                                                                     ███████████▎       ┊     565 ms
- Orders     GET    /api/invoices/{id}                                                              ██████████▋        ┊     530 ms
- Orders     GET    /api/orders/{id}                                                                █████████▉         ┊     495 ms
-
-
-
-
-
-
+ ╭──────────────────────────────────────╮
+ │ ■ Console                  ○ stopped │
+ │ cpu -   mem -                        │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
   r  restart   s  stop   w  open   /  search   S  stop all               :  commands   x  menu   ?  keys   ,  settings   q  quit

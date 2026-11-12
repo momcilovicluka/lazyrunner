@@ -18,6 +18,7 @@ pub mod flame;
 pub mod follow;
 pub mod graph;
 pub mod health;
+pub mod health_draw;
 pub mod held;
 pub mod icons;
 pub mod jumps;
@@ -380,6 +381,11 @@ pub struct Ui {
     pub stack_tab: stack::Tab,
     /// The Health tab's cards across, as last drawn (j k move a row).
     pub health_columns: usize,
+    /// What the Health tab's cards chart (`v`), by its place in `health_draw::Chart::ALL`.
+    pub health_chart: usize,
+    /// How the Health tab orders its cards (`s`), by its place in `health::SORTS`; the target `,` edits.
+    pub health_sort: usize,
+    pub health_edit: Option<health::Editing>,
     /// The capture whose chart opened on its own (#83), by when it was done.
     pub profile_seen: Option<Instant>,
     /// What each view had when it was last open: the panel's chips say what's new since.
@@ -443,6 +449,8 @@ pub struct Ui {
     pub whats_new: Vec<changelog::Entry>,
     /// Opens a link or a file (the default app); tests swap it for one that only records.
     pub opener: fn(&str) -> bool,
+    /// The machine's memory in MB, for the Health tab's capacity bar (the tests' is fixed).
+    pub machine_memory: fn() -> f32,
     /// Copies to the clipboard (`y`); tests swap it for one that only records.
     pub clipboard: copy::Clipboard,
     /// The reducedMotion setting (`, f`), read at every frame: nothing blinks, spins, glides or fades.
@@ -488,6 +496,9 @@ impl Ui {
             stack_dots: stack::Dots::default(),
             stack_tab: stack::Tab::default(),
             health_columns: 1,
+            health_chart: 0,
+            health_sort: 0,
+            health_edit: None,
             profile_seen: None,
             seen: seen::Seen::default(),
             phases: phases::Phases::default(),
@@ -524,6 +535,7 @@ impl Ui {
             switch_to: None,
             whats_new: Vec::new(),
             opener: status::open,
+            machine_memory: lazyrunner_core::metrics::machine_memory_mb,
             clipboard: copy::to_clipboard,
             reduced_motion: controller.setting(Toggle::ReducedMotion),
             terminal_focused: None,

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.84.0] - 2026-11-12
+
+### Changed
+- A fuller Health tab, after #35's sketch: the header counts the healthy, warning and failing apps and says the stack's last minute (p95, requests a second, 5xx); bars show the stack's share of the machine's memory and CPU, a segment per app; each card says its probe (`● up 12 ms`), its readings against its targets (`△` near, `▲` over) with requests a second, and charts its last minute as a filled braille area with the target dotted across - `v` switches what every card charts - its border red when failing and amber when warning; the picked app's panel shows its targets against its readings, its slowest endpoints with their errors, its alerts and its last profile; and a log of recent alerts and recoveries sits at the bottom. The pointer on a chart says that moment's reading; `,` edits an app's targets right there, kept on this machine (`"healthTargets"`); `s` orders the cards (the profile's order, worst first, CPU, memory, p95) (#35)
+
 ## [1.83.0] - 2026-11-12
 
 ### Added

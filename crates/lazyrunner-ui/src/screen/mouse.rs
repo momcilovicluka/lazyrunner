@@ -61,6 +61,8 @@ pub enum Target {
     Screen(super::screens::Screen),
     /// The panel's chip of the stack's alerts: a click opens the Health tab.
     Health,
+    /// A cell of a Health card's chart: its app, its cell (the pointer on it shows that moment's reading).
+    Chart { app: usize, cell: usize },
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
