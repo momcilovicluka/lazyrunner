@@ -450,6 +450,10 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "Escape" | "q" | "K" => ui.overlay = None,
         "Tab" => super::code::open(ui, controller, None),
         "c" => super::code::open(ui, controller, controller.apps.get(picked).map(|app| app.key.clone())),
+        "p" if picked < count => {
+            let key = controller.apps[picked].key.clone();
+            super::flame::start(ui, controller, &key);
+        }
         "Enter" if picked < count => {
             ui.overlay = None;
             ui.focus = picked;

@@ -17,6 +17,7 @@ mod migrations;
 mod npm_ci;
 mod overrides;
 mod parallel;
+pub mod profile;
 mod stack;
 mod start;
 mod suites;
@@ -283,6 +284,11 @@ pub struct Controller {
     build_units: HashMap<String, usize>,
     /// Each .NET app's build as a map (#82): the running one, else the last, kept across sessions.
     pub build_runs: HashMap<String, crate::run::build_map::BuildRun>,
+    /// The CPU capture under way (#83), each app's kept captures, the one just done, and dotnet-trace installing.
+    pub profiling: Option<profile::Profiling>,
+    pub profiles: HashMap<String, Vec<crate::run::profile::Profile>>,
+    pub last_profiled: Option<(String, Instant)>,
+    pub installing_trace: bool,
     task_results: HashMap<String, tasks::TaskResult>,
     metric_roots: Arc<Mutex<Vec<(String, u32)>>>,
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
@@ -324,6 +330,13 @@ impl Controller {
             .filter(|app| app.is_dotnet())
             .filter_map(|app| crate::run::build_map::load(&state_dir, &app.key))
             .map(|run| (run.key.clone(), run))
+            .collect();
+        let profiles = project
+            .apps
+            .iter()
+            .filter(|app| app.is_dotnet())
+            .map(|app| (app.key.clone(), crate::run::profile::load(&state_dir, &app.key)))
+            .filter(|(_, kept)| !kept.is_empty())
             .collect();
         let mut controller = Self {
             timings: Timings::load(&state_dir),
@@ -428,6 +441,10 @@ impl Controller {
             composed: compose::Composed::default(),
             build_units: HashMap::new(),
             build_runs,
+            profiling: None,
+            profiles,
+            last_profiled: None,
+            installing_trace: false,
             task_results: HashMap::new(),
             metric_roots,
             commands: Arc::new(super::tools::Tools),
@@ -681,6 +698,8 @@ impl Controller {
             Event::Code { map, cache, done } => self.code_arrived(*map, cache.map(|cache| *cache), done),
             Event::Suites(found) => self.suites_found(found),
             Event::Audit { key, result } => self.audit_done(key, result),
+            Event::Profiled { key, result } => self.profiled(key, result),
+            Event::TraceInstalled { result } => self.trace_installed(result),
             Event::AuditInstalled { key, result } => self.audit_installed(key, result),
             Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),
             Event::ComposeServices { key, generation, services } => self.compose_arrived(key, generation, services),

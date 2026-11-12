@@ -14,6 +14,7 @@ pub mod columns;
 pub mod copy;
 pub mod diff;
 pub mod durations;
+pub mod flame;
 pub mod follow;
 pub mod graph;
 pub mod health;
@@ -222,6 +223,8 @@ pub enum Overlay {
         index: usize,
         opened: Instant,
     },
+    /// `Alt+p`, or `p` on a Health card or a Map box: an app's CPU as a flame chart (#83).
+    Flame(Box<flame::View>),
     /// `K`, then Tab twice: the stack's health (#35); the picked card (then the slowest endpoints), and when it opened.
     Health {
         index: usize,
@@ -286,6 +289,7 @@ impl Overlay {
             Self::Stack { .. } => "stack",
             Self::Code(_) => "code",
             Self::Health { .. } => "health",
+            Self::Flame(_) => "profile",
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
@@ -376,6 +380,8 @@ pub struct Ui {
     pub stack_tab: stack::Tab,
     /// The Health tab's cards across, as last drawn (j k move a row).
     pub health_columns: usize,
+    /// The capture whose chart opened on its own (#83), by when it was done.
+    pub profile_seen: Option<Instant>,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
@@ -482,6 +488,7 @@ impl Ui {
             stack_dots: stack::Dots::default(),
             stack_tab: stack::Tab::default(),
             health_columns: 1,
+            profile_seen: None,
             seen: seen::Seen::default(),
             phases: phases::Phases::default(),
             log_newest: None,
@@ -641,6 +648,7 @@ impl Ui {
             || stack::animating(self, controller)
             || code::animating(self, controller)
             || health::animating(self, controller)
+            || flame::animating(self)
             || durations::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
@@ -671,6 +679,7 @@ impl Ui {
         typing
             || self.busy.is_some()
             || controller.building.is_some()
+            || controller.profiling.is_some()
             || controller.npm_ci.is_some()
             || controller.tests_active()
             || controller.migrations_active()
@@ -771,6 +780,7 @@ pub(super) fn reveal(rows: Vec<Vec<Seg>>, opened: f64) -> Vec<Vec<Seg>> {
 
 /// The body: a full screen under the bar of screens, else what's open over the columns, else the columns.
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
+    flame::open_fresh(ui, controller);
     let screen = screens::Screen::of(ui.overlay.as_ref()).filter(|_| ui.picker.is_none());
     let Some(screen) = screen else { return under_bar(ui, controller, width, rows) };
     let mut lines = vec![screens::bar(ui, screen, width)];
@@ -798,6 +808,7 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         Some(Overlay::Ports { .. }) => return ports::rows(ui, controller, width, rows),
         Some(Overlay::Stack { .. }) => return stack::rows(ui, controller, width, rows),
         Some(Overlay::Health { .. }) => return health::rows(ui, controller, width, rows),
+        Some(Overlay::Flame(_)) => return flame::rows(ui, controller, width, rows),
         Some(Overlay::Code(_)) => return code::rows(ui, controller, width, rows),
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),

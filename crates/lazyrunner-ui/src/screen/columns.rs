@@ -337,6 +337,9 @@ pub fn bar(ui: &mut Ui, fraction: f64, id: &str, animated: bool) -> String {
 fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
     let state = &controller.states[index];
     let key = state.key.clone();
+    if let Some(profiling) = super::flame::title(ui, controller, &key) {
+        return profiling;
+    }
     let tick = ui.tick();
     let animated = !ui.reduced_motion;
     if let Some((kind, job)) = tool(controller, &key) {

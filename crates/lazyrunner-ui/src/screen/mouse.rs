@@ -188,6 +188,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         || super::ports::click(ui, controller, target, double)
         || super::stack::click(ui, controller, target, double)
         || super::health::click(ui, controller, target, double)
+        || super::flame::click(ui, target, double)
         || super::code::click(ui, controller, target, double)
         || super::durations::click(ui, target)
     {

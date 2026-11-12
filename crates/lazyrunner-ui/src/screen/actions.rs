@@ -61,6 +61,8 @@ pub enum Run {
     Diff,
     /// Alt+b: the build as a map (#82).
     BuildMap,
+    /// `Alt+p`: profile the focused app's CPU, or stop the capture under way (#83).
+    Profile,
     Widen,
     Narrow,
     EqualWidths,
@@ -295,6 +297,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("View", "Alt+d", "What's new since the last run", "the rest dims; n N step through it", Run::Diff)
             .safe()
             .focused(),
+        action(
+            "View",
+            "Alt+p",
+            "Profile the focused app's CPU",
+            "10 s with dotnet-trace, then its flame chart; again stops it",
+            Run::Profile,
+        )
+        .safe(),
         action("View", "Alt+b", "The build as a map", "its projects, their times, the critical path", Run::BuildMap)
             .safe(),
         action("View", "+", "Widen the focused column", "taller when the apps are stacked", Run::Widen).safe(),

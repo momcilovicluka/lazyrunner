@@ -33,3 +33,34 @@ try {
     say(request, portOf(error) || (request.socket && request.socket.remotePort), 'error');
   });
 } catch {}
+// lazyrunner's profiles (#83): when lazyrunner asks this process - a request file named for its pid beside this
+// one - it samples its own CPU with Node's inspector for the seconds asked and writes the profile where it says.
+try {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const asking = path.join(__dirname, `profile-request.${process.pid}.json`);
+  const timer = setInterval(() => {
+    if (!fs.existsSync(asking)) return;
+    let asked;
+    try {
+      asked = JSON.parse(fs.readFileSync(asking, 'utf8'));
+      fs.unlinkSync(asking);
+    } catch {
+      return;
+    }
+    const inspector = require('node:inspector');
+    const session = new inspector.Session();
+    session.connect();
+    session.post('Profiler.enable', () =>
+      session.post('Profiler.start', () =>
+        setTimeout(() =>
+          session.post('Profiler.stop', (error, result) => {
+            try {
+              fs.writeFileSync(`${asked.out}.part`, JSON.stringify(error ? { error: String(error) } : result.profile));
+              fs.renameSync(`${asked.out}.part`, asked.out);
+            } catch {}
+            session.disconnect();
+          }), asked.seconds * 1000)));
+  }, 1000);
+  if (timer.unref) timer.unref();
+} catch {}

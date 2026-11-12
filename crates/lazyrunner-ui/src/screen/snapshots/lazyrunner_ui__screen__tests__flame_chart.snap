@@ -1,0 +1,38 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ⋈ STACK   H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline
+ Map  Code  Health   › Profile Orders · capture 2 of 2 · 12:05:00 · 10 s · 1000 ms on the CPU
+ h j k l move · Enter zoom in · Backspace out · / find · [ ] captures · c compare · o its source · y copy the top · p profile again · + - its length
+ Esc back
+Shop.Pricing 100%
+ all
+
+▲ Quote.Total                                                                               ▲ Rules.T  │ TOP FRAMES BY SELF TIME
+Program.Main                                                                                           │ ▲  90%     900 ms  Quote.Total
+all 1000 ms                                                                                            │ ▲  10%     100 ms  Rules.Tax
+ all  1000 ms on the CPU, every thread's - k goes up into it
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                                                         :  commands   x  menu   ?  keys   ,  settings   q  quit

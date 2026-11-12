@@ -437,7 +437,7 @@ pub(super) fn clock() -> String {
 }
 
 /// Kills another program's process tree (what holds a port lazyrunner needs); true when it is gone.
-fn kill_process_tree(pid: u32) -> bool {
+pub(super) fn kill_process_tree(pid: u32) -> bool {
     #[cfg(windows)]
     {
         std::process::Command::new("taskkill")

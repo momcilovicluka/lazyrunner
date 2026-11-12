@@ -4316,6 +4316,91 @@ async fn the_build_shows_over_the_code_maps_projects_with_its_critical_path() {
     assert_eq!(code(&screen).as_deref(), Some("orders"), "Enter on a build in D: its map");
 }
 
+/// A capture of Orders (#83): Main calling Quote.Total for `total` ms and Rules.Tax for `tax`, on the CPU.
+fn capture(at: &str, total: u32, tax: u32) -> lazyrunner_core::run::profile::Profile {
+    let end = total + tax;
+    let text = format!(
+        r#"{{ "shared": {{ "frames": [ {{ "name": "Thread (1)" }}, {{ "name": "Orders!Orders.Api.Program.Main()" }},
+        {{ "name": "Orders!Shop.Pricing.Quote.Total(int32)" }}, {{ "name": "Orders!Shop.Pricing.Rules.Tax()" }},
+        {{ "name": "CPU_TIME" }} ] }}, "profiles": [ {{ "type": "evented", "events": [
+        {{ "type": "O", "frame": 0, "at": 0 }}, {{ "type": "O", "frame": 1, "at": 0 }}, {{ "type": "O", "frame": 2, "at": 0 }},
+        {{ "type": "O", "frame": 4, "at": 0 }}, {{ "type": "C", "frame": 4, "at": {total} }}, {{ "type": "C", "frame": 2, "at": {total} }},
+        {{ "type": "O", "frame": 3, "at": {total} }}, {{ "type": "O", "frame": 4, "at": {total} }}, {{ "type": "C", "frame": 4, "at": {end} }},
+        {{ "type": "C", "frame": 3, "at": {end} }}, {{ "type": "C", "frame": 1, "at": {end} }} ] }} ] }}"#
+    );
+    lazyrunner_core::run::profile::from_speedscope(&text, "orders", at, 10).unwrap()
+}
+
+/// #83: a capture opens as a flame chart in K - frames as wide as their time, the namespaces' split, the top frames -
+/// h j k l, Enter and Backspace move and zoom, [ ] step through the captures and c compares; Esc goes back; Alt+p on
+/// an app that isn't running opens its captures; an agent reads it with get_profile.
+#[tokio::test]
+async fn a_capture_opens_as_a_flame_chart_with_its_top_frames_and_compares_with_the_one_before() {
+    let mut screen = screen("flame", json!({}));
+    let kept = vec![capture("2026-11-12T12:00:00+01:00", 600, 200), capture("2026-11-12T12:05:00+01:00", 900, 100)];
+    screen.controller.profiles.insert("orders".into(), kept);
+    screen.controller.last_profiled = Some(("orders".into(), screen.ui.now));
+    screen.frame();
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Flame(_))), "a capture just done opens on its own");
+    let frame = screen.render(150, 40);
+    insta::assert_snapshot!("flame_chart", frame);
+    for said in [
+        "› Profile Orders",
+        "capture 2 of 2",
+        "1000 ms on the CPU",
+        "Quote.Total",
+        "Shop.Pricing 100%",
+        "TOP FRAMES BY SELF TIME",
+    ] {
+        assert!(frame.contains(said), "{said}: {frame}");
+    }
+    screen.press("k k");
+    let picked = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Flame(view)) => (view.picked, view.zoom, view.capture, view.compare),
+        _ => panic!("the chart"),
+    };
+    let (main_total, ..) = picked(&screen);
+    screen.press("k Enter");
+    let (quote, zoom, ..) = picked(&screen);
+    assert_eq!(zoom, quote, "Enter zooms into the picked frame (from {main_total})");
+    assert!(
+        screen.render(150, 40).contains("Quote.Total  Shop.Pricing  900 ms in all (90%)"),
+        "{}",
+        screen.render(150, 40)
+    );
+    screen.press("Backspace [ c");
+    let (_, _, capture, compare) = picked(&screen);
+    assert_eq!((capture, compare), (0, false), "[ goes to the capture before; c there has none before it");
+    screen.press("] c");
+    assert!(screen.render(150, 40).contains("▲ +300 ms"), "compared: {}", screen.render(150, 40));
+    let profile = agent(&mut screen, "profile_view", json!({ "app": "orders" }), None);
+    assert_eq!(profile["result"]["top_frames"][0]["short"], "Quote.Total", "{profile}");
+    assert_eq!(profile["result"]["top_frames"][0]["change_ms"], 300.0, "{profile}");
+    screen.press("Esc");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Health { .. })), "Esc: back to the Stack screen");
+    screen.press("Esc Alt+p");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Flame(_))), "Alt+p on a stopped app: its captures");
+    screen.press("+");
+    assert_eq!(screen.controller.profile_seconds(), 15, "+ makes a capture longer, saved");
+
+    (screen.ui.motion.enabled, screen.ui.reduced_motion) = (true, false);
+    screen.press("Esc Alt+p");
+    screen.ui.now += std::time::Duration::from_millis(130);
+    let blooming = screen.render(150, 40);
+    assert!(blooming.contains("all 1000 ms") && !blooming.contains("Program.Main"), "it blooms upward: {blooming}");
+    screen.ui.now += std::time::Duration::from_secs(1);
+    assert!(screen.render(150, 40).contains("Quote.Total"), "then the whole chart");
+    (screen.ui.motion.enabled, screen.ui.reduced_motion) = (false, true);
+
+    screen.press("Esc");
+    with_requests(&mut screen);
+    screen.press("H f");
+    assert!(
+        matches!(screen.ui.overlay, Some(Overlay::Flame(_))),
+        "f in H: its app's profile (Orders is stopped: its last)"
+    );
+}
+
 /// #35: K's Health tab - a card per app against its targets, an alert and its acknowledgement, the slowest endpoints
 /// leading into H - the panel's chip while it's elsewhere, an agent's get_health and get_status, and K reopening on it.
 #[tokio::test]
