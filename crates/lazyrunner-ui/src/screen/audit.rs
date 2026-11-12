@@ -347,6 +347,59 @@ fn spin(ui: &Ui) -> &str {
 
 /// The view's first row: the project, what the scans found (a count pulsing as a scan adds to it), and what's
 /// installing or scanning - with the batch counted off - or when the last scan was, coloured by its age.
+/// The severity bar's cells.
+const SEVERITY_BAR: usize = 12;
+
+/// The stack's vulnerable packages as one bar: a share each for critical, high, moderate and low.
+fn severity_bar(all: &[&Package]) -> Vec<Seg> {
+    let shares = [
+        (Severity::Critical, C::Red),
+        (Severity::High, C::DarkRed),
+        (Severity::Moderate, C::Yellow),
+        (Severity::Low, C::DarkGray),
+    ];
+    let vulnerable =
+        all.iter().filter(|package| package.severity.is_some_and(|severity| severity >= Severity::Low)).count();
+    if vulnerable == 0 {
+        return vec![seg("  ✓ nothing vulnerable", C::Green)];
+    }
+    let mut bar = vec![seg("  ▕", C::DarkGray)];
+    let mut drawn = 0;
+    for (severity, color) in shares {
+        let count = all.iter().filter(|package| package.severity == Some(severity)).count();
+        let cells = ((count * SEVERITY_BAR) as f64 / vulnerable as f64).round() as usize;
+        let cells = cells.max(usize::from(count > 0)).min(SEVERITY_BAR - drawn);
+        bar.push(seg("█".repeat(cells), color));
+        drawn += cells;
+    }
+    bar.push(seg(format!("{}▏ {vulnerable} vulnerable", " ".repeat(SEVERITY_BAR - drawn)), C::DarkGray));
+    bar
+}
+
+/// How far behind the outdated packages are: major, minor and patch versions.
+fn outdated(all: &[&Package]) -> Vec<Seg> {
+    let parts = |version: &str| -> Vec<u64> {
+        version.trim_start_matches('v').split(['.', '-']).take(3).map(|part| part.parse().unwrap_or(0)).collect()
+    };
+    let mut counts = [0usize; 3];
+    for package in all {
+        let Some(latest) = package.latest.as_deref() else { continue };
+        let (now, then) = (parts(&package.current), parts(latest));
+        if let Some(place) = (0..3).find(|&at| now.get(at) != then.get(at)) {
+            counts[place] += 1;
+        }
+    }
+    if counts.iter().sum::<usize>() == 0 {
+        return Vec::new();
+    }
+    vec![
+        seg("  outdated ", C::DarkGray),
+        seg(format!("{} major", counts[0]), if counts[0] > 0 { C::Red } else { C::DarkGray }),
+        seg(format!(" · {} minor", counts[1]), if counts[1] > 0 { C::Yellow } else { C::DarkGray }),
+        seg(format!(" · {} patch", counts[2]), C::DarkGray),
+    ]
+}
+
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let mut header = vec![seg(format!("  {}", controller.project.name), C::White)];
     let scans = controller.audits();
@@ -397,6 +450,10 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         header.push(seg(format!(" · last scan {}{nudge}", audit::age(at)), color));
     }
     header.push(seg(format!(" · {} at once (+ -)", controller.audit_parallelism()), C::DarkGray));
+    if !scans.is_empty() {
+        header.extend(severity_bar(&all));
+        header.extend(outdated(&all));
+    }
     header
 }
 

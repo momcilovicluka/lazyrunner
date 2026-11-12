@@ -4,9 +4,9 @@ expression: "screen.render(60, 15)"
 ---
  ▸ ◆ Orders ┳ ■ Billing  ┬ ■ Shop   ○ ┬ ■ Docs   ○ ┬ ■ Conso
             ┃            │   dev serve│   watch bui│   live
-ed once     ┃error: Billi│            │            │
-info: Applic┃ng.cs(3,1): │not started │not started │not star
-ation starte┃ something  │            │            │
+ed once     ┃error: Billi│not started │            │not star
+info: Applic┃ng.cs(3,1): │            │not started │
+ation starte┃ something  │port 47301 ·│            │port 473
 d.          ┃is off      │            │            │
 ────────────────────────────────────────────────────────────
  lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ l

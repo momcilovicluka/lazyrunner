@@ -31,6 +31,8 @@ const SLOW_RESPONSE_MS: u64 = 1000;
 const FRESH: Duration = Duration::from_millis(400);
 const SETTLING: Duration = Duration::from_millis(1000);
 const SPARK_WIDTH: usize = 10;
+/// A stopped app's state breathes once in this many ticks.
+const IDLE_BREATH: u64 = 16;
 /// Narrower than this, `"layout": "auto"` stacks the apps top to bottom.
 pub const STACK_BELOW: usize = 120;
 /// A stacked app's fewest rows: its title, its numbers and a line of output.
@@ -443,7 +445,14 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
             vec![seg(format!("{exited} exited (code {})", code.map_or("?".into(), |c| c.to_string())), C::Red)]
         }
         Status::Error(error) => vec![seg(format!("{} {error}", icons::icon(ui.nerd, Icon::Exited)), C::Red)],
-        Status::Stopped => vec![seg(format!("{} stopped", icons::icon(ui.nerd, Icon::Stopped)), C::DarkGray)],
+        Status::Stopped => {
+            // A stopped app's state breathes, faintly and slowly (not with reduced motion).
+            let lit = animated && tick % IDLE_BREATH < IDLE_BREATH / 4;
+            vec![seg(
+                format!("{} stopped", icons::icon(ui.nerd, Icon::Stopped)),
+                if lit { C::Gray } else { C::DarkGray },
+            )]
+        }
     }
 }
 
@@ -460,7 +469,7 @@ fn memory_growing(state: &AppState) -> bool {
 }
 
 /// Second title line: live CPU and memory with sparklines, the response-time trend, requests, errors, the variant.
-fn info(ui: &Ui, controller: &Controller, index: usize, cells: usize) -> Vec<Seg> {
+fn info(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Vec<Seg> {
     let nerd = ui.nerd;
     let state = &controller.states[index];
     let mut segs = vec![seg(" ", C::Gray)];
@@ -478,10 +487,13 @@ fn info(ui: &Ui, controller: &Controller, index: usize, cells: usize) -> Vec<Seg
             C::Green
         };
         segs.push(seg("cpu ", C::DarkGray));
-        segs.push(seg(format!("{cpu:>3.0}%"), color));
+        let (cpu, tint) = ui.roll(&format!("column:{}:cpu", state.key), f64::from(cpu), false, true);
+        segs.push(seg(format!("{cpu:>3.0}%"), tint.unwrap_or(color)));
         segs.push(seg(format!(" {}", sparkline(state.cpu_history.iter(), 25.0)), C::DarkCyan));
         segs.push(seg("  mem ", C::DarkGray));
-        segs.push(seg(format!("{:.0} MB", state.memory_mb.unwrap_or_default()), C::Gray));
+        let memory = f64::from(state.memory_mb.unwrap_or_default());
+        let (memory, tint) = ui.roll(&format!("column:{}:memory", state.key), memory, false, true);
+        segs.push(seg(format!("{memory:.0} MB"), tint.unwrap_or(C::Gray)));
         if memory_growing(state) {
             segs.push(seg(format!(" {}", icons::icon(nerd, Icon::Growing)), C::Yellow));
         }
@@ -628,6 +640,44 @@ fn bright(color: C) -> C {
     }
 }
 
+/// How long ago an RFC 3339 time was, as the panel says durations.
+fn ago(at: &str) -> Option<String> {
+    let at = chrono::DateTime::parse_from_rfc3339(at).ok()?;
+    let seconds = (chrono::Local::now().fixed_offset() - at).num_seconds().max(0) as f64;
+    Some(format_duration(seconds))
+}
+
+/// A stopped app's last runs, from the durations: its last start and how long it took, its last build against its
+/// usual, and its port - free, or who holds it.
+fn last_runs(controller: &Controller, index: usize) -> Vec<String> {
+    use lazyrunner_core::run::history::Kind;
+    let key = &controller.apps[index].key;
+    let mut lines = Vec::new();
+    let last = |kind: Kind| controller.durations.item(kind, key).and_then(|item| item.runs.last().cloned());
+    if let Some(run) = last(Kind::Start) {
+        let when = ago(&run.at).map_or(String::new(), |ago| format!("{ago} ago"));
+        lines.push(format!("last start {when} · up in {}", format_duration(run.sec)));
+    }
+    if let Some(run) = last(Kind::Build) {
+        let when = ago(&run.at).map_or(String::new(), |ago| format!("{ago} ago"));
+        let usual = controller
+            .durations
+            .usual(Kind::Build, key)
+            .map_or(String::new(), |usual| format!(" (usual {})", format_duration(usual)));
+        let said = if run.ok { format!("in {}{usual}", format_duration(run.sec)) } else { "failed".to_string() };
+        lines.push(format!("last build {when} · {said}"));
+    }
+    if let Some(port) = controller.port(key) {
+        let row = controller.port_map().rows.iter().find(|row| row.port == port);
+        let holder = row.and_then(|row| row.holder.as_ref()).map(|holder| format!("{} ({})", holder.name, holder.pid));
+        lines.push(match holder {
+            Some(holder) => format!("port {port} · held by {holder} - ! in P frees it"),
+            None => format!("port {port} · free"),
+        });
+    }
+    lines
+}
+
 /// What an empty column says, centred: a stopped app's keys (in the focused column, where they act), or what hides
 /// every line and how to show them again.
 fn empty_hint(controller: &Controller, index: usize, focused: bool, search: Option<&super::Search>) -> Vec<String> {
@@ -645,10 +695,15 @@ fn empty_hint(controller: &Controller, index: usize, focused: bool, search: Opti
             Status::Error(_) => "couldn't start".to_string(),
             Status::Running => return Vec::new(),
         };
-        if !focused || !matches!(state.status, Status::Stopped) {
+        if !matches!(state.status, Status::Stopped) {
             return vec![line];
         }
-        let mut hint = vec![line, String::new(), "u starts it".to_string()];
+        let mut hint = vec![line, String::new()];
+        hint.extend(last_runs(controller, index));
+        if !focused {
+            return hint;
+        }
+        hint.extend([String::new(), "u starts it".to_string()]);
         if controller.apps[index].traits().builds {
             hint.push("b builds it".into());
         }

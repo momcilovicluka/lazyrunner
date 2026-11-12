@@ -2,6 +2,13 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
+  K Stack  H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline DB DATABASE
+ DefaultConnection · secrets.json · 2 connection strings · the active one ●
+ j k choose · Enter switch + restart the APIs · n new (a copy) · / filter · y copy row · Esc back
+
+   DATABASE @ SERVER              ANSWERS        APPS ON IT                MIGRATIONS  SWITCHED TO
+   Shop @ dev-sql                 – local        -                         -           -
+ ● ShopLocal @ localhost          – local        -                         -           -
 
 
 
@@ -9,13 +16,6 @@ expression: screen.frame()
 
 
 
-
-     ┌─ Database · DefaultConnection ───────────────────────────────────────────────────────────────────┐
-     │ secrets.json · 2 connection strings · active one marked ●                                        │
-     │    Shop @ dev-sql                                                                                │
-     │  ● ShopLocal @ localhost   (active)                                                              │
-     │ j k choose · Enter switch + restart the APIs · n new · y copy row · / filter · Esc close         │
-     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 
 

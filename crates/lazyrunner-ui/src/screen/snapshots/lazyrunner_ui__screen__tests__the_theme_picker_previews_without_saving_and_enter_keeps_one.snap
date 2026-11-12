@@ -11,13 +11,13 @@ expression: screen.frame()
              ┃             │             │             │                 ┃    Catppuccin Mocha      ■■■■■■
              ┃             │             │             │                 ┃    Dark                  ■■■■■■
              ┃             │             │             │                 ┃    Dracula               ■■■■■■
-             ┃             │             │             │                 ┃    Evangelion            ■■■■■■
-not started y┃             │             │             │                 ┃    Everforest            ■■■■■■
-             ┃             │             │             │                 ┃    GitHub Dark           ■■■■■■
-u starts it  ┃not started y│not started y│not started y│ not started yet ┃    Gruvbox               ■■■■■■
-b builds it  ┃             │             │             │                 ┃    Hatsune Miku          ■■■■■■
-U starts all ┃             │             │             │                 ┃    High Contrast         ■■■■■■
-             ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
+not started y┃             │             │             │                 ┃    Evangelion            ■■■■■■
+             ┃             │             │             │                 ┃    Everforest            ■■■■■■
+port 47201 · ┃not started y│not started y│not started y│not started yet  ┃    GitHub Dark           ■■■■■■
+             ┃             │             │             │                 ┃    Gruvbox               ■■■■■■
+u starts it  ┃port 47202 · │port 47301 · │             │port 47303 · free┃    Hatsune Miku          ■■■■■■
+b builds it  ┃             │             │             │                 ┃    High Contrast         ■■■■■■
+U starts all ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
              ┃             │             │             │                 ┃    Monokai Pro           ■■■■■■
              ┃             │             │             │                 ┃    Night Owl             ■■■■■■
              ┃             │             │             │                 ┃────────────────────────────────────

@@ -13,9 +13,9 @@ expression: screen.frame()
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
+                     ┃                     │  not started yet    │   not started yet   │  not started yet
                      ┃                     │                     │                     │
-                     ┃                     │   not started yet   │   not started yet   │   not started yet
-                     ┃                     │                     │                     │
+                     ┃                     │  port 47301 · free  │                     │  port 47303 · free
 info: Microsoft.     ┃                     │                     │                     │
 Hosting.Lifetime[14] ┃                     │                     │                     │
       Now listening  ┃                     │                     │                     │

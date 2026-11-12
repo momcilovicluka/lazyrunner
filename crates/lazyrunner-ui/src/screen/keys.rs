@@ -269,7 +269,16 @@ fn action_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
         ui.exit = Some(Exit::Quit);
         return;
     }
-    let Some(action) = actions::find(ui, controller, name) else { return };
+    let found = actions::find(ui, controller, name);
+    if found.is_some() {
+        *ui.key_counts.entry(name.to_string()).or_default() += 1;
+    }
+    let Some(action) = found else {
+        if name.chars().count() == 1 {
+            ui.shake_at = Some(ui.now);
+        }
+        return;
+    };
     if busy && !action.safe {
         controller.add_log(format!("Building - press S to cancel it first, then: {}", action.label), Hue::Yellow);
         return;
@@ -466,8 +475,8 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         return;
     }
     match &mut ui.overlay {
-        Some(Overlay::Checklist(_)) => {}         // press() has it
-        Some(Overlay::Help) => ui.overlay = None, // any key closes the reference
+        Some(Overlay::Checklist(_)) => {} // press() has it
+        Some(Overlay::Help) => super::overlays::help_key(ui, name, key),
         Some(Overlay::Themes { .. }) => super::theme_picker::key(ui, controller, name, key),
         Some(Overlay::About { .. }) => super::about::key(ui, controller, name),
         Some(Overlay::Changelog { top, .. }) => match name {
@@ -841,11 +850,14 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
             ui.overlay = Some(Overlay::Checklist(Box::new(Checklist::start(controller, true, &[], false))));
         }
         Run::Changelog => {
+            const CHANGELOG_SEEN: &str = "changelogSeen";
             let lines = changelog::format(&changelog::entries(changelog::CHANGELOG, None, None));
             if lines.is_empty() {
                 controller.add_log("No changelog in this lazyrunner.", Hue::DarkGray);
             } else {
-                ui.overlay = Some(Overlay::Changelog { lines, top: 0 });
+                let seen = controller.config[CHANGELOG_SEEN].as_str().map(str::to_string);
+                controller.set_setting(CHANGELOG_SEEN, serde_json::json!(changelog::VERSION));
+                ui.overlay = Some(Overlay::Changelog { lines, top: 0, seen });
             }
         }
         Run::About => super::about::open(ui, controller),
@@ -989,10 +1001,15 @@ fn open_picker(ui: &mut Ui, controller: &mut Controller) {
     let mut picker =
         Picker { path, groups, group: 0, index: 0, top: 0, filter: String::new(), filtering: false, new_name: None };
     picker.index = picker.active_index();
+    let entries: Vec<secrets::Entry> = picker.groups.iter().flat_map(|(_, entries)| entries.iter().cloned()).collect();
+    ui.db_reach = Some(super::database::check(&entries));
     ui.picker = Some(picker);
 }
 
 fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
+    if super::screens::switch_key(ui, controller, name) {
+        return;
+    }
     let Some(picker) = ui.picker.as_mut() else { return };
     if let Some(new_name) = picker.new_name.as_mut() {
         match name {

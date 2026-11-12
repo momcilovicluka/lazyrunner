@@ -10,6 +10,7 @@ impl Controller {
     /// `event` happened (to app `app`): each hook waiting for it runs in the background. Hooks that can't be used
     /// are said once, until the setting changes.
     pub(super) fn happened(&mut self, event: &'static str, app: Option<&str>, details: String) {
+        *self.session.entry(event).or_default() += 1;
         let (all, problems) = hooks::read(&self.config);
         if !problems.is_empty() && self.hooks_said != self.config["hooks"] {
             self.hooks_said = self.config["hooks"].clone();

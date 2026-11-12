@@ -544,6 +544,12 @@ impl Controller {
 
     /// d: makes `entry` the active connection string, then restarts the APIs that read it.
     pub fn switch_database(&mut self, entry: &secrets::Entry) {
+        let mut switched = self.config[SWITCHED].clone();
+        if !switched.is_object() {
+            switched = serde_json::json!({});
+        }
+        switched[&entry.label] = serde_json::json!(chrono::Local::now().to_rfc3339());
+        self.set_setting(SWITCHED, switched);
         let Some(path) = secrets::secrets_path(&self.root, &self.apps) else {
             self.add_log("No secrets.json: no API has a UserSecretsId.", Hue::Yellow);
             return;
@@ -572,6 +578,9 @@ impl Controller {
         }
     }
 }
+
+/// When each database was last switched to, by its label (the database screen says it).
+const SWITCHED: &str = "databaseSwitched";
 
 /// What the response-time probe asks an app for: its own health endpoint, else its Swagger page, else its root.
 pub(super) fn probe_path(app: &crate::profile::App) -> String {
