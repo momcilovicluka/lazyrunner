@@ -4,6 +4,16 @@ use std::collections::HashMap;
 
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
+/// The machine's memory in MB, read once: the Health tab's capacity bar (#35).
+pub fn machine_memory_mb() -> f32 {
+    static TOTAL: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *TOTAL.get_or_init(|| {
+        let mut system = System::new();
+        system.refresh_memory();
+        system.total_memory() as f32 / 1_048_576.0
+    })
+}
+
 /// CPU and memory of whole process trees (dotnet run and its API, npm and node): what an app costs.
 pub struct TreeSampler {
     system: System,

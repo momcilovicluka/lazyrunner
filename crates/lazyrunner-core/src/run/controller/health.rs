@@ -8,6 +8,12 @@ use crate::output::Hue;
 use crate::run::format_duration;
 use crate::run::health::{Breach, Change, FEWEST_REQUESTS, Metric};
 
+/// The targets `,` edits on the Health tab: their names in the config, the metric each holds.
+pub const TARGETS: [(&str, Metric); 4] =
+    [("p95Ms", Metric::P95), ("errorRate", Metric::Errors), ("memoryMb", Metric::Memory), ("cpuPercent", Metric::Cpu)];
+/// The config's per-machine targets, by app key.
+const OVERRIDES: &str = "healthTargets";
+
 /// A new alert's title flash: two pulses.
 const ALERT_FLASH: Duration = Duration::from_millis(2000);
 
@@ -68,6 +74,7 @@ impl Controller {
                 )
             }
         };
+        self.health.note(log.trim_start_matches("! "), false);
         self.add_log(log, Hue::Red);
         self.notifications.push((title, message));
         self.states[index].flash_until = Some(now + ALERT_FLASH);
@@ -80,7 +87,54 @@ impl Controller {
             Metric::Growth => format!("✓ {name}'s memory stopped growing after {after}"),
             metric => format!("✓ {name} {} back under {} after {after}", metric.name(), metric.say(breach.target)),
         };
+        self.health.note(log.trim_start_matches("✓ "), true);
         self.add_log(log, Hue::Green);
+    }
+
+    /// The targets kept on this machine (`"healthTargets"`, set with `,` on the Health tab) over the profile's.
+    pub(super) fn apply_health_targets(&mut self) {
+        let overrides = self.config[OVERRIDES].clone();
+        for app in &mut self.apps {
+            let mine = &overrides[&app.key];
+            let whole = |name: &str| mine[name].as_f64().map(|value| value.max(0.0) as u32);
+            if let Some(p95) = whole("p95Ms") {
+                app.health.p95_ms = p95;
+            }
+            if let Some(rate) = mine["errorRate"].as_f64() {
+                app.health.error_bp = (rate.clamp(0.0, 1.0) * 10_000.0).round() as u32;
+            }
+            if let Some(memory) = whole("memoryMb") {
+                app.health.memory_mb = memory;
+            }
+            if let Some(cpu) = whole("cpuPercent") {
+                app.health.cpu_percent = cpu;
+            }
+        }
+    }
+
+    /// `,` on the Health tab: app `key`'s target `field` (one of [`TARGETS`]) set to `value` on this machine.
+    pub fn set_health_target(&mut self, key: &str, field: &str, value: f64) -> Result<(), String> {
+        let most = match field {
+            "errorRate" => 1.0,
+            "cpuPercent" => 100.0,
+            _ => f64::MAX,
+        };
+        if !(value > 0.0 && value <= most) {
+            let range = if most == f64::MAX { "above 0".to_string() } else { format!("above 0, at most {most}") };
+            return Err(format!("{field} must be {range}"));
+        }
+        let mut overrides = self.config[OVERRIDES].clone();
+        if !overrides.is_object() {
+            overrides = serde_json::json!({});
+        }
+        overrides[key][field] = serde_json::json!(value);
+        self.set_setting(OVERRIDES, overrides);
+        self.apply_health_targets();
+        let name = self.app(key).map_or_else(|| key.to_string(), |app| app.name.clone());
+        let metric = TARGETS.iter().find(|(name, _)| *name == field).map(|(_, metric)| *metric);
+        let said = metric.map_or_else(|| value.to_string(), |metric| metric.say(value));
+        self.add_log(format!("{name}'s {field} target: {said} (kept on this machine)"), Hue::Gray);
+        Ok(())
     }
 
     /// `a` on the Health tab: app `key`'s alerts are acknowledged until it recovers.

@@ -15,6 +15,8 @@ pub const FEWEST_REQUESTS: usize = 10;
 pub const GROWTH: f64 = 0.2;
 /// The samples of p95 and 5xx rate kept for each app's sparklines, one per metrics sample.
 pub const SERIES: usize = 30;
+/// The alerts and recoveries kept for the Health tab's log.
+const LOGGED: usize = 30;
 /// How long a recovery shows on its card.
 pub const RECOVERY_SHOWS: Duration = Duration::from_secs(2);
 
@@ -100,13 +102,22 @@ pub enum Change {
     Recovered(Breach, Duration),
 }
 
-/// The breaches and alerts, each app's p95 and 5xx rate over time, and the recent recoveries.
+/// An alert or a recovery as the Health tab's log says it: when (`09:41:15`), what, and whether it was a recovery.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Logged {
+    pub at: String,
+    pub text: String,
+    pub recovered: bool,
+}
+
+/// The breaches and alerts, each app's p95 and 5xx rate over time, the recent recoveries, and the log of alerts.
 #[derive(Debug, Default)]
 pub struct Watch {
     pub breaches: Vec<Breach>,
     pub p95: HashMap<String, VecDeque<f32>>,
     pub errors: HashMap<String, VecDeque<f32>>,
     pub recovered: Vec<(String, Metric, Instant)>,
+    pub log: VecDeque<Logged>,
 }
 
 impl Watch {
@@ -143,6 +154,15 @@ impl Watch {
         }
         breach.fired = Some(now);
         Some(Change::Fired(breach.clone()))
+    }
+
+    /// Notes an alert or a recovery in the log, the newest last.
+    pub fn note(&mut self, text: &str, recovered: bool) {
+        let at = chrono::Local::now().format("%H:%M:%S").to_string();
+        self.log.push_back(Logged { at, text: text.to_string(), recovered });
+        while self.log.len() > LOGGED {
+            self.log.pop_front();
+        }
     }
 
     /// An app that stopped: its breaches go without a word, its series start again.

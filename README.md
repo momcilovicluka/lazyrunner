@@ -658,10 +658,21 @@ back to the box picked before. A running build opens followed; moving about by h
 shows the build's projects alone - built, building and still to build, with their links - without the projects and
 parts it doesn't build; `B` again shows everything.
 
-**The Health tab** (`K`, then `Tab` from the Code tab): is the stack well? A card per app, in the profile's order: its
-p95 latency and 5xx rate over the last minute (the .NET apps whose requests are logged), its memory and CPU - each
-against its target, with a braille sparkline that has the target dotted across it and what's over it in red, the
-reading amber near the target and red over it. A reading over its target fills a bar on the card toward an alert; one
+**The Health tab** (`K`, then `Tab` from the Code tab): is the stack well? Its header says it in a line - `● 3
+healthy · △ 1 warning · ✗ 0 failing`, and the stack's last minute: `p95 42 ms · 12.4 req/s · 0.3% 5xx` - and under it
+the stack's share of the machine: its memory and its CPU, a bar each with a segment per app in its colour and the rest
+free (`2.9 GB of 16 GB · 13 GB free`, `12% of the machine · 88% headroom`). Then a card per app, in the profile's order:
+its probe (`● up 12 ms`, not responding, starting, stopped), its CPU and memory, its p95 latency, 5xx rate and requests
+a second over the last minute (the .NET apps whose requests are logged) - each against its target, `△` near it and
+`▲` over it - and a chart of its last minute, a filled braille area with the target dotted across and what's over it
+red; `v` switches what the cards chart (CPU, memory, p95, 5xx, requests a second), the same on every card, so their
+spikes line up. A card's border says how it is: red failing, amber warning. Beside the cards (under them when it's
+narrow), the picked app's panel: its targets against its readings (`✓` `△` `✗`), its slowest endpoints of the last five
+minutes with their errors, its alerts, and its last profile (`p` profiles it, #83). At the bottom, the log of recent
+alerts and recoveries with their times. The pointer on a chart says that moment's reading (`memory 1.8 GB of 2048 MB
+· 24 s ago`). `,` edits the picked app's targets in its panel - `j` `k` choose one, type a number, `Enter` saves it -
+kept on this machine (`"healthTargets"` in lazyrunner's config, over the profile's). `s` orders the cards: the
+profile's order (they never move by themselves), worst first, or by CPU, memory or p95. A reading over its target fills a bar on the card toward an alert; one
 that lasts a minute **is an alert**: the log says `! Orders p95 1240 ms, over its 1000 ms target for 1m00s`, the app's
 title flashes twice and its column's border stays red, a desktop notification goes out (while you're elsewhere), the
 panel shows `! K 1 alert` (a click opens the tab), and the terminal tab's progress turns red. Memory that grows more

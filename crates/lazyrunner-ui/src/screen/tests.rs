@@ -117,6 +117,7 @@ fn screen(label: &str, config: Value) -> Screen {
     let started = Instant::now();
     let (mut ui, _) = Ui::new(&controller, None, started);
     ui.opener = opened;
+    ui.machine_memory = || 16_384.0;
     ui.launcher = launched;
     ui.revealer = revealed;
     ui.clipboard = record;
@@ -4441,6 +4442,32 @@ async fn the_health_tab_holds_each_app_to_its_targets_and_says_its_alerts() {
     assert!(frame.contains("memory 3000 MB for 1m30s (a)"), "the alert on its card: {frame}");
     assert!(frame.contains("SLOWEST ENDPOINTS") && frame.contains("/api/orders/{id}"), "{frame}");
     assert!(!frame.contains("K 1 alert"), "no chip on the tab itself");
+    for said in
+        ["✗ 1 failing", "memory ▕", "of 16.0 GB", "● up", "Orders · targets", "memory           2048 MB   3000 MB ✗"]
+    {
+        assert!(frame.contains(said), "{said}: {frame}");
+    }
+    screen.press("v");
+    assert!(screen.render(130, 40).contains("memory · last 60 s · ┄ 2048 MB"), "v: the cards chart memory");
+    screen.controller.health.note("Orders memory 3000 MB, over its 2048 MB target for 1m00s", false);
+    let frame = screen.render(130, 60);
+    assert!(frame.contains("RECENT ALERTS") && frame.contains("! Orders memory 3000 MB"), "the log: {frame}");
+
+    screen.ui.hover = Some(Target::Chart { app: 0, cell: 35 });
+    let frame = screen.render(130, 40);
+    assert!(
+        frame.contains("memory 2960 MB ▲ of 2048 MB · 0 s ago")
+            || frame.contains("memory 2960 MB of 2048 MB · 0 s ago"),
+        "hover: that moment: {frame}"
+    );
+    screen.ui.hover = None;
+    screen.press(", Backspace Backspace Backspace Backspace 5 0 0 Enter");
+    assert_eq!(screen.controller.apps[0].health.p95_ms, 500, "{}", screen.last_log());
+    assert_eq!(screen.controller.config["healthTargets"]["orders"]["p95Ms"], 500.0, "kept on this machine");
+    assert!(screen.render(130, 40).contains("Orders · targets · editing"));
+    screen.press("Esc s");
+    assert!(screen.render(130, 40).contains("sorted: worst first (s)"), "{}", screen.render(130, 40));
+    screen.press("s s s s");
     screen.press("a");
     assert!(screen.controller.health.alerts().all(|alert| alert.acknowledged));
     assert!(screen.frame().contains("acknowledged"), "{}", screen.frame());

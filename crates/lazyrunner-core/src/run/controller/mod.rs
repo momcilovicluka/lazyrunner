@@ -10,6 +10,7 @@ mod code_map;
 pub mod compose;
 mod handover;
 mod health;
+pub use health::TARGETS;
 mod hooks;
 mod impact;
 mod launch;
@@ -465,6 +466,7 @@ impl Controller {
             );
         }
         controller.set_root(&root);
+        controller.apply_health_targets();
         Ok(controller)
     }
 

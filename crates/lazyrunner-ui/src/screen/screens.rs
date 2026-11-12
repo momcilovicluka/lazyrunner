@@ -141,6 +141,7 @@ fn typing(ui: &Ui) -> bool {
         Some(Overlay::Tests { .. }) => ui.tests_typing,
         Some(Overlay::Code(_)) => super::code::typing(ui),
         Some(Overlay::Flame(_)) => super::flame::typing(ui),
+        Some(Overlay::Health { .. }) => ui.health_edit.is_some(),
         _ => false,
     }
 }
