@@ -92,7 +92,7 @@ impl Screen {
     /// The screen open, if one is: the Code tab is the stack's.
     pub fn of(overlay: Option<&Overlay>) -> Option<Self> {
         Some(match overlay? {
-            Overlay::Stack { .. } | Overlay::Code(_) => Self::Stack,
+            Overlay::Stack { .. } | Overlay::Code(_) | Overlay::Health { .. } => Self::Stack,
             Overlay::Requests(_) => Self::Requests,
             Overlay::Migrations { .. } => Self::Migrations,
             Overlay::Audit { .. } => Self::Audit,
@@ -181,7 +181,9 @@ pub fn go(ui: &mut Ui, controller: &mut Controller, next: Screen) {
 fn looked_at(ui: &Ui, controller: &Controller) -> Option<usize> {
     let place = |key: &str| controller.apps.iter().position(|app| app.key == key);
     let key = match &ui.overlay {
-        Some(Overlay::Stack { index, .. }) => return (*index < controller.apps.len()).then_some(*index),
+        Some(Overlay::Stack { index, .. } | Overlay::Health { index, .. }) => {
+            return (*index < controller.apps.len()).then_some(*index);
+        }
         Some(Overlay::Audit { app, .. }) => return Some(*app),
         Some(Overlay::Code(view)) => {
             let picked = view.picked.as_deref().and_then(|id| {

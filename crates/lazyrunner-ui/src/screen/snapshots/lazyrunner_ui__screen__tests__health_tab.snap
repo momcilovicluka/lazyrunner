@@ -1,0 +1,41 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ⋈ STACK   H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline
+ Map  Code  Health    5 apps · ! 1 alert · a reading over its target for a minute is an alert
+ h j k l choose · a acknowledge its alerts · Enter its column, an endpoint's requests · Tab the map · Esc back
+
+ ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮
+ │ ◆ Orders                           ● │ │ ■ Billing                          ○ │ │ ■ Shop                             ○ │
+ │ p95     565 ms ⠂⠂⠂⠂⠂⠂⠂⠂⠂⠂ / 1000 ms  │ │ p95    -                             │ │ p95    no requests logged            │
+ │ 5xx       0.0% ⠂⠂⠂⠂⠂⠂⠂⠂⠂⠂ / 5.0%     │ │ 5xx    -                             │ │ 5xx    no requests logged            │
+ │ memory 3000 MB ⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿ / 2048 MB  │ │ memory -                             │ │ memory -                             │
+ │ cpu        12% ⣂⣂⣂⣂⣂⣂⣂⣂⣂⣂ / 90%      │ │ cpu    -                             │ │ cpu    -                             │
+ │ ! memory 3000 MB for 1m30s (a)       │ │ not running                          │ │ not running                          │
+ ╰──────────────────────────────────────╯ ╰──────────────────────────────────────╯ ╰──────────────────────────────────────╯
+ ╭──────────────────────────────────────╮ ╭──────────────────────────────────────╮
+ │ ■ Docs                             ○ │ │ ■ Console                          ○ │
+ │ p95    no requests logged            │ │ p95    no requests logged            │
+ │ 5xx    no requests logged            │ │ 5xx    no requests logged            │
+ │ memory -                             │ │ memory -                             │
+ │ cpu    -                             │ │ cpu    -                             │
+ │ not running                          │ │ not running                          │
+ ╰──────────────────────────────────────╯ ╰──────────────────────────────────────╯
+
+ SLOWEST ENDPOINTS · p95 over the last 5 minutes, ┊ its app's target
+ Orders     GET    /api/orders                                                                     ███████████▎       ┊     565 ms
+ Orders     GET    /api/invoices/{id}                                                              ██████████▋        ┊     530 ms
+ Orders     GET    /api/orders/{id}                                                                █████████▉         ┊     495 ms
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   starting (1/2 up)…   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  r  restart   s  stop   w  open   /  search   S  stop all               :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00   Starting Orders + Billing
+ 12:00:00 ✓ Orders is up (3.2 s)

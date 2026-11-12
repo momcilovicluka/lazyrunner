@@ -74,6 +74,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "request" => one_request(controller, args),
         "actions" => Ok(drive::actions(ui, controller)),
         "durations" => Ok(views::durations(controller, args)),
+        "health" => Ok(views::health(controller)),
         "timeline" => views::timeline(ui, controller, args),
         "sheet" => views::sheet(ui, controller, args),
         "checks" => Ok(views::checks(ui, controller, args)),
@@ -177,6 +178,7 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
         },
         "apps": apps,
         "tasks": tasks(controller),
+        "alerts": views::alerts(controller),
         "tests": {
             "passed": totals.passed,
             "failed": totals.failed,

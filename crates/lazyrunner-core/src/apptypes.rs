@@ -554,6 +554,7 @@ mod tests {
                 migrations: None,
                 env: Vec::new(),
                 depends_on: Vec::new(),
+                health: crate::profile::Health::default(),
             }
         };
         assert_eq!(language(&app(Some("python"), "./serve.ps1")), Some(PYTHON), "its preset's");
@@ -589,6 +590,7 @@ mod tests {
             migrations: None,
             env: Vec::new(),
             depends_on: Vec::new(),
+            health: crate::profile::Health::default(),
         };
         let write = |dir: &str, package: &str| {
             std::fs::create_dir_all(temp.join(dir)).unwrap();

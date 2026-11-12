@@ -48,6 +48,13 @@ pub fn summary(controller: &Controller) -> Summary {
     if let Some(job) = &controller.npm_ci {
         tools.push(format!("{}…", job.what));
     }
+    let alerts: Vec<bool> = controller.health.alerts().map(|alert| alert.acknowledged).collect();
+    // An alert turns a quiet tab red while it's open, amber once acknowledged (#35).
+    let alarm = match () {
+        _ if alerts.iter().any(|acknowledged| !acknowledged) => Some("2;100"),
+        _ if !alerts.is_empty() => Some("4;100"),
+        _ => None,
+    };
     let (progress, mark, text, color) = if !tools.is_empty() {
         ("4;100", None, tools.join(" + "), C::Yellow)
     } else if failed {
@@ -55,9 +62,9 @@ pub fn summary(controller: &Controller) -> Summary {
     } else if !running.is_empty() && up < running.len() {
         ("4;100", None, format!("starting ({up}/{} up)…", running.len()), C::Yellow)
     } else if slow > 0 {
-        ("4;100", None, "up, but slow / not responding".into(), C::Yellow)
+        (alarm.unwrap_or("4;100"), None, "up, but slow / not responding".into(), C::Yellow)
     } else if !running.is_empty() {
-        ("1;100", Some(Icon::Up), format!("all up ({up})"), C::Green)
+        (alarm.unwrap_or("1;100"), Some(Icon::Up), format!("all up ({up})"), C::Green)
     } else {
         ("0;0", Some(Icon::Stopped), "stopped".into(), C::DarkGray)
     };

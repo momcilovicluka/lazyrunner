@@ -282,6 +282,17 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "get_health",
+            "The stack's health (K, then Tab to Health): each app's p95 latency and 5xx rate over the last minute \
+             (.NET apps whose requests are logged), its memory, CPU and memory growth, each against its target (the \
+             profile's health, else p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU); its breaches with how long each has \
+             lasted; and the alerts - breaches that lasted a minute - acknowledged or not. get_status lists the \
+             alerts too.",
+            json!({}),
+            &[],
+            true,
+        ),
+        tool(
             "get_dependencies",
             "The code map: what depends on what in the code - .NET projects (their project references) and their \
              namespaces (their usings), TypeScript projects (an Nx workspace's, through tsconfig paths and imports) \

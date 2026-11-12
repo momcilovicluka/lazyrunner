@@ -102,6 +102,8 @@ impl Controller {
             push_history(&mut state.request_history, state.requests as f32 / seconds);
             state.requests = 0;
         }
+        let now = (self.now)();
+        self.sample_health(now);
     }
 
     /// A fresh snapshot of the listening ports, in the background (`now`: don't wait for the next second).
@@ -166,6 +168,7 @@ impl Controller {
             for state in &mut self.states {
                 state.flush_log();
             }
+            self.tick_health(now);
         }
         if self.db_due.is_none_or(|due| now >= due) {
             self.db_due = Some(now + DB_LABEL_EVERY);
@@ -354,6 +357,8 @@ impl Controller {
         if self.states[index].generation != generation || !self.probes.contains_key(key) {
             return;
         }
+        let expected = self.apps[index].health.expected_status;
+        let result = ProbeResult { ok: result.ok && expected.is_none_or(|code| code == result.code), ..result };
         let previous = self.probes.get(key).and_then(|probe| probe.last);
         self.probes
             .insert(key.to_string(), Probe { in_flight: false, last: Some(result), next_at: Some(now + PROBE_EVERY) });
@@ -568,8 +573,11 @@ impl Controller {
     }
 }
 
-/// What the response-time probe asks an app for: its Swagger page, else its root.
+/// What the response-time probe asks an app for: its own health endpoint, else its Swagger page, else its root.
 pub(super) fn probe_path(app: &crate::profile::App) -> String {
+    if let Some(path) = &app.health.path {
+        return path.clone();
+    }
     match &app.kind {
         AppKind::Dotnet { swagger: Some(swagger), .. } => format!("{swagger}/index.html"),
         AppKind::Command(command) => match &command.ready {

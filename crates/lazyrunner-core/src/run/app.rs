@@ -207,6 +207,19 @@ impl AppState {
         self.is_running() && self.up_generation == Some(self.generation)
     }
 
+    /// How much its memory grew over the last minute - the newest samples' average against the oldest's - once a
+    /// minute is kept: 0.25 is a quarter more.
+    pub fn memory_growth(&self) -> Option<f64> {
+        let history = &self.memory_history;
+        if history.len() < HISTORY {
+            return None;
+        }
+        let average = |values: &mut dyn Iterator<Item = &f32>| f64::from(values.copied().sum::<f32>() / 5.0);
+        let old = average(&mut history.iter().take(5));
+        let new = average(&mut history.iter().rev().take(5));
+        (old > 0.0).then(|| new / old - 1.0)
+    }
+
     /// Opens the column's log file. The previous run's becomes `<key>.prev.log` - when it has anything in it, so
     /// opening lazyrunner twice in a row (an update) keeps the last real run's. One that can't be moved aside (open
     /// in an editor) is added to rather than wiped.
@@ -502,6 +515,7 @@ mod tests {
             migrations: None,
             env: Vec::new(),
             depends_on: Vec::new(),
+            health: crate::profile::Health::default(),
         }
     }
 

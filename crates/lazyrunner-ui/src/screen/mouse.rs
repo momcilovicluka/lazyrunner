@@ -59,6 +59,8 @@ pub enum Target {
     TaskResult(usize),
     /// A screen's name in the bar over every screen: a click goes there.
     Screen(super::screens::Screen),
+    /// The panel's chip of the stack's alerts: a click opens the Health tab.
+    Health,
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -185,6 +187,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         || super::audit::click(ui, target)
         || super::ports::click(ui, controller, target, double)
         || super::stack::click(ui, controller, target, double)
+        || super::health::click(ui, controller, target, double)
         || super::code::click(ui, controller, target, double)
         || super::durations::click(ui, target)
     {
@@ -220,6 +223,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
         Some(Target::RunNews(index)) => super::diff::open_news(ui, controller, index),
         Some(Target::Ports) => super::ports::open_taken(ui, controller),
+        Some(Target::Health) => super::health::open(ui, controller),
         Some(Target::TaskResult(index)) => {
             if let Some(key) = controller.tasks().get(index).map(|task| task.key.clone()) {
                 controller.dismiss_task_result(&key);

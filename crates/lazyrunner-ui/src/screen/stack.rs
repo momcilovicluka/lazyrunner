@@ -35,8 +35,37 @@ const DOT_FASTEST: f64 = 30.0;
 /// A box's edge kept this far from the view's side when it scrolls to the picked one.
 const MARGIN: usize = 2;
 
-/// K: opens the map on the focused app, the apps' config read again for where their calls go.
+/// The Stack screen's tabs: the map, the code map, the health (#35).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Tab {
+    #[default]
+    Map,
+    Code,
+    Health,
+}
+
+/// The tabs as a header starts with, `current` lit.
+pub(super) fn tabs(current: Tab) -> Vec<Seg> {
+    [(Tab::Map, " Map "), (Tab::Code, " Code "), (Tab::Health, " Health ")]
+        .into_iter()
+        .map(
+            |(tab, label)| if tab == current { on(label, C::FocusText, C::FocusBack) } else { seg(label, C::DarkGray) },
+        )
+        .collect()
+}
+
+/// `K`: the Stack screen on the tab used last.
+pub fn reopen(ui: &mut Ui, controller: &mut Controller) {
+    match ui.stack_tab {
+        Tab::Map => open(ui, controller),
+        Tab::Code => super::code::open(ui, controller, None),
+        Tab::Health => super::health::open(ui, controller),
+    }
+}
+
+/// The map on the focused app, the apps' config read again for where their calls go.
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
+    ui.stack_tab = Tab::Map;
     controller.find_configured_calls();
     let index = ui.focus.min(controller.apps.len().saturating_sub(1));
     ui.overlay = Some(Overlay::Stack { index, opened: ui.now });
@@ -51,7 +80,7 @@ fn view(ui: &Ui) -> Option<(usize, Instant)> {
 }
 
 /// Whether its motion runs: not with reduced motion, nor in the screen tests' frozen frames.
-fn moving(ui: &Ui) -> bool {
+pub(super) fn moving(ui: &Ui) -> bool {
     ui.motion.enabled && !ui.reduced_motion
 }
 
@@ -474,11 +503,8 @@ fn header(controller: &Controller, figures: &[calls::Edge], width: usize) -> Vec
     let failing = figures.iter().filter(|edge| edge.failing()).count();
     let apps = controller.apps.len();
     let edges = figures.len() + controller.database_users().len();
-    let mut segs = vec![
-        on(" Map ", C::FocusText, C::FocusBack),
-        seg(" Code ", C::DarkGray),
-        seg(format!("   {apps} app{} · {edges} edge{}", plural(apps), plural(edges)), C::DarkGray),
-    ];
+    let mut segs = tabs(Tab::Map);
+    segs.push(seg(format!("   {apps} app{} · {edges} edge{}", plural(apps), plural(edges)), C::DarkGray));
     if per_second > 0.0 {
         segs.push(seg(format!(" · {per_second:.1} calls/s"), C::DarkGray));
     }

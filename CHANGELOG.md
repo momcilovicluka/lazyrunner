@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.81.0] - 2026-11-12
+
+### Added
+- A Health tab on the Stack screen (`K`, beside Map and Code; `K` opens on the tab used last): a card per app with its p95 latency and 5xx rate over the last minute, its memory and CPU against its targets - braille sparklines with the target dotted across - and the slowest endpoints of the last five minutes as bars, `Enter` opening one in `H`. A reading over its target for a minute is an alert: logged, notified, the app's title flashed and its border red, `! K 1 alert` in the panel, the tab's progress red; `a` acknowledges it (amber) until the app recovers, which the log says with how long it lasted. Memory that keeps growing is an alert too. Targets per app in the profile - `"health": { "p95Ms", "errorRate", "memoryMb", "cpuPercent" }`, else 1000 ms, 5%, 2048 MB, 90% - and `"path"` / `"expectedStatus"` make the response-time probe ask the app's own health endpoint instead of the Swagger page. An agent reads it with `get_health`, and the alerts are in `get_status` (closes #35)
+
 ## [1.80.0] - 2026-11-12
 
 ### Added

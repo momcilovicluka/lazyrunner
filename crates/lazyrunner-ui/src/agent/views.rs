@@ -7,6 +7,7 @@ use std::time::Instant;
 use lazyrunner_core::changelog::{self, CHANGELOG, VERSION};
 use lazyrunner_core::output::Level;
 use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::health::{Breach, Metric};
 use lazyrunner_core::run::history;
 use serde_json::{Value, json};
 
@@ -201,4 +202,54 @@ pub fn changelog(args: &Value) -> Value {
         .map(|entry| json!({ "version": entry.version, "date": entry.date, "lines": entry.lines }))
         .collect();
     json!({ "running": VERSION, "entries": entries })
+}
+
+/// A breach as an agent reads it: the app, what's over, by how much, for how long, and whether it's an alert yet.
+fn breach(breach: &Breach) -> Value {
+    json!({
+        "app": breach.app,
+        "metric": breach.metric.name(),
+        "value": breach.metric.say(breach.value),
+        "target": breach.metric.say(breach.target),
+        "seconds": Instant::now().saturating_duration_since(breach.since).as_secs(),
+        "alert": breach.alert(),
+        "acknowledged": breach.acknowledged,
+    })
+}
+
+/// The stack's alerts: breaches that lasted a minute, until the app recovers (get_status).
+pub fn alerts(controller: &Controller) -> Value {
+    Value::Array(controller.health.alerts().map(breach).collect())
+}
+
+/// The Health tab (#35): each app's readings against its targets, and its breaches; the alerts.
+pub fn health(controller: &Controller) -> Value {
+    let apps: Vec<Value> = (0..controller.apps.len())
+        .map(|index| {
+            let app = &controller.apps[index];
+            let reading = |metric: Metric| match controller.reading(index, metric) {
+                Some((value, target)) => {
+                    json!({ "value": metric.say(value), "target": metric.say(target), "over": value > target })
+                }
+                None => Value::Null,
+            };
+            json!({
+                "key": app.key,
+                "name": app.name,
+                "up": controller.states[index].is_up(),
+                "p95": reading(Metric::P95),
+                "errorRate": reading(Metric::Errors),
+                "memory": reading(Metric::Memory),
+                "cpu": reading(Metric::Cpu),
+                "memoryGrowth": reading(Metric::Growth),
+                "breaches": controller.health.of(&app.key).map(breach).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    json!({
+        "apps": apps,
+        "alerts": alerts(controller),
+        "note": "A reading over its target for a minute is an alert until the app recovers; a on the Health tab \
+                 acknowledges it. Targets come from the profile's health, else p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU.",
+    })
 }

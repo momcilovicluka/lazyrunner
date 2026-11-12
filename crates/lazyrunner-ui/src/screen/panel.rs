@@ -128,6 +128,10 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         let chip = if popping { on(format!(" {chip} "), C::Black, C::Red) } else { seg(chip, C::Red) };
         segs.push(chip.at(Target::Ports)); // a click opens P on it
     }
+    if let Some((chip, color)) = super::health::chip(ui, controller) {
+        segs.push(seg("   ", C::Gray));
+        segs.push(seg(chip, color).at(Target::Health)); // a click opens the Health tab
+    }
     segs.extend([
         seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta),
         seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),

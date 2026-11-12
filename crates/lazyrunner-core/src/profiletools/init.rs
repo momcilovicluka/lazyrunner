@@ -569,6 +569,7 @@ PORT=4100",
             migrations: None,
             env: Vec::new(),
             depends_on: Vec::new(),
+            health: crate::profile::Health::default(),
             kind: AppKind::Dotnet {
                 project: crate::profile::native("tests/Shop.Tests/Shop.Tests.csproj"),
                 launch_profile: "Shop.Tests".into(),

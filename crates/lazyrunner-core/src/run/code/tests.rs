@@ -29,6 +29,7 @@ fn dotnet_app(key: &str, project: &str) -> App {
         migrations: None,
         env: Vec::new(),
         depends_on: Vec::new(),
+        health: crate::profile::Health::default(),
     }
 }
 

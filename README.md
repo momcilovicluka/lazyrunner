@@ -225,7 +225,7 @@ at once while the palette wipes away.
 | `M` | **Migrations**: the EF Core migrations, applied and pending, per DbContext; apply or roll back (below) |
 | `A` | **Audit**: outdated and vulnerable packages, per app, and what fixes each (below) |
 | `P` | **Ports**: every port the apps want, who holds it, and what to do (below) |
-| `K` | **Stack**: which app calls which, and how those calls go; `Tab` the **code map**: what depends on what in the code (below) |
+| `K` | **Stack**: which app calls which, and how those calls go; `Tab` the **code map**: what depends on what in the code; `Tab` again its **health**: each app against its targets, its alerts (below). `K` opens on the tab used last |
 | `H` | **Requests**: the HTTP requests the .NET apps served, per endpoint too (below) |
 | `T` | **Tests**: the project's test suites - run them in the background, see what failed, run one test (below) |
 | `L` | **lazygit** (or your `gitTool`) without leaving lazyrunner (below) |
@@ -340,8 +340,8 @@ focused app's build or take it out of the queue, and `q`.
 
 - **Each column's title:** a spinner and progress bar while building or starting, with an estimate from previous runs
   (`23s / ~41s`); a pulsing dot until the app is up; then its URL, response time (`12 ms`, `slow 1.4s`, `not
-  responding`) and how long it took to start. The response time comes from requesting the app's Swagger page (`/`
-  otherwise) every 5 s.
+  responding`) and how long it took to start. The response time comes from requesting the app's own health endpoint
+  (`"health": { "path": "/healthz", "expectedStatus": 200 }`), else its Swagger page (`/` otherwise), every 5 s.
 - **The layout:** the apps side by side, or top to bottom when the terminal is narrower than 120 cells (a Windows
   Terminal pane, a laptop screen); `|` picks one for good.
 - **Each column's info line:** CPU and memory of the app's whole process tree with sparklines, requests per second for
@@ -633,7 +633,7 @@ tags).
   crossing doesn't look like a junction, and the picked box's lines are drawn on top. A map bigger than the room has a
   minimap in its corner, the part in view brighter.
 
-`o` opens a box's file, `y` copies its path, `Tab` goes back to the Map, and on the Map `c` opens the Code tab on the
+`o` opens a box's file, `y` copies its path, `Tab` goes on to the Health tab, and on the Map `c` opens the Code tab on the
 picked app's projects. Under the map, the picked box: what it depends on and what uses it (directly, and in all) and by
 name, what a change to it affects - how many projects and test projects - its tags, the rules it breaks and what only
 Nx links it to. Like the Map, the boxes say as much as fits. With motion on, a level zooms in (its boxes growing) or
@@ -656,6 +656,27 @@ it's done moves on to the next one compiling (the one that could start first), u
 back to the box picked before. A running build opens followed; moving about by hand, or `w` again, stops it. `B`
 shows the build's projects alone - built, building and still to build, with their links - without the projects and
 parts it doesn't build; `B` again shows everything.
+
+**The Health tab** (`K`, then `Tab` from the Code tab): is the stack well? A card per app, in the profile's order: its
+p95 latency and 5xx rate over the last minute (the .NET apps whose requests are logged), its memory and CPU - each
+against its target, with a braille sparkline that has the target dotted across it and what's over it in red, the
+reading amber near the target and red over it. A reading over its target fills a bar on the card toward an alert; one
+that lasts a minute **is an alert**: the log says `! Orders p95 1240 ms, over its 1000 ms target for 1m00s`, the app's
+title flashes twice and its column's border stays red, a desktop notification goes out (while you're elsewhere), the
+panel shows `! K 1 alert` (a click opens the tab), and the terminal tab's progress turns red. Memory that grows more
+than a fifth over a minute - the title's `↗` - is an alert at once. `a` on a card acknowledges its alerts: amber until
+the app recovers, when the log says `✓ Orders p95 back under 1000 ms after 4m10s` and its card glints green. A stopped
+app's breaches go without a word. Under the cards, the slowest endpoints of the last five minutes by p95, as bars with
+their app's target ticked across; `Enter` on one opens it in the requests view's Endpoints tab (`H`), on a card goes to
+its column. The targets come from the profile, per app, else p95 1000 ms, 5% 5xx, 2048 MB and 90% CPU:
+
+```jsonc
+{ "key": "orders", "type": "dotnet", "health": { "p95Ms": 500, "errorRate": 0.02, "memoryMb": 1500, "cpuPercent": 80,
+  "path": "/healthz", "expectedStatus": 200 } }
+```
+
+`path` is the app's own health endpoint, which the response-time probe asks for instead of the Swagger page; with
+`expectedStatus` another answer counts as not responding.
 
 ## Requests (`H`)
 
@@ -822,6 +843,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
 | `get_stack` | The stack map: which app calls which (seen and declared), each edge's calls, p95 and failures over the last minute, the apps that use the database, and the newest failed calls |
+| `get_health` | The Health tab: each app's p95, 5xx rate, memory, CPU and memory growth against its targets, its breaches and how long each has lasted, and the alerts; `get_status` lists the alerts too |
 | `get_build` | A .NET app's build as a map: each project's state, its own time against its usual, and the critical path - the running build, else the last |
 | `get_dependencies` | The code map: the apps and their projects, every project with how many it depends on and how many use it, the cycles and the links a rule doesn't allow; or for one app, project, namespace, folder, module, component or source file, what it depends on and what uses it, each with its depth and the way to it, its own parts, the rules it breaks and what only Nx links it to |
 | `get_durations` | The durations: builds, starts, installs, test suites and tasks - each one's last runs, its usual time and how the last compares |

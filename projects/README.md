@@ -118,6 +118,13 @@ An ASP.NET (or any dotnet run) project. lazyrunner builds it with dotnet build, 
 | `migrations` | object |  | Optional. Where its EF Core migrations are, for the migrations view (M), when lazyrunner shouldn't find them itself (the model snapshots in the app's project and the projects it builds). dotnet ef runs with this app's project as the startup project (its Development settings, the database picked with d) and its last build. |
 | `migrations.project` | path |  | The project with the migrations, when it isn't the app's own. Example: `"src/Shop.Data/Shop.Data.csproj"`. |
 | `migrations.contexts` | array of strings |  | Its DbContexts. Without them, those of the model snapshots in project, else what dotnet ef dbcontext list finds. Example: `["ShopDbContext"]`. |
+| `health` | object |  | Optional, on a .NET, npm or command app. What the Stack screen's Health tab (K) holds the app to, and what its response-time probe asks for. A reading over its target for a minute is an alert - the log says so, the app's title flashes and a notification goes out - until it recovers; a on the Health tab acknowledges it. Without it: p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU. |
+| `health.p95Ms` | number |  | Optional. The p95 latency over the last minute, in milliseconds (a .NET app whose requests are logged). Default 1000. Example: `500`. |
+| `health.errorRate` | number |  | Optional. The share of 5xx answers over the last minute, judged from 10 requests on (a .NET app whose requests are logged). Default 0.05. Example: `0.02`. |
+| `health.memoryMb` | number |  | Optional. Memory of the app's whole process tree, in MB. Default 2048. Example: `1500`. |
+| `health.cpuPercent` | number |  | Optional. CPU of the app's whole process tree, as a percent of the machine. Default 90. Example: `80`. |
+| `health.path` | string |  | Optional. The app's own health endpoint: the response-time probe asks for it instead of the Swagger page (or /). Example: `"/healthz"`. |
+| `health.expectedStatus` | integer |  | Optional. The status the probe expects; any other counts as not responding. Without it any answer counts. Example: `200`. |
 
 #### An npm app ("type": "npm")
 
@@ -135,6 +142,13 @@ A folder with package.json, run with npm run <script>. It needs no build from la
 | `env` | object |  | Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them). Example: `{"VITE_API_URL":"http://localhost:5001"}`. |
 | `tests` | array of strings |  | Optional. Test suites that belong to this app in the tests view (T), whatever lazyrunner works out: .NET test projects by path from the repo root or by name, Nx projects by name. Without it a .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in. Example: `["admin","shared-ui"]`. |
 | `dependsOn` | array of app keys |  | Optional. The apps it calls, by key: the stack map (K) draws these edges dashed until a call is seen (a .NET app's own calls are seen in its log without this). Example: `["orders"]`. |
+| `health` | object |  | Optional, on a .NET, npm or command app. What the Stack screen's Health tab (K) holds the app to, and what its response-time probe asks for. A reading over its target for a minute is an alert - the log says so, the app's title flashes and a notification goes out - until it recovers; a on the Health tab acknowledges it. Without it: p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU. |
+| `health.p95Ms` | number |  | Optional. The p95 latency over the last minute, in milliseconds (a .NET app whose requests are logged). Default 1000. Example: `500`. |
+| `health.errorRate` | number |  | Optional. The share of 5xx answers over the last minute, judged from 10 requests on (a .NET app whose requests are logged). Default 0.05. Example: `0.02`. |
+| `health.memoryMb` | number |  | Optional. Memory of the app's whole process tree, in MB. Default 2048. Example: `1500`. |
+| `health.cpuPercent` | number |  | Optional. CPU of the app's whole process tree, as a percent of the machine. Default 90. Example: `80`. |
+| `health.path` | string |  | Optional. The app's own health endpoint: the response-time probe asks for it instead of the Swagger page (or /). Example: `"/healthz"`. |
+| `health.expectedStatus` | integer |  | Optional. The status the probe expects; any other counts as not responding. Without it any answer counts. Example: `200`. |
 
 #### A dev-server variant
 
@@ -194,6 +208,13 @@ Any long-running command - a Python, Go or Rust service, a queue emulator, a scr
 | `frames` | string |  | Optional. A regular expression of a stack frame with (?P<file>...) and (?P<line>...) groups, and (?P<col>...) when it says: the file becomes a link that opens the editor at its line. Example: `"File \"(?P<file>[^\"]+)\", line (?P<line>\\d+)"`. |
 | `env` | object |  | Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them); {port} in a value is its port, {cwd} its folder. Example: `{"APP_ENV":"dev"}`. |
 | `dependsOn` | array of app keys |  | Optional. The apps it calls, by key: the stack map (K) draws these edges dashed. Example: `["orders"]`. |
+| `health` | object |  | Optional, on a .NET, npm or command app. What the Stack screen's Health tab (K) holds the app to, and what its response-time probe asks for. A reading over its target for a minute is an alert - the log says so, the app's title flashes and a notification goes out - until it recovers; a on the Health tab acknowledges it. Without it: p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU. |
+| `health.p95Ms` | number |  | Optional. The p95 latency over the last minute, in milliseconds (a .NET app whose requests are logged). Default 1000. Example: `500`. |
+| `health.errorRate` | number |  | Optional. The share of 5xx answers over the last minute, judged from 10 requests on (a .NET app whose requests are logged). Default 0.05. Example: `0.02`. |
+| `health.memoryMb` | number |  | Optional. Memory of the app's whole process tree, in MB. Default 2048. Example: `1500`. |
+| `health.cpuPercent` | number |  | Optional. CPU of the app's whole process tree, as a percent of the machine. Default 90. Example: `80`. |
+| `health.path` | string |  | Optional. The app's own health endpoint: the response-time probe asks for it instead of the Swagger page (or /). Example: `"/healthz"`. |
+| `health.expectedStatus` | integer |  | Optional. The status the probe expects; any other counts as not responding. Without it any answer counts. Example: `200`. |
 
 #### A compose app ("type": "compose")
 
@@ -211,6 +232,19 @@ Docker Compose services as one app: starting it runs docker compose up for them,
 | `services` | array of strings |  | Optional. The services it runs; all of the file's without it. Example: `["db","redis"]`. |
 | `env` | object |  | Optional. Environment variables docker compose gets on top of lazyrunner's own: the compose file's ${VARIABLES}. Example: `{"DB_PORT":"5433"}`. |
 | `dependsOn` | array of app keys |  | Optional. The apps it calls, by key: the stack map (K) draws these edges dashed. Example: `["orders"]`. |
+
+#### An app's health ("health")
+
+Optional, on a .NET, npm or command app. What the Stack screen's Health tab (K) holds the app to, and what its response-time probe asks for. A reading over its target for a minute is an alert - the log says so, the app's title flashes and a notification goes out - until it recovers; a on the Health tab acknowledges it. Without it: p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU.
+
+| Field | Type | Required | What it does |
+|---|---|---|---|
+| `p95Ms` | number |  | Optional. The p95 latency over the last minute, in milliseconds (a .NET app whose requests are logged). Default 1000. Example: `500`. |
+| `errorRate` | number |  | Optional. The share of 5xx answers over the last minute, judged from 10 requests on (a .NET app whose requests are logged). Default 0.05. Example: `0.02`. |
+| `memoryMb` | number |  | Optional. Memory of the app's whole process tree, in MB. Default 2048. Example: `1500`. |
+| `cpuPercent` | number |  | Optional. CPU of the app's whole process tree, as a percent of the machine. Default 90. Example: `80`. |
+| `path` | string |  | Optional. The app's own health endpoint: the response-time probe asks for it instead of the Swagger page (or /). Example: `"/healthz"`. |
+| `expectedStatus` | integer |  | Optional. The status the probe expects; any other counts as not responding. Without it any answer counts. Example: `200`. |
 
 #### A preset ("presets")
 

@@ -1991,7 +1991,11 @@ async fn the_code_map_shows_what_depends_on_what_goes_inside_a_project_and_finds
     assert_eq!(all["result"]["apps"][0]["projects"], json!(["Orders.Api", "Orders.Core", "Shared.Kernel"]), "{all}");
     assert_eq!(all["result"]["apps"][0]["shares"], json!({ "Shop": 1 }), "{all}");
 
-    screen.press("Esc K c");
+    screen.press("Esc K");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Code(_))), "K reopens the tab used last");
+    screen.press("Tab");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Health { .. })), "Tab: Map, Code, Health");
+    screen.press("Tab c");
     let app = match &screen.ui.overlay {
         Some(Overlay::Code(view)) => view.app.clone(),
         _ => None,
@@ -4291,6 +4295,66 @@ async fn the_build_shows_over_the_code_maps_projects_with_its_critical_path() {
         _ => None,
     };
     assert_eq!(code(&screen).as_deref(), Some("orders"), "Enter on a build in D: its map");
+}
+
+/// #35: K's Health tab - a card per app against its targets, an alert and its acknowledgement, the slowest endpoints
+/// leading into H - the panel's chip while it's elsewhere, an agent's get_health and get_status, and K reopening on it.
+#[tokio::test]
+async fn the_health_tab_holds_each_app_to_its_targets_and_says_its_alerts() {
+    use lazyrunner_core::run::health::Metric;
+    use lazyrunner_core::run::requests::Finished;
+    let mut screen = screen("health", json!({}));
+    screen.running();
+    let state = &mut screen.controller.states[0];
+    (state.memory_mb, state.cpu) = (Some(3000.0), Some(12.0));
+    for at in 0..30 {
+        state.memory_history.push_back(1800.0 + at as f32 * 40.0);
+        state.cpu_history.push_back(10.0 + (at % 5) as f32);
+    }
+    for (at, path) in
+        ["/api/orders/42", "/api/orders/43", "/api/invoices/7", "/api/orders"].iter().cycle().take(16).enumerate()
+    {
+        let request = Finished {
+            method: "GET".into(),
+            path: path.to_string(),
+            status: 200,
+            ms: 40.0 + at as f64 * 35.0,
+            ..Finished::default()
+        };
+        screen.controller.requests.add("orders", request, chrono::Local::now());
+    }
+    let now = screen.ui.now;
+    screen.controller.health.step("orders", Metric::Memory, Some((3000.0, 2048.0)), now - Duration::from_secs(90));
+    screen.controller.health.step("orders", Metric::Memory, Some((3000.0, 2048.0)), now - Duration::from_secs(30));
+    assert_eq!(screen.controller.health.alerts().count(), 1);
+    let frame = screen.frame();
+    assert!(frame.contains("K 1 alert"), "the panel's chip: {frame}");
+
+    screen.press("K Tab Tab");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Health { .. })), "Map, Code, then Health");
+    let frame = screen.render(130, 40);
+    insta::assert_snapshot!("health_tab", frame);
+    assert!(frame.contains("memory 3000 MB for 1m30s (a)"), "the alert on its card: {frame}");
+    assert!(frame.contains("SLOWEST ENDPOINTS") && frame.contains("/api/orders/{id}"), "{frame}");
+    assert!(!frame.contains("K 1 alert"), "no chip on the tab itself");
+    screen.press("a");
+    assert!(screen.controller.health.alerts().all(|alert| alert.acknowledged));
+    assert!(screen.frame().contains("acknowledged"), "{}", screen.frame());
+
+    let health = agent(&mut screen, "health", json!({}), None);
+    assert_eq!(health["result"]["alerts"][0]["metric"], "memory", "{health}");
+    assert_eq!(health["result"]["apps"][0]["memory"]["over"], true, "{health}");
+    let status = agent(&mut screen, "status", json!({}), None);
+    assert_eq!(status["result"]["alerts"][0]["acknowledged"], true, "{status}");
+
+    screen.press("G Enter");
+    let endpoints = match &screen.ui.overlay {
+        Some(Overlay::Requests(view)) => (matches!(view.tab, super::requests::Tab::Endpoints), view.app.clone()),
+        _ => (false, None),
+    };
+    assert_eq!(endpoints, (true, Some("orders".to_string())), "Enter on an endpoint: its row in H");
+    screen.press("Esc K");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Health { .. })), "K reopens the tab used last");
 }
 
 /// Every screen starts with the bar of screens: another screen's key, or a click on its name, goes there - on the app

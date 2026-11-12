@@ -149,6 +149,12 @@ fn shown<'a>(view: &View, controller: &'a Controller) -> Vec<&'a Request> {
     list
 }
 
+/// Where `endpoint` is in the view's Endpoints tab.
+pub(super) fn endpoint_index(view: &View, controller: &Controller, endpoint: &Endpoint) -> Option<usize> {
+    let key = |row: &Endpoint| (row.app.clone(), row.method.clone(), row.endpoint.clone());
+    summed(view, controller).iter().position(|row| key(row) == key(endpoint))
+}
+
 /// The shown requests per endpoint, by the chosen sort (the most first).
 fn summed(view: &View, controller: &Controller) -> Vec<Endpoint> {
     let mut list = endpoints(shown(&View { sort: 0, ..view.clone() }, controller).into_iter());

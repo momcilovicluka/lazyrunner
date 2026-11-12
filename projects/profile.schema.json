@@ -66,6 +66,20 @@
     "then": { "properties": { "apps": { "items": { "oneOf": [{ "$ref": "#/$defs/dotnetApp" }, { "$ref": "#/$defs/npmApp" }, { "$ref": "#/$defs/commandApp" }, { "$ref": "#/$defs/composeApp" }] } } } }
   }],
   "$defs": {
+    "health": {
+      "title": "An app's health (\"health\")",
+      "description": "Optional, on a .NET, npm or command app. What the Stack screen's Health tab (K) holds the app to, and what its response-time probe asks for. A reading over its target for a minute is an alert - the log says so, the app's title flashes and a notification goes out - until it recovers; a on the Health tab acknowledges it. Without it: p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "p95Ms": { "type": "number", "exclusiveMinimum": 0, "description": "Optional. The p95 latency over the last minute, in milliseconds (a .NET app whose requests are logged). Default 1000.", "examples": [500] },
+        "errorRate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Optional. The share of 5xx answers over the last minute, judged from 10 requests on (a .NET app whose requests are logged). Default 0.05.", "examples": [0.02] },
+        "memoryMb": { "type": "number", "exclusiveMinimum": 0, "description": "Optional. Memory of the app's whole process tree, in MB. Default 2048.", "examples": [1500] },
+        "cpuPercent": { "type": "number", "exclusiveMinimum": 0, "maximum": 100, "description": "Optional. CPU of the app's whole process tree, as a percent of the machine. Default 90.", "examples": [80] },
+        "path": { "type": "string", "pattern": "^/", "description": "Optional. The app's own health endpoint: the response-time probe asks for it instead of the Swagger page (or /).", "examples": ["/healthz"] },
+        "expectedStatus": { "type": "integer", "minimum": 100, "maximum": 599, "description": "Optional. The status the probe expects; any other counts as not responding. Without it any answer counts.", "examples": [200] }
+      }
+    },
     "relativePath": { "type": "string", "minLength": 1, "pattern": "^[^:]+$", "description": "Relative to the repo root; / or \\ both work." },
     "appKey": { "type": "string", "pattern": "^[a-z][a-z0-9]*$", "description": "Lowercase letters and digits, starting with a letter." },
     "icon": { "type": "string", "minLength": 1, "maxLength": 1, "description": "One character before the app's name in its title bar.", "default": "■", "examples": ["◆"] },
@@ -89,7 +103,8 @@
         "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them).", "examples": [{ "ASPNETCORE_ENVIRONMENT": "Development" }] },
         "tests": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Optional. Test suites that belong to this app in the tests view (T), whatever lazyrunner works out: .NET test projects by path from the repo root or by name, Nx projects by name. Without it a .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in.", "examples": [["tests/Orders.Tests/Orders.Tests.csproj"]] },
         "dependsOn": { "type": "array", "items": { "$ref": "#/$defs/appKey" }, "uniqueItems": true, "description": "Optional. The apps it calls, by key: the stack map (K) draws these edges dashed until a call is seen (a .NET app's own calls are seen in its log without this).", "examples": [["billing"]] },
-        "migrations": { "type": "object", "additionalProperties": false, "description": "Optional. Where its EF Core migrations are, for the migrations view (M), when lazyrunner shouldn't find them itself (the model snapshots in the app's project and the projects it builds). dotnet ef runs with this app's project as the startup project (its Development settings, the database picked with d) and its last build.", "properties": { "project": { "allOf": [{ "$ref": "#/$defs/relativePath" }], "pattern": "\\.csproj$", "description": "The project with the migrations, when it isn't the app's own.", "examples": ["src/Shop.Data/Shop.Data.csproj"] }, "contexts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Its DbContexts. Without them, those of the model snapshots in project, else what dotnet ef dbcontext list finds.", "examples": [["ShopDbContext"]] } } }
+        "migrations": { "type": "object", "additionalProperties": false, "description": "Optional. Where its EF Core migrations are, for the migrations view (M), when lazyrunner shouldn't find them itself (the model snapshots in the app's project and the projects it builds). dotnet ef runs with this app's project as the startup project (its Development settings, the database picked with d) and its last build.", "properties": { "project": { "allOf": [{ "$ref": "#/$defs/relativePath" }], "pattern": "\\.csproj$", "description": "The project with the migrations, when it isn't the app's own.", "examples": ["src/Shop.Data/Shop.Data.csproj"] }, "contexts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Its DbContexts. Without them, those of the model snapshots in project, else what dotnet ef dbcontext list finds.", "examples": [["ShopDbContext"]] } } },
+        "health": { "$ref": "#/$defs/health" }
       }
     },
     "npmApp": {
@@ -113,7 +128,8 @@
         },
         "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them).", "examples": [{ "VITE_API_URL": "http://localhost:5001" }] },
         "tests": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Optional. Test suites that belong to this app in the tests view (T), whatever lazyrunner works out: .NET test projects by path from the repo root or by name, Nx projects by name. Without it a .NET test project belongs to the app whose project it references, an npm or Nx suite to the npm app whose folder it runs in.", "examples": [["admin", "shared-ui"]] },
-        "dependsOn": { "type": "array", "items": { "$ref": "#/$defs/appKey" }, "uniqueItems": true, "description": "Optional. The apps it calls, by key: the stack map (K) draws these edges dashed until a call is seen (a .NET app's own calls are seen in its log without this).", "examples": [["orders"]] }
+        "dependsOn": { "type": "array", "items": { "$ref": "#/$defs/appKey" }, "uniqueItems": true, "description": "Optional. The apps it calls, by key: the stack map (K) draws these edges dashed until a call is seen (a .NET app's own calls are seen in its log without this).", "examples": [["orders"]] },
+        "health": { "$ref": "#/$defs/health" }
       }
     },
     "command": {
@@ -162,7 +178,8 @@
         "warnings": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Optional. Regular expressions of a warning line: shown yellow and counted as a warning.", "examples": [["^WARNING"]] },
         "frames": { "type": "string", "minLength": 1, "description": "Optional. A regular expression of a stack frame with (?P<file>...) and (?P<line>...) groups, and (?P<col>...) when it says: the file becomes a link that opens the editor at its line.", "examples": ["File \"(?P<file>[^\"]+)\", line (?P<line>\\d+)"] },
         "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Optional. Environment variables the app gets on top of lazyrunner's own (x then e shows them); {port} in a value is its port, {cwd} its folder.", "examples": [{ "APP_ENV": "dev" }] },
-        "dependsOn": { "type": "array", "items": { "$ref": "#/$defs/appKey" }, "uniqueItems": true, "description": "Optional. The apps it calls, by key: the stack map (K) draws these edges dashed.", "examples": [["orders"]] }
+        "dependsOn": { "type": "array", "items": { "$ref": "#/$defs/appKey" }, "uniqueItems": true, "description": "Optional. The apps it calls, by key: the stack map (K) draws these edges dashed.", "examples": [["orders"]] },
+        "health": { "$ref": "#/$defs/health" }
       }
     },
     "composeApp": {
