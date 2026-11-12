@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.85.0] - 2026-11-12
+
+### Added
+- The rest of a request's timeline: `]` `[` pick a bar - its log line lit - and `Enter` jumps to that line in its column; `u` edits the URL before the request is sent again, the replay becoming the selection with the baseline kept; a playhead sweeps the timeline as it opens, the bars appearing in the order they ran and the exception's mark pulsing as it passes; the requests running right now are listed on top, their timelines growing until they finish; and `Enter` on a request's rule in the timeline (`~`) opens it in `H`. With `"openTelemetry"` on (`,` then `t`), lazyrunner receives the .NET apps' OpenTelemetry spans (OTLP over HTTP on localhost, `OTEL_EXPORTER_OTLP_ENDPOINT` set as they start) and an instrumented app's request timelines come from its traces - nested, exact, with SQL and URLs, the critical path lit; `get_request` says which (closes #97)
+
 ## [1.84.0] - 2026-11-12
 
 ### Changed

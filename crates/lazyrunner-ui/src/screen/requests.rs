@@ -78,6 +78,9 @@ pub struct View {
     pub copying: Option<usize>,
     /// `m`: the request others are compared with (#38), by its seq.
     pub baseline: Option<u64>,
+    /// `u`: the URL being edited before the request is sent again; `]` `[`: the picked bar of its timeline (#97).
+    pub url_edit: Option<String>,
+    pub bar: Option<usize>,
 }
 
 /// What `y` copies a request as.
@@ -121,6 +124,8 @@ impl Default for View {
             endpoint_row: 0,
             copying: None,
             baseline: None,
+            url_edit: None,
+            bar: None,
         }
     }
 }
@@ -192,6 +197,24 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         (view.index, view.follow) = (0, true);
         return true;
     }
+    if let Some(path) = view.url_edit.as_mut() {
+        match name {
+            "Escape" => view.url_edit = None,
+            "Enter" => {
+                let path = path.clone();
+                let request = shown(view, controller).get(view.index).map(|request| (*request).clone());
+                (view.url_edit, view.index, view.follow) = (None, 0, true);
+                if let Some(request) = request {
+                    send_again(ui, controller, &request, &path);
+                }
+            }
+            "Backspace" => {
+                path.pop();
+            }
+            _ => path.extend(super::keys::typed(key)),
+        }
+        return true;
+    }
     if let Some(at) = view.copying {
         let at = at.min(COPY_AS.len() - 1);
         let kind = match name {
@@ -222,7 +245,34 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         Tab::Endpoints => summed(view, controller).len(),
     };
     match name {
+        "Escape" if view.bar.is_some() => view.bar = None,
         "Escape" if view.details => view.details = false,
+        "]" | "[" if view.tab == Tab::Requests && view.details => {
+            let Some(request) = shown(view, controller).get(view.index).map(|request| (*request).clone()) else {
+                return true;
+            };
+            let count = super::request_waterfall::timed_count(controller, &request);
+            view.bar = match (view.bar, name) {
+                (_, _) if count == 0 => None,
+                (None, "]") => Some(0),
+                (None, _) => Some(count - 1),
+                (Some(bar), "]") => Some((bar + 1).min(count - 1)),
+                (Some(bar), _) => Some(bar.saturating_sub(1)),
+            };
+        }
+        "Enter" if view.details && view.bar.is_some() => {
+            let request = shown(view, controller).get(view.index).map(|request| (*request).clone());
+            let line = request.and_then(|request| {
+                super::request_waterfall::bar_line(controller, &request, view.bar.unwrap_or_default())
+            });
+            if let Some((app, number)) = line {
+                ui.overlay = None;
+                super::marks::go_to(ui, controller, app, number);
+            }
+        }
+        "u" if view.tab == Tab::Requests => {
+            view.url_edit = shown(view, controller).get(view.index).map(|request| request.path.clone());
+        }
         "Escape" | "h" | "LeftArrow" | "Tab" if view.endpoint.is_some() => back_to_endpoints(view),
         "Escape" | "q" | "H" => ui.overlay = None,
         "Enter" | "Space" => view.details = !view.details,
@@ -418,7 +468,13 @@ pub fn command(kind: CopyAs, method: &str, url: &str, content_type: &str) -> Str
 /// here as the newest; how it went goes to the log.
 fn replay(ui: &mut Ui, controller: &mut Controller, view: &View) {
     let Some(request) = shown(view, controller).get(view.index).map(|request| (*request).clone()) else { return };
-    let (method, path) = (request.method.clone(), request.path.clone());
+    let path = request.path.clone();
+    send_again(ui, controller, &request, &path);
+}
+
+/// Sends `request` again to `path` (its own, or as `u` edited it): its answer in the log, the new request at the top.
+fn send_again(ui: &mut Ui, controller: &mut Controller, request: &Request, path: &str) {
+    let (method, path) = (request.method.clone(), path.to_string());
     if !REPLAYABLE.contains(&method.as_str()) {
         controller.add_log(
             format!(
@@ -434,7 +490,7 @@ fn replay(ui: &mut Ui, controller: &mut Controller, view: &View) {
         controller.add_log(format!("{name} isn't running - start it to send {method} {path} again."), Hue::DarkGray);
         return;
     }
-    let url = url(controller, &request);
+    let url = url(controller, &Request { path: path.clone(), ..request.clone() });
     let (sender, results) = channel();
     let (sent_method, sent_path) = (method.clone(), path.clone());
     std::thread::spawn(move || {
@@ -583,6 +639,19 @@ fn cut(text: &str, cells: usize) -> String {
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let cursor = ui.cursor();
+    let opened = match &ui.overlay {
+        Some(Overlay::Requests(view)) if view.details => {
+            shown(view, controller).get(view.index).map(|request| request.seq)
+        }
+        _ => None,
+    };
+    if opened.is_some() && ui.waterfall_seen.map(|(seq, _)| seq) != opened {
+        ui.waterfall_seen = opened.map(|seq| (seq, ui.now));
+        if let Some(Overlay::Requests(view)) = &mut ui.overlay {
+            view.bar = None;
+        }
+    }
+    let reveal = super::request_waterfall::reveal(ui);
     let Some(Overlay::Requests(view)) = &ui.overlay else { return Vec::new() };
     let keys = super::viewbar::keys(&hint(view, controller), width);
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return Vec::new() };
@@ -593,9 +662,20 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
             view.index = at;
         }
     }
-    let height = rows.saturating_sub(3 + keys.len());
+    let running = if view.tab == Tab::Requests {
+        super::request_waterfall::running_rows(controller, ui.now, width)
+    } else {
+        Vec::new()
+    };
+    let editing = view.url_edit.as_ref().map(|path| {
+        let method = list.get(view.index).map_or("GET", |request| request.method.as_str());
+        vec![seg(format!(" ↻ {method} {path}{cursor}"), C::Cyan), seg("   Enter sends it · Esc cancels", C::DarkGray)]
+    });
+    let height = rows.saturating_sub(3 + keys.len() + running.len() + usize::from(editing.is_some()));
     let mut out = vec![header(view, controller, &list, width, cursor)];
     out.extend(keys);
+    out.extend(editing);
+    out.extend(running);
     let least = if view.tab == Tab::Requests { REQUEST_FIXED } else { ENDPOINT_FIXED } + LIST_PATH;
     let side_width = (width * LIST_SHARE / 20).max(least);
     let side = view.details && width >= side_width + 2 + PANEL_MIN;
@@ -610,7 +690,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
                 .baseline
                 .filter(|seq| picked.is_none_or(|picked| picked.seq != *seq))
                 .and_then(|seq| controller.requests.items.iter().find(|request| request.seq == seq));
-            let right = request_details(controller, picked, baseline, ui.nerd, panel);
+            let right = request_details(controller, picked, baseline, ui.nerd, panel, (view.bar, reveal));
             out.extend(beside(left, right, list_width, panel));
         }
         Tab::Requests => {
@@ -743,6 +823,7 @@ fn request_details(
     baseline: Option<&Request>,
     nerd: bool,
     (width, height): (usize, usize),
+    (bar, reveal): (Option<usize>, Option<f64>),
 ) -> Vec<Vec<Seg>> {
     let Some(request) = request else { return vec![vec![seg("No request selected.", C::DarkGray)]] };
     let mut lines: Vec<Vec<Seg>> = wrap(&format!("{} {}", request.method, request.path), width, 3)
@@ -832,7 +913,10 @@ fn request_details(
         let text = "Possibly mixed: other requests of the app ran meanwhile, some lines may be theirs.";
         lines.extend(words(text, width).into_iter().map(|line| vec![seg(line, C::Yellow)]));
     }
-    lines.extend(super::request_waterfall::timeline(nerd, controller, request, baseline, width));
+    lines.extend(super::request_waterfall::timeline(nerd, controller, request, baseline, width, (bar, reveal)));
+    let lit = bar
+        .and_then(|bar| super::request_waterfall::bar_line(controller, request, bar))
+        .and_then(|(_, number)| state.and_then(|state| state.output.numbered(number, number).next()));
     if expected == 0 {
         lines.push(vec![seg("It logged nothing.", C::DarkGray)]);
         return lines;
@@ -844,7 +928,9 @@ fn request_details(
         .iter()
         .map(|line| {
             let text = line.text.strip_prefix("      ").map_or_else(|| line.text.clone(), |rest| format!("  {rest}"));
-            wrap(&text, width, LOG_WRAP).into_iter().map(|row| vec![seg(row, line_color(line))]).collect()
+            let picked = lit.is_some_and(|lit| std::ptr::eq(lit, *line));
+            let paint = |row: String| if picked { on(row, C::Black, C::Yellow) } else { seg(row, line_color(line)) };
+            wrap(&text, width, LOG_WRAP).into_iter().map(|row| vec![paint(row)]).collect()
         })
         .collect();
     // The newest lines that fit, below a note of how many more there are.
@@ -990,7 +1076,8 @@ fn hint(view: &View, controller: &Controller) -> String {
         ),
         (Tab::Requests, filtered) => format!(
             " {} · j k choose · Enter details · e errors only · a app · s sort ({sort}) · / filter · y copy (curl…) · \
-             m baseline · f profile its app · p send again · w open · o log · c clear · Esc back",
+             m baseline · f profile its app · p send again · u edit its URL and send · ] [ its bars · w open · o log · c clear · \
+             Esc back",
             if filtered { "h endpoints" } else { "Tab requests/endpoints" }
         ),
     }

@@ -23,6 +23,7 @@ pub mod hooks;
 pub mod impact;
 pub mod migrations;
 pub mod net;
+pub mod otlp;
 pub mod ports;
 pub mod profile;
 pub mod requests;
@@ -151,6 +152,8 @@ pub enum Event {
         key: String,
         result: Result<Box<profile::Profile>, String>,
     },
+    /// Spans an app sent its OpenTelemetry exporter's way (#97).
+    Spans(Vec<otlp::Span>),
     /// dotnet-trace's install (the startup checklist's fix) is done.
     TraceInstalled {
         result: Result<(), String>,

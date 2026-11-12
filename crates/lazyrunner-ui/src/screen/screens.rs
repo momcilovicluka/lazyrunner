@@ -136,7 +136,7 @@ pub fn bar(ui: &Ui, open: Screen, cells: usize) -> Vec<Seg> {
 /// Whether the open screen takes typed text now: its keys are letters then.
 fn typing(ui: &Ui) -> bool {
     match &ui.overlay {
-        Some(Overlay::Requests(view)) => view.typing,
+        Some(Overlay::Requests(view)) => view.typing || view.url_edit.is_some(),
         Some(Overlay::Timeline(view)) => view.typing,
         Some(Overlay::Tests { .. }) => ui.tests_typing,
         Some(Overlay::Code(_)) => super::code::typing(ui),

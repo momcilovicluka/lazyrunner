@@ -12,7 +12,6 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::impact::Impact;
 use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
 use lazyrunner_core::run::suites::{Outcome, Suite};
-use lazyrunner_core::run::waterfall;
 use lazyrunner_core::run::{Command, Controller, Origin};
 use serde_json::{Value, json};
 
@@ -399,7 +398,7 @@ fn one_request(controller: &Controller, args: &Value) -> Answer {
         stats["slower_than_p95"] = json!(request.ms > usual.p95);
         answer["endpoint_stats"] = stats;
     }
-    if let Some(fall) = controller.state(&request.app).and_then(|state| waterfall::of(request, &state.output)) {
+    if let Some(fall) = controller.waterfall(request) {
         answer["waterfall"] = views::waterfall(&fall);
     }
     if let Some(seq) = args["baseline"].as_u64() {

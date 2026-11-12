@@ -383,7 +383,7 @@ pub(crate) struct MenuToggle {
 }
 
 /// The , menu's toggles, by their group ([`setting_group`]).
-const MENU_TOGGLES: [MenuToggle; 13] = [
+const MENU_TOGGLES: [MenuToggle; 14] = [
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
     MenuToggle { letter: "w", toggle: Toggle::StartupChecklist, label: "Startup checklist when lazyrunner opens" },
     MenuToggle { letter: "v", toggle: Toggle::AutoUpdate, label: "Auto-update lazyrunner when it opens" },
@@ -409,6 +409,11 @@ const MENU_TOGGLES: [MenuToggle; 13] = [
         label: "L opens the git tool beside lazyrunner (Windows Terminal)",
     },
     MenuToggle { letter: "F", toggle: Toggle::FollowAgent, label: "Follow an agent when it calls (F: your keys back)" },
+    MenuToggle {
+        letter: "t",
+        toggle: Toggle::OpenTelemetry,
+        label: "Request timelines from the .NET apps' OpenTelemetry spans",
+    },
 ];
 
 /// A setting's group in the , menu.
@@ -423,7 +428,7 @@ pub fn setting_group(toggle: Toggle) -> &'static str {
         | Toggle::SkipUnchangedBuilds
         | Toggle::Notifications => "Running",
         Toggle::Mouse | Toggle::ReducedMotion | Toggle::NerdIcons | Toggle::LinksOnAltClick => "Display",
-        Toggle::GitBeside | Toggle::FollowAgent => "Integrations",
+        Toggle::GitBeside | Toggle::FollowAgent | Toggle::OpenTelemetry => "Integrations",
     }
 }
 

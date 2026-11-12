@@ -1473,6 +1473,40 @@ async fn a_requests_details_show_what_it_logged_its_queries_and_what_it_sent() {
     assert!(matches!(screen.ui.overlay, Some(Overlay::Requests(_))), "and only the details");
 }
 
+/// #97: in a request's details `]` `[` pick a bar - its log line lit - and `Enter` jumps to it; `u` edits the URL
+/// before it's sent again; a request still running shows at the top with its timeline so far.
+#[tokio::test]
+async fn a_requests_bars_lead_to_their_lines_and_a_running_one_shows_as_it_runs() {
+    let mut screen = screen("request-bars", json!({}));
+    with_requests(&mut screen);
+    with_logged_request(&mut screen);
+    screen.press("H Enter");
+    screen.render(160, 44);
+    screen.press("]");
+    let view = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Requests(view)) => (view.bar, view.url_edit.clone()),
+        _ => (None, None),
+    };
+    assert_eq!(view(&screen).0, Some(0), "] picks the first bar");
+    screen.render(160, 44);
+    screen.press("u");
+    assert!(screen.render(160, 44).contains("↻ POST /api/invoices/7/send"), "{}", screen.render(160, 44));
+    screen.press("? x Esc");
+    assert_eq!(view(&screen), (Some(0), None), "Esc cancels the edit, the bar stays picked");
+    screen.press("Enter");
+    let billing = screen.controller.apps.iter().position(|app| app.key == "billing").unwrap();
+    assert!(screen.ui.overlay.is_none() && screen.ui.focus == billing, "Enter: the bar's line in its column");
+
+    let app = screen.controller.apps[billing].clone();
+    let now = screen.ui.now;
+    let state = &mut screen.controller.states[billing];
+    state.receive(&app, "info: Microsoft.AspNetCore.Hosting.Diagnostics[1]", now);
+    state.receive(&app, "      Request starting HTTP/1.1 GET http://localhost:47202/api/slow - - -", now);
+    screen.press("H");
+    let frame = screen.render(160, 44);
+    assert!(frame.contains("⋯ Billing GET /api/slow running"), "the running request: {frame}");
+}
+
 #[tokio::test]
 async fn an_endpoints_details_show_its_times_statuses_and_slowest_and_failing_requests() {
     let mut screen = screen("endpoint-details", json!({}));

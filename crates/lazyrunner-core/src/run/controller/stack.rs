@@ -82,6 +82,28 @@ impl Controller {
         command
     }
 
+    /// With `"openTelemetry"` on, a .NET app starts exporting its spans to lazyrunner (#97) - unless its own env says
+    /// where they go.
+    pub(super) fn with_otlp(&self, key: &str, mut command: ServerCommand) -> ServerCommand {
+        let dotnet = self.app(key).is_some_and(crate::profile::App::is_dotnet);
+        let Some(port) = self.otlp_port.filter(|_| dotnet && self.setting(crate::config::Toggle::OpenTelemetry)) else {
+            return command;
+        };
+        let name = OsString::from(crate::run::otlp::ENDPOINT);
+        let set = command.spec.env.iter().any(|(each, _)| each.eq_ignore_ascii_case(&name))
+            || std::env::var_os(crate::run::otlp::ENDPOINT).is_some();
+        if !set {
+            command.spec.env.push((name, format!("http://127.0.0.1:{port}/{key}").into()));
+            command.spec.env.push((crate::run::otlp::PROTOCOL.into(), crate::run::otlp::PROTOBUF.into()));
+        }
+        command
+    }
+
+    /// A request's timeline: from its trace when its app sent one (OpenTelemetry, exact), else from its log lines.
+    pub fn waterfall(&self, request: &crate::run::requests::Request) -> Option<crate::run::waterfall::Waterfall> {
+        self.traces.waterfall(request).or_else(|| crate::run::waterfall::of(request, &self.state(&request.app)?.output))
+    }
+
     /// Reads each npm app's config for the other apps' ports it names, and each .NET app's projects for a database's
     /// packages (as the stack map opens, as the agent asks).
     pub fn find_configured_calls(&mut self) {

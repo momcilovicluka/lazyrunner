@@ -385,6 +385,8 @@ pub struct Ui {
     pub health_chart: usize,
     /// How the Health tab orders its cards (`s`), by its place in `health::SORTS`; the target `,` edits.
     pub health_sort: usize,
+    /// The request whose timeline last opened, and when (its playhead sweeps from then, #97).
+    pub waterfall_seen: Option<(u64, Instant)>,
     pub health_edit: Option<health::Editing>,
     /// The capture whose chart opened on its own (#83), by when it was done.
     pub profile_seen: Option<Instant>,
@@ -498,6 +500,7 @@ impl Ui {
             health_columns: 1,
             health_chart: 0,
             health_sort: 0,
+            waterfall_seen: None,
             health_edit: None,
             profile_seen: None,
             seen: seen::Seen::default(),
@@ -661,6 +664,7 @@ impl Ui {
             || code::animating(self, controller)
             || health::animating(self, controller)
             || flame::animating(self)
+            || request_waterfall::animating(self)
             || durations::animating(self)
             || phases::animating(self)
             || panel::sliding(self)

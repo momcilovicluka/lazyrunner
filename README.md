@@ -754,6 +754,22 @@ database commands, its log lines - what differs amber, what's the same dim, unde
 reading (`4 rows differ · +180 ms · DB commands 6 → 8`), and its timeline draws the baseline's bars as `▒` ghosts
 behind its own on one scale, so a new slow span stands out.
 
+**Its bars, its lines, its replay** (#97): `]` and `[` pick a bar of the timeline - its log line lights up among the
+request's lines below - and `Enter` jumps to that line in the app's column. `u` opens the request's URL for editing
+before it's sent again (`p` sends it as it was), to try other query parameters; the replay becomes the selection and
+the baseline stays. As a request's timeline opens, a playhead sweeps it and the bars appear in the order they ran, the
+exception's `✗` pulsing as it passes (not with reduced motion). The requests running right now are listed above the
+others - `⋯ Billing GET /api/slow running 1.4 s` - their timelines growing at the right edge until they finish. In the
+timeline (`~`), `Enter` on a request's rule opens that request here.
+
+**Exact timelines from OpenTelemetry** (`,` then `t`, `"openTelemetry"`, off by default): lazyrunner receives
+OpenTelemetry spans on a localhost port, and the .NET apps start with `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at it - a
+path per app - unless their own env says where their spans go. An app that already uses OpenTelemetry (ASP.NET Core,
+EF Core and HttpClient instrumentation, exporting over OTLP) then sends its real spans, and a request's timeline comes
+from its trace instead of its log: nested, timed exactly, with the SQL and URLs, the critical path - the chain of spans
+that decided its length - lit and the rest dimmed; its title says `exact, from OpenTelemetry`. Apps without
+OpenTelemetry are unchanged.
+
 A request that runs the same query 10 times or more (its parameters aside) looks like an N+1 - a loop loading one row
 at a time: its row says `N+1`, its details show the query, how often and how long it ran, and its endpoint's say how
 many of its requests do it. lazyrunner sums a request's database commands up as it finishes, so they stay after its
@@ -880,7 +896,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_logs` | An app's output as one text, each line after its number: `since` (only what's new), `limit`, `grep`, `errors_only` |
 | `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
 | `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path, one endpoint - or summed up per endpoint (p50, p95, max); N+1s marked |
-| `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1), and its waterfall - each command and call where it ran, the exception's moment, the time in the app itself; with `baseline`, another request's id, the two compared row against row |
+| `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1), and its waterfall - each command and call where it ran, the exception's moment, the time in the app itself, from its OpenTelemetry trace when its app sends one (nested, the critical path marked); with `baseline`, another request's id, the two compared row against row |
 | `get_screen` | The screen as you see it, as text |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
