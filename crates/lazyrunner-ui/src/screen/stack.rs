@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use lazyrunner_core::profile::AppKind;
 use lazyrunner_core::run::app::{AppState, Status};
+use lazyrunner_core::run::audit::Severity;
 use lazyrunner_core::run::calls;
 use lazyrunner_core::run::controller::{Minute, compose};
 use lazyrunner_core::run::history::Kind;
@@ -169,6 +170,7 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
         let line = vec![seg(dot, color), seg(format!(" {word}{}", port.replace(" · ", "  ")), C::DarkGray)];
         let mut lines = vec![vec![name], line];
         lines.extend(services);
+        lines.extend(marks(controller, &app.key, detail));
         return graph::Node { lines, pad: 1, border, dashed: false, target, bare: false };
     }
     let running = matches!(state.status, Status::Running);
@@ -189,6 +191,7 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
         minute(&controller.calls_last_minute(&app.key), "calls", "no calls (1 min)", "failed")
     };
     let mut lines = vec![vec![name], first, vec![seg(load, C::DarkGray)], services.unwrap_or(work)];
+    lines.extend(marks(controller, &app.key, detail));
     if detail >= 2 {
         lines.push(printed(state));
     }
@@ -204,6 +207,44 @@ fn app_node(ui: &Ui, controller: &Controller, index: usize, picked: bool, detail
         lines.push(line(ui, format!("npm run {script}{label}"), C::DarkGray));
     }
     graph::Node { lines, pad: 2, border, dashed: false, target, bare: false }
+}
+
+/// What waits on an app in the other screens, each with the screen's key: its migrations to apply, its failing tests,
+/// its worst vulnerability (moderate and up), and - on a box that doesn't say its minute already - its 5xx.
+fn marks(controller: &Controller, key: &str, detail: usize) -> Option<Vec<Seg>> {
+    let mut marks = Vec::new();
+    let contexts = controller.contexts.as_deref().unwrap_or_default();
+    let pending: usize =
+        contexts.iter().filter(|context| context.app == key).map(|context| context.pending().len()).sum();
+    if pending > 0 {
+        marks.push(seg(format!("{pending} to apply (M)"), C::Yellow));
+    }
+    let suites = controller.suites.as_deref().unwrap_or_default();
+    let failing: usize =
+        suites.iter().filter(|suite| suite.app.as_deref() == Some(key)).map(|suite| suite.failed).sum();
+    if failing > 0 {
+        marks.push(seg(format!("{failing} failing (T)"), C::Red));
+    }
+    let worst = controller.audits().get(key).and_then(|scan| scan.worst()).filter(|worst| *worst >= Severity::Moderate);
+    if let Some(worst) = worst {
+        let color = if worst >= Severity::High { C::Red } else { C::Yellow };
+        marks.push(seg(format!("{} (A)", worst.name()), color));
+    }
+    let failed = controller.served_last_minute(key).failed;
+    if failed > 0 && detail == 0 {
+        marks.push(seg(format!("{failed} 5xx (H)"), C::Red));
+    }
+    if marks.is_empty() {
+        return None;
+    }
+    let mut line = Vec::new();
+    for (at, mark) in marks.into_iter().enumerate() {
+        if at > 0 {
+            line.push(seg(" · ", C::DarkGray));
+        }
+        line.push(mark);
+    }
+    Some(line)
 }
 
 /// A compose app's services, a dot each in its state's colour (a starting one breathing).
@@ -428,14 +469,12 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
         || controller.stack_edges().iter().any(|edge| edge.calls > 0 || pulsing(edge))
 }
 
-fn header(ui: &Ui, controller: &Controller, figures: &[calls::Edge], width: usize) -> Vec<Seg> {
+fn header(controller: &Controller, figures: &[calls::Edge], width: usize) -> Vec<Seg> {
     let per_second: f64 = figures.iter().map(|edge| edge.per_second).sum();
     let failing = figures.iter().filter(|edge| edge.failing()).count();
     let apps = controller.apps.len();
     let edges = figures.len() + controller.database_users().len();
     let mut segs = vec![
-        super::viewbar::chip(ui.nerd, Icon::Stack, "Stack"),
-        seg("  ", C::Gray),
         on(" Map ", C::FocusText, C::FocusBack),
         seg(" Code ", C::DarkGray),
         seg(format!("   {apps} app{} · {edges} edge{}", plural(apps), plural(edges)), C::DarkGray),
@@ -537,7 +576,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let known = |key: &str| controller.app(key).is_some();
     let shown: Vec<calls::Edge> = edges.iter().filter(|edge| known(&edge.from) && known(&edge.to)).cloned().collect();
     let below = figures(controller, &shown, controller.apps.get(picked).map(|app| app.key.as_str()));
-    let hint = " h j k l choose an app · Enter its column · c its code · Tab the code map · Esc back";
+    let hint = " h j k l choose an app · Enter its column · c its code · Tab the code map · H M A T P its requests, \
+                migrations, audit, tests, port · Esc back";
     let keys = super::viewbar::keys(hint, width);
     let map_rows = rows.saturating_sub(2 + keys.len() + below.len() + 1).max(3);
     let mut dots = std::mem::take(&mut ui.stack_dots);
@@ -545,7 +585,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     ui.stack_dots = dots;
     let picked = picked.min(model.nodes.len().saturating_sub(1));
     let from = map.layout.boxes.get(picked).map_or(0, |at| (at.x + at.w + MARGIN).saturating_sub(room));
-    let mut lines = vec![header(ui, controller, &model.figures, width)];
+    let mut lines = vec![header(controller, &model.figures, width)];
     lines.extend(keys);
     lines.push(Vec::new());
     for row in map.rows(from, room).into_iter().take(map_rows) {

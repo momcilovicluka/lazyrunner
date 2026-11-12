@@ -605,7 +605,6 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
         ("not run yet".to_string(), C::DarkGray)
     };
     let mut segs = vec![
-        super::viewbar::chip(ui.nerd, Icon::Tests, "Tests"),
         seg(format!("  {count} suite{} · ", if count == 1 { "" } else { "s" }), C::DarkGray),
         seg(summary, color),
         seg("   ", C::Gray),

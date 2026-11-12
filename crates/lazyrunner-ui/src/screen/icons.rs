@@ -77,9 +77,10 @@ pub enum Icon {
     Docker,
     /// The palette's tasks.
     Tasks,
-    /// A command app in Python, in Go.
+    /// A command app in Python, in Go, in Java.
     Python,
     Go,
+    Java,
     /// The build map (#82).
     Hammer,
     Clipboard,
@@ -190,7 +191,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Faster, false) => "▼",
         (Icon::Faster, true) => "\u{f063}", // arrow down
         (Icon::Docker, false) => "■",
-        (Icon::Python | Icon::Go, false) => "■",
+        (Icon::Python | Icon::Go | Icon::Java, false) => "■",
+        (Icon::Java, true) => "\u{e738}", // Java
         (Icon::Hammer, false) => "⚒",
         (Icon::Hammer, true) => "\u{f0ad}", // wrench
         (Icon::Python, true) => "\u{e73c}", // Python
@@ -264,6 +266,7 @@ pub fn language_icon(language: &str) -> Icon {
         apptypes::PYTHON => Icon::Python,
         apptypes::GO => Icon::Go,
         apptypes::RUST => Icon::Rust,
+        apptypes::JAVA => Icon::Java,
         _ => Icon::Npm,
     }
 }
@@ -274,6 +277,7 @@ pub fn language_chip(language: &str) -> &'static str {
         apptypes::PYTHON => "py",
         apptypes::GO => "go",
         apptypes::RUST => "rs",
+        apptypes::JAVA => "jv",
         _ => "js",
     }
 }
@@ -328,6 +332,7 @@ mod tests {
         assert_eq!((language_icon(apptypes::GO), language_chip(apptypes::GO)), (Icon::Go, "go"));
         assert_eq!((language_icon(apptypes::RUST), language_chip(apptypes::RUST)), (Icon::Rust, "rs"));
         assert_eq!((language_icon(apptypes::NODE), language_chip(apptypes::NODE)), (Icon::Npm, "js"));
+        assert_eq!((language_icon(apptypes::JAVA), language_chip(apptypes::JAVA)), (Icon::Java, "jv"));
     }
 
     #[test]
@@ -379,6 +384,7 @@ mod tests {
             Icon::Tasks,
             Icon::Python,
             Icon::Go,
+            Icon::Java,
             Icon::Hammer,
             Icon::Bookmark,
             Icon::Lock,

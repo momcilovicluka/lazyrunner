@@ -2,7 +2,8 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
- ◈ AUDIT   Sample  1 high  3 packages · last scan just now · 2 at once (+ -)
+  K Stack  H Requests  M Migrations ◈ AUDIT   T Tests  P Ports  D Durations  ~ Timeline
+  Sample  1 high  3 packages · last scan just now · 2 at once (+ -)
  i install · I install many · y copy · Enter advisory · e details · / filter · v vulnerable · r rescan
  h apps ·              Esc
  APPS                       │  PACKAGES · BILLING   / filter
@@ -24,7 +25,6 @@ expression: frame
                             │  dotnet add Billing.csproj package Example.Json --version 13.0.4
                             │  in services/Billing · y copies it
                             │  a new major version: check what changed first
-                            │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ↶ 1/1   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

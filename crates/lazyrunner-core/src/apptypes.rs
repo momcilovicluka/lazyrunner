@@ -111,8 +111,10 @@ pub const PYTHON: &str = "python";
 pub const GO: &str = "go";
 pub const RUST: &str = "rust";
 pub const NODE: &str = "node";
+pub const JAVA: &str = "java";
 /// The programs that say what a command app is written in.
-const LANGUAGE_PROGRAMS: [(&str, &[&str]); 4] = [
+const LANGUAGE_PROGRAMS: [(&str, &[&str]); 5] = [
+    (JAVA, &["java", "mvn", "mvnw", "gradle", "gradlew"]),
     (
         PYTHON,
         &[
@@ -558,8 +560,10 @@ mod tests {
         assert_eq!(language(&app(None, ".venv/Scripts/python.exe")), Some(PYTHON));
         assert_eq!(language(&app(None, "go")), Some(GO));
         assert_eq!(language(&app(None, "cargo")), Some(RUST));
-        assert_eq!(language(&app(Some("java"), "npx")), Some(NODE), "an unknown preset: by its program");
+        assert_eq!(language(&app(Some("ruby"), "npx")), Some(NODE), "an unknown preset: by its program");
         assert_eq!(language(&app(None, "azurite")), None);
+        assert_eq!(language(&app(None, "./mvnw")), Some(JAVA), "a wrapper");
+        assert_eq!(language(&app(Some("java"), "./gradlew")), Some(JAVA));
     }
 
     #[test]

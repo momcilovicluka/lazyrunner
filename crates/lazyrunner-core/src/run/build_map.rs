@@ -133,6 +133,14 @@ impl BuildRun {
         }
     }
 
+    /// The projects compiling now, the one that could start first first.
+    pub fn building(&self) -> Vec<usize> {
+        let mut building: Vec<usize> =
+            (0..self.projects.len()).filter(|&at| self.state(at) == ProjectState::Building).collect();
+        building.sort_by(|&a, &b| self.ready_at(a).total_cmp(&self.ready_at(b)).then(a.cmp(&b)));
+        building
+    }
+
     /// When the last of the projects it references was done: when it could start.
     fn ready_at(&self, at: usize) -> f64 {
         let done = self.projects[at].references.iter().filter_map(|&reference| self.projects[reference].done_at);
@@ -219,7 +227,9 @@ mod tests {
         assert_eq!(run.projects.len(), 4);
         assert_eq!(run.state(at(&run, "Kernel")), ProjectState::Building, "it references nothing");
         assert_eq!(run.state(at(&run, "Core")), ProjectState::Queued);
+        assert_eq!(run.building(), vec![at(&run, "Kernel")]);
         run.built("Kernel", 2.0);
+        assert_eq!(run.building(), vec![at(&run, "Core"), at(&run, "Data")], "both could start at 2s");
         assert_eq!(
             (run.state(at(&run, "Core")), run.state(at(&run, "Data"))),
             (ProjectState::Building, ProjectState::Building)

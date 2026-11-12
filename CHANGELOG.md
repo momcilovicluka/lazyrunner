@@ -3,6 +3,16 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.80.0] - 2026-11-12
+
+### Added
+- A Java preset: `"preset": "java"` builds, installs and runs a Maven or Gradle project by its wrapper (`./mvnw`, `./gradlew` - their `.cmd` and `.bat` on Windows) or else `mvn` / `gradle`, its run Spring Boot's (`spring-boot:run`, `bootRun`) or Quarkus' dev mode (`quarkus:dev`, `quarkusDev`) by the plugin its build file names. It's up at Spring's or Quarkus' started line or a server's `started on port`, else its port; `src/**/*.java` and `*.kt` are its code (Quarkus reloads by itself); an exception's line, `ERROR` and Maven's `[ERROR]` lines are its errors; a frame (`at com.shop.Pricing.quote(Pricing.java:42)`) links to its file by its package, the JDK's and the frameworks' frames dimmed. Kotlin services too. The checklist shows `java`, `mvn` or `gradle` and how to get them; a Java app has Java's icon (`jv` without Nerd Font icons); `profile init` adds one for a Spring Boot or Quarkus project, and `profile check` suggests it. Presets' options can now hold by what a file says (`anyFileContains`), and a tool's version is found past a banner or on stderr (closes #92)
+- A bar of screens over every screen - Stack, Requests, Migrations, Audit, Tests, Ports, Durations, Timeline - naming them all with their keys, the open one lit: another screen's key, or a click on its name, goes there on the app the open one is looking at (the Map's picked box, the requests' app, the migrations' context, the audited app, the picked suite or port), its column focused; `M` on the Map shows the picked app's migrations, `H` its requests alone. The Map's boxes say what waits on each app in the other screens: migrations to apply `(M)`, failing tests `(T)`, its worst vulnerability `(A)`, 5xx `(H)` (closes #96)
+- The build map follows the build: `w` keeps the picked box - and the view - on a project compiling now, moving on to the next one compiling as each is done, and back to the box picked before once the build is over; a running build opens followed, and moving by hand stops it. `B` shows the build's projects alone - built, building and still to build, with their links - without what it doesn't build.
+
+### Changed
+- A map's edge that has to go around boxes now runs through the nearest gap between them, not under the whole map, so on a big map you can see where it goes.
+
 ## [1.79.0] - 2026-11-10
 
 ### Added

@@ -3812,7 +3812,7 @@ async fn the_port_map_shows_who_holds_each_port_and_stops_what_took_one() {
     let frame = screen.render(150, 40);
     assert!(frame.contains("PORTS") && frame.contains("1 conflict") && frame.contains("0 reserved"), "{frame}");
     assert!(frame.contains("occupancy") && frame.contains("a cell per port"), "the strip: {frame}");
-    assert!(frame.lines().nth(1).is_some_and(|keys| keys.contains("j k move")), "the keys under the header: {frame}");
+    assert!(frame.lines().nth(2).is_some_and(|keys| keys.contains("j k move")), "the keys under the header: {frame}");
     assert!(frame.contains("node.exe (PID 4120) · node vite"), "who holds it: {frame}");
     assert!(frame.contains("× held by other") && frame.contains("! stop it · since"), "{frame}");
     assert!(frame.contains(&format!("▲ {taken} conflict since")), "the status line: {frame}");
@@ -4247,11 +4247,34 @@ async fn the_build_shows_over_the_code_maps_projects_with_its_critical_path() {
     assert!(matches!(screen.ui.overlay, Some(Overlay::Code(_))), "the code map: {frame}");
     assert!(frame.contains("building Orders 1/3"), "the build in the header: {frame}");
     assert!(frame.contains("✓ 4.0s") && frame.contains("building") && frame.contains("queued"), "{frame}");
+    let view = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Code(view)) => (**view).clone(),
+        _ => panic!("the code map"),
+    };
+    let picked = |screen: &Screen| view(screen).picked.unwrap_or_default();
+    assert!(frame.contains("following what builds (w stops)"), "a running build is followed: {frame}");
+    assert!(picked(&screen).contains("Orders.Core"), "on what builds now: {}", picked(&screen));
+    screen.controller.build_runs.get_mut("orders").unwrap().built("Orders.Core", 9.0);
+    screen.frame();
+    assert!(picked(&screen).contains("Orders.Api"), "on to the next: {}", picked(&screen));
+    screen.press("w");
+    assert!(screen.frame().contains("w follows it"), "w stops it: {}", screen.frame());
+    screen.press("a w");
+    assert!(screen.frame().contains("shop"), "all the projects: {}", screen.frame());
+    screen.press("B");
+    let frame = screen.frame();
+    let outside = ["Orders.Tests", "shop"];
+    assert!(frame.contains("only the build's projects (B)"), "{frame}");
+    assert!(outside.iter().all(|name| !frame.contains(name)), "what the build doesn't build: {frame}");
+    assert!(view(&screen).following, "B keeps following");
     let built = screen.controller.build_runs.get_mut("orders").unwrap();
-    built.built("Orders.Core", 9.0);
     built.built("Orders.Api", 11.0);
     built.finish(12.0, true);
     let frame = screen.frame();
+    assert!(!view(&screen).following && picked(&screen).contains("Orders.Api"), "back where w was pressed");
+    screen.press("B");
+    assert!(screen.frame().contains("shop"), "B again: everything");
+
     assert!(frame.contains("Orders built in 12s · critical path 11s of 12s"), "{frame}");
     assert!(frame.contains("✓ 5.0s"), "Orders.Core's own time, from Shared.Kernel's end: {frame}");
 
@@ -4268,4 +4291,48 @@ async fn the_build_shows_over_the_code_maps_projects_with_its_critical_path() {
         _ => None,
     };
     assert_eq!(code(&screen).as_deref(), Some("orders"), "Enter on a build in D: its map");
+}
+
+/// Every screen starts with the bar of screens: another screen's key, or a click on its name, goes there - on the app
+/// the open one is looking at - and the Map's boxes say what waits on each app in the others.
+#[tokio::test]
+async fn the_bar_of_screens_goes_from_one_to_another_on_the_app_looked_at() {
+    use super::screens::Screen as Shown;
+    let mut screen = screen("screens", json!({ "layout": "stacked" }));
+    with_shop(&mut screen, &[("20260101000000_Init", true), ("20260301000000_Invoices", false)]);
+    let orders = screen.controller.apps.iter().position(|app| app.key == "orders").unwrap();
+    screen.ui.focus = screen.controller.apps.len() - 1;
+    screen.ui.overlay = Some(Overlay::Stack { index: orders, opened: screen.ui.now });
+    let frame = screen.render(150, 40);
+    let bar = frame.lines().next().unwrap_or_default().to_string();
+    for name in ["STACK", "H Requests", "M Migrations", "A Audit", "T Tests", "P Ports", "D Durations", "~ Timeline"] {
+        assert!(bar.contains(name), "{name}: {bar}");
+    }
+    assert!(frame.contains("1 to apply (M)"), "the Map's box says what waits on it: {frame}");
+
+    screen.press("H");
+    let requests_of = |screen: &Screen| match &screen.ui.overlay {
+        Some(Overlay::Requests(view)) => view.app.clone(),
+        _ => None,
+    };
+    assert_eq!(requests_of(&screen).as_deref(), Some("orders"), "the picked app's requests");
+    assert_eq!(screen.ui.focus, orders, "its column focused too");
+    assert!(screen.frame().lines().next().is_some_and(|bar| bar.contains("REQUESTS")), "{}", screen.frame());
+    screen.press("M");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Migrations { index: 0, .. })), "its context");
+    screen.frame();
+    screen.click(Target::Screen(Shown::Durations));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Migrations { .. })), "no durations yet: it stays");
+    screen.controller.durations.add(lazyrunner_core::run::history::Kind::Build, "orders", "Orders", 12.0, true);
+    screen.click(Target::Screen(Shown::Durations));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Durations { .. })), "a click on the bar");
+    screen.press("T");
+    let bar = screen.render(150, 40).lines().next().unwrap_or_default().to_string();
+    assert!(bar.contains(" Audit") && !bar.contains("A Audit"), "the tests keep A (watch them all): {bar}");
+    screen.press("A");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { .. })), "A stays the tests'");
+    screen.press("~ D");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Durations { .. })), "from the timeline too");
+    screen.press("D");
+    assert!(screen.ui.overlay.is_none(), "a screen's own key still closes it");
 }

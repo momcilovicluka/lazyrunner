@@ -2,8 +2,10 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
- ⋈ STACK    Map  Code    5 apps · 2 edges · 0.1 calls/s · 1 failing
- h j k l choose an app · Enter its column · c its code · Tab the code map · Esc back
+ ⋈ STACK   H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline
+ Map  Code    5 apps · 2 edges · 0.1 calls/s · 1 failing
+ h j k l choose an app · Enter its column · c its code · Tab the code map
+ H M A T P its requests, migrations, audit, tests, port · Esc back
 
   ╭───────────────────╮       ╭───────────────────╮            ╭───────────────────╮
   │ ■ Shop            │       │ ◆ Orders          │            │ ■ Billing         │
@@ -19,8 +21,6 @@ expression: frame
   │ ■ Console         │
   │ ○ stopped  :47303 │
   ╰───────────────────╯
-
-
 
  CALLS · the last minute
    Shop → Orders      dependsOn · no call seen yet

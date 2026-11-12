@@ -460,6 +460,9 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Palette { query, .. }) => actions::palette(ui, controller, query).len(),
         _ => 0,
     };
+    if super::screens::switch_key(ui, controller, name) {
+        return;
+    }
     match &mut ui.overlay {
         Some(Overlay::Checklist(_)) => {}         // press() has it
         Some(Overlay::Help) => ui.overlay = None, // any key closes the reference

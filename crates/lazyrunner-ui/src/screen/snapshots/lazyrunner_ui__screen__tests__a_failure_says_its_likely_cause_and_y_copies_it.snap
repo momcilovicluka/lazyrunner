@@ -2,7 +2,8 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
- ⚗ TESTS   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky  affected
+  K Stack  H Requests  M Migrations   Audit ⚗ TESTS   P Ports  D Durations  ~ Timeline
+  3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky  affected
  j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all
  Alt+r run the affected · l its tests · f / F failed again · Alt+f flaky again · [ ] a run · a / A watch
  v all / failed / flaky / affected · / filter · s stop · o log · y copy failures · Esc back
@@ -21,7 +22,6 @@ expression: frame
                                             │
                                             │ Skipped (1):
                                             │   – Orders.Tests.CartTests.Later
-                                            │
                                             │
                                             │
                                             │

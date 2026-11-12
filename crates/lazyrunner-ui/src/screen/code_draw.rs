@@ -156,9 +156,18 @@ fn build_state(layer: &Layer, at: usize) -> (&'static str, String, C) {
     }
 }
 
-/// The header's say on the build: how far a running one is, how long a done one took and its critical path.
-pub(super) fn build_summary(ui: &Ui, run: &BuildRun) -> Vec<Seg> {
+/// The header's say on the build: how far a running one is, how long a done one took and its critical path; whether
+/// the picked box follows it, and the keys for it.
+pub(super) fn build_summary(ui: &Ui, run: &BuildRun, view: &super::code::View) -> Vec<Seg> {
     let mut segs = summary_of(ui, run);
+    match (run.running(), view.following) {
+        (true, true) => segs.push(seg(" · following what builds (w stops)", C::Cyan)),
+        (true, false) => segs.push(seg(" · w follows it", C::DarkGray)),
+        _ => {}
+    }
+    if view.only.is_none() {
+        segs.push(seg(" · B only its projects", C::DarkGray));
+    }
     segs.push(seg(" · b hides it", C::DarkGray));
     segs
 }

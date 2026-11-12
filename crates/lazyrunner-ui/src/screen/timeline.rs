@@ -243,7 +243,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
 }
 
 fn header(ui: &Ui, controller: &Controller, view: &View, shown: usize, cells: usize) -> Vec<Seg> {
-    let mut segs = vec![super::viewbar::chip(ui.nerd, super::icons::Icon::Timeline, "Timeline")];
+    let mut segs = Vec::new();
     if view.narrowed() || view.typing {
         let total: usize = controller.states.iter().map(|state| state.output.len()).sum();
         segs.push(seg(format!("  {shown} of {total} lines"), C::DarkGray));

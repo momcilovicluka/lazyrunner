@@ -77,6 +77,27 @@ const LIBRARY_PATHS: [&str; 12] = [
     ".rustup",
 ];
 
+/// A JVM frame's class: `at com.shop.Pricing.quote(` (after a module, `app//`, `java.base/`), its package the
+/// lowercase parts before the class.
+static JVM_CLASS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bat\s+(?:[\w.$@-]+/+)?((?:[a-z_][\w]*\.)+)[A-Z_$][\w$]*").expect("a valid pattern"));
+/// A JVM frame in a library: the JDK's, Kotlin's, Scala's, Spring's, Quarkus', Netty's, Apache's...
+static JVM_LIBRARY: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^\s*at\s+(?:[\w.$@-]+/+)?(java|javax|jakarta|jdk|sun|com\.sun|kotlin|kotlinx|scala|groovy|org\.springframework|io\.quarkus|io\.vertx|io\.netty|io\.smallrye|org\.apache|org\.hibernate|org\.junit|com\.fasterxml|reactor)\.",
+    )
+    .expect("a valid pattern")
+});
+
+/// A JVM frame's file as a path from its package (`com/shop/Pricing.java`): the frame names only the file.
+fn jvm_path(frame: &str, file: &str) -> Option<String> {
+    if file.contains(['/', '\\']) {
+        return None;
+    }
+    let package = JVM_CLASS.captures(frame)?.get(1)?.as_str().trim_end_matches('.').replace('.', "/");
+    Some(format!("{package}/{file}"))
+}
+
 /// Whether a stack frame's file is a library's (dimmed, the app's own frames bright).
 pub fn is_library(path: &str) -> bool {
     let path = path.to_lowercase();
@@ -86,6 +107,9 @@ pub fn is_library(path: &str) -> bool {
 
 /// Whether a line is a stack frame (by `frames`) in a library's file.
 pub fn library_frame(text: &str, frames: Option<&Regex>) -> bool {
+    if JVM_LIBRARY.is_match(text) {
+        return true;
+    }
     let file = frames
         .and_then(|frames| frames.captures(text))
         .and_then(|found| found.name("file").map(|file| file.as_str().to_string()));
@@ -115,7 +139,8 @@ pub fn find_with(text: &str, frames: Option<&Regex>) -> Vec<Link> {
             continue;
         }
         let number = |name| found.name(name).and_then(|value| value.as_str().parse().ok());
-        let target = Target::File { path: file.into(), line: number("line"), column: number("col") };
+        let file = jvm_path(whole.as_str(), file).unwrap_or_else(|| file.to_string());
+        let target = Target::File { path: file, line: number("line"), column: number("col") };
         links.push(Link { start: path.start(), end: whole.end(), target });
     }
     if !(text.contains('.') && (text.contains('(') || text.contains(':'))) {
@@ -249,6 +274,25 @@ pub fn editor_command(
 mod tests {
     use super::*;
     use crate::testing::{TempDir, write};
+
+    #[test]
+    fn a_jvm_frame_links_its_file_by_its_package_and_a_librarys_is_dimmed() {
+        let java =
+            Regex::new(r"\bat [\w$./<>@-]+\((?P<file>[\w$-]+\.(?:java|kt|kts|scala|groovy)):(?P<line>\d+)\)").unwrap();
+        let own = "\tat com.shop.pricing.Pricing.quote(Pricing.java:42)";
+        let found = find_with(own, Some(&java));
+        let expected = Target::File { path: "com/shop/pricing/Pricing.java".into(), line: Some(42), column: None };
+        assert_eq!(found.first().map(|link| &link.target), Some(&expected), "{found:?}");
+        let inner = find_with("\tat app//com.shop.Pricing$Rules.lambda$apply$0(Pricing.kt:7)", Some(&java));
+        assert!(matches!(&inner[0].target, Target::File { path, .. } if path == "com/shop/Pricing.kt"), "{inner:?}");
+        assert!(!library_frame(own, Some(&java)));
+        assert!(library_frame("\tat java.base/java.lang.Thread.run(Thread.java:1583)", Some(&java)));
+        assert!(library_frame(
+            "\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)",
+            None
+        ));
+        assert!(library_frame("\tat jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)", None));
+    }
 
     #[test]
     fn a_librarys_frame_is_told_from_the_apps_own() {

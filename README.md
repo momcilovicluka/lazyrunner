@@ -250,7 +250,7 @@ at once while the palette wipes away.
 | `,` `A` then `z` | **Diagnostics zip**, in the About box under Report a bug: what to attach to a bug report - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`diagnostics`); the log says where, and Alt+click on its path there (a click with `l` off) shows it in its folder. Look over its logs before you share it |
 | `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`; marks and their notes go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
-| `Alt+b` | The build as a map: the Code tab's projects with the running build, else the last one, over them - each project's state and own time, the critical path in the accent colour (below, "The build map") |
+| `Alt+b` | The build as a map: the Code tab's projects with the running build, else the last one, over them - each project's state and own time, the critical path in the accent colour; `w` follows what's compiling, `B` shows the build's projects alone (below, "The build map") |
 | `Alt+d` | What's new since the app's last run, in the focused column: the lines the last run printed too dim (times, durations, ports and ids don't count as a change), new ones keep their colour - `▲` before a new error or warning, `●` before any other new line - and the top row counts them: `+2 new errors · 3 fixed · 41 new lines` (`fixed?` until the app is up). `n` / `N` step through the new errors and warnings (the new lines when there are none); the rail marks only what's new and sends its ember only for a new error. The last run is kept when lazyrunner quits, so the first run after it compares too. `Enter` lists what was fixed: the last run's errors and warnings that didn't come back. A run with new errors puts a chip in the panel's header - `1 Orders +2 new errors` - whose number (or a click) opens that column this way, on the first of them. A good build says how its warnings changed since the last good one - `12 warnings (+3)` - and lists the new ones under it. `Alt+d` again shows all |
 | `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
 | `<` / `>` | The first / last: the oldest output and following new output again in a column, the first and last item in a list or box (as in lazygit) |
@@ -359,6 +359,13 @@ focused app's build or take it out of the queue, and `q`.
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
   crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none.
 - **After "Ready"**, the log shows a startup timeline per app.
+- **The screens** - Stack `K`, Requests `H`, Migrations `M`, Audit `A`, Tests `T`, Ports `P`, Durations `D`, Timeline
+  `~` - each start with a bar naming them all with their keys, the open one lit (just the keys when the names don't
+  fit). Another screen's key, or a click on its name, goes there on the app the open one is looking at - the Map's
+  picked box, the requests' app, the migrations' context, the audited app, the picked suite or port - with its column
+  focused: `M` on the Map shows the picked app's migrations, `H` its requests alone. A screen's own key still closes
+  it; the tests keep `A` for watching them all (a click on Audit goes there). A screen with nothing to show yet says
+  why and leaves you where you were.
 
 ## Startup checklist
 
@@ -563,7 +570,8 @@ at all, its edge's figures are what the called app served, marked `~`. The profi
 Each edge is coloured by its last minute - cyan with calls, red with a failure (a 5xx, or no answer in 30 s), grey
 once seen - with its calls on it (`3/min`, `12/s`). An edge to the next column runs between the boxes, each edge of a
 box on a row of its own, in the order of where its other end is; one blocked by a box goes around it, never behind
-it. Each box says as much as fits - the more room (fewer apps, a bigger terminal), the more, and with many apps just
+it - through the nearest gap between the boxes it passes, so it stays close to its ends, and only under them all when
+there's none nearer. Each box says as much as fits - the more room (fewer apps, a bigger terminal), the more, and with many apps just
 the name and state, so nothing overlaps:
 
 | Detail | .NET app | npm app | Database |
@@ -572,10 +580,11 @@ the name and state, so nothing overlaps:
 | 1 | how long it has run, CPU and memory, requests a minute with their p95 and 5xx | the same, with the calls its proxy made a minute (the Node hook) | commands a minute and their time |
 | 2 | the errors and warnings it printed | the same | the slowest command, the requests that look like an N+1 |
 | 3 | its slowest endpoint, its last build (`built 4m ago in 22s`) | the `npm run` script and variant it runs | |
+| when there's any | what waits on it in the other screens, with their keys: migrations to apply `(M)`, failing tests `(T)`, its worst vulnerability from moderate up `(A)`, and 5xx in the last minute `(H)` where the box doesn't say its minute already | the same | |
 
 A line too long for a box (an endpoint) scrolls through. Under the map, every edge's figures over the last minute: calls, p95 and
-failures, the picked app's bright. `h` `j` `k` `l` choose an app, `Enter` (or a double click) goes to its column, `Esc`
-closes. It moves (not with reduced motion): the edges draw in as it opens, a dot travels along each edge that carries
+failures, the picked app's bright. `h` `j` `k` `l` choose an app, `Enter` (or a double click) goes to its column,
+`H` `M` `A` `T` `P` open its requests, migrations, audit, tests or port, `Esc` closes. It moves (not with reduced motion): the edges draw in as it opens, a dot travels along each edge that carries
 anything - faster the more it carries; white, yellow on a failing edge, cyan to the database - and an edge's new
 failure pulses it twice. The MCP's `get_stack` gives an agent the same
 map, with the newest failed calls (url, status, or no answer).
@@ -641,6 +650,12 @@ says its time in this build against its usual, and whether it's on the critical 
 `<ProjectReference>`s, and MSBuild's own `Project -> output.dll` lines, stamped as they arrive - no new tooling. Each
 project's own time goes into the durations (`D`, **Projects built**), so they say which project got slower; an app's
 last build is kept, so `D` opens it in the next session too. `b` again hides it.
+
+**Following the build** (`w`): the picked box stays on a project compiling now - the map scrolls with it - and once
+it's done moves on to the next one compiling (the one that could start first), until the build is over, when it goes
+back to the box picked before. A running build opens followed; moving about by hand, or `w` again, stops it. `B`
+shows the build's projects alone - built, building and still to build, with their links - without the projects and
+parts it doesn't build; `B` again shows everything.
 
 ## Requests (`H`)
 
@@ -927,10 +942,23 @@ and runs `cargo run` where there's a `src/main.rs`, with `RUST_BACKTRACE=1` so a
 lines its errors; `cargo` is looked for in `~/.cargo/bin` too. Their versions (`go version`, `cargo --version`) are
 in the startup checklist.
 
+`"preset": "java"` builds, installs and runs a Maven or Gradle project - by its wrapper (`./mvnw`, `./gradlew`; their
+`.cmd` and `.bat` on Windows) when it has one, else `mvn` or `gradle`: `compile` / `classes` before a start (skipped
+when nothing changed), `dependency:go-offline` / `dependencies` for `i`, and as its run `spring-boot:run` / `bootRun`
+for Spring Boot or `quarkus:dev` / `quarkusDev` for Quarkus, by the plugin its `pom.xml` or `build.gradle` names. It's
+up at Spring's `Started ... in 3.2 seconds`, Quarkus' `Listening on`, or a server's `started on port`, else its port.
+`src/**/*.java`, `*.kt` and the resources are its code - not for Quarkus, whose dev mode reloads by itself. An
+exception's line (`java.lang.IllegalStateException: ...`), `ERROR` lines and Maven's `[ERROR]` are its errors; a frame
+(`at com.shop.Pricing.quote(Pricing.java:42)`) links to the file by its package (`com/shop/Pricing.java`), and the
+JDK's, Spring's, Quarkus' and other libraries' frames are dimmed. Kotlin services are covered the same way. The
+checklist shows `java` (and `mvn` or `gradle` without a wrapper), and how to get one that's missing.
+
 Anything set by hand wins (`env` merges, the app's own on top). Presets are data - `projects/presets/*.json` - and
-you can add or replace them: a `presets` folder beside your profiles (`java.json`), or a profile's own `"presets"`.
+you can add or replace them: a `presets` folder beside your profiles (`ruby.json`), or a profile's own `"presets"`.
+An option holds by the files in the app's folder (`anyFile`), a program on PATH (`program`), or what a file says
+(`anyFileContains`: `{ "pom.xml": "spring-boot-maven-plugin" }`).
 `lazyrunner profile init` adds a command app with its preset for a folder that looks like one (a `pyproject.toml`,
-`requirements.txt`, `manage.py`, `go.mod` or `Cargo.toml`), and `profile check` suggests the preset for a command app
+`requirements.txt`, `manage.py`, `go.mod`, `Cargo.toml`, `pom.xml` or `build.gradle`), and `profile check` suggests the preset for a command app
 without one - as does its start sheet (`x`, `e`), dimmed, until it's set.
 
 Not for a command app yet, .NET and npm only: the stack map's calls, the code map, migrations, requests (`H`) and test
