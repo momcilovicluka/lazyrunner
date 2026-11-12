@@ -12,6 +12,7 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::impact::Impact;
 use lazyrunner_core::run::requests::{Endpoint, Request, endpoints};
 use lazyrunner_core::run::suites::{Outcome, Suite};
+use lazyrunner_core::run::waterfall;
 use lazyrunner_core::run::{Command, Controller, Origin};
 use serde_json::{Value, json};
 
@@ -393,6 +394,15 @@ fn one_request(controller: &Controller, args: &Value) -> Answer {
         let mut stats = endpoint_row(&usual);
         stats["slower_than_p95"] = json!(request.ms > usual.p95);
         answer["endpoint_stats"] = stats;
+    }
+    if let Some(fall) = controller.state(&request.app).and_then(|state| waterfall::of(request, &state.output)) {
+        answer["waterfall"] = views::waterfall(&fall);
+    }
+    if let Some(seq) = args["baseline"].as_u64() {
+        let Some(baseline) = controller.requests.items.iter().find(|request| request.seq == seq) else {
+            return Err(("not_found", format!("no request {seq} to compare with: lazyrunner keeps the newest ones")));
+        };
+        answer["compare"] = views::compare(request, baseline);
     }
     let Some((first, last)) = request.logs else {
         answer["log"] = json!({

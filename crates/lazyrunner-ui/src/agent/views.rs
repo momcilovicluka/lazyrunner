@@ -253,3 +253,50 @@ pub fn health(controller: &Controller) -> Value {
                  acknowledges it. Targets come from the profile's health, else p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU.",
     })
 }
+
+/// A request's waterfall (#38) for get_request: its spans in the order they started and its time in the app itself.
+pub fn waterfall(fall: &lazyrunner_core::run::waterfall::Waterfall) -> Value {
+    use lazyrunner_core::run::waterfall::Kind;
+    let spans: Vec<Value> = fall
+        .spans
+        .iter()
+        .map(|span| {
+            let kind = match span.kind {
+                Kind::Db => "db",
+                Kind::Http => "http",
+                Kind::Exception => "exception",
+            };
+            json!({
+                "kind": kind,
+                "start_ms": (span.start * 10.0).round() / 10.0,
+                "ms": (span.ms * 10.0).round() / 10.0,
+                "what": span.label,
+                "line": span.line,
+                "runs": if span.repeats.is_empty() { 1 } else { span.repeats.len() },
+            })
+        })
+        .collect();
+    json!({
+        "ms": fall.ms,
+        "in_the_app_ms": fall.unaccounted.round(),
+        "spans": spans,
+        "note": "From the request's log lines and when each arrived: a database command ends at its line, a call \
+                 runs from its start line to its end line; in_the_app_ms is the time no line accounts for.",
+    })
+}
+
+/// A request against a baseline (get_request's baseline): row against row, and the digest.
+pub fn compare(
+    request: &lazyrunner_core::run::requests::Request,
+    baseline: &lazyrunner_core::run::requests::Request,
+) -> Value {
+    let rows: Vec<Value> = lazyrunner_core::run::waterfall::compare(request, baseline)
+        .iter()
+        .map(|row| json!({ "what": row.what, "this": row.this, "baseline": row.baseline, "differs": row.differs() }))
+        .collect();
+    json!({
+        "baseline": baseline.seq,
+        "digest": lazyrunner_core::run::waterfall::digest(request, baseline),
+        "rows": rows,
+    })
+}

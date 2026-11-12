@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.82.0] - 2026-11-12
+
+### Added
+- Where a request's time went: its details in `H` draw its timeline from its log lines and when each arrived - the request as a bar (`✗` where it logged an exception), each EF Core command and outbound HttpClient call where it ran with its SQL or URL, a query run over and over as one comb, the time no line accounts for hatched as `in the app`, the longest bar amber, the endpoint's p95 dotted across, an axis of milliseconds. `m` marks a request as the baseline (`★`): another's details compare the two row against row - what differs amber, a digest like `4 rows differ · +180 ms · DB commands 6 → 8` - and draw the baseline's bars as ghosts behind its own. `get_request` gains the waterfall and a `baseline` to compare with (closes #38)
+
 ## [1.81.0] - 2026-11-12
 
 ### Added

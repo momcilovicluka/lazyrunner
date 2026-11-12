@@ -73,8 +73,13 @@ pub fn list(apps: &str) -> Vec<Value> {
              to compare with (p50, p95, slower_than_p95), the log lines its app wrote while it ran \
              (possibly_mixed: other requests ran meanwhile, so some lines may be theirs), and its EF Core \
              database commands: how many, their total and the slowest, and `repeated` - the query it ran over \
-             and over (10 times or more), an N+1.",
-            json!({ "id": { "type": "integer", "minimum": 1 } }),
+             and over (10 times or more), an N+1. Its waterfall: each database command and outbound call where it \
+             ran, from the log lines and when each arrived, the exception's moment, and the time no line accounts \
+             for (in_the_app_ms). With baseline, another request's id: the two compared row against row.",
+            json!({
+                "id": { "type": "integer", "minimum": 1 },
+                "baseline": { "type": "integer", "minimum": 1, "description": "Another request's id: compare the two." }
+            }),
             &["id"],
             true,
         ),

@@ -5,7 +5,7 @@ expression: screen.frame()
   K Stack ⇄ REQUESTS   M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline
  requests  endpoints    4 shown · 1 error · avg 400 ms
  Tab requests/endpoints · j k choose · Enter details · e errors only · a app · s sort (time) · / filter
- y copy (curl…) · p send again · w open · o log · c clear · Esc back
+ y copy (curl…) · m baseline · p send again · w open · o log · c clear · Esc back
  TIME      APP       METHOD STATUS      MS  PATH
  09:41:07  Orders    GET       200      10  /api/orders/43
  09:41:07  Billing   GET       500    1530  /api/invoices/7

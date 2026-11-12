@@ -27,9 +27,9 @@ fn pattern(regex: &str) -> Regex {
     Regex::new(regex).expect("a valid pattern")
 }
 
-static START: LazyLock<Regex> =
+pub(super) static START: LazyLock<Regex> =
     LazyLock::new(|| pattern(r"Start processing HTTP request (?P<method>[A-Z]+) (?P<url>\S+)"));
-static END: LazyLock<Regex> =
+pub(super) static END: LazyLock<Regex> =
     LazyLock::new(|| pattern(r"End processing HTTP request after (?P<ms>[\d.,]+) ?ms - (?P<status>\w+)"));
 /// HttpClient's own scope on its entries: "=> HTTP GET http://localhost:47202/api/invoices".
 static SCOPE: LazyLock<Regex> = LazyLock::new(|| pattern(r"=> HTTP (?P<method>[A-Z]+) (?P<url>\S+)"));
