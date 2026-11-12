@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.86.1] - 2026-11-12
+
+### Fixed
+- The changelog's long lines were cut off (`…`) since its rail of versions came in: they wrap beside it again.
+
 ## [1.86.0] - 2026-11-12
 
 ### Added
