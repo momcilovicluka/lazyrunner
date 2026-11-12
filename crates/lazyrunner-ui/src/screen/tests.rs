@@ -609,6 +609,19 @@ async fn changelog_view() {
     assert!(screen.ui.overlay.is_none());
 }
 
+#[tokio::test]
+async fn a_long_changelog_line_wraps_beside_the_rail_and_none_is_cut_off() {
+    let mut screen = screen("changelog-wraps", json!({}));
+    let words = "the database picker is a screen of its own with each server's answer ".repeat(4);
+    let lines = vec![Line { text: format!("  • {words}"), hue: Hue::Gray }];
+    screen.ui.overlay = Some(Overlay::Changelog { lines, top: 0, seen: None });
+    for width in [60, 100, 140] {
+        let frame = screen.render(width, 30);
+        assert!(!frame.contains('…'), "{width} columns: {frame}");
+        assert!(frame.contains("answer"), "{frame}");
+    }
+}
+
 // ---------------------------------------------------------------- D (durations)
 
 #[tokio::test]

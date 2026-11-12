@@ -927,10 +927,13 @@ fn group_icon(group: Group) -> Icon {
     }
 }
 
+/// The cells the changelog's rail of versions takes before each line.
+const RAIL_CELLS: usize = 2;
+
 pub fn changelog(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some(Overlay::Changelog { lines, top, seen }) = &mut ui.overlay else { return Vec::new() };
     let seen = seen.as_deref().and_then(changelog::version);
-    let wrapped = changelog::wrap(lines, cells.saturating_sub(8).clamp(20, 90));
+    let wrapped = changelog::wrap(lines, cells.saturating_sub(8).clamp(20, 90) - RAIL_CELLS);
     let visible = rows.saturating_sub(4).max(1);
     *top = (*top).min(wrapped.len().saturating_sub(visible));
     // A rail down the side: a dot per version, what's newer than the version it was last opened at lit.
