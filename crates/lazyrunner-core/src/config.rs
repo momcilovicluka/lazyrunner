@@ -37,10 +37,11 @@ pub enum Toggle {
     CheckMigrationsOnOpen,
     LinksOnAltClick,
     FollowAgent,
+    OpenTelemetry,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 15] = [
+    pub const ALL: [Toggle; 16] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -56,6 +57,7 @@ impl Toggle {
         Toggle::CheckMigrationsOnOpen,
         Toggle::LinksOnAltClick,
         Toggle::FollowAgent,
+        Toggle::OpenTelemetry,
     ];
 
     /// Its name in the settings file.
@@ -76,6 +78,7 @@ impl Toggle {
             Toggle::CheckMigrationsOnOpen => "checkMigrationsOnOpen",
             Toggle::LinksOnAltClick => "linksOnAltClick",
             Toggle::FollowAgent => "followAgent",
+            Toggle::OpenTelemetry => "openTelemetry",
         }
     }
 
@@ -87,6 +90,7 @@ impl Toggle {
                 | Toggle::ReducedMotion
                 | Toggle::GitBeside
                 | Toggle::CheckMigrationsOnOpen
+                | Toggle::OpenTelemetry
         )
     }
 

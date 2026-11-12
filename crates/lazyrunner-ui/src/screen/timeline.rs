@@ -230,6 +230,12 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "Ctrl+D" | "PageDown" => view.scroll = view.scroll.saturating_sub(PAGE),
         "g" | "Home" | "<" => view.scroll = last,
         "G" | "End" | ">" => view.scroll = 0,
+        "Enter" if matches!(rows.iter().rev().nth(view.scroll), Some(Row::Request { .. })) => {
+            let Some(Row::Request { request, .. }) = rows.iter().rev().nth(view.scroll) else { return };
+            let Some(seq) = controller.requests.items.get(*request).map(|request| request.seq) else { return };
+            let opened = super::requests::View { follow: false, selected: seq, details: true, ..Default::default() };
+            ui.overlay = Some(Overlay::Requests(Box::new(opened)));
+        }
         "Enter" => {
             let picked = picked(&rows, view.scroll);
             ui.overlay = None;
@@ -279,7 +285,8 @@ fn hint(view: &View) -> &'static str {
     } else if view.narrowed() {
         " j k scroll · / search · f level · Enter jumps to the picked line in its column · Esc shows every line"
     } else {
-        " j k scroll · G follow · / search · f level · Enter jumps to the picked line in its column · Esc closes"
+        " j k scroll · G follow · / search · f level · Enter jumps to the picked line in its column (on a request's \
+         rule: the request in H) · Esc closes"
     }
 }
 

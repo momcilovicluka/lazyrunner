@@ -290,6 +290,9 @@ pub struct Controller {
     pub profiles: HashMap<String, Vec<crate::run::profile::Profile>>,
     pub last_profiled: Option<(String, Instant)>,
     pub installing_trace: bool,
+    /// The spans the apps sent (#97), and the port lazyrunner receives them on.
+    pub traces: crate::run::otlp::Traces,
+    pub otlp_port: Option<u16>,
     task_results: HashMap<String, tasks::TaskResult>,
     metric_roots: Arc<Mutex<Vec<(String, u32)>>>,
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
@@ -339,6 +342,7 @@ impl Controller {
             .map(|app| (app.key.clone(), crate::run::profile::load(&state_dir, &app.key)))
             .filter(|(_, kept)| !kept.is_empty())
             .collect();
+        let otlp_port = crate::run::otlp::listen(events.clone());
         let mut controller = Self {
             timings: Timings::load(&state_dir),
             durations: Durations::load(&state_dir),
@@ -446,6 +450,8 @@ impl Controller {
             profiles,
             last_profiled: None,
             installing_trace: false,
+            traces: Default::default(),
+            otlp_port,
             task_results: HashMap::new(),
             metric_roots,
             commands: Arc::new(super::tools::Tools),
@@ -702,6 +708,7 @@ impl Controller {
             Event::Audit { key, result } => self.audit_done(key, result),
             Event::Profiled { key, result } => self.profiled(key, result),
             Event::TraceInstalled { result } => self.trace_installed(result),
+            Event::Spans(spans) => self.traces.add(spans),
             Event::AuditInstalled { key, result } => self.audit_installed(key, result),
             Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),
             Event::ComposeServices { key, generation, services } => self.compose_arrived(key, generation, services),

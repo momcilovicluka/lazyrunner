@@ -4,7 +4,7 @@ expression: screen.frame()
 ---
 
   ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ › rest▏                                                                                    54 commands │
+  │ › rest▏                                                                                    55 commands │
   │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  ◆  Restart Orders  rebuild if it changed                                                          r   │
   │  ▸  Restart all  rebuild if anything changed                                                       R   │
@@ -12,6 +12,7 @@ expression: screen.frame()
   │  ≡  [x] Stop/Restart all include the frontend                                                  ,   s   │
   │  ≡  [ ] Restart the APIs when code changes                                                     ,   e   │
   │  ✱  Requests: what the .NET apps served  newest or slowest, per endpoint; filter, copy, open       H   │
+  │  ≡  [ ] Request timelines from the .NET apps' OpenTelemetry spans                              ,   t   │
   │  ≡  Run the startup checklist now (and check for an update)                                    ,   r   │
   │  ≡  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklist…                   ,   │
   │  ✱  Tests: run the project's test suites  dotnet test, jest, vitest - several at once in the bac…  T   │
@@ -20,7 +21,6 @@ expression: screen.frame()
   │  ◆  Open Orders in the browser  Swagger for an API                                                 w   │
   │  ◆  Run Orders on another launch profile or npm variant                                            p   │
   │  ✱  Ports: who holds each app's port  free, its app, something else, reserved by Windows - and t…  P   │
-  │  ≡  [ ] L opens the git tool beside lazyrunner (Windows Terminal)                              ,   g   │
   │ type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 

@@ -2,7 +2,6 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-
                   ┌─ Settings (saved) ────────────────────────────────────────────────────┐
                   │  u      ● Auto-start when lazyrunner opens                            │
                   │  w      ● Startup checklist when lazyrunner opens                     │
@@ -17,6 +16,7 @@ expression: screen.frame()
                   │  l      ● Links open on Alt+click (off: on a click)                   │
                   │  g      ○ L opens the git tool beside lazyrunner (Windows Terminal)   │
                   │  F      ○ Follow an agent when it calls (F: your keys back)           │
+                  │  t      ○ Request timelines from the .NET apps' OpenTelemetry spans   │
                   │  r      Run the startup checklist now (and check for an update)       │
                   │  c      What's new: the lazyrunner changelog                          │
                   │  A      About lazyrunner: version, contributors, links                │

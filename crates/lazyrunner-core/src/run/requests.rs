@@ -244,17 +244,22 @@ fn finished(text: &str) -> Option<Finished> {
 /// and whether another one ran beside it.
 #[derive(Debug, Default)]
 pub struct InFlight {
-    items: VecDeque<(Started, u64, bool)>,
+    items: VecDeque<(Started, u64, bool, std::time::Instant)>,
 }
 
 impl InFlight {
-    /// A request started when the app had printed `lines` lines.
-    pub fn start(&mut self, started: Started, lines: u64) {
+    /// The requests running now: what each started as, the line count at its start, and when (#97's live timeline).
+    pub fn running(&self) -> impl Iterator<Item = (&Started, u64, std::time::Instant)> {
+        self.items.iter().map(|(started, lines, _, at)| (started, *lines, *at))
+    }
+
+    /// A request started when the app had printed `lines` lines, at `at`.
+    pub fn start(&mut self, started: Started, lines: u64, at: std::time::Instant) {
         let mixed = !self.items.is_empty();
         for item in &mut self.items {
             item.2 = true;
         }
-        self.items.push_back((started, lines, mixed));
+        self.items.push_back((started, lines, mixed, at));
         if self.items.len() > MAX_IN_FLIGHT {
             self.items.pop_front();
         }
@@ -263,9 +268,11 @@ impl InFlight {
     /// The request finished when the app had printed `lines` lines: what its start line said, and which lines it
     /// logged meanwhile.
     pub fn finish(&mut self, request: &mut Finished, lines: u64) {
-        let same =
-            |(started, ..): &(Started, u64, bool)| started.method == request.method && started.path == request.path;
-        let Some((started, from, mixed)) = self.items.iter().position(same).and_then(|at| self.items.remove(at)) else {
+        let same = |(started, ..): &(Started, u64, bool, std::time::Instant)| {
+            started.method == request.method && started.path == request.path
+        };
+        let Some((started, from, mixed, _)) = self.items.iter().position(same).and_then(|at| self.items.remove(at))
+        else {
             return;
         };
         if request.proto.is_empty() {
@@ -576,12 +583,12 @@ mod tests {
         let start = |path: &str| Started { method: "GET".into(), path: path.into(), ..Started::default() };
         let done = |path: &str| Finished { method: "GET".into(), path: path.into(), ..Finished::default() };
         let mut flights = InFlight::default();
-        flights.start(start("/a"), 10);
+        flights.start(start("/a"), 10, std::time::Instant::now());
         let mut a = done("/a");
         flights.finish(&mut a, 14);
         assert_eq!((a.logs, a.mixed), (Some((11, 14)), false));
-        flights.start(start("/b"), 20);
-        flights.start(start("/c"), 21);
+        flights.start(start("/b"), 20, std::time::Instant::now());
+        flights.start(start("/c"), 21, std::time::Instant::now());
         let (mut c, mut b) = (done("/c"), done("/b"));
         flights.finish(&mut c, 25);
         flights.finish(&mut b, 30);

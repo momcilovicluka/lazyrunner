@@ -265,6 +265,7 @@ pub fn waterfall(fall: &lazyrunner_core::run::waterfall::Waterfall) -> Value {
                 Kind::Db => "db",
                 Kind::Http => "http",
                 Kind::Exception => "exception",
+                Kind::Span => "span",
             };
             json!({
                 "kind": kind,
@@ -273,12 +274,15 @@ pub fn waterfall(fall: &lazyrunner_core::run::waterfall::Waterfall) -> Value {
                 "what": span.label,
                 "line": span.line,
                 "runs": if span.repeats.is_empty() { 1 } else { span.repeats.len() },
+                "depth": span.depth,
+                "critical": span.critical,
             })
         })
         .collect();
     json!({
         "ms": fall.ms,
         "in_the_app_ms": fall.unaccounted.round(),
+        "source": if fall.exact { "opentelemetry" } else { "log" },
         "spans": spans,
         "note": "From the request's log lines and when each arrived: a database command ends at its line, a call \
                  runs from its start line to its end line; in_the_app_ms is the time no line accounts for.",

@@ -16,6 +16,8 @@ pub enum Kind {
     Db,
     Http,
     Exception,
+    /// Another span of a trace (OpenTelemetry's): the app's own work, by its name.
+    Span,
 }
 
 /// Something the request did: when it started (ms from the request's start) and how long it took, what it was (the
@@ -28,6 +30,10 @@ pub struct Span {
     pub label: String,
     pub line: u64,
     pub repeats: Vec<(f64, f64)>,
+    /// How deep it's nested under the request (a trace's spans; 0 from the log), and whether it's on the chain that
+    /// decided the request's length.
+    pub depth: usize,
+    pub critical: bool,
 }
 
 impl Span {
@@ -42,6 +48,8 @@ pub struct Waterfall {
     pub ms: f64,
     pub spans: Vec<Span>,
     pub unaccounted: f64,
+    /// From the request's trace (OpenTelemetry), not its log.
+    pub exact: bool,
 }
 
 impl Waterfall {
@@ -92,6 +100,15 @@ pub fn of(request: &Request, output: &Output) -> Option<Waterfall> {
     Some(from_lines(request.ms, start, &lines))
 }
 
+/// A request still running, started at `started` when its app had printed `from` lines: its spans so far, up to `now`.
+pub fn running(output: &Output, from: u64, started: Instant, now: Instant) -> Waterfall {
+    let total = now.saturating_duration_since(started).as_secs_f64() * 1000.0;
+    let lines: Vec<(u64, &OutputLine)> = (from + 1..=output.total())
+        .filter_map(|number| Some((number, output.numbered(number, number).next()?)))
+        .collect();
+    from_lines(total, started, &lines)
+}
+
 /// The spans of lines that arrived from `start` on, in a request of `total` ms.
 pub fn from_lines(total: f64, start: Instant, lines: &[(u64, &OutputLine)]) -> Waterfall {
     let at = |born: Instant| (born.saturating_duration_since(start).as_secs_f64() * 1000.0).min(total);
@@ -109,7 +126,16 @@ pub fn from_lines(total: f64, start: Instant, lines: &[(u64, &OutputLine)]) -> W
                 .collect();
             let label: String = sql.join(" ").chars().take(SQL).collect();
             let start = (at(line.born) - ms).max(0.0);
-            spans.push(Span { kind: Kind::Db, start, ms, label, line: number, repeats: Vec::new() });
+            spans.push(Span {
+                kind: Kind::Db,
+                start,
+                ms,
+                label,
+                line: number,
+                repeats: Vec::new(),
+                depth: 0,
+                critical: false,
+            });
         } else if let Some(found) = START.captures(text) {
             pending.push((format!("{} {}", &found["method"], &found["url"]), at(line.born), number));
         } else if let Some(found) = END.captures(text) {
@@ -120,7 +146,16 @@ pub fn from_lines(total: f64, start: Instant, lines: &[(u64, &OutputLine)]) -> W
                 pending.remove(0)
             };
             let label = format!("{label} → {}", &found["status"]);
-            spans.push(Span { kind: Kind::Http, start: started.max(0.0), ms, label, line: from, repeats: Vec::new() });
+            spans.push(Span {
+                kind: Kind::Http,
+                start: started.max(0.0),
+                ms,
+                label,
+                line: from,
+                repeats: Vec::new(),
+                depth: 0,
+                critical: false,
+            });
         } else if !exception && line.severity() == Level::Error {
             exception = true;
             let named = lines[index..].iter().map(|(_, line)| line.text.trim()).find(|text| text.contains("Exception"));
@@ -132,16 +167,27 @@ pub fn from_lines(total: f64, start: Instant, lines: &[(u64, &OutputLine)]) -> W
                 label,
                 line: number,
                 repeats: Vec::new(),
+                depth: 0,
+                critical: false,
             });
         }
     }
     for (label, started, line) in pending {
-        let span = Span { kind: Kind::Http, start: started, ms: total - started, label, line, repeats: Vec::new() };
+        let span = Span {
+            kind: Kind::Http,
+            start: started,
+            ms: total - started,
+            label,
+            line,
+            repeats: Vec::new(),
+            depth: 0,
+            critical: false,
+        };
         spans.push(span);
     }
     let mut spans = combed(spans);
     spans.sort_by(|a, b| a.start.total_cmp(&b.start));
-    let mut waterfall = Waterfall { ms: total, spans, unaccounted: 0.0 };
+    let mut waterfall = Waterfall { ms: total, spans, unaccounted: 0.0, exact: false };
     waterfall.unaccounted = waterfall.gaps().iter().map(|(start, end)| end - start).sum();
     waterfall
 }

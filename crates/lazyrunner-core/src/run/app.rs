@@ -202,6 +202,11 @@ impl AppState {
         self.status == Status::Running
     }
 
+    /// The requests it's serving now.
+    pub fn in_flight(&self) -> &requests::InFlight {
+        &self.in_flight
+    }
+
     /// Whether this run is up (listening, or its watch build written).
     pub fn is_up(&self) -> bool {
         self.is_running() && self.up_generation == Some(self.generation)
@@ -326,7 +331,7 @@ impl AppState {
                 }
                 requests::Line::Started(started) => {
                     self.scope = None;
-                    self.in_flight.start(started, self.output.total());
+                    self.in_flight.start(started, self.output.total(), now);
                     self.log_line(&text);
                     return None;
                 }
