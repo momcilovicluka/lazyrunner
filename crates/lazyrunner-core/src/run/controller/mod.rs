@@ -9,6 +9,7 @@ mod causes;
 mod code_map;
 pub mod compose;
 mod handover;
+mod health;
 mod hooks;
 mod impact;
 mod launch;
@@ -202,6 +203,8 @@ pub struct Controller {
     migrations_check: bool,
     /// The HTTP requests the .NET apps served (H).
     pub requests: super::requests::Requests,
+    /// Each app against its targets: breaches, alerts, the p95 and 5xx series (#35).
+    pub health: super::health::Watch,
     /// The calls the apps made to each other (#51).
     pub calls: super::calls::Calls,
     /// Where each app's config says its calls go: the caller, the app called, the file (#51).
@@ -332,6 +335,7 @@ impl Controller {
             migration_queue: VecDeque::new(),
             migrations_check: false,
             requests: Default::default(),
+            health: Default::default(),
             calls: Default::default(),
             configured_calls: Vec::new(),
             database_apps: Vec::new(),

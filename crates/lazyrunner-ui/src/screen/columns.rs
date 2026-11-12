@@ -31,7 +31,6 @@ const SLOW_RESPONSE_MS: u64 = 1000;
 const FRESH: Duration = Duration::from_millis(400);
 const SETTLING: Duration = Duration::from_millis(1000);
 const SPARK_WIDTH: usize = 10;
-const HISTORY: usize = 30;
 /// Narrower than this, `"layout": "auto"` stacks the apps top to bottom.
 pub const STACK_BELOW: usize = 120;
 /// A stacked app's fewest rows: its title, its numbers and a line of output.
@@ -112,6 +111,14 @@ pub fn tone(ui: &Ui, controller: &Controller, index: usize) -> C {
 /// The border colour: the state colour, dimmed (never flashes, so borders stay calm).
 pub fn border(controller: &Controller, index: usize) -> C {
     let state = &controller.states[index];
+    let alerts: Vec<bool> =
+        controller.health.of(&state.key).filter(|breach| breach.alert()).map(|breach| breach.acknowledged).collect();
+    if alerts.iter().any(|acknowledged| !acknowledged) {
+        return C::Red;
+    }
+    if !alerts.is_empty() {
+        return C::Yellow;
+    }
     if tool(controller, &state.key).is_some() {
         return C::DarkYellow;
     }
@@ -444,16 +451,9 @@ pub fn sparkline<'a>(values: impl DoubleEndedIterator<Item = &'a f32> + ExactSiz
     recent.iter().map(|value| SPARKS[((value / max * 7.999).floor() as usize).min(7)]).collect()
 }
 
-/// Over the last minute the newest samples average 20% above the oldest ones.
+/// Its memory grew more than a fifth over the last minute (an alert of its own, #35).
 fn memory_growing(state: &AppState) -> bool {
-    let history = &state.memory_history;
-    if history.len() < HISTORY {
-        return false;
-    }
-    let average = |values: &mut dyn Iterator<Item = &f32>| values.copied().sum::<f32>() / 5.0;
-    let old = average(&mut history.iter().take(5));
-    let new = average(&mut history.iter().rev().take(5));
-    old > 0.0 && new > old * 1.2
+    state.memory_growth().is_some_and(|growth| growth > lazyrunner_core::run::health::GROWTH)
 }
 
 /// Second title line: live CPU and memory with sparklines, the response-time trend, requests, errors, the variant.

@@ -194,6 +194,33 @@ pub struct App {
     pub env: Vec<(String, String)>,
     /// The apps it calls (`"dependsOn"`), by key: the stack map draws them before a call is seen.
     pub depends_on: Vec<String>,
+    /// What the Health tab holds it to and what its probe asks for (`"health"`), the defaults when it says nothing.
+    pub health: Health,
+}
+
+/// An app's targets (#35) - p95 latency, the 5xx rate (in basis points: 200 is 2%), memory and CPU - and its own
+/// health endpoint for the probe, with the status it should answer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Health {
+    pub path: Option<String>,
+    pub expected_status: Option<u16>,
+    pub p95_ms: u32,
+    pub error_bp: u32,
+    pub memory_mb: u32,
+    pub cpu_percent: u32,
+}
+
+impl Default for Health {
+    fn default() -> Self {
+        Self { path: None, expected_status: None, p95_ms: 1000, error_bp: 500, memory_mb: 2048, cpu_percent: 90 }
+    }
+}
+
+impl Health {
+    /// The 5xx rate it's held to, as a share: 0.05 is 5%.
+    pub fn error_rate(&self) -> f64 {
+        f64::from(self.error_bp) / 10_000.0
+    }
 }
 
 /// Where a .NET app's EF Core migrations are: the project with them (the app's own when `None`) and its DbContexts

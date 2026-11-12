@@ -758,6 +758,7 @@ mod tests {
             migrations: None,
             env: Vec::new(),
             depends_on: Vec::new(),
+            health: crate::profile::Health::default(),
             kind: AppKind::Npm { dir: dir.into(), variants: Vec::new() },
         };
         let api = App {
@@ -769,6 +770,7 @@ mod tests {
             migrations: None,
             env: Vec::new(),
             depends_on: Vec::new(),
+            health: crate::profile::Health::default(),
             kind: AppKind::Dotnet {
                 project: "services/Shop/Shop.csproj".into(),
                 launch_profile: "Api".into(),

@@ -3,10 +3,10 @@ source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
  ⋈ STACK   H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline
- Map  Code    4 .NET · 3 TypeScript projects · 1 cycle · 1 rule break
+ Map  Code  Health    4 .NET · 3 TypeScript projects · 1 cycle · 1 rule break
  h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom
  r implied edges · t tests · a all projects · c cycles · b the build (w follow it · B it alone) · o open
- y copy path · Tab the map · Esc back
+ y copy path · Tab health · Esc back
  2 implied edges hidden (r)
   ╭──────────────╮                                                                      ╭────────────────────╮
   │ ■ Orders.Api │────╮                                                                 │■■■■···■■■■■········│

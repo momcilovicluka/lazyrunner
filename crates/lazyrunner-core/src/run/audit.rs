@@ -620,6 +620,7 @@ mod tests {
             migrations: None,
             env: Vec::new(),
             depends_on: Vec::new(),
+            health: crate::profile::Health::default(),
         }
     }
 

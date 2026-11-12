@@ -26,6 +26,7 @@ pub struct Fields {
     pub when: &'static [&'static str],
     pub ready: &'static [&'static str],
     pub migrations: &'static [&'static str],
+    pub health: &'static [&'static str],
 }
 
 pub const FIELDS: Fields = Fields {
@@ -57,8 +58,9 @@ pub const FIELDS: Fields = Fields {
         "tests",
         "migrations",
         "dependsOn",
+        "health",
     ],
-    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "env", "tests", "dependsOn"],
+    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "env", "tests", "dependsOn", "health"],
     command: &[
         "key",
         "name",
@@ -82,6 +84,7 @@ pub const FIELDS: Fields = Fields {
         "tools",
         "env",
         "dependsOn",
+        "health",
     ],
     compose: &["key", "name", "icon", "nerdIcon", "type", "file", "cwd", "services", "env", "dependsOn"],
     command_ready: &["port", "line", "http", "orPort"],
@@ -110,6 +113,7 @@ pub const FIELDS: Fields = Fields {
     when: &["packageScript"],
     ready: &["file"],
     migrations: &["project", "contexts"],
+    health: &["p95Ms", "errorRate", "memoryMb", "cpuPercent", "path", "expectedStatus"],
 };
 
 impl Fields {
@@ -128,11 +132,38 @@ impl Fields {
             self.when,
             self.ready,
             self.migrations,
+            self.health,
         ]
         .concat();
         all.sort_unstable();
         all.dedup();
         all
+    }
+}
+
+/// An app's `"health"`: its targets are positive numbers (the 5xx rate a share, CPU a percent), its path starts with
+/// /, its status is an HTTP one.
+fn check_health(health: &Value, at: &str, problems: &mut Vec<String>) {
+    if !health.is_object() {
+        problems.push(format!("{at} must be an object, e.g. {{ \"p95Ms\": 500, \"path\": \"/healthz\" }}"));
+        return;
+    }
+    known_fields(health, FIELDS.health, at, problems);
+    for (name, most) in [("p95Ms", f64::MAX), ("memoryMb", f64::MAX), ("cpuPercent", 100.0), ("errorRate", 1.0)] {
+        let value = field(health, name);
+        if !value.is_null() && !value.as_f64().is_some_and(|value| value > 0.0 && value <= most) {
+            let range =
+                if most == f64::MAX { "a number above 0".to_string() } else { format!("above 0, at most {most}") };
+            problems.push(format!("{at}.{name} must be {range}"));
+        }
+    }
+    let path = field(health, "path");
+    if !path.is_null() && !text(path).starts_with('/') {
+        problems.push(format!("{at}.path must start with /, e.g. '/healthz'"));
+    }
+    let status = field(health, "expectedStatus");
+    if !status.is_null() && !status.as_u64().is_some_and(|code| (100..=599).contains(&code)) {
+        problems.push(format!("{at}.expectedStatus must be an HTTP status, e.g. 200"));
     }
 }
 
@@ -296,6 +327,10 @@ fn check_app<'a>(app: &'a Value, index: usize, keys: &mut HashMap<String, &'a Va
     if !env.is_null() && !env.as_object().is_some_and(|vars| vars.values().all(Value::is_string)) {
         problems
             .push(format!("{at}.env must name text values, e.g. {{ \"ASPNETCORE_ENVIRONMENT\": \"Development\" }}"));
+    }
+    let health = field(app, "health");
+    if !health.is_null() {
+        check_health(health, &format!("{at}.health"), problems);
     }
     let kind = field(app, "type").as_str().map(str::to_lowercase);
     match kind.as_deref() {
@@ -697,6 +732,26 @@ mod tests {
         assert_eq!(edit_distance("Prot", "port"), 2);
         assert_eq!(edit_distance("", "abc"), 3);
         assert_eq!(edit_distance("Name", "name"), 0);
+    }
+
+    #[test]
+    fn an_apps_health_holds_positive_targets_a_path_and_an_http_status() {
+        let mut problems = Vec::new();
+        let good = serde_json::json!({ "p95Ms": 500, "errorRate": 0.02, "path": "/healthz", "expectedStatus": 200 });
+        check_health(&good, "apps[0].health", &mut problems);
+        assert!(problems.is_empty(), "{problems:?}");
+        let bad = serde_json::json!({ "p95Ms": 0, "errorRate": 2, "cpuPercent": 150, "path": "healthz", "expectedStatus": 42, "p59Ms": 1 });
+        check_health(&bad, "apps[0].health", &mut problems);
+        for said in [
+            "p95Ms must be",
+            "errorRate must be",
+            "cpuPercent must be",
+            "path must start with /",
+            "expectedStatus",
+            "p59Ms",
+        ] {
+            assert!(problems.iter().any(|problem| problem.contains(said)), "{said}: {problems:?}");
+        }
     }
 
     #[test]

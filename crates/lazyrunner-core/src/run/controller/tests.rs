@@ -700,3 +700,36 @@ async fn a_command_apps_setup_makes_its_folder_then_its_install_runs_and_a_chang
         last_log(&controller)
     );
 }
+
+/// #35: an app over its target for a minute is an alert - logged, notified, its title flashed - acknowledged with a,
+/// and its recovery says how long it lasted; a stopped app's breaches go without a word.
+#[tokio::test]
+async fn an_app_over_its_memory_target_for_a_minute_is_an_alert_until_it_recovers() {
+    use std::time::{Duration, Instant};
+    let temp = TempDir::new("health-alert");
+    let (mut controller, _events) = controller(&temp, json!({}));
+    let orders = controller.apps.iter().position(|app| app.key == "orders").unwrap();
+    let state = &mut controller.states[orders];
+    (state.status, state.generation, state.up_generation) = (crate::run::app::Status::Running, 1, Some(1));
+    state.memory_mb = Some(3000.0);
+    let start = Instant::now();
+    controller.tick_health(start);
+    assert_eq!(controller.health.alerts().count(), 0, "not for a minute yet");
+    assert_eq!(controller.health.breaches.len(), 1, "but a breach");
+    controller.tick_health(start + Duration::from_secs(60));
+    let log = last_log(&controller);
+    assert_eq!(log, "! Orders memory 3000 MB, over its 2048 MB target for 1m00s");
+    assert_eq!(controller.notifications.last().map(|(title, _)| title.as_str()), Some("Orders memory 3000 MB"));
+    assert!(controller.states[orders].flash_until.is_some(), "its title flashes");
+    controller.acknowledge_alerts("orders");
+    assert!(controller.health.alerts().all(|alert| alert.acknowledged), "{}", last_log(&controller));
+    controller.states[orders].memory_mb = Some(900.0);
+    controller.tick_health(start + Duration::from_secs(300));
+    assert_eq!(last_log(&controller), "✓ Orders memory back under 2048 MB after 5m00s");
+    controller.states[orders].memory_mb = Some(3000.0);
+    controller.tick_health(start + Duration::from_secs(301));
+    controller.states[orders].status = crate::run::app::Status::Stopped;
+    controller.tick_health(start + Duration::from_secs(400));
+    assert!(controller.health.breaches.is_empty(), "a stopped app's breaches go");
+    assert_eq!(last_log(&controller), "✓ Orders memory back under 2048 MB after 5m00s", "without a word");
+}

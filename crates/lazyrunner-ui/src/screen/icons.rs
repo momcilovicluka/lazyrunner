@@ -37,6 +37,10 @@ pub enum Icon {
     Update,
     Person,
     Heart,
+    /// The Health tab (#35), an alert, an acknowledged one.
+    Health,
+    Alert,
+    Acknowledged,
     Rust,
     /// The command palette's groups.
     Run,
@@ -160,6 +164,12 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Person, true) => "\u{f007}", // user
         (Icon::Heart, false) => "♥",
         (Icon::Heart, true) => "\u{f004}", // heart
+        (Icon::Health, false) => "♥",
+        (Icon::Health, true) => "\u{f21e}", // heartbeat
+        (Icon::Alert, false) => "!",
+        (Icon::Alert, true) => "\u{f0f3}", // bell
+        (Icon::Acknowledged, false) => "!",
+        (Icon::Acknowledged, true) => "\u{f1f6}", // bell slash
         (Icon::Rust, false) => "⚙",
         (Icon::Rust, true) => "\u{e7a8}", // Rust
         (Icon::Run, false) => "▸",
@@ -364,6 +374,9 @@ mod tests {
             Icon::Update,
             Icon::Person,
             Icon::Heart,
+            Icon::Health,
+            Icon::Alert,
+            Icon::Acknowledged,
             Icon::Rust,
             Icon::Run,
             Icon::Tools,

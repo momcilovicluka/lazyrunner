@@ -363,6 +363,7 @@ fn to_app(app: &Value) -> App {
         .as_object()
         .map(|vars| vars.iter().filter_map(|(name, value)| Some((name.clone(), value.as_str()?.to_string()))).collect())
         .unwrap_or_default();
+    let health = to_health(field(app, "health"));
     let setup = field(app, "migrations");
     let migrations = setup.is_object().then(|| Migrations {
         project: truthy(field(setup, "project")).then(|| native(&text(field(setup, "project")))),
@@ -378,6 +379,22 @@ fn to_app(app: &Value) -> App {
         migrations,
         env,
         depends_on,
+        health,
+    }
+}
+
+/// An app's `"health"`: what it says, the defaults for the rest.
+fn to_health(health: &Value) -> super::Health {
+    let defaults = super::Health::default();
+    let whole = |name: &str, default: u32| field(health, name).as_f64().map_or(default, |value| value.max(0.0) as u32);
+    let rate = field(health, "errorRate").as_f64();
+    super::Health {
+        path: truthy(field(health, "path")).then(|| text(field(health, "path"))),
+        expected_status: field(health, "expectedStatus").as_u64().and_then(|code| u16::try_from(code).ok()),
+        p95_ms: whole("p95Ms", defaults.p95_ms),
+        error_bp: rate.map_or(defaults.error_bp, |rate| (rate.clamp(0.0, 1.0) * 10_000.0).round() as u32),
+        memory_mb: whole("memoryMb", defaults.memory_mb),
+        cpu_percent: whole("cpuPercent", defaults.cpu_percent),
     }
 }
 
@@ -400,5 +417,20 @@ fn to_variant(variant: &Value) -> Variant {
         port,
         served_by: truthy(field(variant, "servedBy")).then(|| text(field(variant, "servedBy"))),
         ready_file: truthy(ready).then(|| native(&text(ready))),
+    }
+}
+
+#[cfg(test)]
+mod health_tests {
+    use super::*;
+
+    #[test]
+    fn an_apps_health_takes_what_it_says_and_the_defaults_for_the_rest() {
+        let health = to_health(
+            &serde_json::json!({ "p95Ms": 500, "errorRate": 0.02, "path": "/healthz", "expectedStatus": 200 }),
+        );
+        assert_eq!((health.p95_ms, health.error_bp, health.memory_mb, health.cpu_percent), (500, 200, 2048, 90));
+        assert_eq!((health.path.as_deref(), health.expected_status), (Some("/healthz"), Some(200)));
+        assert_eq!(to_health(&Value::Null), crate::profile::Health::default());
     }
 }

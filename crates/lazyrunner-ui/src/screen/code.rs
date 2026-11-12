@@ -28,7 +28,7 @@ use lazyrunner_core::run::code::{CodeMap, Kind, Link, STACK, Stack};
 use super::code_draw::{self, Look, MINI};
 use super::graph;
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, seg};
+use super::seg::{Seg, aim, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -136,6 +136,7 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, app: Option<String>) {
         before_follow: None,
         only: None,
     };
+    ui.stack_tab = super::stack::Tab::Code;
     ui.overlay = Some(Overlay::Code(Box::new(view)));
 }
 
@@ -516,7 +517,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
     match name {
         "Escape" if current.trace.is_some() => retrace(ui, None),
         "Escape" | "q" | "K" => ui.overlay = None,
-        "Tab" => super::stack::open(ui, controller),
+        "Tab" => super::health::open(ui, controller),
         "/" => change(ui, Zoom::Still, |view| (view.typing, view.query, view.choice) = (true, String::new(), 0)),
         _ => return map_key(ui, controller, name, &current),
     }
@@ -754,7 +755,8 @@ fn summary(map: &CodeMap, view: &View, parts: &[usize]) -> String {
 
 /// The header: the tabs, the level, then what the map has and how it's shown.
 fn header(ui: &Ui, controller: &Controller, view: &View, shown: Option<&Shown>, width: usize) -> Vec<Seg> {
-    let mut segs = vec![seg(" Map ", C::DarkGray), on(" Code ", C::FocusText, C::FocusBack), seg("   ", C::Gray)];
+    let mut segs = super::stack::tabs(super::stack::Tab::Code);
+    segs.push(seg("   ", C::Gray));
     let (Some(map), Some(shown)) = (controller.code_map(), shown) else {
         segs.push(seg("reading the code…", C::Yellow));
         return super::columns::fit(segs, width);
@@ -905,7 +907,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let shown = map.map(|map| shown(ui, map, &current));
     let hint = " h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z \
                 zoom · r implied edges · t tests · a all projects · c cycles · b the build (w follow it · B it alone) · o \
-                open · y copy path · Tab the map · Esc back";
+                open · y copy path · Tab health · Esc back";
     let mut lines = vec![header(ui, controller, &current, shown.as_ref(), width)];
     lines.extend(super::viewbar::keys(hint, width));
     if let Some(run) = current.build.as_deref().and_then(|key| controller.build_run(key)) {

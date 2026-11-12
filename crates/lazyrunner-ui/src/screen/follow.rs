@@ -212,8 +212,18 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             Some("read the port map".to_string())
         }
         "stack" => {
-            open_view(ui, controller, "stack", Run::Stack);
+            if ui.overlay.as_ref().map(|overlay| overlay.kind()) != Some("stack") {
+                ui.overlay = None;
+                super::stack::open(ui, controller);
+            }
             Some("read the stack map".to_string())
+        }
+        "health" => {
+            if ui.overlay.as_ref().map(|overlay| overlay.kind()) != Some("health") {
+                ui.overlay = None;
+                super::health::open(ui, controller);
+            }
+            Some("read the stack's health".to_string())
         }
         "dependencies" => {
             let app = app_of(controller, &args["part"]).map(|app| controller.apps[app].key.clone());

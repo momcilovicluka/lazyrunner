@@ -16,6 +16,7 @@ pub mod diff;
 pub mod durations;
 pub mod follow;
 pub mod graph;
+pub mod health;
 pub mod held;
 pub mod icons;
 pub mod jumps;
@@ -220,6 +221,11 @@ pub enum Overlay {
         index: usize,
         opened: Instant,
     },
+    /// `K`, then Tab twice: the stack's health (#35); the picked card (then the slowest endpoints), and when it opened.
+    Health {
+        index: usize,
+        opened: Instant,
+    },
     /// `M`: the EF Core migrations; the selected context, and the migration chosen in it (`l`).
     Migrations {
         index: usize,
@@ -278,6 +284,7 @@ impl Overlay {
             Self::Ports { .. } => "ports",
             Self::Stack { .. } => "stack",
             Self::Code(_) => "code",
+            Self::Health { .. } => "health",
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
             Self::Themes { .. } => "themes",
@@ -364,6 +371,10 @@ pub struct Ui {
     pub tests_impact: suite_impact::Seen,
     /// Where the stack map's dots are along their edges (K, #51).
     pub stack_dots: stack::Dots,
+    /// The Stack screen's tab used last: `K` opens on it.
+    pub stack_tab: stack::Tab,
+    /// The Health tab's cards across, as last drawn (j k move a row).
+    pub health_columns: usize,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
@@ -468,6 +479,8 @@ impl Ui {
             tests_typing: false,
             tests_impact: suite_impact::Seen::default(),
             stack_dots: stack::Dots::default(),
+            stack_tab: stack::Tab::default(),
+            health_columns: 1,
             seen: seen::Seen::default(),
             phases: phases::Phases::default(),
             log_newest: None,
@@ -626,6 +639,7 @@ impl Ui {
             || ports::animating(self, controller)
             || stack::animating(self, controller)
             || code::animating(self, controller)
+            || health::animating(self, controller)
             || durations::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
@@ -782,6 +796,7 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         Some(Overlay::Audit { .. }) => return audit::rows(ui, controller, width, rows),
         Some(Overlay::Ports { .. }) => return ports::rows(ui, controller, width, rows),
         Some(Overlay::Stack { .. }) => return stack::rows(ui, controller, width, rows),
+        Some(Overlay::Health { .. }) => return health::rows(ui, controller, width, rows),
         Some(Overlay::Code(_)) => return code::rows(ui, controller, width, rows),
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
