@@ -383,10 +383,15 @@ pub(crate) struct MenuToggle {
 }
 
 /// The , menu's toggles, by their group ([`setting_group`]).
-const MENU_TOGGLES: [MenuToggle; 14] = [
+const MENU_TOGGLES: [MenuToggle; 15] = [
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
     MenuToggle { letter: "w", toggle: Toggle::StartupChecklist, label: "Startup checklist when lazyrunner opens" },
     MenuToggle { letter: "v", toggle: Toggle::AutoUpdate, label: "Auto-update lazyrunner when it opens" },
+    MenuToggle {
+        letter: "k",
+        toggle: Toggle::RestoreSession,
+        label: "Keep the session: reopen with the apps and the screen it had",
+    },
     MenuToggle {
         letter: "o",
         toggle: Toggle::CheckMigrationsOnOpen,
@@ -419,9 +424,11 @@ const MENU_TOGGLES: [MenuToggle; 14] = [
 /// A setting's group in the , menu.
 pub fn setting_group(toggle: Toggle) -> &'static str {
     match toggle {
-        Toggle::AutoStartOnOpen | Toggle::StartupChecklist | Toggle::AutoUpdate | Toggle::CheckMigrationsOnOpen => {
-            "Startup"
-        }
+        Toggle::AutoStartOnOpen
+        | Toggle::StartupChecklist
+        | Toggle::AutoUpdate
+        | Toggle::CheckMigrationsOnOpen
+        | Toggle::RestoreSession => "Startup",
         Toggle::AutoRestartOnBranchChange
         | Toggle::StopFrontendOnStop
         | Toggle::RestartOnCodeChange

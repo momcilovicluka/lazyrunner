@@ -18,6 +18,9 @@ use lazyrunner_core::ipc;
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
+    /// Start afresh: don't resume the session lazyrunner kept when it last closed.
+    #[arg(long, global = true)]
+    fresh: bool,
 }
 
 #[derive(Subcommand)]
@@ -123,8 +126,8 @@ fn run_cli() -> Result<()> {
         }
         Some(Command::Mcp { ipc }) => mcp::run(ipc),
         Some(Command::Hook { action, event, app }) => hook_cli::run(&action, &event, app.as_deref()),
-        Some(Command::Start) => start::start(true),
-        None => start::start(false),
+        Some(Command::Start) => start::start(true, cli.fresh),
+        None => start::start(false, cli.fresh),
         Some(Command::Update) => update_cli::update(),
         Some(Command::Version) => update_cli::version(),
         Some(Command::Changelog { after }) => update_cli::changelog_after(&after),
@@ -132,7 +135,8 @@ fn run_cli() -> Result<()> {
         Some(Command::Restart) => start::send("restart"),
         Some(Command::Run { root, headless, ipc, start, handover, handover_handles, notes }) => {
             let size = headless.as_deref().map(parse_size).transpose()?;
-            start::run_root(&root, size, ipc, start, handover.map(|file| (file, handover_handles)), notes)
+            let opening = start::Opening { start_now: start, fresh: cli.fresh };
+            start::run_root(&root, size, ipc, opening, handover.map(|file| (file, handover_handles)), notes)
         }
         Some(Command::Guard) => {
             lazyrunner_core::run::child::run_guard();

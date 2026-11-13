@@ -2,29 +2,29 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-                  ┌─ Settings (saved) ────────────────────────────────────────────────────┐
-                  │  u      ● Auto-start when lazyrunner opens                            │
-                  │  w      ● Startup checklist when lazyrunner opens                     │
-                  │  v      ● Auto-update lazyrunner when it opens                        │
-                  │  o      ○ Check the migrations against the database when M opens      │
-                  │  a      ○ Auto-restart on branch change                               │
-                  │  s      ● Stop/Restart all include the frontend                       │
-                  │  e      ○ Restart the APIs when code changes                          │
-                  │  m      ● Mouse: click and scroll (off: select text)                  │
-                  │  f      ○ Reduced motion: no blinking, spinners or fades              │
-                  │  i      ○ Nerd Font icons (the terminal's font a Nerd Font Mono)      │
-                  │  l      ● Links open on Alt+click (off: on a click)                   │
-                  │  g      ○ L opens the git tool beside lazyrunner (Windows Terminal)   │
-                  │  F      ○ Follow an agent when it calls (F: your keys back)           │
-                  │  t      ○ Request timelines from the .NET apps' OpenTelemetry spans   │
-                  │  r      Run the startup checklist now (and check for an update)       │
-                  │  c      What's new: the lazyrunner changelog                          │
-                  │  A      About lazyrunner: version, contributors, links                │
-                  │  p      Reload the project profile                                    │
-                  │  P      Open the project profile in your editor  sample.json          │
-                  │ press a letter to toggle, or j k + Enter · Esc / , close              │
-                  └───────────────────────────────────────────────────────────────────────┘
-
+                 ┌─ Settings (saved) ───────────────────────────────────────────────────────┐
+                 │  u      ● Auto-start when lazyrunner opens                               │
+                 │  w      ● Startup checklist when lazyrunner opens                        │
+                 │  v      ● Auto-update lazyrunner when it opens                           │
+                 │  k      ● Keep the session: reopen with the apps and the screen it had   │
+                 │  o      ○ Check the migrations against the database when M opens         │
+                 │  a      ○ Auto-restart on branch change                                  │
+                 │  s      ● Stop/Restart all include the frontend                          │
+                 │  e      ○ Restart the APIs when code changes                             │
+                 │  m      ● Mouse: click and scroll (off: select text)                     │
+                 │  f      ○ Reduced motion: no blinking, spinners or fades                 │
+                 │  i      ○ Nerd Font icons (the terminal's font a Nerd Font Mono)         │
+                 │  l      ● Links open on Alt+click (off: on a click)                      │
+                 │  g      ○ L opens the git tool beside lazyrunner (Windows Terminal)      │
+                 │  F      ○ Follow an agent when it calls (F: your keys back)              │
+                 │  t      ○ Request timelines from the .NET apps' OpenTelemetry spans      │
+                 │  r      Run the startup checklist now (and check for an update)          │
+                 │  c      What's new: the lazyrunner changelog                             │
+                 │  A      About lazyrunner: version, contributors, links                   │
+                 │  p      Reload the project profile                                       │
+                 │  P      Open the project profile in your editor  sample.json             │
+                 │ press a letter to toggle, or j k + Enter · Esc / , close                 │
+                 └──────────────────────────────────────────────────────────────────────────┘
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

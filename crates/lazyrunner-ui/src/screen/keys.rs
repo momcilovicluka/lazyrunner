@@ -209,7 +209,11 @@ fn checklist_key(
         "n" | "N" => {
             list.next_problem(name == "n");
         }
-        "i" => list.ignore(),
+        "i" => {
+            if !list.set_aside(controller) {
+                list.ignore();
+            }
+        }
         "f" => {
             if let Some(index) = list.fix_target() {
                 fix_check(list, controller, index, replay, clipboard);

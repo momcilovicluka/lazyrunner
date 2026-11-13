@@ -145,6 +145,11 @@ pub fn toggle(ui: &mut Ui, controller: &Controller) {
     set(ui, controller, ui.focus, on);
 }
 
+/// Diff mode on app `index`'s column (a resumed session's).
+pub fn turn_on(ui: &mut Ui, controller: &Controller, index: usize) {
+    set(ui, controller, index, true);
+}
+
 /// Diff mode on app `index`'s column, or off.
 fn set(ui: &mut Ui, controller: &Controller, index: usize, on: bool) {
     let Some(state) = controller.states.get(index) else { return };

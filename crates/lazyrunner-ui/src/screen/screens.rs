@@ -95,6 +95,11 @@ impl Screen {
         }
     }
 
+    /// The screen with this key.
+    pub fn by_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|screen| screen.key() == key)
+    }
+
     /// The screen open, if one is: the Code tab is the stack's.
     pub fn of(overlay: Option<&Overlay>) -> Option<Self> {
         Some(match overlay? {
@@ -270,8 +275,19 @@ pub fn go(ui: &mut Ui, controller: &mut Controller, next: Screen) {
     }
 }
 
+/// Opens `next` on app `at` when there is one, as its key would from a screen looking at that app.
+pub fn open_on(ui: &mut Ui, controller: &mut Controller, next: Screen, at: Option<usize>) {
+    if let Some(at) = at {
+        ui.focus = at;
+    }
+    super::keys::run(ui, controller, &next.run());
+    if let Some(at) = at {
+        on_app(ui, controller, next, at);
+    }
+}
+
 /// The app the open screen is looking at, by its place in the apps.
-fn looked_at(ui: &Ui, controller: &Controller) -> Option<usize> {
+pub(super) fn looked_at(ui: &Ui, controller: &Controller) -> Option<usize> {
     let place = |key: &str| controller.apps.iter().position(|app| app.key == key);
     let key = match &ui.overlay {
         Some(Overlay::Stack { index, .. } | Overlay::Health { index, .. }) => {

@@ -38,10 +38,11 @@ pub enum Toggle {
     LinksOnAltClick,
     FollowAgent,
     OpenTelemetry,
+    RestoreSession,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 16] = [
+    pub const ALL: [Toggle; 17] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -58,6 +59,7 @@ impl Toggle {
         Toggle::LinksOnAltClick,
         Toggle::FollowAgent,
         Toggle::OpenTelemetry,
+        Toggle::RestoreSession,
     ];
 
     /// Its name in the settings file.
@@ -79,6 +81,7 @@ impl Toggle {
             Toggle::LinksOnAltClick => "linksOnAltClick",
             Toggle::FollowAgent => "followAgent",
             Toggle::OpenTelemetry => "openTelemetry",
+            Toggle::RestoreSession => "restoreSession",
         }
     }
 

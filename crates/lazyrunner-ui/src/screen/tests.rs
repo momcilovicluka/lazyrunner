@@ -2521,6 +2521,82 @@ async fn with_links_on_alt_click_off_a_plain_click_opens_a_link() {
     assert_eq!(OPENED.with(|opened| opened.borrow().clone()), ["http://localhost:47202/"]);
 }
 
+// ---------------------------------------------------------------- the session (#85)
+
+fn resume(screen: &mut Screen, running: &[&str], view: Value) {
+    let running = running.iter().map(|key| key.to_string()).collect();
+    let (at, branch) = (chrono::Local::now().fixed_offset().to_rfc3339(), screen.controller.branch.clone());
+    screen.controller.resume = Some(lazyrunner_core::run::session::Snapshot { at, branch, running, view });
+}
+
+#[tokio::test]
+async fn closing_keeps_the_session_and_one_still_to_resume_stays_as_it_was() {
+    let mut screen = screen("session-keep", json!({}));
+    screen.controller.save_session(json!({ "focus": "billing" }));
+    screen.controller.load_session();
+    let kept = screen.controller.resume.clone().expect("kept for the next start");
+    assert_eq!(kept.view["focus"], "billing");
+    assert!(kept.running.is_empty(), "nothing ran");
+    screen.controller.save_session(json!({ "focus": "orders" }));
+    screen.controller.load_session();
+    assert_eq!(screen.controller.resume.as_ref().unwrap().view["focus"], "billing", "not resumed yet: kept as it was");
+    let off = self::screen("session-off", json!({ "restoreSession": false }));
+    let mut off = off;
+    off.controller.save_session(json!({}));
+    off.controller.load_session();
+    assert!(off.controller.resume.is_none(), "restoreSession off: nothing kept, nothing offered");
+}
+
+#[tokio::test]
+async fn a_resumed_session_brings_back_the_focus_the_search_and_the_requests_view_with_its_filter() {
+    let mut before = screen("session-before", json!({}));
+    with_requests(&mut before);
+    (before.ui.focus, before.ui.zoom) = (1, true);
+    let key = before.controller.apps[1].key.clone();
+    let search = super::Search { key: key.clone(), query: "timeout".into(), filter: true, ..super::Search::default() };
+    before.ui.search = Some(search);
+    before.press("H");
+    if let Some(Overlay::Requests(view)) = &mut before.ui.overlay {
+        (view.filter, view.errors_only) = ("orders".into(), true);
+    }
+    let view = super::session::snapshot(&before.ui, &before.controller);
+    assert_eq!(view["screen"], "H", "{view}");
+
+    let mut after = screen("session-after", json!({}));
+    resume(&mut after, &[], view);
+    super::session::restore(&mut after.ui, &mut after.controller);
+    assert!(after.controller.resume.is_none(), "taken: the next close keeps this session");
+    assert_eq!((after.ui.focus, after.ui.zoom), (1, true));
+    let search = after.ui.search.as_ref().expect("the search");
+    assert_eq!((search.key.as_str(), search.query.as_str(), search.filter), (key.as_str(), "timeout", true));
+    let Some(Overlay::Requests(view)) = &after.ui.overlay else { panic!("the requests view again") };
+    assert_eq!((view.filter.as_str(), view.errors_only), ("orders", true));
+}
+
+#[tokio::test]
+async fn an_app_the_profile_no_longer_has_is_left_out_of_the_session_with_a_line() {
+    let mut screen = screen("session-gone", json!({}));
+    resume(&mut screen, &["orders", "payments"], Value::Null);
+    assert_eq!(screen.controller.resumed_apps(), ["orders"]);
+    assert!(screen.controller.log.iter().any(|entry| entry.text.contains("Left payments out of the session")));
+}
+
+#[tokio::test]
+async fn resumed_columns_fade_in_one_after_another_as_their_apps_run() {
+    let mut screen = screen("session-fade", json!({}));
+    screen.ui.restoring = vec!["orders".into(), "billing".into()];
+    screen.running();
+    screen.render(160, 30);
+    let (orders, billing) = (screen.ui.fades["orders"], screen.ui.fades["billing"]);
+    assert!(billing > orders, "one after another");
+    assert!(screen.ui.restoring.is_empty() && screen.ui.is_animating(&screen.controller));
+    let frame = screen.render(160, 30);
+    assert!(frame.contains("Application started."), "{frame}");
+    screen.ui.now += Duration::from_secs(2);
+    screen.render(160, 30);
+    assert!(screen.ui.fades.is_empty(), "done");
+}
+
 // ---------------------------------------------------------------- about
 
 /// A fixed list of contributors in the state folder, newer than the one built in - which the repo's workflow keeps

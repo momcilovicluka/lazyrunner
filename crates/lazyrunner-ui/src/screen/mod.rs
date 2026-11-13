@@ -46,6 +46,7 @@ pub mod requests;
 pub mod screens;
 pub mod seen;
 pub mod seg;
+pub mod session;
 pub mod sheet;
 pub mod spinner;
 pub mod stack;
@@ -413,6 +414,9 @@ pub struct Ui {
     pub help_filter: String,
     /// The database screen's servers, answering or not (checked as it opens).
     pub db_reach: Option<database::Reachability>,
+    /// The resumed apps whose columns fade in once they run, and the fades under way, by app (#85).
+    pub restoring: Vec<String>,
+    pub fades: HashMap<String, Instant>,
     pub help_typing: bool,
     pub key_counts: HashMap<String, usize>,
     pub health_edit: Option<health::Editing>,
@@ -537,6 +541,8 @@ impl Ui {
             shake_at: None,
             help_filter: String::new(),
             db_reach: None,
+            restoring: Vec::new(),
+            fades: HashMap::new(),
             help_typing: false,
             key_counts: HashMap::new(),
             health_edit: None,
@@ -737,6 +743,7 @@ impl Ui {
             || request_waterfall::animating(self)
             || screens::animating(self)
             || database::animating(self)
+            || session::animating(self)
             || durations::animating(self)
             || phases::animating(self)
             || panel::sliding(self)

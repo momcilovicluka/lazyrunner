@@ -19,6 +19,7 @@ mod npm_ci;
 mod overrides;
 mod parallel;
 pub mod profile;
+mod session;
 mod stack;
 mod start;
 mod suites;
@@ -293,6 +294,8 @@ pub struct Controller {
     /// What happened this session, by the hooks' event names (the About box counts them), and when it began.
     pub session: HashMap<&'static str, usize>,
     pub session_started: Instant,
+    /// The session kept when lazyrunner last closed, until it's resumed (or set aside) at the start (#85).
+    pub resume: Option<crate::run::session::Snapshot>,
     /// The spans the apps sent (#97), and the port lazyrunner receives them on.
     pub traces: crate::run::otlp::Traces,
     pub otlp_port: Option<u16>,
@@ -455,6 +458,7 @@ impl Controller {
             installing_trace: false,
             session: HashMap::new(),
             session_started: Instant::now(),
+            resume: None,
             traces: Default::default(),
             otlp_port,
             task_results: HashMap::new(),

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.87.0] - 2026-11-13
+
+### Added
+- Pick up where you left off: when lazyrunner closes it keeps the session for the branch - the apps that were running, the focused and zoomed column, the open screen on the app it looked at with its filters, each column's search and `Alt+d` mode - and the next start offers it in the startup checklist (`Session · 2 h ago · 3 apps were running`, its age coloured, not after a week). With auto-start on it starts those apps instead of all of them (`U` still starts everything), a bar filling along the doctor's edge as they come up; with it off `f` starts them; `i` or `lazyrunner --fresh` starts afresh. The screen comes back once the checklist closes, the resumed columns fading in one after another. `restoreSession` (`,` then `k`) turns it off (#85).
+
 ## [1.86.1] - 2026-11-12
 
 ### Fixed
