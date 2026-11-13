@@ -1,0 +1,32 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+
+
+
+
+
+
+   ┌─ Orders log levels ──────────────────────────────────────────────────────────────────────────────────┐
+   │  ▸ Default                                           Trace   Debug   Information   Warning  its own  │
+   │    Microsoft.EntityFrameworkCore.Database.Command    Trace   Debug   Information   Warning  its own  │
+   │    System.Net.Http.HttpClient                        Trace   Debug   Information   Warning  its own  │
+   │    Microsoft.AspNetCore                              Trace   Debug   Information   Warning  its own  │
+   │    Orders                                            Trace   Debug   Information   Warning  its own  │
+   │                                                                                                      │
+   │  After lazyrunner's own --Logging arguments, so they win; this session only, unless kept (s).        │
+   │ j k category · h l level · Enter sets it (restarts it) · x its own · r all · s keeps · Esc           │
+   └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00   Log levels are for .NET apps; Shop isn't one.

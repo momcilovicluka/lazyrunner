@@ -134,7 +134,7 @@ impl Controller {
         crate::json::read(&self.state_dir.join(FILE)).and_then(|value| value.as_object().cloned()).unwrap_or_default()
     }
 
-    fn app_title(&self, key: &str) -> String {
+    pub(super) fn app_title(&self, key: &str) -> String {
         self.app(key).map_or_else(|| key.to_string(), |app| app.name.clone())
     }
 }

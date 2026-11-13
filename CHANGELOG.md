@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.91.0] - 2026-11-13
+
+### Added
+- `Alt+l` on a .NET app: its log levels - the default, EF Core's SQL, HttpClient's calls, ASP.NET Core and its own namespace, each at Trace, Debug, Information or Warning. Picking one restarts the app with it (after lazyrunner's own `--Logging` arguments, so it wins), for this session unless kept with `s`; `x` gives a category back to the app's settings, `r` all of them. The column's title says `Debug` while it differs (#101).
+
 ## [1.90.0] - 2026-11-13
 
 ### Added

@@ -274,6 +274,12 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     if !controller.env_overrides(&app.key).is_empty() {
         name.push_str(" · env*"); // what it gets on this machine differs (the start sheet)
     }
+    let levels = controller.log_levels(&app.key);
+    match levels.iter().find(|level| level.category == lazyrunner_core::run::controller::DEFAULT) {
+        Some(default) => name.push_str(&format!(" · {}", default.level)),
+        None if !levels.is_empty() => name.push_str(" · log*"),
+        None => {}
+    }
     super::phases::note(ui, &app.key, super::phases::Phase::of(&controller.states[index]));
     // Without Nerd Font icons a command app's language is a chip beside the plain icon: `■ py Pricing`.
     let chip = lazyrunner_core::apptypes::language(app)
