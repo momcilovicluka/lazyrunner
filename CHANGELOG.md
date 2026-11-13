@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.95.0] - 2026-11-13
+
+### Added
+- Faults on the calls between apps: `f` on a stack map box sets a fault on that app's calls to another app (or a host) - a delay, a status it fails with, a dropped connection, or a mock answering with a file's body - for a share of the calls, on a route's prefix. The edge is dashed in amber and says it (`⚡ 500 · 30% /api`); `F` takes them all away. npm apps get them through lazyrunner's call hook, live; .NET apps through a startup hook lazyrunner builds with `dotnet` the first time (a running one starts again once to load it), so no code changes. A failed or mocked call is answered by lazyrunner's fault server (#105).
+
+### Fixed
+- A flaky test: its stand-in server answered before it read a request's body.
+
 ## [1.94.0] - 2026-11-13
 
 ### Added

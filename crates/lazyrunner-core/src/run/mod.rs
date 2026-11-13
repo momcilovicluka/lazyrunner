@@ -18,6 +18,7 @@ pub mod command;
 pub mod compose;
 pub mod controller;
 pub mod diff;
+pub mod faults;
 pub mod health;
 pub mod history;
 pub mod hooks;

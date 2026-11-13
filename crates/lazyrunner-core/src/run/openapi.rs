@@ -265,15 +265,23 @@ mod tests {
 
     #[test]
     fn a_body_is_sent_with_its_method_and_headers_and_the_status_comes_back() {
-        use std::io::{Read, Write};
+        use std::io::{BufRead, BufReader, Read, Write};
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let asked = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut asked = vec![0; 4096];
-            let read = stream.read(&mut asked).unwrap();
+            // The whole request, its body too, before answering: an answer mid-body resets the connection.
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let (mut asked, mut line) = (String::new(), String::new());
+            while reader.read_line(&mut line).is_ok_and(|read| read > 0) && !line.trim_end().is_empty() {
+                asked.push_str(&std::mem::take(&mut line));
+            }
+            let lower = asked.to_lowercase();
+            let length = lower.lines().find_map(|line| line.strip_prefix("content-length:")?.trim().parse().ok());
+            let mut body = vec![0; length.unwrap_or(0)];
+            let _ = reader.read_exact(&mut body);
             let _ = stream.write_all(b"HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n");
-            String::from_utf8_lossy(&asked[..read]).to_lowercase()
+            lower
         });
         let url = format!("http://127.0.0.1:{port}/api/orders");
         let (status, _) = send("POST", &url, &[("X-Tenant".into(), "a".into())], Some(r#"{"name":"x"}"#)).unwrap();

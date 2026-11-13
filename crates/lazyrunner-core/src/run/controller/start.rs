@@ -229,7 +229,13 @@ impl Controller {
     pub fn server_command(&self, key: &str) -> anyhow::Result<super::super::tools::ServerCommand> {
         let app = self.app(key).ok_or_else(|| anyhow::anyhow!("no app '{key}'"))?;
         self.commands.server(&self.root, app, &self.apps).map(|command| {
-            self.with_log_levels(key, self.with_otlp(key, self.with_call_hook(key, self.with_overrides(key, command))))
+            self.with_fault_hook(
+                key,
+                self.with_log_levels(
+                    key,
+                    self.with_otlp(key, self.with_call_hook(key, self.with_overrides(key, command))),
+                ),
+            )
         })
     }
 
@@ -246,7 +252,13 @@ impl Controller {
         self.probes.remove(key);
         let app = self.apps[index].clone();
         let command = self.commands.server(&self.root, &app, &self.apps).map(|command| {
-            self.with_log_levels(key, self.with_otlp(key, self.with_call_hook(key, self.with_overrides(key, command))))
+            self.with_fault_hook(
+                key,
+                self.with_log_levels(
+                    key,
+                    self.with_otlp(key, self.with_call_hook(key, self.with_overrides(key, command))),
+                ),
+            )
         });
         let overrides: Vec<(String, String)> =
             self.env_overrides(key).iter().map(|found| (found.name.clone(), found.value.clone())).collect();

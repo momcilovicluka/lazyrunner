@@ -12,6 +12,7 @@ mod handover;
 mod health;
 pub use health::TARGETS;
 mod crashes;
+mod faults;
 mod log_levels;
 mod tunnels;
 pub use crashes::{LOOP_CRASHES, Recovery};
@@ -310,6 +311,8 @@ pub struct Controller {
     pub branch_changes: Option<(String, String, Vec<crate::run::branch_changes::Change>)>,
     /// The apps shared through a tunnel (#102).
     tunnels: tunnels::Tunnels,
+    /// The faults set on the calls between apps (#105).
+    faults: faults::Faults,
     /// The spans the apps sent (#97), and the port lazyrunner receives them on.
     pub traces: crate::run::otlp::Traces,
     pub otlp_port: Option<u16>,
@@ -478,6 +481,7 @@ impl Controller {
             log_levels: kept_levels,
             branch_changes: None,
             tunnels: Default::default(),
+            faults: Default::default(),
             traces: Default::default(),
             otlp_port,
             task_results: HashMap::new(),

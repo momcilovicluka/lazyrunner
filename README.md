@@ -699,6 +699,19 @@ back to the box picked before. A running build opens followed; moving about by h
 shows the build's projects alone - built, building and still to build, with their links - without the projects and
 parts it doesn't build; `B` again shows everything.
 
+**Faults on the calls** (`f` on a Map box): how does the frontend take a slow API, or Orders a 500 from Billing? Pick
+the calling app's box and `f`: a fault on its calls to another app (or a host you type) - a **delay** (ms), a **fail**
+(the status it answers with), a **drop** (the connection resets) or a **mock** (a status and a body from a file in the
+repo, for a service that isn't running) - for a share of the calls (`← →` in steps of 10%), on routes starting with a
+path if you give one. `↑ ↓` move between the fields, `← →` change one, typing fills one in, `Enter` sets it, `Del`
+takes that target's away and `Esc` goes back to the map, where the edge is dashed in amber and says its fault
+(`⚡ 500 · 30% /api`) - an edge of its own when no call was seen yet. `F` on the map takes every fault away. Faults are
+for this session only, and the app's code doesn't change: an npm app's calls (http, https and `fetch`) go through
+lazyrunner's call hook, which reads them as they change; a .NET app's go through a startup hook
+(`DOTNET_STARTUP_HOOKS`) lazyrunner builds with `dotnet` for the app's target framework the first time (kept in its
+state folder), so a running .NET app starts again once to load it. A failed or mocked call is answered by lazyrunner's
+fault server on localhost, which counts them (`3 answered`).
+
 **The Health tab** (`K`, then `Tab` from the Code tab): is the stack well? Its header says it in a line - `● 3
 healthy · △ 1 warning · ✗ 0 failing`, and the stack's last minute: `p95 42 ms · 12.4 req/s · 0.3% 5xx` - and under it
 the stack's share of the machine: its memory and its CPU, a bar each with a segment per app in its colour and the rest
