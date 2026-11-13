@@ -223,6 +223,7 @@ at once while the palette wipes away.
 | `e` | The start sheet: what the focused app is started with - the command line and its folder, the launch profile (its URL) or npm script, the profile's `args`, its environment and the user secrets with their values masked (`Space` shows the picked one for 5 s; a connection string reads `database @ server`). Each variable says where it comes from - `launch`, `profile`, `secrets` or `override` - the one that wins with what it hides under it (a launch profile's variable wins over the profile's `env`, as `dotnet run` has it). **Overrides** are what the app gets on this machine on top, kept in lazyrunner's state and never in a shared file: `a` adds one (`NAME=value`), `Enter` overrides the picked variable (a user secret through its `Section__Key` variable), `d` drops one, `b` keeps one to this branch or gives it back to every branch, and `s` moves one that looks like a secret into the app's user secrets (a value that looks like one is masked, and the log says it's kept in plain text). A .NET app gets them as `dotnet run -e`, which beats its launch profile; an npm app in its environment. They apply from its next start, and its title says `env*` while it has any. `v` shows only the overrides, `V` copies them as what they change. A part that changed since the app started says so, and `r` restarts it; `y` copies the sheet, secrets masked |
 | `y` | Copy from the focused app's output - it asks what: `y` the last error with its stack trace (a failed build's errors with full paths), `e` every error, `w` every warning, `a` both in order (repeats once), `s` the search match, `o` all of it |
 | `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |
+| `E` | **Problems**: every app's errors and warnings, grouped - how often, where, since when (below) |
 | `M` | **Migrations**: the EF Core migrations, applied and pending, per DbContext; apply or roll back (below) |
 | `A` | **Audit**: outdated and vulnerable packages, per app, and what fixes each (below) |
 | `P` | **Ports**: every port the apps want, who holds it, and what to do (below) |
@@ -365,7 +366,7 @@ focused app's build or take it out of the queue, and `q`.
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
   crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none.
 - **After "Ready"**, the log shows a startup timeline per app.
-- **The screens** - Stack `K`, Requests `H`, Migrations `M`, Audit `A`, Tests `T`, Ports `P`, Durations `D`, Timeline
+- **The screens** - Stack `K`, Problems `E`, Requests `H`, Migrations `M`, Audit `A`, Tests `T`, Ports `P`, Durations `D`, Timeline
   `~`, Database `d` - each start with a bar naming them all with their keys, the open one lit (just the keys when the names don't
   fit). Another screen's key, or a click on its name, goes there on the app the open one is looking at - the Map's
   picked box, the requests' app, the migrations' context, the audited app, the picked suite or port - with its column
@@ -891,6 +892,22 @@ the right side shows its message and stack, `r` runs just that test (its result 
 last results are kept, so they're still there after a restart, and each suite's time shows in `D`. The panel's
 status line sums them up - `⚗ ✓438 ✗13` (red when something failed), `⚗ testing 6 +10 queued` while they run - and a
 click on it opens `T`.
+
+## Problems (`E`)
+
+`E` lists every app's errors and warnings, grouped as an editor's Problems panel groups them. An entry - a red or amber
+line and the indented lines under it, a .NET `fail:` with its message and stack, a compiler error - is one occurrence;
+entries alike but for what changes every time (ids, times, ports, numbers) are one problem, by the same shape `Alt+d`
+compares runs with. Each row: how many times (it rolls up, and pulses as it rises), the apps (`Orders ×38 · Billing
+×1`), when last, `new` when its app's last run didn't have it, `fixed?` once every app it happened in has started again
+and it hasn't come back, and its message - errors first. The picked one's details: its message, how often and since
+when, a chart of when it happened this session, and an occurrence's lines, their stack frames links.
+
+`j` `k` pick one, `Enter` jumps to its occurrence in its column (a jump: `Ctrl+O` comes back), `n` `N` step through its
+occurrences, `s` sorts by count, latest or first seen, `/` filters, `v` shows errors only, `y` copies it as Markdown -
+its message, count, apps and lines. It counts what the columns still have. A new problem while it's closed puts an `E`
+chip in the panel's header (`E 2 new problems`), which opens it on the first of them; a new one while it's open slides
+in.
 
 ## Durations (`D`)
 

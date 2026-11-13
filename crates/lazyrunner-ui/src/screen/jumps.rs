@@ -20,6 +20,7 @@ pub enum View {
     Tests,
     Migrations,
     Audit,
+    Problems,
 }
 
 /// Where you are: the view open (none: the columns), the focused column, and its bottom line (none: following).
@@ -91,6 +92,7 @@ fn view(overlay: Option<&Overlay>) -> Option<View> {
         Some(Overlay::Tests { .. }) => Some(View::Tests),
         Some(Overlay::Migrations { .. }) => Some(View::Migrations),
         Some(Overlay::Audit { .. }) => Some(View::Audit),
+        Some(Overlay::Problems(_)) => Some(View::Problems),
         _ => None,
     }
 }
@@ -199,6 +201,7 @@ pub(super) fn go(ui: &mut Ui, controller: &mut Controller, place: &Place) -> boo
             Some(View::Tests) => super::suites::open(ui, controller),
             Some(View::Migrations) => super::migrations::open(ui, controller),
             Some(View::Audit) => super::audit::open(ui, controller),
+            Some(View::Problems) => super::problems::open(ui, controller),
             None => {}
         }
     }

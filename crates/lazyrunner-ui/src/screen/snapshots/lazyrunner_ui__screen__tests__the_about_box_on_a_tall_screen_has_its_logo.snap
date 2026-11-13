@@ -14,7 +14,7 @@ expression: "screen.render(SIZE.0, 44)"
                 │   Runs a project's .NET and npm apps side by side.                        │
                 │                                                                           │
                 │   This session                                                            │
-                │    up 0s · 0 builds (0 failed) · 0 apps up                                │
+                │    up 2s · 0 builds (0 failed) · 0 apps up                                │
                 │    0 crashes · 0 requests · 0 test runs                                   │
                 │                                                                           │
                 │   Core contributors                                                       │

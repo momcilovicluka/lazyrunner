@@ -492,6 +492,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Launch { .. }) => super::launch::key(ui, controller, name),
         Some(Overlay::Timeline(_)) => super::timeline::key(ui, controller, name, key),
         Some(Overlay::Durations { .. }) => super::durations::key(ui, controller, name),
+        Some(Overlay::Problems(_)) => super::problems::key(ui, controller, name),
         // The views' own keys first; the rest do what they do on the columns (, settings, d database, ...).
         Some(Overlay::Tests { .. }) => {
             if !super::suites::typing_key(ui, name, key) && !super::suites::key(ui, controller, name) {
@@ -767,6 +768,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenLog => open_log(ui, controller),
         Run::Copy => ui.overlay = Some(Overlay::Copy { index: 0 }),
         Run::Durations => super::durations::open(ui, controller),
+        Run::Problems => super::seen::open(ui, controller, super::jumps::View::Problems),
         Run::Tests => super::seen::open(ui, controller, super::jumps::View::Tests),
         Run::Requests => super::seen::open(ui, controller, super::jumps::View::Requests),
         Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),

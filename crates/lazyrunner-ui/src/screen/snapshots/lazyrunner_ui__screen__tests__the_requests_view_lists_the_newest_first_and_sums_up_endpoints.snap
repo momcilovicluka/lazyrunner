@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-  K Stack ⇄ REQUESTS   M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline  d Database
+  K  E ⇄ REQUESTS   M  A  T  P  D  ~  d
  requests  endpoints    4 shown · 1 error · avg 400 ms
  Tab requests/endpoints · j k choose · Enter details · e errors only · a app · s sort (time) · / filter
  y copy (curl…) · m baseline · f profile its app · p send again · u edit its URL and send · ] [ its bars

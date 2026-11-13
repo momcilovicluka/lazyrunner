@@ -16,6 +16,7 @@ use super::{Overlay, Ui};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Screen {
     Stack,
+    Problems,
     Requests,
     Migrations,
     Audit,
@@ -27,8 +28,9 @@ pub enum Screen {
 }
 
 impl Screen {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Stack,
+        Self::Problems,
         Self::Requests,
         Self::Migrations,
         Self::Audit,
@@ -48,6 +50,7 @@ impl Screen {
             Self::Tests => "T",
             Self::Ports => "P",
             Self::Durations => "D",
+            Self::Problems => "E",
             Self::Timeline => "~",
             Self::Database => "d",
         }
@@ -62,6 +65,7 @@ impl Screen {
             Self::Tests => "Tests",
             Self::Ports => "Ports",
             Self::Durations => "Durations",
+            Self::Problems => "Problems",
             Self::Timeline => "Timeline",
             Self::Database => "Database",
         }
@@ -76,6 +80,7 @@ impl Screen {
             Self::Tests => Icon::Tests,
             Self::Ports => Icon::Plug,
             Self::Durations => Icon::Hourglass,
+            Self::Problems => Icon::Warnings,
             Self::Timeline => Icon::Timeline,
             Self::Database => Icon::Database,
         }
@@ -90,6 +95,7 @@ impl Screen {
             Self::Tests => Run::Tests,
             Self::Ports => Run::Ports,
             Self::Durations => Run::Durations,
+            Self::Problems => Run::Problems,
             Self::Timeline => Run::Timeline,
             Self::Database => Run::Database,
         }
@@ -110,6 +116,7 @@ impl Screen {
             Overlay::Tests { .. } => Self::Tests,
             Overlay::Ports { .. } => Self::Ports,
             Overlay::Durations { .. } => Self::Durations,
+            Overlay::Problems(_) => Self::Problems,
             Overlay::Timeline(_) => Self::Timeline,
             _ => return None,
         })
@@ -238,6 +245,7 @@ fn typing(ui: &Ui) -> bool {
         Some(Overlay::Code(_)) => super::code::typing(ui),
         Some(Overlay::Flame(_)) => super::flame::typing(ui),
         Some(Overlay::Health { .. }) => ui.health_edit.is_some(),
+        Some(Overlay::Problems(_)) => super::problems::typing(ui),
         _ => false,
     }
 }

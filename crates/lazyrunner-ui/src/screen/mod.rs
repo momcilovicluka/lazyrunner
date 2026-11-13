@@ -37,6 +37,7 @@ pub mod palette;
 pub mod panel;
 pub mod phases;
 pub mod ports;
+pub mod problems;
 pub mod rail;
 pub mod rail_density;
 pub mod rail_motion;
@@ -177,6 +178,8 @@ pub enum Overlay {
         /// The version it was last opened at: what's newer is marked.
         seen: Option<String>,
     },
+    /// `E`: every app's errors and warnings, grouped (#98).
+    Problems(Box<problems::View>),
     /// `D`: how long builds, starts and npm ci took over their last runs.
     /// `D`: the durations; the picked item, and when it was picked (its chart grows in).
     Durations {
@@ -295,6 +298,7 @@ impl Overlay {
             Self::Checklist(_) => "checklist",
             Self::Changelog { .. } => "changelog",
             Self::Durations { .. } => "durations",
+            Self::Problems(_) => "problems",
             Self::Marks { .. } => "marks",
             Self::Sheet { .. } => "sheet",
             Self::Launch { .. } => "launch",
@@ -424,6 +428,8 @@ pub struct Ui {
     pub profile_seen: Option<Instant>,
     /// What each view had when it was last open: the panel's chips say what's new since.
     pub seen: seen::Seen,
+    /// The apps' errors and warnings grouped, as the Problems screen (`E`) and its chip count them.
+    pub problems: problems::Cache,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
     pub phases: phases::Phases,
     /// The panel's newest log line, and when it came (it slides in).
@@ -548,6 +554,7 @@ impl Ui {
             health_edit: None,
             profile_seen: None,
             seen: seen::Seen::default(),
+            problems: problems::Cache::default(),
             phases: phases::Phases::default(),
             log_newest: None,
             replays: Vec::new(),
@@ -745,6 +752,7 @@ impl Ui {
             || database::animating(self)
             || session::animating(self)
             || durations::animating(self)
+            || problems::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
             || controller.test_watch.runs_in(self.now).is_some()
@@ -897,6 +905,7 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         Some(Overlay::Palette { .. }) => return palette::rows(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
+        Some(Overlay::Problems(_)) => return problems::rows(ui, controller, width, rows),
         Some(Overlay::Marks { .. }) => return marks::rows(ui, controller, width, rows),
         Some(Overlay::Sheet { .. }) => return sheet::rows(ui, controller, width, rows),
         Some(Overlay::Launch { .. }) => return launch::rows(ui, controller, width, rows),

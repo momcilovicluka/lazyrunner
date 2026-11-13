@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.88.0] - 2026-11-13
+
+### Added
+- A Problems screen (`E`, in the bar of screens): every app's errors and warnings, grouped - entries alike but for their ids, times and numbers are one problem, with how many times (rolling up, pulsing as it rises), in which apps (`Orders ×38 · Billing ×1`), when last, and `new` since its app's last run or `fixed?` since it started again. The picked one shows its message, a chart of when it happened this session and an occurrence's lines with their links; `Enter` jumps to it in its column, `n` `N` step through the occurrences, `s` sorts, `/` filters, `v` errors only, `y` copies it as Markdown. A new problem while it's closed puts an `E` chip in the panel (#98).
+
 ## [1.87.0] - 2026-11-13
 
 ### Added
