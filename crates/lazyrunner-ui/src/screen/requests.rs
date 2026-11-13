@@ -52,6 +52,8 @@ pub enum Tab {
     #[default]
     Requests,
     Endpoints,
+    /// The running .NET apps' endpoints from their OpenAPI documents (#100).
+    Spec,
 }
 
 /// What the view shows: the tab, the selected row, the filters and the sort.
@@ -81,6 +83,9 @@ pub struct View {
     /// `u`: the URL being edited before the request is sent again; `]` `[`: the picked bar of its timeline (#97).
     pub url_edit: Option<String>,
     pub bar: Option<usize>,
+    /// The spec tab's picked endpoint, and the one being filled in to send (#100).
+    pub spec_index: usize,
+    pub form: Option<super::spec::Form>,
 }
 
 /// What `y` copies a request as.
@@ -126,6 +131,8 @@ impl Default for View {
             baseline: None,
             url_edit: None,
             bar: None,
+            spec_index: 0,
+            form: None,
         }
     }
 }
@@ -181,6 +188,9 @@ fn summed(view: &View, controller: &Controller) -> Vec<Endpoint> {
 /// only, a app, s sort, / filter by path, y copy (a request: as the row, curl, PowerShell, ...), p send a GET again, w
 /// open a GET request, o the app's log, c clear, Esc the details or back, q / H back; false for a key it doesn't use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) -> bool {
+    if matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.tab == Tab::Spec) {
+        return super::spec::key(ui, controller, name, key);
+    }
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return false };
     if view.typing {
         match name {
@@ -243,6 +253,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
     let count = match view.tab {
         Tab::Requests => shown(view, controller).len(),
         Tab::Endpoints => summed(view, controller).len(),
+        Tab::Spec => 0,
     };
     match name {
         "Escape" if view.bar.is_some() => view.bar = None,
@@ -284,7 +295,11 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             (view.index, view.follow) = (0, true);
         }
         "Tab" => {
-            view.tab = if view.tab == Tab::Requests { Tab::Endpoints } else { Tab::Requests };
+            view.tab = match view.tab {
+                Tab::Requests => Tab::Endpoints,
+                Tab::Endpoints => Tab::Spec,
+                Tab::Spec => Tab::Requests,
+            };
             (view.index, view.follow) = (0, true);
         }
         "j" | "DownArrow" => step(view, controller, 1, count),
@@ -311,6 +326,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             match view.tab {
                 Tab::Requests => view.sort = (view.sort + 1) % SORTS.len(),
                 Tab::Endpoints => view.endpoint_sort = (view.endpoint_sort + 1) % ENDPOINT_SORTS.len(),
+                Tab::Spec => {}
             }
             (view.index, view.follow) = (0, true);
         }
@@ -374,7 +390,7 @@ fn step(view: &mut View, controller: &Controller, by: isize, count: usize) {
     view.follow = view.index == 0;
     view.selected = match view.tab {
         Tab::Requests => shown(view, controller).get(view.index).map_or(0, |request| request.seq),
-        Tab::Endpoints => 0,
+        Tab::Endpoints | Tab::Spec => 0,
     };
 }
 
@@ -409,6 +425,11 @@ fn copy_as(ui: &Ui, controller: &mut Controller, view: &View, kind: CopyAs) {
 /// A request as a command or snippet that sends it: `method` to `url`, with the content type it sent and an empty
 /// body (the log doesn't keep bodies).
 pub fn command(kind: CopyAs, method: &str, url: &str, content_type: &str) -> String {
+    command_with(kind, method, url, content_type, "")
+}
+
+/// A request as a command or snippet that sends it, with its body (the spec tab's, #100).
+pub fn command_with(kind: CopyAs, method: &str, url: &str, content_type: &str, body: &str) -> String {
     let typed = !content_type.is_empty();
     let header = format!("Content-Type: {content_type}");
     match kind {
@@ -426,7 +447,7 @@ pub fn command(kind: CopyAs, method: &str, url: &str, content_type: &str) -> Str
             }
             parts.push(quote(url));
             if typed {
-                parts.extend([format!("-H {}", quote(&header)), format!("--data-raw {}", quote(""))]);
+                parts.extend([format!("-H {}", quote(&header)), format!("--data-raw {}", quote(body))]);
             }
             parts.join(" ")
         }
@@ -437,13 +458,13 @@ pub fn command(kind: CopyAs, method: &str, url: &str, content_type: &str) -> Str
                 parts.push(format!("-Method {method}"));
             }
             if typed {
-                parts.push(format!("-ContentType {} -Body {}", quote(content_type), quote("")));
+                parts.push(format!("-ContentType {} -Body {}", quote(content_type), quote(body)));
             }
             parts.join(" ")
         }
         CopyAs::Http => {
             let headers = if typed { format!("{header}\n") } else { String::new() };
-            format!("{method} {url}\n{headers}\n")
+            format!("{method} {url}\n{headers}\n{body}")
         }
         CopyAs::Fetch => {
             let quote = |text: &str| format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'"));
@@ -453,7 +474,7 @@ pub fn command(kind: CopyAs, method: &str, url: &str, content_type: &str) -> Str
             }
             if typed {
                 options.push(format!("headers: {{ 'Content-Type': {} }}", quote(content_type)));
-                options.push("body: ''".to_string());
+                options.push(format!("body: {}", quote(body)));
             }
             if options.is_empty() {
                 format!("await fetch({});", quote(url))
@@ -570,6 +591,7 @@ fn copy_row(ui: &Ui, controller: &mut Controller, view: &View) {
                 ms(endpoint.max)
             )
         }),
+        Tab::Spec => None,
     };
     if let Some(text) = text {
         copy::put(ui.clipboard, controller, &text, "the selected row");
@@ -582,7 +604,7 @@ fn open_row(ui: &Ui, controller: &mut Controller, view: &View) {
             .get(view.index)
             .filter(|request| request.method == "GET")
             .map(|request| url(controller, request)),
-        Tab::Endpoints => None,
+        Tab::Endpoints | Tab::Spec => None,
     };
     match found {
         Some(url) if (ui.opener)(&url) => controller.add_log(format!("Opening {url}"), Hue::DarkGray),
@@ -596,6 +618,7 @@ fn open_log(ui: &Ui, controller: &mut Controller, view: &View) {
     let app = match view.tab {
         Tab::Requests => shown(view, controller).get(view.index).map(|request| request.app.clone()),
         Tab::Endpoints => summed(view, controller).get(view.index).map(|endpoint| endpoint.app.clone()),
+        Tab::Spec => None,
     };
     let Some(state) = app.and_then(|app| controller.states.iter_mut().find(|state| state.key == app)) else { return };
     state.flush_log();
@@ -699,6 +722,10 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
             out.extend(request_rows(view, controller, &list, width, height, ui.motion.looked_requests(ui.now)));
             out.resize(rows.saturating_sub(1), Vec::new());
             out.push(vec![seg(detail(controller, list.get(view.index).copied()), C::White)]);
+        }
+        Tab::Spec => {
+            let specs = &mut ui.specs;
+            out.extend(super::spec::rows(view, specs, controller, (width, height + 1), cursor));
         }
         Tab::Endpoints => {
             let summed = summed(view, controller);
@@ -1049,7 +1076,7 @@ fn header(view: &View, controller: &Controller, list: &[&Request], width: usize,
         filters.push(format!("{method} {endpoint} · {}", app_name(controller, app)));
     }
     let mut segs = Vec::new();
-    for (tab, label) in [(Tab::Requests, " requests "), (Tab::Endpoints, " endpoints ")] {
+    for (tab, label) in [(Tab::Requests, " requests "), (Tab::Endpoints, " endpoints "), (Tab::Spec, " spec ")] {
         segs.push(if view.tab == tab { on(label, C::FocusText, C::FocusBack) } else { seg(label, C::DarkGray) });
     }
     segs.push(seg(format!("   {} shown · ", list.len()), C::DarkGray));
@@ -1069,8 +1096,10 @@ fn hint(view: &View, controller: &Controller) -> String {
     let sort = match view.tab {
         Tab::Requests => SORTS[view.sort],
         Tab::Endpoints => ENDPOINT_SORTS[view.endpoint_sort],
+        Tab::Spec => "",
     };
     match (view.tab, view.endpoint.is_some()) {
+        (Tab::Spec, _) => super::spec::hint(view).to_string(),
         (Tab::Endpoints, _) => format!(
             " Tab requests/endpoints · j k choose · l its requests · Enter details · e errors only · a app · \
              s sort ({sort}) · / filter · y copy · o log · c clear · Esc back"

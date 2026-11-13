@@ -24,6 +24,7 @@ pub mod hooks;
 pub mod impact;
 pub mod migrations;
 pub mod net;
+pub mod openapi;
 pub mod otlp;
 pub mod ports;
 pub mod profile;
