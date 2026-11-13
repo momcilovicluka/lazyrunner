@@ -61,6 +61,8 @@ pub enum Target {
     Screen(super::screens::Screen),
     /// The panel's chip of the stack's alerts: a click opens the Health tab.
     Health,
+    /// The branch on the panel's status line: a click shows what changed for running on the last switch (#104).
+    Branch,
     /// A cell of a Health card's chart: its app, its cell (the pointer on it shows that moment's reading).
     Chart { app: usize, cell: usize },
 }
@@ -228,6 +230,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::RunNews(index)) => super::diff::open_news(ui, controller, index),
         Some(Target::Ports) => super::ports::open_taken(ui, controller),
         Some(Target::Health) => super::health::open(ui, controller),
+        Some(Target::Branch) => super::branch_changes::open(ui),
         Some(Target::TaskResult(index)) => {
             if let Some(key) = controller.tasks().get(index).map(|task| task.key.clone()) {
                 controller.dismiss_task_result(&key);

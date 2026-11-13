@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.92.0] - 2026-11-13
+
+### Added
+- What changed for running when the branch changes: of what git says changed, the profile, an app's `appsettings*.json` (the keys whose values changed, never the values), launch settings and project file, an npm app's packages, migrations added or removed and `.env` files. The log sums it up (`main → feature/x: Orders appsettings (2 keys), web package-lock, 1 migration`), the status line says `· 3 changed`, and `Alt+g` (or a click on the branch) lists them with their fixes - `Enter` runs `npm ci`, opens `M` or reloads the profile. The startup checklist's Branch row says what changed since the branch the last session was on; `get_status` has it for agents (#104).
+
 ## [1.91.0] - 2026-11-13
 
 ### Added

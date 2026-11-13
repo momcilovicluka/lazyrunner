@@ -4,7 +4,7 @@ expression: screen.frame()
 ---
 
   ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ › rest▏                                                                                    59 commands │
+  │ › rest▏                                                                                    60 commands │
   │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  ◆  Restart Orders  rebuild if it changed                                                          r   │
   │  ▸  Restart all  rebuild if anything changed                                                       R   │
@@ -19,8 +19,8 @@ expression: screen.frame()
   │  ≡  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklist…                   ,   │
   │  ✱  Tests: run the project's test suites  dotnet test, jest, vitest - several at once in the bac…  T   │
   │  ◧  Marks: every column's, to jump to                                                              '   │
+  │  ✱  What changed for running on the last branch switch  settings keys, packages, migrations,…  Alt+g   │
   │  ≡  [x] Startup checklist when lazyrunner opens                                                ,   w   │
-  │  ◆  Open Orders in the browser  Swagger for an API                                                 w   │
   │ type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 

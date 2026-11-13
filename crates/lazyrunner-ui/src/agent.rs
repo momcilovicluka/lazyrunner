@@ -165,7 +165,11 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
         .cloned()
         .collect();
     let totals = controller.test_totals();
+    let branch_changes = controller.branch_changes.as_ref().map(|(from, to, changes)| {
+        json!({ "from": from, "to": to, "changes": changes.iter().map(|change| &change.text).collect::<Vec<_>>() })
+    });
     json!({
+        "branch_changes": branch_changes,
         "version": VERSION,
         "project": controller.project.name,
         "root": controller.root.display().to_string(),

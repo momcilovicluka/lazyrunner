@@ -254,7 +254,19 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
             branch.push_str(&format!(" · {}: {} ({})", app.name.to_lowercase(), mode.label, mode.script));
         }
     }
-    checks.push(check(Kind::Branch, "Branch", move || (Status::Ok, branch)));
+    // Opened on another branch than the session it closed on: what changed for running since (#104).
+    let since = controller.resume.as_ref().map(|snapshot| snapshot.branch.clone());
+    let since = since.filter(|from| !from.is_empty() && *from != controller.branch);
+    let (root, apps, to) = (controller.root.clone(), controller.apps.clone(), controller.branch.clone());
+    checks.push(check(Kind::Branch, "Branch", move || {
+        let Some(from) = since else { return (Status::Ok, branch) };
+        let changes = crate::run::branch_changes::between(&root, &from, &to, &apps);
+        if changes.is_empty() {
+            return (Status::Ok, branch);
+        }
+        let shorts: Vec<&str> = changes.iter().map(|change| change.short.as_str()).collect();
+        (Status::Ok, format!("{branch} · since {from}: {} (Alt+g once open)", shorts.join(", ")))
+    }));
     if let Some(snapshot) = &controller.resume {
         let now = chrono::Local::now().fixed_offset();
         let (summary, freshness) = (snapshot.summary(&controller.branch, now), snapshot.freshness(now));

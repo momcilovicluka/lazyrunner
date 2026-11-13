@@ -409,6 +409,7 @@ impl Controller {
         }
         let previous = std::mem::replace(&mut self.branch, branch.clone());
         self.pending_branch = None;
+        self.note_branch_changes(&previous, &branch);
         self.test_profile_change();
         self.apply_launch_choices();
         self.update_modes();
@@ -439,6 +440,21 @@ impl Controller {
         if !restart.is_empty() {
             self.restart(&format!("branch changed {previous} → {branch}"), Some(&restart), false);
         }
+    }
+
+    /// What changed for running between the two branches (#104): one line in the log, all of it for Alt+g and agents.
+    fn note_branch_changes(&mut self, previous: &str, branch: &str) {
+        let revision = |name: &str| name.trim_end_matches(" (detached)").to_string();
+        let changes = if previous.is_empty() {
+            Vec::new()
+        } else {
+            crate::run::branch_changes::between(&self.root, &revision(previous), &revision(branch), &self.apps)
+        };
+        if !changes.is_empty() {
+            let line = crate::run::branch_changes::summary(previous, branch, &changes);
+            self.add_log(format!("Changed for running: {line} (Alt+g)"), Hue::Yellow);
+        }
+        self.branch_changes = Some((previous.to_string(), branch.to_string(), changes));
     }
 
     /// A branch can change the repo's .lazyrunner.json, or add or remove one: say what changed (lazyrunner keeps

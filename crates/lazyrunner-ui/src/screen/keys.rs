@@ -92,7 +92,7 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
 fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     let name = match key_name(&key) {
         // The Alt+letters that are actions of their own (a search's Alt+r and Alt+c are the search's).
-        name if matches!(name.as_str(), "d" | "f" | "b" | "p" | "l") && key.modifiers == KeyModifiers::ALT => {
+        name if matches!(name.as_str(), "d" | "f" | "b" | "p" | "l" | "g") && key.modifiers == KeyModifiers::ALT => {
             format!("Alt+{name}")
         }
         name => name,
@@ -492,6 +492,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Sheet { .. }) => super::sheet::key(ui, controller, name, key),
         Some(Overlay::Launch { .. }) => super::launch::key(ui, controller, name),
         Some(Overlay::LogLevels { .. }) => super::log_levels::key(ui, controller, name),
+        Some(Overlay::BranchChanges { .. }) => super::branch_changes::key(ui, controller, name),
         Some(Overlay::Timeline(_)) => super::timeline::key(ui, controller, name, key),
         Some(Overlay::Durations { .. }) => super::durations::key(ui, controller, name),
         Some(Overlay::Problems(_)) => super::problems::key(ui, controller, name),
@@ -802,6 +803,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Sheet => super::sheet::open(ui, controller),
         Run::Launch => super::launch::open(ui, controller),
         Run::LogLevels => super::log_levels::open(ui, controller),
+        Run::BranchChanges => super::branch_changes::open(ui),
         Run::Timeline => super::timeline::open(ui),
         Run::Diff => super::diff::toggle(ui, controller),
         Run::Profile if controller.profiling.is_some() => controller.stop_profile(),
