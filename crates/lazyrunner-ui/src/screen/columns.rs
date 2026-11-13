@@ -306,6 +306,11 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     if let Some(recovery) = controller.recovery(&app.key) {
         segs.push(recovery_chip(ui, recovery));
     }
+    if let Some(tunnel) = controller.tunnel(&app.key) {
+        // Shared through a tunnel (#102): its public host, or that it's on its way.
+        let host = tunnel.url.as_deref().map_or("…", |url| url.trim_start_matches("https://"));
+        segs.push(seg(format!(" ⇄ {host}"), C::Cyan));
+    }
     let status = status(ui, controller, index);
     segs.extend(services(ui, controller, &app.key, cells.saturating_sub(width(&segs) + width(&status) + 2)));
     let port = seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray);

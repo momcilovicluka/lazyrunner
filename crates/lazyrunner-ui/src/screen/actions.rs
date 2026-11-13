@@ -64,6 +64,8 @@ pub enum Run {
     LogLevels,
     /// `Alt+g`: what changed for running on the last branch switch (#104).
     BranchChanges,
+    /// `Alt+s` / `Alt+S`: share the focused app through a tunnel - anyone with the link may open it - or stop (#102).
+    Share(bool),
     Timeline,
     Diff,
     /// Alt+b: the build as a map (#82).
@@ -207,6 +209,18 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             Run::BranchChanges,
         )
         .safe(),
+        action(
+            "Tools",
+            "Alt+s",
+            "Share the focused app through a tunnel (again: stop)",
+            "devtunnel or ngrok; the tool's own login",
+            Run::Share(false),
+        )
+        .safe()
+        .focused(),
+        action("Tools", "Alt+S", "Share the focused app with anyone who has the link", "", Run::Share(true))
+            .safe()
+            .focused(),
         action(
             "Tools",
             "y",

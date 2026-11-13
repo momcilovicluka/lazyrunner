@@ -2574,6 +2574,18 @@ async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_c
     assert!(!screen.render(160, 30).contains("new problem"));
 }
 
+// ---------------------------------------------------------------- share through a tunnel (#102)
+
+#[tokio::test]
+async fn alt_s_shares_the_focused_app_and_says_it_has_to_run_first() {
+    let mut screen = screen("share", json!({ "tunnelTool": "no-such-tool" }));
+    screen.press("Alt+s");
+    assert!(screen.last_log().ends_with("has to run, on a port, to be shared."), "{}", screen.last_log());
+    screen.running();
+    screen.press("Alt+S");
+    assert!(screen.last_log().starts_with("Sharing needs devtunnel or ngrok"), "{}", screen.last_log());
+}
+
 // ---------------------------------------------------------------- endpoints from the spec (#100)
 
 #[tokio::test]

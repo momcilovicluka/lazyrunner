@@ -1141,7 +1141,7 @@ fn request_rows(
         let time = request.at.format("%H:%M:%S").to_string();
         let app = pad(&cut(&app_name(controller, &request.app), APP_CELLS), APP_CELLS);
         let n_plus_one = request.db.as_ref().is_some_and(|db| db.repeated.is_some());
-        let tag = if n_plus_one { "  N+1" } else { "" };
+        let tag = format!("{}{}", if n_plus_one { "  N+1" } else { "" }, if request.outside { "  ⇄" } else { "" });
         let path = cut(&request.path, path_cells.saturating_sub(tag.len()));
         let (method, status, took) = (&request.method, request.status, ms(request.ms));
         let mark = if view.baseline == Some(request.seq) { "★" } else { " " };

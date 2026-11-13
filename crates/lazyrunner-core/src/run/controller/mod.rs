@@ -13,8 +13,10 @@ mod health;
 pub use health::TARGETS;
 mod crashes;
 mod log_levels;
+mod tunnels;
 pub use crashes::{LOOP_CRASHES, Recovery};
 pub use log_levels::{CATEGORIES, DEFAULT, LEVELS, LogLevel};
+pub use tunnels::Tunnel;
 mod hooks;
 mod impact;
 mod launch;
@@ -306,6 +308,8 @@ pub struct Controller {
     log_levels: log_levels::LogLevels,
     /// What changed for running on the last branch switch (#104): from, to, and the changes.
     pub branch_changes: Option<(String, String, Vec<crate::run::branch_changes::Change>)>,
+    /// The apps shared through a tunnel (#102).
+    tunnels: tunnels::Tunnels,
     /// The spans the apps sent (#97), and the port lazyrunner receives them on.
     pub traces: crate::run::otlp::Traces,
     pub otlp_port: Option<u16>,
@@ -473,6 +477,7 @@ impl Controller {
             recoveries: Default::default(),
             log_levels: kept_levels,
             branch_changes: None,
+            tunnels: Default::default(),
             traces: Default::default(),
             otlp_port,
             task_results: HashMap::new(),
@@ -677,10 +682,12 @@ impl Controller {
             Event::Output { tag: Tag::Build { key, job }, line } => self.build_output(&key, job, &line),
             Event::Output { tag: Tag::NpmCi { key, job }, line } => self.npm_ci_output(&key, job, &line),
             Event::Output { tag: Tag::Task { key, job }, line } => self.task_output(&key, job, &line),
+            Event::Output { tag: Tag::Tunnel { key, job }, line } => self.tunnel_output(&key, job, &line),
             Event::Exited { tag: Tag::App { key, generation }, code } => self.app_exited(&key, generation, code),
             Event::Exited { tag: Tag::Build { key, job }, code } => self.build_exited(&key, job, code),
             Event::Exited { tag: Tag::NpmCi { key, job }, code } => self.npm_ci_exited(&key, job, code),
             Event::Exited { tag: Tag::Task { key, job }, code } => self.task_exited(&key, job, code),
+            Event::Exited { tag: Tag::Tunnel { key, job }, code } => self.tunnel_exited(&key, job, code),
             Event::Output { tag: Tag::Suite { key, job }, line } => self.suite_output(&key, job, &line),
             Event::Exited { tag: Tag::Suite { key, job }, code } => self.suite_exited(&key, job, code),
             Event::Output { tag: Tag::TestBuild { job }, line } => self.test_build_output(job, &line),

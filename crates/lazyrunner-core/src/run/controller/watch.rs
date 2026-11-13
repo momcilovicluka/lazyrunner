@@ -159,6 +159,7 @@ impl Controller {
         self.tick_code(now);
         self.tick_compose(now);
         self.tick_recoveries(now);
+        self.tick_tunnels(now);
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {

@@ -92,6 +92,8 @@ pub struct Finished {
     pub db: Option<DbSummary>,
     /// When its finished line arrived: its waterfall (#38) places its lines from there back.
     pub ended: Option<std::time::Instant>,
+    /// It came to another host than this machine: through a tunnel (#102).
+    pub outside: bool,
 }
 
 /// What a request did in the database: its EF Core commands - how many, their total and the slowest - and the query
@@ -236,8 +238,18 @@ fn finished(text: &str) -> Option<Finished> {
         length: length.trim_matches('-').to_string(),
         content: content.trim_matches('-').trim().to_string(),
         proto: found.name("proto").map_or_else(String::new, |proto| proto.as_str().to_string()),
+        outside: outside(&found["url"]),
         ..Finished::default()
     })
+}
+
+/// Whether a request's URL names another host than this machine (it came through a tunnel).
+fn outside(url: &str) -> bool {
+    let Some((_, rest)) = url.split_once("://") else { return false };
+    let host = rest.split('/').next().unwrap_or_default();
+    let numbered = |port: &str| port.chars().all(|c| c.is_ascii_digit());
+    let host = host.rsplit_once(':').filter(|(_, port)| numbered(port)).map_or(host, |(host, _)| host);
+    !matches!(host.to_ascii_lowercase().as_str(), "localhost" | "127.0.0.1" | "[::1]" | "")
 }
 
 /// An app's requests started and not finished yet, the oldest first, each with the output line count at its start
@@ -331,6 +343,8 @@ pub struct Request {
     pub db: Option<DbSummary>,
     /// See [`Finished::ended`].
     pub ended: Option<std::time::Instant>,
+    /// See [`Finished::outside`].
+    pub outside: bool,
 }
 
 /// The requests served, oldest first.
@@ -358,6 +372,7 @@ impl Requests {
             exact,
             db,
             ended,
+            outside,
         } = request;
         let endpoint = endpoint(&path);
         let seq = self.seq;
@@ -380,6 +395,7 @@ impl Requests {
             exact,
             db,
             ended,
+            outside,
         });
         while self.items.len() > MAX_REQUESTS {
             self.items.pop_front();
@@ -477,6 +493,15 @@ pub fn replay(method: &str, url: &str) -> Result<(u16, f64), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_request_to_another_host_than_this_machine_came_from_outside() {
+        let tunnel = "Request finished HTTP/1.1 GET https://k3x9-47201.euw.devtunnels.ms/api/x - 200 2 - 1.2ms";
+        let local = "Request finished HTTP/1.1 GET http://localhost:47201/api/x - 200 2 - 1.2ms";
+        assert!(finished(tunnel).unwrap().outside);
+        assert!(!finished(local).unwrap().outside);
+        assert!(!finished("Request finished HTTP/1.1 GET http://127.0.0.1:5000/ - 200 0 - 0.5ms").unwrap().outside);
+    }
 
     #[test]
     fn a_request_is_sent_again_and_its_status_comes_back() {

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.94.0] - 2026-11-13
+
+### Added
+- `Alt+s` shares the focused app through a tunnel - `devtunnel` or `ngrok`, whichever is installed (`"tunnelTool"` picks one) - run beside it on its port: its public URL is copied as it comes and shows in its title (`⇄ k3x9-47201.euw.devtunnels.ms`). `Alt+S` lets anyone with the link in; `Alt+s` keeps the tool's login required. Again stops it, as does the app being down 10 s, or lazyrunner closing; requests that came through it show `⇄` in `H` (#102).
+
 ## [1.93.0] - 2026-11-13
 
 ### Added

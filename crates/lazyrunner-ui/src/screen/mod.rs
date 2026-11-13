@@ -450,6 +450,8 @@ pub struct Ui {
     pub again: Option<repeat::Again>,
     /// The running .NET apps' OpenAPI documents, as the requests view's spec tab reads them (#100).
     pub specs: spec::Specs,
+    /// The tunnels' public URLs already copied (#102).
+    pub shared: Vec<String>,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
     pub phases: phases::Phases,
     /// The panel's newest log line, and when it came (it slides in).
@@ -577,6 +579,7 @@ impl Ui {
             problems: problems::Cache::default(),
             again: None,
             specs: spec::Specs::new(),
+            shared: Vec::new(),
             phases: phases::Phases::default(),
             log_newest: None,
             replays: Vec::new(),

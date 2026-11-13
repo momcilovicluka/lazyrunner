@@ -141,6 +141,20 @@ pub fn copy_row(clipboard: Clipboard, controller: &mut Controller, path: &Path, 
     }
 }
 
+/// A tunnel's public URL is copied as soon as it comes (#102), once.
+pub fn shared_urls(ui: &mut Ui, controller: &mut Controller) {
+    let fresh: Vec<(String, String)> = controller
+        .apps
+        .iter()
+        .filter_map(|app| Some((app.name.clone(), controller.tunnel(&app.key)?.url.clone()?)))
+        .filter(|(_, url)| !ui.shared.contains(url))
+        .collect();
+    for (name, url) in fresh {
+        ui.shared.push(url.clone());
+        put(ui.clipboard, controller, &url, &format!("{name}'s public URL"));
+    }
+}
+
 pub(super) fn put(clipboard: Clipboard, controller: &mut Controller, text: &str, what: &str) {
     match clipboard(text) {
         Ok(()) => controller.add_log(format!("Copied {what} to the clipboard"), Hue::Cyan),
