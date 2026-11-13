@@ -555,6 +555,7 @@ mod tests {
                 env: Vec::new(),
                 depends_on: Vec::new(),
                 health: crate::profile::Health::default(),
+                restart_on_crash: false,
             }
         };
         assert_eq!(language(&app(Some("python"), "./serve.ps1")), Some(PYTHON), "its preset's");
@@ -591,6 +592,7 @@ mod tests {
             env: Vec::new(),
             depends_on: Vec::new(),
             health: crate::profile::Health::default(),
+            restart_on_crash: false,
         };
         let write = |dir: &str, package: &str| {
             std::fs::create_dir_all(temp.join(dir)).unwrap();

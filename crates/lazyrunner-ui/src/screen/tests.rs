@@ -2573,6 +2573,28 @@ async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_c
     assert!(!screen.render(160, 30).contains("new problem"));
 }
 
+// ---------------------------------------------------------------- restart after a crash (#99)
+
+#[tokio::test]
+async fn a_crash_of_an_app_that_restarts_on_crash_counts_down_in_its_title_and_get_status_says_so() {
+    let mut screen = screen("crash-restart", json!({}));
+    screen.running();
+    screen.controller.apps[0].restart_on_crash = true;
+    let (key, generation) = (screen.controller.apps[0].key.clone(), screen.controller.states[0].generation);
+    let tag = lazyrunner_core::run::Tag::App { key: key.clone(), generation };
+    screen.controller.handle(Event::Exited { tag, code: Some(1) });
+    assert!(screen.controller.log.iter().any(|entry| entry.text.contains("starts again in 1s (1 of 3 crashes)")));
+    screen.ui.now = Instant::now(); // the controller's clock: the wait is still under way
+    let frame = screen.render(240, 30);
+    let title = frame.lines().find(|line| line.contains(" ↻ 1 · 1s ")).map(str::to_string);
+    assert!(title.is_some_and(|title| title.contains('▰')), "the wait drains in its title: {frame}");
+    let status = agent(&mut screen, "status", json!({}), None);
+    let restart = status["result"]["apps"][0]["restart"].as_str().unwrap_or_default().to_string();
+    assert!(restart.starts_with("restarting in ") && restart.ends_with("(1 of 3)"), "{status}");
+    screen.press("s");
+    assert!(screen.controller.recovery(&key).is_none(), "s stops the wait");
+}
+
 // ---------------------------------------------------------------- repeat (#103)
 
 #[tokio::test]

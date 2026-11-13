@@ -158,6 +158,7 @@ impl Controller {
         self.expire_calls(now);
         self.tick_code(now);
         self.tick_compose(now);
+        self.tick_recoveries(now);
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {
@@ -195,6 +196,7 @@ impl Controller {
         self.add_log(format!("✗ {name} exited unexpectedly (code {code_text}) - see its column"), Hue::Red);
         self.notifications.push((format!("{name} stopped unexpectedly"), format!("Exit code {code_text}")));
         self.happened("app.crashed", Some(key), format!("{name} exited with code {code_text}"));
+        self.after_crash(key, code, now);
         self.ready_pending.clear();
         self.update_metric_roots();
     }

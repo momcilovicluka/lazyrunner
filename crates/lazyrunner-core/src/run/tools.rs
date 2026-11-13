@@ -521,6 +521,7 @@ mod tests {
             env: vec![("APP_URL".into(), "http://localhost:{port}".into())],
             depends_on: Vec::new(),
             health: crate::profile::Health::default(),
+            restart_on_crash: false,
         }
     }
 
@@ -617,6 +618,7 @@ mod tests {
             env: Vec::new(),
             depends_on: Vec::new(),
             health: crate::profile::Health::default(),
+            restart_on_crash: false,
             kind: AppKind::Dotnet {
                 project: crate::profile::native("services/Orders/Orders.csproj"),
                 launch_profile: "Orders".into(),

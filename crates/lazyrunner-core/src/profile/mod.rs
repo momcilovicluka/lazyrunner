@@ -29,6 +29,9 @@ pub const REPO_PROFILE_FILE: &str = ".lazyrunner.json";
 pub const TYPE_DOTNET: &str = "dotnet";
 pub const TYPE_NPM: &str = "npm";
 pub const TYPE_COMMAND: &str = "command";
+/// An app's `"restart"`: started again after a crash, or not (#99).
+pub const RESTART_ON_CRASH: &str = "onCrash";
+pub const RESTARTS: [&str; 2] = ["never", RESTART_ON_CRASH];
 pub const TYPE_COMPOSE: &str = "compose";
 /// In a command app's commands and env, its port; and its folder.
 pub const PORT_PLACEHOLDER: &str = "{port}";
@@ -196,6 +199,8 @@ pub struct App {
     pub depends_on: Vec<String>,
     /// What the Health tab holds it to and what its probe asks for (`"health"`), the defaults when it says nothing.
     pub health: Health,
+    /// It starts again by itself after a crash (`"restart": "onCrash"`, #99).
+    pub restart_on_crash: bool,
 }
 
 /// An app's targets (#35) - p95 latency, the 5xx rate (in basis points: 200 is 2%), memory and CPU - and its own

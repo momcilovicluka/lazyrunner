@@ -141,6 +141,7 @@ fn status(ui: &Ui, controller: &Controller) -> Value {
                 "kind": app.traits().name,
                 "status": state.status.name(),
                 "up": state.is_up(),
+                "restart": controller.recovery(&app.key).map(|recovery| recovery.said(std::time::Instant::now())),
                 "port": port,
                 "url": port.map(|port| format!("http://localhost:{port}")),
                 "errors": state.errors,

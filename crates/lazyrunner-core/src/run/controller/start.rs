@@ -40,6 +40,10 @@ impl Controller {
     /// U, u, and `lazyrunner start`: starts `only` (all when `None`) that isn't running, building first what needs it.
     pub fn start(&mut self, only: Option<&[String]>, force_build: bool) {
         debug_assert!(self.building.is_some() || !self.build_only, "b's flag outlives its builds");
+        if !self.retrying_start {
+            let started = only.map_or_else(|| self.keys(), <[String]>::to_vec);
+            self.forget_crashes(&started); // a start by hand; a restart after a crash keeps its count
+        }
         if self.wait_for_ports(only, force_build) || self.wait_for_compose_stops(only, force_build) {
             return;
         }

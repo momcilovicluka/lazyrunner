@@ -366,6 +366,10 @@ focused app's build or take it out of the queue, and `q`.
   bright while the column is scrolled back (`G` follows new output again).
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
   crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none.
+- **An app that crashes starts again by itself** when its profile says `"restart": "onCrash"`: after a wait that
+  doubles each time (1 s, 2 s, 4 s, at most 30 s), its title counting it down (`↻ 2 · 3s ▰▰▱▱`) - `s` cancels it. After 3
+  crashes within 2 minutes it's held (`↻ held`, a notification) until `u` starts it; once it has stayed up a minute its
+  crashes are forgotten. A stop you asked for, a restart or a branch change never counts, nor a clean exit.
 - **After "Ready"**, the log shows a startup timeline per app.
 - **The screens** - Stack `K`, Problems `E`, Requests `H`, Migrations `M`, Audit `A`, Tests `T`, Ports `P`, Durations `D`, Timeline
   `~`, Database `d` - each start with a bar naming them all with their keys, the open one lit (just the keys when the names don't
