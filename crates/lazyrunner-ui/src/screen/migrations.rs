@@ -144,7 +144,7 @@ fn database(controller: &Controller) -> String {
 }
 
 /// u / U: applies the pending migrations of these contexts, after a yes.
-fn apply_pending(ui: &mut Ui, controller: &mut Controller, keys: &[String]) {
+pub(super) fn apply_pending(ui: &mut Ui, controller: &mut Controller, keys: &[String]) {
     let mut lines = vec![format!("Apply the pending migrations to {}?", database(controller)), String::new()];
     let mut jobs = Vec::new();
     let mut why = None;
@@ -227,6 +227,10 @@ pub fn confirm_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     match name {
         "y" | "Enter" => {
             if let Some(Overlay::Confirm(confirm)) = ui.overlay.take() {
+                if confirm.jobs.iter().all(|(_, target, _)| target.is_none()) {
+                    let keys = confirm.jobs.iter().map(|(key, ..)| key.clone()).collect();
+                    ui.again = Some(super::repeat::Again::Migrations(keys));
+                }
                 for (key, target, what) in confirm.jobs {
                     controller.migrate(&key, target, what);
                 }

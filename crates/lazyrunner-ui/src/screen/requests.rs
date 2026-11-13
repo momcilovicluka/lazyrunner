@@ -473,7 +473,7 @@ fn replay(ui: &mut Ui, controller: &mut Controller, view: &View) {
 }
 
 /// Sends `request` again to `path` (its own, or as `u` edited it): its answer in the log, the new request at the top.
-fn send_again(ui: &mut Ui, controller: &mut Controller, request: &Request, path: &str) {
+pub(super) fn send_again(ui: &mut Ui, controller: &mut Controller, request: &Request, path: &str) {
     let (method, path) = (request.method.clone(), path.to_string());
     if !REPLAYABLE.contains(&method.as_str()) {
         controller.add_log(
@@ -491,6 +491,7 @@ fn send_again(ui: &mut Ui, controller: &mut Controller, request: &Request, path:
         return;
     }
     let url = url(controller, &Request { path: path.clone(), ..request.clone() });
+    ui.again = Some(super::repeat::Again::Request { request: Box::new(request.clone()), path: path.clone() });
     let (sender, results) = channel();
     let (sent_method, sent_path) = (method.clone(), path.clone());
     std::thread::spawn(move || {

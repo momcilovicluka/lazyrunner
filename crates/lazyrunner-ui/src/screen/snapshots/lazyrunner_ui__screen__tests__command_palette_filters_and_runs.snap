@@ -4,13 +4,14 @@ expression: screen.frame()
 ---
 
   ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ › rest▏                                                                                    57 commands │
+  │ › rest▏                                                                                    58 commands │
   │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  ◆  Restart Orders  rebuild if it changed                                                          r   │
   │  ▸  Restart all  rebuild if anything changed                                                       R   │
   │  ≡  [ ] Auto-restart on branch change                                                          ,   a   │
   │  ≡  [x] Stop/Restart all include the frontend                                                  ,   s   │
   │  ≡  [ ] Restart the APIs when code changes                                                     ,   e   │
+  │  ▸  Repeat the last action  the last start, stop, build, test run, request or task                 .   │
   │  ✱  Requests: what the .NET apps served  newest or slowest, per endpoint; filter, copy, open       H   │
   │  ≡  [ ] Request timelines from the .NET apps' OpenTelemetry spans                              ,   t   │
   │  ≡  [x] Keep the session: reopen with the apps and the screen it had                           ,   k   │
@@ -20,7 +21,6 @@ expression: screen.frame()
   │  ◧  Marks: every column's, to jump to                                                              '   │
   │  ≡  [x] Startup checklist when lazyrunner opens                                                ,   w   │
   │  ◆  Open Orders in the browser  Swagger for an API                                                 w   │
-  │  ◆  Run Orders on another launch profile or npm variant                                            p   │
   │ type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 

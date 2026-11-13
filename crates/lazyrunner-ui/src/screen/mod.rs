@@ -42,6 +42,7 @@ pub mod rail;
 pub mod rail_density;
 pub mod rail_motion;
 pub mod reload;
+pub mod repeat;
 pub mod request_waterfall;
 pub mod requests;
 pub mod screens;
@@ -430,6 +431,8 @@ pub struct Ui {
     pub seen: seen::Seen,
     /// The apps' errors and warnings grouped, as the Problems screen (`E`) and its chip count them.
     pub problems: problems::Cache,
+    /// What `.` does again: the last action that changed something (#103).
+    pub again: Option<repeat::Again>,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
     pub phases: phases::Phases,
     /// The panel's newest log line, and when it came (it slides in).
@@ -555,6 +558,7 @@ impl Ui {
             profile_seen: None,
             seen: seen::Seen::default(),
             problems: problems::Cache::default(),
+            again: None,
             phases: phases::Phases::default(),
             log_newest: None,
             replays: Vec::new(),

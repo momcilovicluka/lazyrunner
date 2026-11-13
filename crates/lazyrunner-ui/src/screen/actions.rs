@@ -32,6 +32,8 @@ pub enum Run {
     Copy,
     Durations,
     Problems,
+    /// `.`: the last action that changed something, again (#103).
+    Repeat,
     Tests,
     Requests,
     Migrations,
@@ -139,6 +141,8 @@ impl Action {
 /// Every action shown now (some only when they apply).
 pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
     let installs = controller.apps.iter().any(|app| app.traits().installs);
+    let repeat = super::repeat::said(ui, controller)
+        .map_or_else(|| "Repeat the last action".to_string(), |said| format!("Repeat: {said}"));
     let mut list = vec![
         action("Run", "Space", "Start / stop the focused app", "whichever it is not", Run::Toggle).safe().focused(),
         action("Run", "u", "Start the focused app", "builds it first if it changed", Run::StartFocused)
@@ -150,6 +154,7 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Run", "U", "Start all", "build if needed, start whatever is stopped", Run::StartAll),
         action("Run", "S", "Stop all", "also cancels a running build", Run::StopAll),
         action("Run", "R", "Restart all", "rebuild if anything changed", Run::RestartAll),
+        action("Run", ".", &repeat, "the last start, stop, build, test run, request or task", Run::Repeat).safe(),
         action("Run", "B", "Build all", "full build of every app that builds, leaves them stopped", Run::BuildAll),
     ];
     if !controller.conflicts.is_empty() {
@@ -545,12 +550,14 @@ pub fn palette(ui: &Ui, controller: &Controller, query: &str) -> Vec<Action> {
         setting
     }));
     if query.trim().is_empty() {
-        let recent: Vec<Action> = ui
+        // What . would do again comes first, then what ran lately.
+        let repeat = all.iter().find(|action| action.run == Run::Repeat).filter(|_| ui.again.is_some());
+        let lately = ui
             .recent_commands
             .iter()
-            .filter_map(|key| all.iter().find(|action| action.key == *key))
-            .map(|action| Action { recent: true, ..action.clone() })
-            .collect();
+            .filter_map(|key| all.iter().find(|action| action.key == *key && action.run != Run::Repeat));
+        let recent: Vec<Action> =
+            repeat.into_iter().chain(lately).map(|action| Action { recent: true, ..action.clone() }).collect();
         return recent.into_iter().chain(all).collect();
     }
     let mut scored: Vec<(u32, Action)> = all

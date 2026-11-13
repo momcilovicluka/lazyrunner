@@ -2573,6 +2573,31 @@ async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_c
     assert!(!screen.render(160, 30).contains("new problem"));
 }
 
+// ---------------------------------------------------------------- repeat (#103)
+
+#[tokio::test]
+async fn dot_repeats_the_last_action_on_the_app_it_acted_on_and_the_hints_and_palette_say_what() {
+    let mut screen = screen("repeat", json!({}));
+    screen.press(".");
+    assert!(screen.ui.shake_at.is_some(), "nothing to repeat: the hints shake");
+    assert!(screen.last_log().starts_with("Nothing to repeat yet"), "{}", screen.last_log());
+    screen.ui.focus = 1;
+    let name = screen.controller.apps[1].name.clone();
+    screen.press("s");
+    screen.press("/ e r r o r Enter Esc");
+    let frame = screen.frame();
+    assert!(frame.contains(&format!(" .  stop {name}")), "a search isn't repeated; the hint says what is: {frame}");
+    screen.ui.focus = 0;
+    screen.press(".");
+    assert_eq!(screen.ui.focus, 1, "on the app it acted on then");
+    assert!(screen.controller.log.iter().any(|entry| entry.text == format!(". stop {name}")));
+    screen.press(":");
+    let palette = screen.frame();
+    let first = palette.lines().find(|line| line.contains("Repeat") || line.contains("Recent")).unwrap_or_default();
+    assert!(palette.contains(&format!("Repeat: stop {name}")), "{palette}");
+    assert!(first.contains("Recent"), "listed first, under Recent: {palette}");
+}
+
 // ---------------------------------------------------------------- the session (#85)
 
 fn resume(screen: &mut Screen, running: &[&str], view: Value) {

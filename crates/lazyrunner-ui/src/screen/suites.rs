@@ -327,12 +327,14 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "r" | "Enter" | "f" if selected.is_empty() => {
             controller.add_log("Nothing to run here: these projects have no test files.", Hue::DarkGray);
         }
-        "r" | "Enter" => controller.run_tests(&selected, false),
-        "R" => controller.run_tests(&all, false),
+        "r" | "Enter" | "R" | "f" | "F" => {
+            let keys = if matches!(name, "R" | "F") { all.clone() } else { selected.clone() };
+            let failed_only = matches!(name, "f" | "F");
+            controller.run_tests(&keys, failed_only);
+            ui.again = Some(super::repeat::Again::Tests { keys, failed_only });
+        }
         "a" => controller.toggle_watch(&selected),
         "A" => controller.toggle_watch(&all),
-        "f" => controller.run_tests(&selected, true),
-        "F" => controller.run_tests(&all, true),
         "s" if controller.tests_active() => controller.stop_tests(false),
         "s" => controller.add_log("No tests are running.", Hue::DarkGray),
         "o" if !a_suite => controller.add_log("o opens a suite's log - choose one.", Hue::DarkGray),
@@ -371,6 +373,7 @@ fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "r" | "Enter" => {
             if let Some(test) = names.get(*at) {
                 controller.run_test(&key, test);
+                ui.again = Some(super::repeat::Again::Test { suite: key.clone(), test: test.clone() });
             }
         }
         "y" => {
