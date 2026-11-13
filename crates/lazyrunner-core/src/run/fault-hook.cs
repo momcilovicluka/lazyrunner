@@ -68,7 +68,9 @@ internal sealed class Calls : IObserver<KeyValuePair<string, object?>>
         switch (fault.GetProperty("kind").GetString())
         {
             case "delay":
-                Thread.Sleep(fault.GetProperty("ms").GetInt32());
+                var least = fault.GetProperty("ms").GetInt32();
+                var most = fault.TryGetProperty("ms_max", out var max) ? max.GetInt32() : least;
+                Thread.Sleep(most > least ? Random.Shared.Next(least, most + 1) : least);
                 break;
             case "drop":
                 throw new HttpRequestException("lazyrunner dropped this call: a fault on its stack map (K)");

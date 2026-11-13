@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use crate::screen::Ui;
 use crate::screen::copy::{self, Pick};
 
-mod drive;
+pub(crate) mod drive;
 mod views;
 
 /// The agent protocol this lazyrunner speaks; `lazyrunner mcp` sends it with every request.
@@ -85,15 +85,23 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "changelog" => Ok(views::changelog(args)),
         "build_map" => views::build(ui, controller, args),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
-        | "run_action" | "press_keys" | "switch_database" | "install_packages" | "apply_migrations"
-        | "kill_port_holder" | "set_setting" | "run_task" | "profile") => {
+        | "run_action" | "press_keys" | "switch_database" | "add_database" | "install_packages"
+        | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
     };
+    let op = request["op"].as_str().unwrap_or_default();
     if let Ok(result) = &answer {
-        let op = request["op"].as_str().unwrap_or_default();
         crate::screen::follow::agent_call(ui, controller, op, args, result, &client);
+    }
+    // Asking you first: the screen shows what it asks about (the database, the migrations...) while it does.
+    if let Err((code, why)) = &answer
+        && *code == "needs_confirm"
+    {
+        let what = why.split(" can't be undone").next().unwrap_or(why);
+        let asking = json!({ "doing": format!("asks you first: {what}") });
+        crate::screen::follow::agent_call(ui, controller, op, args, &asking, &client);
     }
     match answer {
         Ok(result) => json!({ "ok": true, "result": result }),
@@ -938,6 +946,7 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
         "run_action" => drive::run_action(ui, controller, args)?,
         "press_keys" => drive::press_keys(ui, controller, args)?,
         "switch_database" => drive::switch_database(controller, args)?,
+        "add_database" => drive::add_database(controller, args)?,
         "install_packages" => drive::install_packages(controller, args)?,
         "apply_migrations" => drive::apply_migrations(controller, args)?,
         "kill_port_holder" => drive::kill_port_holder(controller, args)?,

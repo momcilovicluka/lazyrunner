@@ -51,7 +51,10 @@ the user before stopping or restarting apps \
 they may be using. With restartOnCodeChange on (get_status settings), your own edits rebuild the running APIs by \
 themselves a moment after the last save: wait for build_done instead of calling build. list_actions names \
 everything else lazyrunner can do: run_action runs one by its key, press_keys presses keys for what no tool covers - \
-ask the user before anything that needs confirm.";
+ask the user before anything that needs confirm. The user follows your work on lazyrunner's screen - it goes to the \
+view each call is about, as if they pressed its keys - so do things through lazyrunner's tools rather than by hand: \
+add_database and switch_database rather than editing secrets.json, apply_migrations rather than dotnet ef, \
+run_action or press_keys for the rest.";
 
 /// How the server reaches the open lazyrunner (the tests use a fake).
 pub trait Channel: Send + Sync + 'static {
@@ -300,8 +303,8 @@ impl<C: Channel> Server<C> {
             "check_migrations" => self.agent("check_migrations", args).await,
             "list_actions" => self.agent("actions", json!({})).await,
             "press_keys" => self.pressed(args).await,
-            name @ ("run_action" | "switch_database" | "install_packages" | "apply_migrations" | "kill_port_holder"
-            | "set_setting" | "run_task") => self.agent(name, args).await,
+            name @ ("run_action" | "switch_database" | "add_database" | "install_packages" | "apply_migrations"
+            | "kill_port_holder" | "set_setting" | "run_task") => self.agent(name, args).await,
             _ => return None,
         };
         Some(match outcome {
@@ -625,7 +628,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 40));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 41));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);

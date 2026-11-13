@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use super::Controller;
-use crate::output::Hue;
+use crate::output::{Hue, Level};
 use crate::run::format_duration;
 
 const FIRST_WAIT: Duration = Duration::from_secs(1);
@@ -27,8 +27,9 @@ pub struct Recovery {
     pub restarts: usize,
     /// When it starts again, and how long it waits in all.
     pub next: Option<(Instant, Duration)>,
-    /// Held after a crash loop, until `u`.
+    /// Held after a crash loop, until `u`, and since when (its border pulses).
     pub held: bool,
+    pub held_at: Option<Instant>,
 }
 
 impl Recovery {
@@ -57,6 +58,18 @@ impl Recovery {
 
 pub(super) type Recoveries = HashMap<String, Recovery>;
 
+/// A crash this session: when, its exit code, and the last error the app printed before it.
+#[derive(Clone, Debug)]
+pub struct Crash {
+    pub at: Instant,
+    pub code: Option<i32>,
+    pub error: Option<String>,
+}
+
+/// Each app's crashes this session, oldest first, at most `MOST_KEPT`.
+pub(super) type History = HashMap<String, Vec<Crash>>;
+const MOST_KEPT: usize = 20;
+
 impl Controller {
     /// An app's crashes and restarts, while it has any.
     pub fn recovery(&self, key: &str) -> Option<&Recovery> {
@@ -68,13 +81,36 @@ impl Controller {
         self.recoveries.values().any(|recovery| recovery.next.is_some())
     }
 
-    /// After app `key` crashed (exited by itself, not with 0): it starts again after a wait, or is held after a loop.
+    /// App `key`'s crashes this session, oldest first.
+    pub fn crashes_of(&self, key: &str) -> &[Crash] {
+        self.crash_history.get(key).map_or(&[], Vec::as_slice)
+    }
+
+    /// Keeps a crash of app `key`, with the last error it printed.
+    fn note_crash(&mut self, key: &str, code: Option<i32>, now: Instant) {
+        let error = self.states.iter().find(|state| state.key == key).and_then(|state| {
+            state
+                .output
+                .newest_first(0)
+                .find(|line| line.level == Level::Error)
+                .map(|line| line.text.trim().to_string())
+        });
+        let history = self.crash_history.entry(key.to_string()).or_default();
+        history.push(Crash { at: now, code, error });
+        if history.len() > MOST_KEPT {
+            history.remove(0);
+        }
+    }
+
+    /// After app `key` crashed (exited by itself, not with 0): it's kept in its crashes; it starts again after a wait,
+    /// or is held after a loop.
     pub(super) fn after_crash(&mut self, key: &str, code: Option<i32>, now: Instant) {
-        let Some(app) = self.app(key).filter(|app| app.restart_on_crash) else { return };
         let building = self.building.as_ref().is_some_and(|job| job.key == key);
         if code == Some(0) || building {
             return;
         }
+        self.note_crash(key, code, now);
+        let Some(app) = self.app(key).filter(|app| app.restart_on_crash) else { return };
         let name = app.name.clone();
         let recovery = self.recoveries.entry(key.to_string()).or_default();
         recovery.crashes.retain(|at| now.saturating_duration_since(*at) < LOOP_WINDOW);
@@ -82,7 +118,7 @@ impl Controller {
         let crashes = recovery.crashes.len();
         if crashes >= LOOP_CRASHES {
             let span = now.saturating_duration_since(recovery.crashes[0]).as_secs_f64();
-            (recovery.held, recovery.next) = (true, None);
+            (recovery.held, recovery.next, recovery.held_at) = (true, None, Some(now));
             let held = format!("{name} crashed {crashes} times in {} - held (u starts it)", format_duration(span));
             self.add_log(format!("✗ {held}"), Hue::Red);
             self.notifications.push((format!("{name} is crash-looping"), held));
@@ -146,6 +182,7 @@ mod tests {
         assert!(controller.recovery(&other).is_none(), "its profile doesn't ask for it");
         controller.after_crash(&key, Some(0), start);
         assert!(controller.recovery(&key).is_none(), "a clean exit isn't a crash");
+        assert_eq!(controller.crashes_of(&other).len(), 1, "a crash is kept even without a restart");
         controller.after_crash(&key, Some(1), start);
         assert_eq!(controller.recovery(&key).unwrap().said(start), "restarting in 1s (1 of 3)");
         let later = start + Duration::from_secs(5);

@@ -17,6 +17,8 @@ pub const MOST_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
 const MINUTE: u64 = 60;
 const HOUR: u64 = 3600;
 const DAY: u64 = 24 * HOUR;
+/// The snapshots kept for each branch (and offered), the newest first.
+const KEPT: usize = 3;
 
 /// What lazyrunner had when it closed.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -81,20 +83,40 @@ fn all(state_dir: &Path) -> Map<String, Value> {
     crate::json::read(&state_dir.join(FILE)).and_then(|value| value.as_object().cloned()).unwrap_or_default()
 }
 
-/// Keeps `snapshot` as its branch's, beside the other branches'.
+/// A branch's snapshots in the file: a list, the newest first (one on its own, as 1.87 kept it).
+fn snapshots_in(value: Value) -> Vec<Snapshot> {
+    match value {
+        Value::Array(items) => items.into_iter().filter_map(|item| serde_json::from_value(item).ok()).collect(),
+        single => serde_json::from_value(single).ok().into_iter().collect(),
+    }
+}
+
+/// Keeps `snapshot` as its branch's newest, the last few before it kept too, beside the other branches'.
 pub fn save(state_dir: &Path, snapshot: &Snapshot) -> Result<()> {
     let mut all = all(state_dir);
-    all.insert(snapshot.branch.clone(), serde_json::to_value(snapshot)?);
+    let mut kept = all.remove(&snapshot.branch).map(snapshots_in).unwrap_or_default();
+    kept.insert(0, snapshot.clone());
+    kept.truncate(KEPT);
+    all.insert(snapshot.branch.clone(), serde_json::to_value(kept)?);
     crate::config::write(&state_dir.join(FILE), &Value::Object(all))
 }
 
-/// The snapshot to offer on `branch`: its own, else the newest of another branch's - none older than a week.
-pub fn load(state_dir: &Path, branch: &str, now: DateTime<FixedOffset>) -> Option<Snapshot> {
+/// The snapshots to offer on `branch`, the first resumed unless another is picked: its own (the newest first), then
+/// the other branches' - at most `KEPT`, none older than a week.
+pub fn history(state_dir: &Path, branch: &str, now: DateTime<FixedOffset>) -> Vec<Snapshot> {
     let fresh = |snapshot: &Snapshot| snapshot.age(now).is_some_and(|age| age < MOST_AGE);
-    let snapshots: Vec<Snapshot> =
-        all(state_dir).into_values().filter_map(|value| serde_json::from_value(value).ok()).filter(fresh).collect();
-    let own = snapshots.iter().find(|snapshot| snapshot.branch == branch).cloned();
-    own.or_else(|| snapshots.into_iter().min_by_key(|snapshot| snapshot.age(now)))
+    let (mut own, mut others) = (Vec::new(), Vec::new());
+    for (name, value) in all(state_dir) {
+        let kept: Vec<Snapshot> = snapshots_in(value).into_iter().filter(fresh).collect();
+        if name == branch { own = kept } else { others.extend(kept) }
+    }
+    others.sort_by_key(|snapshot| snapshot.age(now));
+    own.into_iter().chain(others).take(KEPT).collect()
+}
+
+/// The snapshot to offer on `branch`: its own newest, else the newest of another branch's.
+pub fn load(state_dir: &Path, branch: &str, now: DateTime<FixedOffset>) -> Option<Snapshot> {
+    history(state_dir, branch, now).into_iter().next()
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@ expression: screen.frame()
 ---
 
   ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ › rest▏                                                                                    62 commands │
+  │ › rest▏                                                                                    65 commands │
   │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  ◆  Restart Orders  rebuild if it changed                                                          r   │
   │  ▸  Restart all  rebuild if anything changed                                                       R   │
@@ -12,15 +12,15 @@ expression: screen.frame()
   │  ≡  [x] Stop/Restart all include the frontend                                                  ,   s   │
   │  ≡  [ ] Restart the APIs when code changes                                                     ,   e   │
   │  ▸  Repeat the last action  the last start, stop, build, test run, request or task                 .   │
+  │  ▸  Repeat one of the last few actions  3. repeats a test run 3 times                          Alt+.   │
   │  ✱  Requests: what the .NET apps served  newest or slowest, per endpoint; filter, copy, open       H   │
   │  ≡  [ ] Request timelines from the .NET apps' OpenTelemetry spans                              ,   t   │
   │  ≡  [x] Keep the session: reopen with the apps and the screen it had                           ,   k   │
   │  ≡  Run the startup checklist now (and check for an update)                                    ,   r   │
   │  ◆  Share Orders through a tunnel (again: stop)  devtunnel or ngrok; the tool's own login      Alt+s   │
+  │  ◆  The focused app's crashes this session  when, exit codes, last errors                      Alt+x   │
   │  ≡  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklist…                   ,   │
   │  ✱  Tests: run the project's test suites  dotnet test, jest, vitest - several at once in the bac…  T   │
-  │  ◧  Marks: every column's, to jump to                                                              '   │
-  │  ✱  What changed for running on the last branch switch  settings keys, packages, migrations,…  Alt+g   │
   │ type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 

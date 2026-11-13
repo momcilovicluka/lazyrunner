@@ -8,8 +8,16 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::requests::Request;
 
+use std::time::Duration;
+
 use super::Ui;
 use super::actions::{self, Run};
+
+/// How soon a count's digit has to come before `.`, how many actions the history keeps, and how long a test run
+/// repeated by a count waits before it checks the last one finished.
+const COUNT_WAIT: Duration = Duration::from_millis(1500);
+const HISTORY: usize = 5;
+const SETTLE: Duration = Duration::from_secs(2);
 
 /// What `.` does again.
 #[derive(Clone, Debug)]
@@ -68,7 +76,12 @@ fn name(controller: &Controller, key: &str) -> String {
 
 /// What `.` would do, as the hints and the palette say it: `restart Orders`, `run 2 suites`.
 pub fn said(ui: &Ui, controller: &Controller) -> Option<String> {
-    Some(match ui.again.as_ref()? {
+    said_of(ui.again.as_ref()?, controller)
+}
+
+/// What `again` does, said.
+pub fn said_of(again: &Again, controller: &Controller) -> Option<String> {
+    Some(match again {
         Again::Action { run, app } => {
             let on = app.as_deref().map_or("all".to_string(), |key| name(controller, key));
             match run {
@@ -109,6 +122,16 @@ pub fn repeat(ui: &mut Ui, controller: &mut Controller) {
         return;
     };
     let said = said(ui, controller).unwrap_or_default();
+    let count = ui.count_prefix.take().filter(|(_, at)| ui.now.saturating_duration_since(*at) < COUNT_WAIT);
+    let times = count.map_or(1, |(count, _)| count);
+    if times > 1 {
+        if matches!(again, Again::Tests { .. } | Again::Test { .. }) {
+            ui.repeat_left = Some((again.clone(), times as usize - 1, ui.now));
+            controller.add_log(format!(". {said} - {times} times, one after another"), Hue::DarkGray);
+        } else {
+            controller.add_log(format!("A count repeats test runs; . does {said} once"), Hue::DarkGray);
+        }
+    }
     match again {
         Again::Action { run, app } => {
             if let Some(key) = app {
@@ -131,4 +154,78 @@ pub fn repeat(ui: &mut Ui, controller: &mut Controller) {
         Again::Request { request, path } => super::requests::send_again(ui, controller, &request, &path),
         Again::Migrations(keys) => super::migrations::apply_pending(ui, controller, &keys),
     }
+}
+
+/// Each tick: a new repeatable action goes into the history (and the `.` hint pulses); a test run repeated by a count
+/// runs again once the last one finished.
+pub fn tick(ui: &mut Ui, controller: &mut Controller) {
+    if let Some(again) = ui.again.clone() {
+        let said = format!("{again:?}");
+        if ui.again_history.first().is_none_or(|newest| format!("{newest:?}") != said) {
+            ui.again_history.retain(|each| format!("{each:?}") != said);
+            ui.again_history.insert(0, again);
+            ui.again_history.truncate(HISTORY);
+            ui.motion.flash(super::motion::Spot::Hint(".".into()), ui.now);
+        }
+    }
+    let Some((again, left, since)) = ui.repeat_left.clone() else { return };
+    if ui.now.saturating_duration_since(since) < SETTLE || controller.tests_active() {
+        return;
+    }
+    match &again {
+        Again::Tests { keys, failed_only } => controller.run_tests(keys, *failed_only),
+        Again::Test { suite, test } => controller.run_test(suite, test),
+        _ => {}
+    }
+    ui.repeat_left = (left > 1).then(|| (again, left - 1, ui.now));
+}
+
+/// `Alt+.`: the last few repeatable actions to pick one of.
+pub fn open_history(ui: &mut Ui, controller: &mut Controller) {
+    if ui.again_history.is_empty() {
+        ui.shake_at = Some(ui.now);
+        controller.add_log("Nothing to repeat yet.", Hue::DarkGray);
+        return;
+    }
+    ui.overlay = Some(super::Overlay::Repeats { index: 0 });
+}
+
+pub fn history_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
+    let count = ui.again_history.len();
+    let Some(super::Overlay::Repeats { index }) = &mut ui.overlay else { return };
+    match name {
+        "Escape" | "q" | "Alt+." => ui.overlay = None,
+        "j" | "DownArrow" => *index = super::keys::wrapped(*index, 1, count.max(1)),
+        "k" | "UpArrow" => *index = super::keys::wrapped(*index, -1, count.max(1)),
+        "Enter" | "Space" => {
+            let picked = ui.again_history.get(*index).cloned();
+            ui.overlay = None;
+            if let Some(again) = picked {
+                ui.again = Some(again);
+                repeat(ui, controller);
+            }
+        }
+        _ => {}
+    }
+}
+
+pub fn history_rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<super::seg::Seg>> {
+    use super::seg::{on, pad, seg};
+    use super::theme::C;
+    let Some(super::Overlay::Repeats { index }) = &ui.overlay else { return Vec::new() };
+    let inner = cells.saturating_sub(8).clamp(20, 70);
+    let lines = ui
+        .again_history
+        .iter()
+        .enumerate()
+        .map(|(at, again)| {
+            let said = said_of(again, controller).unwrap_or_default();
+            let mark = if at == 0 { "." } else { " " };
+            let text = pad(&format!(" {mark} {said}"), inner);
+            if at == *index { vec![on(text, C::Black, C::Cyan)] } else { vec![seg(text, C::Gray)] }
+        })
+        .collect();
+    let title = super::icons::titled(ui.nerd, super::icons::Icon::Reload, "Repeat");
+    let footer = "j k pick · Enter runs it again (and . repeats it from now) · Esc closes";
+    super::overlays::boxed(&title, lines, footer, cells, rows, inner)
 }

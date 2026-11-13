@@ -123,7 +123,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         // Taking over from the previous lazyrunner: its apps keep running; no checklist, no auto-start.
         log_whats_new(&mut controller, &whats_new);
         take_over(&mut controller, file, &options.handover_handles);
-        screen::session::restore(&mut ui, &mut controller);
+        screen::session::restore(&mut ui, &mut controller, true);
         quiet = None;
     } else if controller.setting(Toggle::StartupChecklist) {
         let checklist = Checklist::start(&controller, false, &whats_new, options.start_now);
@@ -275,6 +275,8 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                 poll_quiet_update(&mut quiet, &mut ui, &mut controller);
                 screen::requests::poll_replays(&mut ui, &mut controller);
                 screen::copy::shared_urls(&mut ui, &mut controller);
+                screen::repeat::tick(&mut ui, &mut controller);
+                screen::branch_changes::tick(&mut ui, &controller);
                 if let Some(version) = screen::about::poll_update(&mut ui, &mut controller) {
                     after_update(&mut ui, &mut controller, &version, true, false);
                 }
@@ -432,7 +434,7 @@ fn begin(ui: &mut Ui, controller: &mut Controller, start_now: bool, started: boo
             Hue::Cyan,
         );
     }
-    screen::session::restore(ui, controller);
+    screen::session::restore(ui, controller, false);
 }
 
 fn update_checklist(ui: &mut Ui, controller: &mut Controller, still_checking: &mut Option<StillChecking>) {

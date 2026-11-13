@@ -206,6 +206,23 @@ pub fn list(apps: &str) -> Vec<Value> {
             false,
         )),
         tool(
+            "add_database",
+            "Adds a SQL connection string to the APIs' secrets.json as n on the database screen (d) does: a copy \
+             of one there (`from`, by its database or label; the one in use when left out; `key` picks between \
+             connection strings of one name) with another database (`name`), not in use yet, right under it. With \
+             switch: true it becomes the one in use too - the running APIs restart on it - which needs confirm: \
+             true: ask the user first. The user watches it on the database screen.",
+            json!({
+                "name": { "type": "string", "description": "The new database's name" },
+                "from": { "type": "string", "description": "The connection string to copy, by its database or label" },
+                "key": { "type": "string", "description": "The connection string's key, e.g. ConnectionStrings:Default" },
+                "switch": { "type": "boolean" },
+                "confirm": { "type": "boolean" },
+            }),
+            &["name"],
+            false,
+        ),
+        tool(
             "run_task",
             "Runs one of the profile's tasks (get_status lists them: key, name, running, last) in the background - \
              a one-off command such as seeding the database. Its output goes to the panel's log. Then wait for \

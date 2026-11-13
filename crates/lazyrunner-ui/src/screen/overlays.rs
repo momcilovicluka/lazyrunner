@@ -536,6 +536,10 @@ pub fn checklist(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
         }
         lines.push(row);
     }
+    let resumed = resuming(ui, list);
+    if !resumed.is_empty() {
+        lines.push(resumed);
+    }
     lines.extend([countdown(ui, list, inner), vec![seg(keys_line(ui), C::DarkGray)]]);
     let sparkle = if animated { SPARKLE[(ui.tick() / 3) as usize % 2] } else { SPARKLE[0] };
     let title = format!("{sparkle} lazyrunner v{VERSION} · startup doctor");
@@ -611,6 +615,25 @@ fn countdown(ui: &Ui, list: &Checklist, inner: usize) -> Vec<Seg> {
     let bar = share_bar(left, cells).trim_end().to_string();
     let rest = cells.saturating_sub(bar.width());
     vec![seg(text, C::Cyan), seg(bar, C::Cyan), seg("─".repeat(rest), C::DarkGray)]
+}
+
+/// The session's apps as they come up, a chip each: green once up, amber while they start, red when one stopped.
+fn resuming(ui: &Ui, list: &Checklist) -> Vec<Seg> {
+    let apps = list.resuming();
+    if apps.is_empty() {
+        return Vec::new();
+    }
+    let mut segs = vec![seg(format!(" {} resuming ", icons::icon(ui.nerd, Icon::Reload)), C::Cyan)];
+    for (name, rising) in apps {
+        let spin = if ui.reduced_motion { "…" } else { super::columns::spinner(ui) };
+        segs.push(match rising {
+            super::checklist::Rising::Up => on(format!(" ✓ {name} "), C::Black, C::Green),
+            super::checklist::Rising::Starting => on(format!(" {spin} {name} "), C::Black, C::Yellow),
+            super::checklist::Rising::Down => on(format!(" ✗ {name} "), C::Black, C::Red),
+        });
+        segs.push(seg(" ", C::Gray));
+    }
+    segs
 }
 
 /// The doctor's keys, under the checks.

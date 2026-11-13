@@ -13,12 +13,14 @@ pub mod code_draw;
 pub mod code_search;
 pub mod columns;
 pub mod copy;
+pub mod crashes;
 pub mod database;
 pub mod diff;
 pub mod durations;
 pub mod faults;
 pub mod flame;
 pub mod follow;
+pub mod ghost;
 pub mod graph;
 pub mod health;
 pub mod health_draw;
@@ -52,6 +54,7 @@ pub mod screens;
 pub mod seen;
 pub mod seg;
 pub mod session;
+pub mod share;
 pub mod sheet;
 pub mod spec;
 pub mod spinner;
@@ -207,6 +210,19 @@ pub enum Overlay {
     /// `Alt+g`: what changed for running on the last branch switch (#104); the picked change.
     BranchChanges {
         index: usize,
+        open: bool,
+    },
+    /// `Alt+.`: the last few repeatable actions; the picked one.
+    Repeats {
+        index: usize,
+    },
+    /// `Alt+q`: a shared app's public URL as a QR code.
+    ShareQr {
+        app: usize,
+    },
+    /// `Alt+x`: an app's crashes this session.
+    Crashes {
+        app: usize,
     },
     /// `Alt+l`: a .NET app's log levels (#101); the picked category and level.
     LogLevels {
@@ -321,6 +337,9 @@ impl Overlay {
             Self::Sheet { .. } => "sheet",
             Self::Launch { .. } => "launch",
             Self::LogLevels { .. } => "log levels",
+            Self::Repeats { .. } => "repeats",
+            Self::ShareQr { .. } => "qr code",
+            Self::Crashes { .. } => "crashes",
             Self::BranchChanges { .. } => "branch changes",
             Self::Timeline(_) => "timeline",
             Self::Tests { .. } => "tests",
@@ -438,6 +457,8 @@ pub struct Ui {
     pub help_filter: String,
     /// The database screen's servers, answering or not (checked as it opens).
     pub db_reach: Option<database::Reachability>,
+    /// The database screen's rows coming in and answers flashing.
+    pub db_motion: database::Motion,
     /// The resumed apps whose columns fade in once they run, and the fades under way, by app (#85).
     pub restoring: Vec<String>,
     pub fades: HashMap<String, Instant>,
@@ -452,10 +473,21 @@ pub struct Ui {
     pub problems: problems::Cache,
     /// What `.` does again: the last action that changed something (#103).
     pub again: Option<repeat::Again>,
+    /// The branch changes whose fix ran (`Alt+g`), and the branch whose changes the status chip slid in for, when.
+    pub branch_fixes: std::collections::HashSet<String>,
+    pub branch_chip: Option<(String, Instant)>,
+    /// The last few repeatable actions (`Alt+.`), a count's digit and when, and a counted test run's runs left.
+    pub again_history: Vec<repeat::Again>,
+    pub count_prefix: Option<(u32, Instant)>,
+    pub repeat_left: Option<(repeat::Again, usize, Instant)>,
     /// The running .NET apps' OpenAPI documents, as the requests view's spec tab reads them (#100).
     pub specs: spec::Specs,
+    /// The spec tab's values per endpoint and its last send's answer.
+    pub spec_memory: spec::Memory,
     /// The tunnels' public URLs already copied (#102).
     pub shared: Vec<String>,
+    /// When each app's public URL was copied (its host shimmers).
+    pub tunnel_copied: HashMap<String, Instant>,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
     pub phases: phases::Phases,
     /// The panel's newest log line, and when it came (it slides in).
@@ -573,6 +605,7 @@ impl Ui {
             shake_at: None,
             help_filter: String::new(),
             db_reach: None,
+            db_motion: database::Motion::default(),
             restoring: Vec::new(),
             fades: HashMap::new(),
             help_typing: false,
@@ -582,8 +615,15 @@ impl Ui {
             seen: seen::Seen::default(),
             problems: problems::Cache::default(),
             again: None,
+            branch_fixes: std::collections::HashSet::new(),
+            branch_chip: None,
+            again_history: Vec::new(),
+            count_prefix: None,
+            repeat_left: None,
             specs: spec::Specs::new(),
+            spec_memory: spec::Memory::default(),
             shared: Vec::new(),
+            tunnel_copied: HashMap::new(),
             phases: phases::Phases::default(),
             log_newest: None,
             replays: Vec::new(),
@@ -782,6 +822,10 @@ impl Ui {
             || session::animating(self)
             || durations::animating(self)
             || problems::animating(self)
+            || share::animating(self, controller)
+            || crashes::animating(self, controller)
+            || ghost::animating(self)
+            || branch_changes::animating(self)
             || spec::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
@@ -889,6 +933,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.marquees.borrow_mut().retain(|_, (_, seen)| *seen);
     theme_picker::paint_ripple(buf, area, ui);
     reload::paint(buf, area, ui);
+    ghost::paint(buf, area, ui);
 }
 
 /// A box opening (`opened` of the way): only its middle rows so far, more the further it has opened.
@@ -941,6 +986,9 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         Some(Overlay::Sheet { .. }) => return sheet::rows(ui, controller, width, rows),
         Some(Overlay::Launch { .. }) => return launch::rows(ui, controller, width, rows),
         Some(Overlay::LogLevels { .. }) => return log_levels::rows(ui, controller, width, rows),
+        Some(Overlay::Repeats { .. }) => return repeat::history_rows(ui, controller, width, rows),
+        Some(Overlay::ShareQr { .. }) => return share::rows(ui, controller, width, rows),
+        Some(Overlay::Crashes { .. }) => return crashes::rows(ui, controller, width, rows),
         Some(Overlay::BranchChanges { .. }) => return branch_changes::rows(ui, controller, width, rows),
         Some(Overlay::Timeline(_)) => return timeline::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),

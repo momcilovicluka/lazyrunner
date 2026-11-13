@@ -3,7 +3,8 @@
 //! changes every time - ids, times, ports, numbers - are one problem (the shape `Alt+d` compares runs by). Each row
 //! says how often, in which apps, when last, and whether it's new since its app's last run or gone since its app
 //! restarted; the picked one's details have its message, a chart of when it happened and an occurrence's lines, its
-//! frames links. `Enter` jumps to the occurrence in its column, `n` `N` step through them, `y` copies it.
+//! frames links. `Enter` jumps to the occurrence in its column, `n` `N` step through them, `y` copies it; `m` mutes a
+//! problem for the session (`u` shows the muted ones), `a` groups them by app.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -20,8 +21,8 @@ use super::{Overlay, Ui};
 
 /// What `s` orders the problems by, errors before warnings always.
 const SORTS: [&str; 3] = ["count", "latest", "first seen"];
-const KEYS: &str = " j k choose · Enter its line · n N its occurrences · s sort · / filter · v errors only · y copy · \
-     Esc closes";
+const KEYS: &str = " j k choose · Enter its line · n N its occurrences · s sort · a by app · / filter · v errors only \
+     · m mute · u muted · y copy · Esc closes";
 /// From this wide the details go beside the list, this wide; else under it.
 const BESIDE_FROM: usize = 150;
 const DETAIL_WIDTH: usize = 52;
@@ -32,10 +33,17 @@ const FLAG_CELLS: usize = 8;
 /// An occurrence's lines the details show, and the chart's bars.
 const MOST_LINES: usize = 14;
 const CHART_BARS: usize = 32;
-/// A problem that happens again pulses this long; a new one slides in this long, from this far.
+/// A problem that happens again pulses this long; a new one slides in this long, from this far, and flashes this
+/// long; a fixed one dims over this long.
 const PULSE: Duration = Duration::from_millis(400);
 const SLIDE: Duration = Duration::from_millis(200);
 const SLIDE_CELLS: f64 = 12.0;
+const FLASH: Duration = Duration::from_millis(600);
+const DIM: Duration = Duration::from_secs(1);
+/// A row's sparkline bars, and how soon after its app's start a problem's first sight hints at the start.
+const ROW_BARS: usize = 8;
+const SPARK_CELLS: usize = ROW_BARS + 2;
+const CAUSE_WINDOW: Duration = Duration::from_secs(120);
 
 /// One time a problem happened: the app, its first and last line, and when it came.
 #[derive(Clone, Debug)]
@@ -79,13 +87,25 @@ impl Problem {
         let name = |app: usize| controller.apps.get(app).map_or("?", |app| app.name.as_str());
         counts.iter().map(|(app, count)| format!("{} ×{count}", name(*app))).collect::<Vec<_>>().join(" · ")
     }
+
+    /// The app it happened in most (the first such, for a tie): the group `a` puts it in.
+    fn main_app(&self) -> usize {
+        let mut counts: HashMap<usize, usize> = HashMap::new();
+        for occurrence in &self.occurrences {
+            *counts.entry(occurrence.app).or_default() += 1;
+        }
+        counts.into_iter().max_by_key(|(app, count)| (*count, std::cmp::Reverse(*app))).map_or(0, |(app, _)| app)
+    }
 }
 
-/// The problems as last worked out, and what from: each app's last line and run.
+/// The problems as last worked out, and what from: each app's last line and run; the ones muted this session, and
+/// when each became fixed?.
 #[derive(Debug, Default)]
 pub struct Cache {
     from: Vec<(u64, u64)>,
     pub list: Vec<Problem>,
+    pub muted: HashSet<u64>,
+    fixed_at: HashMap<u64, Instant>,
 }
 
 /// The screen: the picked problem and occurrence (back from the newest), the order, the filter and whether it's
@@ -98,6 +118,8 @@ pub struct View {
     pub filter: String,
     pub typing: bool,
     pub errors_only: bool,
+    pub show_muted: bool,
+    pub by_app: bool,
     counts: HashMap<u64, (usize, Option<Instant>)>,
     appeared: HashMap<u64, Instant>,
     opened: Instant,
@@ -106,9 +128,17 @@ pub struct View {
 /// Works the problems out again when an app's output or run changed since.
 pub fn refresh(ui: &mut Ui, controller: &Controller) {
     let from: Vec<(u64, u64)> = controller.states.iter().map(|state| (state.output.total(), state.run_from)).collect();
-    if from != ui.problems.from {
-        ui.problems = Cache { list: gather(controller), from };
+    if from == ui.problems.from {
+        return;
     }
+    let list = gather(controller);
+    let was_fixed: HashMap<u64, bool> = ui.problems.list.iter().map(|problem| (problem.shape, problem.fixed)).collect();
+    for problem in &list {
+        if problem.fixed && was_fixed.get(&problem.shape) == Some(&false) {
+            ui.problems.fixed_at.insert(problem.shape, ui.now);
+        }
+    }
+    (ui.problems.list, ui.problems.from) = (list, from);
 }
 
 fn gather(controller: &Controller) -> Vec<Problem> {
@@ -147,9 +177,11 @@ pub fn shapes(ui: &Ui) -> HashSet<u64> {
     ui.problems.list.iter().map(|problem| problem.shape).collect()
 }
 
-/// The problems there are that `seen` didn't have: how many, and whether one is an error.
+/// The problems there are that `seen` didn't have (and aren't muted): how many, and whether one is an error.
 pub fn news(ui: &Ui, seen: &HashSet<u64>) -> (usize, bool) {
-    let fresh = ui.problems.list.iter().filter(|problem| !seen.contains(&problem.shape));
+    let muted = &ui.problems.muted;
+    let fresh =
+        ui.problems.list.iter().filter(|problem| !seen.contains(&problem.shape) && !muted.contains(&problem.shape));
     fresh.fold((0, false), |(count, error), problem| (count + 1, error || problem.error))
 }
 
@@ -162,6 +194,8 @@ pub fn open(ui: &mut Ui, controller: &Controller) {
         filter: String::new(),
         typing: false,
         errors_only: false,
+        show_muted: false,
+        by_app: false,
         counts: HashMap::new(),
         appeared: HashMap::new(),
         opened: ui.now,
@@ -173,28 +207,37 @@ pub fn open(ui: &mut Ui, controller: &Controller) {
 pub fn open_on_news(ui: &mut Ui, controller: &Controller, seen: &HashSet<u64>) {
     open(ui, controller);
     let Some(Overlay::Problems(view)) = &ui.overlay else { return };
-    let at = shown(&ui.problems.list, view).iter().position(|problem| !seen.contains(&problem.shape));
+    let at = shown(&ui.problems, view).iter().position(|problem| !seen.contains(&problem.shape));
     if let (Some(at), Some(Overlay::Problems(view))) = (at, &mut ui.overlay) {
         view.index = at;
     }
 }
 
-/// The problems the screen lists: filtered, errors first, then by the order picked.
-fn shown<'a>(list: &'a [Problem], view: &View) -> Vec<&'a Problem> {
-    let mut shown: Vec<&Problem> = list
+/// The problems the screen lists: filtered, the muted ones only with `u`, by app with `a`, the fixed? ones last,
+/// errors first, then by the order picked.
+fn shown<'a>(cache: &'a Cache, view: &View) -> Vec<&'a Problem> {
+    let mut shown: Vec<&Problem> = cache
+        .list
         .iter()
         .filter(|problem| !view.errors_only || problem.error)
+        .filter(|problem| view.show_muted || !cache.muted.contains(&problem.shape))
         .filter(|problem| view.filter.is_empty() || contains_ignore_case(&problem.text, &view.filter))
         .collect();
     let last = |problem: &Problem| problem.newest().map(|occurrence| occurrence.at);
     let first = |problem: &Problem| problem.occurrences.first().map(|occurrence| occurrence.at);
+    let group = |problem: &Problem| if view.by_app { problem.main_app() } else { 0 };
     shown.sort_by(|a, b| {
         let order = match view.sort {
             1 => last(b).cmp(&last(a)),
             2 => first(a).cmp(&first(b)),
             _ => b.occurrences.len().cmp(&a.occurrences.len()),
         };
-        b.error.cmp(&a.error).then(order).then_with(|| a.text.cmp(&b.text))
+        group(a)
+            .cmp(&group(b))
+            .then(a.fixed.cmp(&b.fixed))
+            .then(b.error.cmp(&a.error))
+            .then(order)
+            .then_with(|| a.text.cmp(&b.text))
     });
     shown
 }
@@ -202,7 +245,7 @@ fn shown<'a>(list: &'a [Problem], view: &View) -> Vec<&'a Problem> {
 /// The picked problem, and the occurrence picked in it.
 fn picked(ui: &Ui) -> Option<(Problem, Occurrence)> {
     let Some(Overlay::Problems(view)) = &ui.overlay else { return None };
-    let problem = shown(&ui.problems.list, view).get(view.index).copied()?.clone();
+    let problem = shown(&ui.problems, view).get(view.index).copied()?.clone();
     let back = view.occurrence.min(problem.occurrences.len().saturating_sub(1));
     let occurrence = problem.occurrences.iter().rev().nth(back)?.clone();
     Some((problem, occurrence))
@@ -221,8 +264,24 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
         "Escape" | "q" | "E" => ui.overlay = None,
         "Enter" | "Space" => jump(ui, controller),
         "y" => copy(ui, controller),
+        "m" => mute(ui, controller),
         _ => pick(ui, name),
     }
+}
+
+/// m: the picked problem muted for the session - off the list and the chip - or, muted, back.
+fn mute(ui: &mut Ui, controller: &mut Controller) {
+    let Some((problem, _)) = picked(ui) else { return };
+    let said = fit(vec![seg(problem.text.clone(), C::Gray)], 60).into_iter().map(|part| part.text).collect::<String>();
+    if ui.problems.muted.remove(&problem.shape) {
+        controller.add_log(format!("🔔 Unmuted: {said}"), lazyrunner_core::output::Hue::DarkGray);
+        return;
+    }
+    ui.problems.muted.insert(problem.shape);
+    controller
+        .add_log(format!("🔕 Muted for this session: {said} (u shows it)"), lazyrunner_core::output::Hue::DarkGray);
+    let Some(Overlay::Problems(view)) = &mut ui.overlay else { return };
+    view.occurrence = 0;
 }
 
 fn type_filter(ui: &mut Ui, name: &str) {
@@ -240,10 +299,11 @@ fn type_filter(ui: &mut Ui, name: &str) {
     (view.index, view.occurrence) = (0, 0);
 }
 
-/// j k g G move, n N step through the picked problem's occurrences, s sorts, v errors only, / filters.
+/// j k g G move, n N step through the picked problem's occurrences, s sorts, a groups by app, v errors only, u the
+/// muted ones, / filters.
 fn pick(ui: &mut Ui, name: &str) {
     let count = match &ui.overlay {
-        Some(Overlay::Problems(view)) => shown(&ui.problems.list, view).len(),
+        Some(Overlay::Problems(view)) => shown(&ui.problems, view).len(),
         _ => return,
     };
     let occurrences = picked(ui).map_or(0, |(problem, _)| problem.occurrences.len());
@@ -267,6 +327,14 @@ fn pick(ui: &mut Ui, name: &str) {
         }
         "v" => {
             view.errors_only = !view.errors_only;
+            0
+        }
+        "a" => {
+            view.by_app = !view.by_app;
+            0
+        }
+        "u" => {
+            view.show_muted = !view.show_muted;
             0
         }
         "/" => {
@@ -327,7 +395,8 @@ pub fn animating(ui: &Ui) -> bool {
     let moving = |at: &Instant, length: Duration| ui.now.saturating_duration_since(*at) < length;
     super::stack::moving(ui)
         && (view.counts.values().any(|(_, rose)| rose.as_ref().is_some_and(|at| moving(at, PULSE)))
-            || view.appeared.values().any(|at| moving(at, SLIDE)))
+            || view.appeared.values().any(|at| moving(at, FLASH))
+            || ui.problems.fixed_at.values().any(|at| moving(at, DIM)))
 }
 
 /// Notes each problem's count: one that rose pulses, one not seen before slides in (not as the screen opens).
@@ -355,24 +424,49 @@ fn ago(ui: &Ui, at: Instant) -> String {
     format!("{} ago", format_duration(ui.now.saturating_duration_since(at).as_secs_f64()))
 }
 
-/// A problem's row: its mark, count (rolling up, lit as it rises), apps, when last, new / fixed?, and message; a new
-/// one slides in from the right.
+/// The colour a problem's message has: its severity's, a muted one grey, a fixed? one dimming to grey over `DIM`.
+fn tone(ui: &Ui, problem: &Problem) -> C {
+    let (bright, dim) = if problem.error { (C::Red, C::DarkRed) } else { (C::Yellow, C::DarkYellow) };
+    if ui.problems.muted.contains(&problem.shape) {
+        return C::DarkGray;
+    }
+    if !problem.fixed {
+        return bright;
+    }
+    let since = ui.problems.fixed_at.get(&problem.shape).map(|at| ui.now.saturating_duration_since(*at));
+    match since {
+        Some(since) if super::stack::moving(ui) && since < DIM / 3 => bright,
+        Some(since) if super::stack::moving(ui) && since < DIM * 2 / 3 => dim,
+        _ => C::DarkGray,
+    }
+}
+
+/// A problem's row: its severity edge and mark, count (rolling up, lit as it rises), apps, when last, new / fixed?,
+/// a sparkline of when, and message; a new one slides in from the right with a flash.
 fn row(ui: &mut Ui, controller: &Controller, problem: &Problem, width: usize) -> Vec<Seg> {
-    let (mark, color) = if problem.error { (" ✗ ", C::Red) } else { (" ! ", C::Yellow) };
+    let muted = ui.problems.muted.contains(&problem.shape);
+    let (mark, color) = match (muted, problem.error) {
+        (true, _) => ("▌~ ", C::DarkGray),
+        (_, true) => ("▌✗ ", C::Red),
+        _ => ("▌! ", C::Yellow),
+    };
     let (rolled, _) = ui.roll(&format!("problem:{}", problem.shape), problem.occurrences.len() as f64, false, true);
     let last = problem.newest().map_or(String::new(), |occurrence| ago(ui, occurrence.at));
-    let (flag, flag_color) = match (problem.new, problem.fixed) {
-        (_, true) => ("fixed?", C::Green),
-        (true, _) => ("new", C::Cyan),
+    let (flag, flag_color) = match (muted, problem.new, problem.fixed) {
+        (true, ..) => ("muted", C::DarkGray),
+        (_, _, true) => ("fixed?", C::Green),
+        (_, true, _) => ("new", C::Cyan),
         _ => ("", C::Gray),
     };
+    let text = tone(ui, problem);
     let mut segs = vec![
         seg(mark, color),
         seg(pad(&format!("{:>5}", rolled.round() as usize), COUNT_CELLS), C::White),
         seg(pad(&problem.apps(controller), APPS_CELLS), C::Gray),
         seg(pad(&last, WHEN_CELLS), C::DarkGray),
         seg(pad(flag, FLAG_CELLS), flag_color),
-        seg(problem.text.clone(), if problem.fixed { C::DarkGray } else { color }),
+        seg(pad(&chart(ui, problem, ROW_BARS), SPARK_CELLS), if text == C::DarkGray { text } else { C::DarkCyan }),
+        seg(problem.text.clone(), text),
     ];
     let moving = super::stack::moving(ui);
     let since = |at: Instant| ui.now.saturating_duration_since(at);
@@ -381,11 +475,33 @@ fn row(ui: &mut Ui, controller: &Controller, problem: &Problem, width: usize) ->
     if rose.is_some_and(|at| moving && since(at) < PULSE) {
         segs[1] = on(segs[1].text.clone(), C::Black, color);
     }
-    if let Some(at) = view.appeared.get(&problem.shape).copied().filter(|at| moving && since(*at) < SLIDE) {
+    let Some(at) = view.appeared.get(&problem.shape).copied().filter(|at| moving && since(*at) < FLASH) else {
+        return fit(segs, width);
+    };
+    let flash = if problem.error { C::DarkRed } else { C::DarkYellow };
+    for part in segs.iter_mut().filter(|part| part.bg.is_none()) {
+        (part.fg, part.bg) = (C::White, Some(flash));
+    }
+    if since(at) < SLIDE {
         let left = 1.0 - since(at).as_secs_f64() / SLIDE.as_secs_f64();
         segs.insert(0, seg(" ".repeat((left * left * SLIDE_CELLS).round() as usize), C::Gray));
     }
     fit(segs, width)
+}
+
+/// "first seen 3s after Orders restarted": when a problem first came soon after its app started, the start likely
+/// brought it.
+fn cause(controller: &Controller, problem: &Problem) -> Option<String> {
+    let current = |occurrence: &&Occurrence| {
+        let state = controller.states.get(occurrence.app)?;
+        let started = state.started_at.filter(|at| occurrence.first >= state.run_from && occurrence.at >= *at)?;
+        Some((occurrence.at.saturating_duration_since(started), state.previous.is_some(), occurrence.app))
+    };
+    let (after, again, app) = problem.occurrences.iter().find_map(|occurrence| current(&occurrence))?;
+    let name = &controller.apps.get(app)?.name;
+    let started = if again { "restarted" } else { "started" };
+    (after <= CAUSE_WINDOW)
+        .then(|| format!("first seen {} after {name} {started}", format_duration(after.as_secs_f64())))
 }
 
 /// The picked problem's details: its message, how often and where, a chart of when, and the picked occurrence's
@@ -404,7 +520,14 @@ fn details(ui: &mut Ui, controller: &Controller, width: usize) -> Vec<Vec<Seg>> 
     } else if problem.new {
         out.push(vec![seg("new since its app's last run", C::Cyan)]);
     }
-    out.extend([Vec::new(), vec![seg("WHEN, THIS SESSION", C::DarkCyan)], vec![seg(chart(ui, &problem), color)]]);
+    if let Some(cause) = cause(controller, &problem) {
+        out.push(vec![seg(format!("↳ {cause}"), C::Magenta)]);
+    }
+    if ui.problems.muted.contains(&problem.shape) {
+        out.push(vec![seg("muted for this session - m unmutes it", C::DarkGray)]);
+    }
+    let when = chart(ui, &problem, CHART_BARS);
+    out.extend([Vec::new(), vec![seg("WHEN, THIS SESSION", C::DarkCyan)], vec![seg(when, color)]]);
     let same = |each: &&Occurrence| each.first == occurrence.first && each.app == occurrence.app;
     let back = problem.occurrences.iter().rev().position(|each| same(&each)).unwrap_or(0);
     let app = controller.apps.get(occurrence.app).map_or("?", |app| app.name.as_str());
@@ -429,13 +552,13 @@ fn details(ui: &mut Ui, controller: &Controller, width: usize) -> Vec<Vec<Seg>> 
 }
 
 /// When it happened this session, as bars from lazyrunner's start to now - the newest on the right.
-fn chart(ui: &Ui, problem: &Problem) -> String {
+fn chart(ui: &Ui, problem: &Problem, count: usize) -> String {
     let span = ui.now.saturating_duration_since(ui.started).as_secs_f64().max(1.0);
-    let mut bars = [0.0_f32; CHART_BARS];
+    let mut bars = vec![0.0_f32; count];
     for occurrence in &problem.occurrences {
         let since = occurrence.at.saturating_duration_since(ui.started).as_secs_f64();
-        let at = ((since / span) * CHART_BARS as f64) as usize;
-        bars[at.min(CHART_BARS - 1)] += 1.0;
+        let at = ((since / span) * count as f64) as usize;
+        bars[at.min(count - 1)] += 1.0;
     }
     let most = bars.iter().copied().fold(1.0, f32::max);
     bars.iter().map(|count| SPARKS[((count / most * 7.999).floor() as usize).min(SPARKS.len() - 1)]).collect()
@@ -459,8 +582,16 @@ fn header(ui: &Ui, view: &View) -> Vec<Seg> {
         segs.push(seg(format!(" · {new} new"), C::Cyan));
     }
     segs.push(seg(format!(" · by {}", SORTS[view.sort]), C::DarkGray));
+    if view.by_app {
+        segs.push(seg(" · grouped by app", C::DarkGray));
+    }
     if view.errors_only {
         segs.push(seg(" · errors only", C::DarkGray));
+    }
+    let muted = list.iter().filter(|problem| ui.problems.muted.contains(&problem.shape)).count();
+    if muted > 0 {
+        let showing = if view.show_muted { ", shown" } else { " (u shows them)" };
+        segs.push(seg(format!(" · {muted} muted{showing}"), C::DarkGray));
     }
     segs
 }
@@ -470,9 +601,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     note_counts(ui);
     let cursor = ui.cursor().to_string();
     let Some(Overlay::Problems(view)) = &ui.overlay else { return Vec::new() };
-    let (index, typing, filter) = (view.index, view.typing, view.filter.clone());
+    let (index, typing, filter, by_app) = (view.index, view.typing, view.filter.clone(), view.by_app);
     let mut out = vec![header(ui, view)];
-    let problems: Vec<Problem> = shown(&ui.problems.list, view).into_iter().cloned().collect();
+    let problems: Vec<Problem> = shown(&ui.problems, view).into_iter().cloned().collect();
     out.extend(super::viewbar::keys(KEYS, cells));
     if typing || !filter.is_empty() {
         out.push(vec![seg(format!(" / {filter}{}", if typing { cursor.as_str() } else { "" }), C::Cyan)]);
@@ -490,9 +621,18 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let list_width = if beside { cells.saturating_sub(DETAIL_WIDTH + 3) } else { cells };
     let index = index.min(problems.len() - 1);
     let mut table: Vec<Vec<Seg>> = Vec::new();
+    let (mut picked_row, mut group) = (0, None);
     for (at, problem) in problems.iter().enumerate() {
+        let app = problem.main_app();
+        if by_app && group != Some(app) {
+            group = Some(app);
+            let name = controller.apps.get(app).map_or("?".to_string(), |app| app.name.to_uppercase());
+            let count = problems.iter().filter(|each| each.main_app() == app).count();
+            table.push(vec![seg(format!(" {name} "), C::DarkCyan), seg(format!("· {count}"), C::DarkGray)]);
+        }
         let mut line = row(ui, controller, problem, list_width);
         if at == index {
+            picked_row = table.len();
             for part in line.iter_mut().filter(|part| part.bg.is_none()) {
                 (part.fg, part.bg) = (C::FocusText, Some(C::FocusBack));
             }
@@ -501,7 +641,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     }
     let details = details(ui, controller, if beside { DETAIL_WIDTH } else { cells.saturating_sub(1) });
     let room = if beside { body } else { table.len().min(body / 2).max(3) };
-    let first = index.saturating_sub(room / 2).min(table.len().saturating_sub(room));
+    let first = picked_row.saturating_sub(room / 2).min(table.len().saturating_sub(room));
     let table: Vec<Vec<Seg>> = table.into_iter().skip(first).take(room).collect();
     if beside {
         for at in 0..body {

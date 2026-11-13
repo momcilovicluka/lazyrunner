@@ -23,14 +23,29 @@ pub enum Fix {
     ReloadProfile,
 }
 
-/// A change that matters for running, as one line, the app it's about and what fixes it.
+/// What a change is to: its icon in the box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum What {
+    Profile,
+    Settings,
+    Launch,
+    Project,
+    Packages,
+    Migrations,
+    Env,
+}
+
+/// A change that matters for running, as one line, the app it's about and what fixes it; a settings file's keys,
+/// each `+` added, `-` taken away or `~` changed (never their values).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Change {
     pub app: Option<String>,
+    pub what: What,
     pub text: String,
     /// Shorter, for the one line that sums them up.
     pub short: String,
     pub fix: Option<Fix>,
+    pub keys: Vec<(char, String)>,
 }
 
 /// The changes between `from` and `to` (branches, or any revisions); none when git can't compare them.
@@ -70,18 +85,19 @@ pub fn classify(
         let name = path.rsplit('/').next().unwrap_or(path);
         let app = owner(path);
         let app_name = app.map_or("", |app| app.name.as_str());
-        let change = |text: String, short: String, fix: Option<Fix>| Change {
+        let change = |what: What, text: String, short: String, fix: Option<Fix>| Change {
             app: app.map(|app| app.key.clone()),
+            what,
             text,
             short,
             fix,
+            keys: Vec::new(),
         };
         if path == REPO_PROFILE_FILE {
+            let text = format!("The profile ({REPO_PROFILE_FILE}) - , then p reloads it");
             changes.push(Change {
                 app: None,
-                text: format!("The profile ({REPO_PROFILE_FILE}) - , then p reloads it"),
-                short: "the profile".into(),
-                fix: Some(Fix::ReloadProfile),
+                ..change(What::Profile, text, "the profile".into(), Some(Fix::ReloadProfile))
             });
         } else if is_migration(path) {
             match status {
@@ -95,26 +111,27 @@ pub fn classify(
             let said = match keys.as_deref() {
                 Some([]) | None => String::new(),
                 Some(keys) => {
-                    let named = keys.iter().take(NAMED_KEYS).cloned().collect::<Vec<_>>().join(", ");
+                    let named = keys.iter().take(NAMED_KEYS).map(|(_, key)| key.clone()).collect::<Vec<_>>().join(", ");
                     let more = if keys.len() > NAMED_KEYS { ", …" } else { "" };
                     format!(" ({} key{}: {named}{more})", keys.len(), if keys.len() == 1 { "" } else { "s" })
                 }
             };
-            let count = keys.map_or(String::new(), |keys| format!(" ({} keys)", keys.len()));
-            changes.push(change(format!("{app_name} {name}{said}"), format!("{app_name} appsettings{count}"), None));
+            let count = keys.as_ref().map_or(String::new(), |keys| format!(" ({} keys)", keys.len()));
+            let short = format!("{app_name} appsettings{count}");
+            let made = change(What::Settings, format!("{app_name} {name}{said}"), short, None);
+            changes.push(Change { keys: keys.unwrap_or_default(), ..made });
         } else if name == "launchSettings.json" {
-            changes.push(change(
-                format!("{app_name} launchSettings.json"),
-                format!("{app_name} launch settings"),
-                None,
-            ));
+            let (text, short) = (format!("{app_name} launchSettings.json"), format!("{app_name} launch settings"));
+            changes.push(change(What::Launch, text, short, None));
         } else if name.ends_with(".csproj") && app.is_some_and(|app| matches!(app.kind, AppKind::Dotnet { .. })) {
-            changes.push(change(format!("{app_name} {name} (packages or build)"), format!("{app_name} project"), None));
+            let text = format!("{app_name} {name} (packages or build)");
+            changes.push(change(What::Project, text, format!("{app_name} project"), None));
         } else if matches!(name, "package.json" | "package-lock.json") && app.is_some() {
             let short = format!("{app_name} {}", name.trim_end_matches(".json"));
-            changes.push(change(format!("{app_name} {name} - i then c runs npm ci"), short, Some(Fix::NpmCi)));
+            let text = format!("{app_name} {name} - i then c runs npm ci");
+            changes.push(change(What::Packages, text, short, Some(Fix::NpmCi)));
         } else if name == ".env" || name.starts_with(".env.") {
-            changes.push(change(format!("{path} (environment)"), name.to_string(), None));
+            changes.push(change(What::Env, format!("{path} (environment)"), name.to_string(), None));
         }
     }
     if added + removed > 0 {
@@ -128,9 +145,11 @@ pub fn classify(
         let short = format!("{} migration{}", added + removed, if added + removed == 1 { "" } else { "s" });
         changes.push(Change {
             app: None,
+            what: What::Migrations,
             text: format!("{} - M shows them", said.join(", ")),
             short,
             fix: Some(Fix::Migrations),
+            keys: Vec::new(),
         });
     }
     changes
@@ -158,9 +177,9 @@ fn is_migration(path: &str) -> bool {
         && !path.ends_with("ModelSnapshot.cs")
 }
 
-/// The keys (`Section:Key`) whose values differ between two versions of a settings file; none when either doesn't
-/// read as JSON (comments, say).
-fn changed_keys(before: Option<&str>, after: Option<&str>) -> Option<Vec<String>> {
+/// The keys (`Section:Key`) whose values differ between two versions of a settings file - `+` added, `-` taken away,
+/// `~` changed; none when either doesn't read as JSON (comments, say).
+fn changed_keys(before: Option<&str>, after: Option<&str>) -> Option<Vec<(char, String)>> {
     let parse = |text: Option<&str>| match text {
         None => Some(BTreeMap::new()),
         Some(text) => serde_json::from_str::<Value>(crate::json::strip_bom(text)).ok().map(|value| flat(&value)),
@@ -169,7 +188,12 @@ fn changed_keys(before: Option<&str>, after: Option<&str>) -> Option<Vec<String>
     let mut keys: Vec<String> = before.keys().chain(after.keys()).cloned().collect();
     keys.sort();
     keys.dedup();
-    Some(keys.into_iter().filter(|key| before.get(key) != after.get(key)).collect())
+    let sign = |key: &String| match (before.get(key), after.get(key)) {
+        (None, _) => '+',
+        (_, None) => '-',
+        _ => '~',
+    };
+    Some(keys.into_iter().filter(|key| before.get(key) != after.get(key)).map(|key| (sign(&key), key)).collect())
 }
 
 /// A JSON object's leaves by their `Section:Key` path (an array is one leaf).

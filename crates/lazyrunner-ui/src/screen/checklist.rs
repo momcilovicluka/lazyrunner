@@ -142,11 +142,20 @@ pub struct Resume {
     coming: Option<Coming>,
 }
 
-/// The resumed apps, how many of them are up, and since when the doctor waits.
+/// The resumed apps, how many of them are up, and since when the doctor waits; each one's name and how it's doing.
 struct Coming {
     keys: Vec<String>,
     up: usize,
     since: Instant,
+    apps: Vec<(String, Rising)>,
+}
+
+/// A resumed app as its chip shows it while the doctor waits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rising {
+    Starting,
+    Up,
+    Down,
 }
 
 enum Phase {
@@ -488,6 +497,30 @@ impl Checklist {
         true
     }
 
+    /// `[` `]` on the session's row: the session before or after among the last few kept. False when the picked row
+    /// isn't the session's.
+    pub fn pick_session(&mut self, controller: &mut Controller, step: isize) -> bool {
+        let index = self.selected;
+        let is_session = self.rows.get(index).is_some_and(|row| matches!(row.kind, Kind::Session(_)));
+        if !is_session || self.session.done {
+            return is_session;
+        }
+        let Some((at, count)) = controller.pick_session(step) else { return true };
+        if let Some(snapshot) = &controller.resume {
+            let now = chrono::Local::now().fixed_offset();
+            let summary = snapshot.summary(&controller.branch, now);
+            self.session.offered = !snapshot.running.is_empty();
+            let item = &mut self.items[index];
+            (item.status, item.detail) = (Status::Ok, format!("{summary} · {} of {count} ([ ] another)", at + 1));
+        }
+        true
+    }
+
+    /// The resumed apps while the doctor waits for them: each one's name and how it's doing.
+    pub fn resuming(&self) -> &[(String, Rising)] {
+        self.session.coming.as_ref().map_or(&[], |coming| coming.apps.as_slice())
+    }
+
     /// As the start comes: the session's apps start, and the doctor waits for them to come up; false when there
     /// are none to resume.
     fn begin_resuming(&mut self, controller: &mut Controller, now: Instant) -> bool {
@@ -497,7 +530,9 @@ impl Checklist {
         let keys = controller.start_resumed();
         self.session.done = !keys.is_empty();
         if self.session.done {
-            self.session.coming = Some(Coming { keys, up: 0, since: now });
+            let name = |key: &String| controller.app(key).map_or_else(|| key.clone(), |app| app.name.clone());
+            let apps = keys.iter().map(|key| (name(key), Rising::Starting)).collect();
+            self.session.coming = Some(Coming { keys, up: 0, since: now, apps });
         }
         self.session.done
     }
@@ -508,6 +543,13 @@ impl Checklist {
         let up = |key: &String| controller.is_running(key) && !controller.getting_ready().contains(key);
         let settled = |key: &String| up(key) || (controller.building.is_none() && !controller.is_running(key));
         coming.up = coming.keys.iter().filter(|key| up(key)).count();
+        for (key, (_, rising)) in coming.keys.iter().zip(coming.apps.iter_mut()) {
+            *rising = match () {
+                () if up(key) => Rising::Up,
+                () if controller.is_running(key) || controller.building.is_some() => Rising::Starting,
+                () => Rising::Down,
+            };
+        }
         let total = coming.keys.len();
         self.footer = format!("resuming the session - {} of {total} up · any key continues", coming.up);
         coming.keys.iter().all(settled) || now.saturating_duration_since(coming.since) >= RESUME_MOST

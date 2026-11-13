@@ -2640,7 +2640,10 @@ async fn the_spec_tab_lists_an_apps_documented_endpoints_and_fills_one_in_to_sen
     assert!(screen.last_log().starts_with("Sending DELETE /api/orders/{id} to"), "{}", screen.last_log());
     assert!(!screen.ui.replays.is_empty(), "it's on its way; how it went comes to the log");
     let Some(Overlay::Requests(view)) = &screen.ui.overlay else { panic!("still in H") };
-    assert_eq!(view.tab, super::requests::Tab::Requests, "where the request shows up");
+    assert_eq!(view.tab, super::requests::Tab::Spec, "its answer shows under the list");
+    assert!(screen.render(160, 30).contains("sending DELETE /api/orders/42"), "{}", screen.render(160, 30));
+    screen.press("Enter");
+    assert!(screen.render(160, 30).contains("42"), "the value sent last is remembered");
 }
 
 // ---------------------------------------------------------------- branch changes (#104)
@@ -2649,7 +2652,10 @@ async fn the_spec_tab_lists_an_apps_documented_endpoints_and_fills_one_in_to_sen
 async fn what_a_branch_switch_changed_shows_on_the_status_line_and_alt_g_lists_it_with_its_fixes() {
     use lazyrunner_core::run::branch_changes::{Change, Fix};
     let mut screen = screen("branch-changes", json!({}));
-    let change = |text: &str, fix| Change { app: None, text: text.into(), short: text.into(), fix };
+    let change = |text: &str, fix| {
+        let what = lazyrunner_core::run::branch_changes::What::Settings;
+        Change { app: None, what, text: text.into(), short: text.into(), fix, keys: Vec::new() }
+    };
     let changes = vec![
         change("Orders appsettings.Development.json (1 key: Db)", None),
         change("1 migration added - M shows them", Some(Fix::Migrations)),
@@ -2703,8 +2709,11 @@ async fn a_crash_of_an_app_that_restarts_on_crash_counts_down_in_its_title_and_g
     assert!(screen.controller.log.iter().any(|entry| entry.text.contains("starts again in 1s (1 of 3 crashes)")));
     screen.ui.now = Instant::now(); // the controller's clock: the wait is still under way
     let frame = screen.render(240, 30);
-    let title = frame.lines().find(|line| line.contains(" ↻ 1 · 1s ")).map(str::to_string);
-    assert!(title.is_some_and(|title| title.contains('▰')), "the wait drains in its title: {frame}");
+    assert!(frame.lines().any(|line| line.contains(" ↻ 1 · 1s ")), "the wait in its title: {frame}");
+    screen.press("Alt+x");
+    let frame = screen.render(240, 30);
+    assert!(frame.contains("crashes") && frame.contains("exit 1") && frame.contains("restarting in"), "{frame}");
+    screen.press("Esc");
     let status = agent(&mut screen, "status", json!({}), None);
     let restart = status["result"]["apps"][0]["restart"].as_str().unwrap_or_default().to_string();
     assert!(restart.starts_with("restarting in ") && restart.ends_with("(1 of 3)"), "{status}");
@@ -2775,12 +2784,14 @@ async fn a_resumed_session_brings_back_the_focus_the_search_and_the_requests_vie
     if let Some(Overlay::Requests(view)) = &mut before.ui.overlay {
         (view.filter, view.errors_only) = ("orders".into(), true);
     }
+    before.controller.states[1].scroll = 2;
     let view = super::session::snapshot(&before.ui, &before.controller);
     assert_eq!(view["screen"], "H", "{view}");
+    assert_eq!(view["scrolls"][&key], 2, "where its column was scrolled, for a handover: {view}");
 
     let mut after = screen("session-after", json!({}));
     resume(&mut after, &[], view);
-    super::session::restore(&mut after.ui, &mut after.controller);
+    super::session::restore(&mut after.ui, &mut after.controller, false);
     assert!(after.controller.resume.is_none(), "taken: the next close keeps this session");
     assert_eq!((after.ui.focus, after.ui.zoom), (1, true));
     let search = after.ui.search.as_ref().expect("the search");
@@ -4869,4 +4880,121 @@ async fn the_bar_of_screens_goes_from_one_to_another_on_the_app_looked_at() {
     assert!(matches!(screen.ui.overlay, Some(Overlay::Durations { .. })), "from the timeline too");
     screen.press("D");
     assert!(screen.ui.overlay.is_none(), "a screen's own key still closes it");
+}
+
+// ---------------------------------------------------------------- the 1.96 polish
+
+#[tokio::test]
+async fn m_mutes_a_problem_for_the_session_u_shows_it_again_and_a_groups_them_by_app() {
+    let mut screen = screen("problems-mute", json!({}));
+    fail(&mut screen, 0, 1);
+    let at = screen.ui.now;
+    screen.controller.states[1].output.push_hued("warn: a slow query", Some(Hue::Yellow), at);
+    screen.press("E m");
+    let frame = screen.render(160, 30);
+    assert!(frame.contains("1 muted (u shows them)") && !frame.contains("▌✗"), "the error is off the list: {frame}");
+    screen.press("u");
+    assert!(screen.render(160, 30).contains("▌~"), "u shows the muted one, dim");
+    screen.press("a");
+    let frame = screen.render(160, 30);
+    let name = screen.controller.apps[1].name.to_uppercase();
+    assert!(frame.contains("grouped by app") && frame.contains(&name), "{frame}");
+}
+
+#[tokio::test]
+async fn a_fault_preset_sets_a_ready_made_fault_and_ctrl_s_keeps_them() {
+    let mut screen = screen("fault-preset", json!({}));
+    let npm = screen.controller.apps.iter().position(|app| matches!(app.kind, AppKind::Npm { .. })).unwrap();
+    screen.ui.overlay = Some(Overlay::Stack { index: npm, opened: screen.ui.now });
+    screen.press("f Up Right Right");
+    assert!(screen.render(160, 40).contains("1 in 5 calls fails with 503"), "the preset says what it does");
+    screen.press("Enter");
+    let fault = screen.controller.faults().first().cloned().expect("set");
+    assert_eq!(fault.said(), "503 · 20%");
+    screen.press("Ctrl+S");
+    assert!(screen.controller.faults_kept() && screen.render(160, 40).contains("kept beyond this session"));
+}
+
+#[tokio::test]
+async fn the_log_levels_box_counts_each_categorys_lines_a_minute_and_shows_the_loud_ones() {
+    let mut screen = screen("log-rates", json!({}));
+    let at = screen.ui.now;
+    for _ in 0..40 {
+        screen.controller.states[0].output.push("info: Microsoft.AspNetCore.Hosting.Diagnostics[1]", at);
+    }
+    screen.ui.focus = 0;
+    screen.press("Alt+l");
+    let frame = screen.render(200, 40);
+    assert!(frame.contains("LOUD CATEGORIES") && frame.contains("40/min"), "{frame}");
+}
+
+#[tokio::test]
+async fn d_shows_a_changed_settings_files_keys_never_their_values() {
+    use lazyrunner_core::run::branch_changes::{Change, What};
+    let mut screen = screen("branch-keys", json!({}));
+    let keys = vec![('+', "ConnectionStrings:Db".to_string()), ('~', "Logging:LogLevel:Default".to_string())];
+    let text = "Orders appsettings.Development.json (2 keys)".to_string();
+    let change = Change { app: None, what: What::Settings, short: text.clone(), text, fix: None, keys };
+    screen.controller.branch_changes = Some(("main".into(), "feature/x".into(), vec![change]));
+    screen.press("Alt+g d");
+    let frame = screen.frame();
+    assert!(
+        frame.contains("+ ConnectionStrings:Db")
+            && frame.contains("~ Logging:LogLevel:Default")
+            && frame.contains("•••"),
+        "{frame}"
+    );
+}
+
+#[tokio::test]
+async fn alt_dot_lists_the_last_repeatable_actions_and_a_count_repeats_a_test_run() {
+    let mut screen = screen("repeat-history", json!({}));
+    screen.press("Alt+.");
+    assert!(screen.last_log().starts_with("Nothing to repeat yet"), "{}", screen.last_log());
+    screen.ui.again = Some(super::repeat::Again::Tests { keys: Vec::new(), failed_only: false });
+    super::repeat::tick(&mut screen.ui, &mut screen.controller);
+    assert_eq!(screen.ui.again_history.len(), 1, "a new repeatable action goes into the history");
+    screen.press("Alt+.");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Repeats { .. })));
+    screen.press("Esc 3 .");
+    assert!(screen.ui.repeat_left.as_ref().is_some_and(|(_, left, _)| *left == 2), "two more runs to come");
+}
+
+#[tokio::test]
+async fn an_agent_adds_a_database_copy_and_following_it_the_database_screen_opens_on_it() {
+    let mut screen = screen("agent-add-db", json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{\n  \"DefaultConnection\": \"Server=localhost;Database=ShopLocal;Trusted_Connection=True\"\n}\n";
+    std::fs::write(&path, secrets).unwrap();
+    let groups = lazyrunner_core::run::secrets::groups(secrets);
+    let picker = Picker {
+        path: path.clone(),
+        groups,
+        group: 0,
+        index: 0,
+        top: 0,
+        filter: String::new(),
+        filtering: false,
+        new_name: None,
+    };
+    screen.ui.picker = Some(picker);
+    let add =
+        |screen: &mut Screen, args: &Value| crate::agent::drive::add_database_at(&mut screen.controller, &path, args);
+    let refused = add(&mut screen, &json!({ "name": "ShopCopy", "switch": true }));
+    assert!(matches!(refused, Err(("needs_confirm", _))), "switching to it needs confirm: {refused:?}");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), secrets, "nothing added before it's confirmed");
+    let args = json!({ "name": "ShopCopy" });
+    let did = add(&mut screen, &args).unwrap();
+    assert_eq!(did, "add the database ShopCopy (a copy of ShopLocal @ localhost), not in use yet");
+    assert!(
+        std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("//\"DefaultConnection\": \"Server=localhost;Database=ShopCopy;")
+    );
+    screen.ui.follow.on = true;
+    let result = json!({ "doing": did });
+    super::follow::agent_call(&mut screen.ui, &mut screen.controller, "add_database", &args, &result, "claude-code");
+    let picker = screen.ui.picker.as_ref().expect("the database screen");
+    assert_eq!(picker.entries()[picker.index].database, "ShopCopy", "on the row it added");
+    assert!(matches!(add(&mut screen, &args), Err(("nothing_to_do", _))), "it's there already");
 }

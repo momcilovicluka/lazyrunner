@@ -2,7 +2,6 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-
   ┌─ Orders ───────────────────────────────────────────────────────────────────────────────────────────────┐
   │  Space  Start / stop the focused app  whichever it is not                                              │
   │  u      Start the focused app  builds it first if it changed                                           │
@@ -16,6 +15,8 @@ expression: screen.frame()
   │  Alt+l  Log levels of the focused app  Debug, EF Core's SQL, HttpClient's calls - restarts it          │
   │  Alt+s  Share the focused app through a tunnel (again: stop)  devtunnel or ngrok; the tool's own login │
   │  Alt+S  Share the focused app with anyone who has the link                                             │
+  │  Alt+q  Show the shared app's public URL as a QR code  for a phone                                     │
+  │  Alt+x  The focused app's crashes this session  when, exit codes, last errors                          │
   │  y      Copy (yank)  the last error, every error or warning, the search match, the output              │
   │  /      Search the focused app's output  n older match, N newer                                        │
   │  z      Zoom the focused column                                                                        │
@@ -24,7 +25,6 @@ expression: screen.frame()
   │  Alt+d  What's new since the last run  the rest dims; n N step through it                              │
   │ press a key, or j k + Enter · Esc / x close                                                            │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

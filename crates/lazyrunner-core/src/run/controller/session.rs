@@ -11,10 +11,21 @@ use crate::run::session::{self, Snapshot};
 impl Controller {
     /// The snapshot to offer at the start, when restoreSession is on.
     pub fn load_session(&mut self) {
-        self.resume = None;
+        self.resume_choices = Vec::new();
         if self.setting(Toggle::RestoreSession) {
-            self.resume = session::load(&self.state_dir, &self.branch, chrono::Local::now().fixed_offset());
+            let now = chrono::Local::now().fixed_offset();
+            self.resume_choices = session::history(&self.state_dir, &self.branch, now);
         }
+        self.resume = self.resume_choices.first().cloned();
+    }
+
+    /// `[` `]` on the checklist's session row: an older or newer session to resume; which of how many.
+    pub fn pick_session(&mut self, step: isize) -> Option<(usize, usize)> {
+        let count = self.resume_choices.len();
+        let at = self.resume.as_ref().and_then(|now| self.resume_choices.iter().position(|each| each.at == now.at))?;
+        let next = (at as isize + step).rem_euclid(count as isize) as usize;
+        self.resume = self.resume_choices.get(next).cloned();
+        Some((next, count))
     }
 
     /// Keeps this session for the next lazyrunner: the running apps and `view`, the screen as the UI gives it.

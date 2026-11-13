@@ -21,6 +21,8 @@ pub struct Tunnel {
     pub tool: &'static str,
     pub url: Option<String>,
     pub anonymous: bool,
+    /// When it was shared (the requests since count in its title).
+    pub since: Instant,
     job: u64,
     said: usize,
     down_since: Option<Instant>,
@@ -58,7 +60,9 @@ impl Controller {
             Ok(child) => {
                 let who = if anonymous || tunnel::always_public(tool) { "anyone with the link" } else { "your login" };
                 self.add_log(format!("⇄ Sharing {name} (:{port}) through {tool} - {who}…"), Hue::Cyan);
-                let tunnel = Tunnel { tool, url: None, anonymous, job, said: 0, down_since: None, _child: child };
+                let since = Instant::now();
+                let tunnel =
+                    Tunnel { tool, url: None, anonymous, since, job, said: 0, down_since: None, _child: child };
                 self.tunnels.insert(key.to_string(), tunnel);
             }
             Err(error) => self.add_log(format!("✗ {tool} didn't start: {error}"), Hue::Red),

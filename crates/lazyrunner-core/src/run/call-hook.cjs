@@ -111,6 +111,8 @@ try {
     );
     return fault && Math.random() * 100 < fault.share ? fault : undefined;
   };
+  // A delay's wait: its ms, or somewhere up to its ms_max (a slow network).
+  const waitOf = (fault) => (fault.ms_max > fault.ms ? fault.ms + Math.random() * (fault.ms_max - fault.ms) : fault.ms);
   const dropped = () =>
     Object.assign(new Error('lazyrunner dropped this call: a fault on its stack map (K)'), { code: 'ECONNRESET' });
   for (const [module, secure] of [[http, false], [https, true]]) {
@@ -142,7 +144,7 @@ try {
             } catch (error) {
               done(error);
             }
-          }, fault.ms);
+          }, waitOf(fault));
         });
       }
       if (fault.kind === 'drop') return through((opts, done) => process.nextTick(() => done(dropped())));
@@ -168,7 +170,7 @@ try {
       const fault = find(url.hostname.replace(/^\[|\]$/g, ''), at, url.pathname);
       if (!fault) return originalFetch(input, init);
       if (fault.kind === 'delay') {
-        await new Promise((done) => setTimeout(done, fault.ms));
+        await new Promise((done) => setTimeout(done, waitOf(fault)));
         return originalFetch(input, init);
       }
       if (fault.kind === 'drop') throw new TypeError('fetch failed', { cause: dropped() });

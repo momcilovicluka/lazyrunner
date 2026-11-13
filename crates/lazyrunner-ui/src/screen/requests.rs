@@ -657,12 +657,13 @@ fn ms_color(ms: f64) -> C {
 }
 
 /// Cut to `cells`, with "…" when it was longer.
-fn cut(text: &str, cells: usize) -> String {
+pub(super) fn cut(text: &str, cells: usize) -> String {
     if text.chars().count() > cells { format!("{}…", take_cells(text, cells.saturating_sub(1))) } else { text.into() }
 }
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let cursor = ui.cursor();
+    let spin = super::columns::spinner(ui).to_string();
     let opened = match &ui.overlay {
         Some(Overlay::Requests(view)) if view.details => {
             shown(view, controller).get(view.index).map(|request| request.seq)
@@ -724,8 +725,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
             out.push(vec![seg(detail(controller, list.get(view.index).copied()), C::White)]);
         }
         Tab::Spec => {
-            let specs = &mut ui.specs;
-            out.extend(super::spec::rows(view, specs, controller, (width, height + 1), cursor));
+            let (specs, memory) = (&mut ui.specs, &mut ui.spec_memory);
+            let look = (cursor, spin.as_str(), ui.now, ui.reduced_motion);
+            out.extend(super::spec::rows(view, specs, memory, controller, (width, height + 1), look));
         }
         Tab::Endpoints => {
             let summed = summed(view, controller);

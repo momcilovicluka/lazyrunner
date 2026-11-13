@@ -270,6 +270,8 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
     if let Some(snapshot) = &controller.resume {
         let now = chrono::Local::now().fixed_offset();
         let (summary, freshness) = (snapshot.summary(&controller.branch, now), snapshot.freshness(now));
+        let count = controller.resume_choices.len();
+        let summary = if count > 1 { format!("{summary} · 1 of {count} ([ ] another)") } else { summary };
         checks.push(check(Kind::Session(freshness), SESSION_CHECK, move || (Status::Ok, summary)));
     }
     checks

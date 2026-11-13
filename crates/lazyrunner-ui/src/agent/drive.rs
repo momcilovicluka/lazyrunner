@@ -194,34 +194,48 @@ pub fn kill_port_holder(controller: &mut Controller, args: &Value) -> Result<Str
     Ok("kill what holds the apps' ports, then start".into())
 }
 
-/// Makes a SQL connection string in the APIs' secrets.json the active one, as `d` does; the APIs restart on it.
-pub fn switch_database(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
-    let Some(path) = secrets::secrets_path(&controller.root, &controller.apps) else {
-        return Err(("not_found", "no secrets.json: no API has a UserSecretsId".into()));
-    };
-    let text = std::fs::read_to_string(&path)
+/// The APIs' secrets.json.
+fn secrets_file(controller: &Controller) -> Result<std::path::PathBuf, Refusal> {
+    secrets::secrets_path(&controller.root, &controller.apps)
+        .ok_or_else(|| ("not_found", "no secrets.json: no API has a UserSecretsId".into()))
+}
+
+/// The SQL connection strings in a secrets.json.
+fn connections_at(path: &std::path::Path) -> Result<Vec<Entry>, Refusal> {
+    let text = std::fs::read_to_string(path)
         .map_err(|error| ("not_found", format!("secrets.json couldn't be read: {error}")))?;
-    let entries = secrets::connections(&text);
-    let choices = entries.iter().map(|entry| format!("{} ({})", entry.label, entry.key)).collect::<Vec<_>>().join(", ");
-    let Some(wanted) = args["name"].as_str() else {
-        return Err(("bad_args", format!("which database? (\"name\"): {choices}")));
-    };
-    let key = args["key"].as_str();
+    Ok(secrets::connections(&text))
+}
+
+/// The connection strings as an answer lists them: `ShopLocal @ localhost (DefaultConnection), ...`.
+fn choices(entries: &[Entry]) -> String {
+    entries.iter().map(|entry| format!("{} ({})", entry.label, entry.key)).collect::<Vec<_>>().join(", ")
+}
+
+/// The one connection string `wanted` names - its database or label - of `key` when given.
+fn find_entry(entries: &[Entry], wanted: &str, key: Option<&str>) -> Result<Entry, Refusal> {
     let found: Vec<&Entry> = entries
         .iter()
         .filter(|entry| entry.label.eq_ignore_ascii_case(wanted) || entry.database.eq_ignore_ascii_case(wanted))
         .filter(|entry| key.is_none_or(|key| entry.key.eq_ignore_ascii_case(key)))
         .collect();
-    let entry = match found.as_slice() {
-        [entry] => (*entry).clone(),
+    match found.as_slice() {
+        [entry] => Ok((*entry).clone()),
         [] => {
-            return Err((
-                "bad_args",
-                format!("no database '{}' - the ones there: {choices}", clean(wanted, CLIENT_CHARS)),
-            ));
+            let wanted = clean(wanted, CLIENT_CHARS);
+            Err(("bad_args", format!("no database '{wanted}' - the ones there: {}", choices(entries))))
         }
-        _ => return Err(("bad_args", format!("several are called that - add \"key\": {choices}"))),
+        _ => Err(("bad_args", format!("several are called that - add \"key\": {}", choices(entries)))),
+    }
+}
+
+/// Makes a SQL connection string in the APIs' secrets.json the active one, as `d` does; the APIs restart on it.
+pub fn switch_database(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let entries = connections_at(&secrets_file(controller)?)?;
+    let Some(wanted) = args["name"].as_str() else {
+        return Err(("bad_args", format!("which database? (\"name\"): {}", choices(&entries))));
     };
+    let entry = find_entry(&entries, wanted, args["key"].as_str())?;
     if entry.active {
         return Ok(format!("keep {} (already in use)", entry.label));
     }
@@ -230,6 +244,63 @@ pub fn switch_database(controller: &mut Controller, args: &Value) -> Result<Stri
     }
     controller.switch_database(&entry);
     Ok(format!("switch the database to {}", entry.label))
+}
+
+/// Adds a SQL connection string as `n` on the database screen does: a copy of one there (`from`; the one in use when
+/// left out) with another database (`name`), inactive, right under it. `switch` makes it the active one too - the APIs
+/// restart on it - after `confirm`.
+pub fn add_database(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let path = secrets_file(controller)?;
+    add_database_at(controller, &path, args)
+}
+
+/// `add_database` on the secrets.json at `path`.
+pub(crate) fn add_database_at(
+    controller: &mut Controller,
+    path: &std::path::Path,
+    args: &Value,
+) -> Result<String, Refusal> {
+    let entries = connections_at(path)?;
+    let Some(name) = args["name"].as_str().map(str::trim).filter(|name| !name.is_empty()) else {
+        let why = format!("the new database's name? (\"name\"), copying \"from\" one of: {}", choices(&entries));
+        return Err(("bad_args", why));
+    };
+    let key = args["key"].as_str();
+    let source = match args["from"].as_str() {
+        Some(from) => find_entry(&entries, from, key)?,
+        None => {
+            let active: Vec<&Entry> = entries
+                .iter()
+                .filter(|entry| entry.active && key.is_none_or(|key| entry.key.eq_ignore_ascii_case(key)))
+                .collect();
+            match active.as_slice() {
+                [entry] => (*entry).clone(),
+                [] => return Err(("bad_args", format!("which one to copy? (\"from\"): {}", choices(&entries)))),
+                _ => return Err(("bad_args", format!("several are in use - add \"from\": {}", choices(&entries)))),
+            }
+        }
+    };
+    let name = clean(name, CLIENT_CHARS);
+    if entries.iter().any(|entry| entry.key == source.key && entry.database.eq_ignore_ascii_case(&name)) {
+        let why = format!("{name} is there already ({}) - switch_database switches to it", source.key);
+        return Err(("nothing_to_do", why));
+    }
+    let switch = args["switch"].as_bool().unwrap_or(false);
+    let copy = format!("{name} (a copy of {})", source.label);
+    if switch && !confirmed(args) {
+        return Err(confirm_first(&format!("adding {copy} and switching to it (the APIs restart on it)")));
+    }
+    secrets::add(path, &source, &name).map_err(|error| ("bad_args", error.to_string()))?;
+    if !switch {
+        return Ok(format!("add the database {copy}, not in use yet"));
+    }
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let added = secrets::connections(&text).into_iter().find(|entry| entry.line == source.line + 1);
+    let Some(added) = added.filter(|entry| entry.key == source.key) else {
+        return Err(("not_found", format!("added {copy}, but couldn't find it again to switch to it")));
+    };
+    controller.switch_database(&added);
+    Ok(format!("add the database {copy} and switch to it"))
 }
 
 /// Applies a DbContext's pending migrations, or moves it to one (`to`): forward applies up to it, back reverts the

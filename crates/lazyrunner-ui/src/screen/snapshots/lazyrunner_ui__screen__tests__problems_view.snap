@@ -4,10 +4,11 @@ expression: screen.frame()
 ---
   K △ PROBLEMS   H  M  A  T  P  D  ~  d
   2 problems · 1 error · 1 warning · by count
- j k choose · Enter its line · n N its occurrences · s sort · / filter · v errors only · y copy · Esc closes
+ j k choose · Enter its line · n N its occurrences · s sort · a by app · / filter · v errors only · m mute
+ u muted · y copy · Esc closes
 
- ✗     3  Orders ×2 · Billing ×1  0s ago             fail: Api.Orders[9]
- !     1  Billing ×1              0s ago             warn: a slow query
+▌✗     3  Orders ×2 · Billing ×1  0s ago             ▁▁▁▁▁▁▁█  fail: Api.Orders[9]
+▌!     1  Billing ×1              0s ago             ▁▁▁▁▁▁▁█  warn: a slow query
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  fail: Api.Orders[9]
  3 times · first 0s ago

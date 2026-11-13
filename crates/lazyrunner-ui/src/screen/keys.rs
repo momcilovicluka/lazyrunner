@@ -92,7 +92,7 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
 fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     let name = match key_name(&key) {
         // The Alt+letters that are actions of their own (a search's Alt+r and Alt+c are the search's).
-        name if matches!(name.as_str(), "d" | "f" | "b" | "p" | "l" | "g" | "s" | "S")
+        name if matches!(name.as_str(), "d" | "f" | "b" | "p" | "l" | "g" | "s" | "S" | "." | "q" | "x")
             && key.modifiers.contains(KeyModifiers::ALT)
             && !key.modifiers.contains(KeyModifiers::CONTROL) =>
         {
@@ -222,6 +222,7 @@ fn checklist_key(
                 fix_check(list, controller, index, replay, clipboard);
             }
         }
+        "[" | "]" => return list.pick_session(controller, if name == "]" { 1 } else { -1 }),
         "Escape" => return list.hold(),
         _ => return false,
     }
@@ -338,6 +339,7 @@ fn navigation(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "Escape" => ui.search = None,
         digit if digit.len() == 1 && ('1'..='9').contains(&digit.chars().next().unwrap_or('0')) => {
             let index = digit.parse::<usize>().unwrap_or(1) - 1;
+            ui.count_prefix = Some((index as u32 + 1, ui.now)); // a count, should . come next
             if super::diff::chip(ui, controller, index).is_some() {
                 super::diff::open_news(ui, controller, index); // as its chip says
             } else if index < controller.apps.len() {
@@ -495,6 +497,9 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::Sheet { .. }) => super::sheet::key(ui, controller, name, key),
         Some(Overlay::Launch { .. }) => super::launch::key(ui, controller, name),
         Some(Overlay::LogLevels { .. }) => super::log_levels::key(ui, controller, name),
+        Some(Overlay::Repeats { .. }) => super::repeat::history_key(ui, controller, name),
+        Some(Overlay::ShareQr { .. }) => super::share::key(ui, controller, name),
+        Some(Overlay::Crashes { .. }) => super::crashes::key(ui, controller, name),
         Some(Overlay::BranchChanges { .. }) => super::branch_changes::key(ui, controller, name),
         Some(Overlay::Timeline(_)) => super::timeline::key(ui, controller, name, key),
         Some(Overlay::Durations { .. }) => super::durations::key(ui, controller, name),
@@ -780,6 +785,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Durations => super::durations::open(ui, controller),
         Run::Problems => super::seen::open(ui, controller, super::jumps::View::Problems),
         Run::Repeat => super::repeat::repeat(ui, controller),
+        Run::RepeatHistory => super::repeat::open_history(ui, controller),
         Run::Tests => super::seen::open(ui, controller, super::jumps::View::Tests),
         Run::Requests => super::seen::open(ui, controller, super::jumps::View::Requests),
         Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),
@@ -815,6 +821,8 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
                 controller.share(&key, *anonymous);
             }
         }
+        Run::ShareQr => super::share::open(ui, controller),
+        Run::Crashes => super::crashes::open(ui, controller),
         Run::Timeline => super::timeline::open(ui),
         Run::Diff => super::diff::toggle(ui, controller),
         Run::Profile if controller.profiling.is_some() => controller.stop_profile(),
@@ -1027,6 +1035,7 @@ fn open_picker(ui: &mut Ui, controller: &mut Controller) {
     picker.index = picker.active_index();
     let entries: Vec<secrets::Entry> = picker.groups.iter().flat_map(|(_, entries)| entries.iter().cloned()).collect();
     ui.db_reach = Some(super::database::check(&entries));
+    ui.db_motion = super::database::Motion::opened(ui.now);
     ui.picker = Some(picker);
 }
 

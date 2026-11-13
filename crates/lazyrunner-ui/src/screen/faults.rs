@@ -1,7 +1,10 @@
 //! `f` on the stack map (K): faults on the picked app's calls (#105) - to another app (or a host you type), delayed,
 //! failed with a status, dropped, or answered with a canned response from a file; for a share of the calls, on
 //! routes starting with a path. `Enter` sets one (a .NET caller starts again once to load lazyrunner's hook), `Del`
-//! takes the target's away, `Esc` goes back to the map; `F` there takes them all away.
+//! takes the target's away, `Esc` goes back to the map; `F` there takes them all away. A preset sets a ready-made one
+//! - a slow network, a flaky one, offline, or 30 s of chaos - and `Ctrl+S` keeps the faults beyond this session.
+
+use std::time::Duration;
 
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
@@ -21,14 +24,36 @@ const KINDS: [&str; 4] = ["delay", "fail", "drop", "mock"];
 /// What each kind's value starts at: ms to wait, the status to answer with, nothing, a mock's status.
 const VALUES: [&str; 4] = ["800", "500", "", "200"];
 const SHARE_STEP: u8 = 10;
-const FOOTER: &str =
-    "↑ ↓ a field · ← → change it · type into it · Enter sets the fault · Del takes this target's away · Esc the map";
+const FOOTER: &str = "↑ ↓ a field · ← → change it · type into it · Enter sets the fault · Del takes this target's away · \
+     Ctrl+S keeps them · Esc the map";
 const HOST: &str = "a host you type…";
+/// The ready-made faults: a name, and what each sets - its kind, share and how long it lasts.
+const PRESETS: [&str; 5] = ["none", "slow network", "flaky", "offline", "chaos"];
+const PRESET_NOTES: [&str; 5] = [
+    "set it field by field",
+    "each call waits 1-3 s",
+    "1 in 5 calls fails with 503",
+    "every call is dropped",
+    "30 s: half wait up to 2 s, 3 in 10 fail with 500",
+];
+const CHAOS_LASTS: Duration = Duration::from_secs(30);
+
+/// What preset `preset` sets: each fault's kind and share, and how long they last.
+fn preset_faults(preset: usize) -> (Vec<(Kind, u8)>, Option<Duration>) {
+    match PRESETS[preset] {
+        "slow network" => (vec![(Kind::Between(1000, 3000), 100)], None),
+        "flaky" => (vec![(Kind::Fail(503), 20)], None),
+        "offline" => (vec![(Kind::Drop, 100)], None),
+        "chaos" => (vec![(Kind::Between(200, 2000), 50), (Kind::Fail(500), 30)], Some(CHAOS_LASTS)),
+        _ => (Vec::new(), None),
+    }
+}
 
 /// The box: whose calls, the target and kind picked, the value, mock file, share, path and host typed, and the field.
 #[derive(Clone, Debug)]
 pub struct View {
     pub caller: usize,
+    preset: usize,
     target: usize,
     kind: usize,
     value: String,
@@ -41,6 +66,7 @@ pub struct View {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Field {
+    Preset,
     To,
     Fault,
     Value,
@@ -74,6 +100,7 @@ fn targets(controller: &Controller, caller: usize) -> Vec<Choice> {
 pub fn open(ui: &mut Ui, caller: usize) {
     let view = View {
         caller,
+        preset: 0,
         target: 0,
         kind: 1,
         value: VALUES[1].to_string(),
@@ -86,9 +113,12 @@ pub fn open(ui: &mut Ui, caller: usize) {
     ui.overlay = Some(Overlay::Faults(Box::new(view)));
 }
 
-/// The fields shown for the kind picked: a drop has no value, only a mock a file.
+/// The fields shown for the kind picked: a drop has no value, only a mock a file; a preset only needs where.
 fn fields(view: &View) -> Vec<Field> {
-    let mut fields = vec![Field::To, Field::Fault];
+    if view.preset > 0 {
+        return vec![Field::Preset, Field::To, Field::Path];
+    }
+    let mut fields = vec![Field::Preset, Field::To, Field::Fault];
     if KINDS[view.kind] != "drop" {
         fields.push(Field::Value);
     }
@@ -115,6 +145,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "LeftArrow" | "RightArrow" => {
             let by = if name == "RightArrow" { 1 } else { -1 };
             match view.field {
+                Field::Preset => view.preset = super::keys::wrapped(view.preset, by, PRESETS.len()),
                 Field::To => view.target = super::keys::wrapped(view.target, by, choices.len().max(1)),
                 Field::Fault => {
                     view.kind = super::keys::wrapped(view.kind, by, KINDS.len());
@@ -129,6 +160,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             let view = view.as_ref().clone();
             set(controller, &view, &choices);
         }
+        "Ctrl+S" => controller.keep_faults(),
         "Delete" => {
             let caller = controller.apps.get(view.caller).map(|app| app.key.clone());
             let target = match choices.get(view.target) {
@@ -173,6 +205,15 @@ fn set(controller: &mut Controller, view: &View, choices: &[Choice]) {
         }
         _ => (view.host.trim().to_string(), None),
     };
+    let path = view.path.trim();
+    let path = if path.is_empty() || path.starts_with('/') { path.to_string() } else { format!("/{path}") };
+    if view.preset > 0 {
+        let (faults, lasts) = preset_faults(view.preset);
+        for each in faults {
+            controller.set_fault(&caller, target.clone(), &path, each, lasts);
+        }
+        return;
+    }
     let number = |text: &str, fallback: u64| text.trim().parse::<u64>().unwrap_or(fallback);
     let status = |fallback: u16| u16::try_from(number(&view.value, u64::from(fallback))).unwrap_or(fallback);
     let kind = match KINDS[view.kind] {
@@ -193,9 +234,7 @@ fn set(controller: &mut Controller, view: &View, choices: &[Choice]) {
         }
         _ => Kind::Fail(status(500)),
     };
-    let path = view.path.trim();
-    let path = if path.is_empty() || path.starts_with('/') { path.to_string() } else { format!("/{path}") };
-    controller.set_fault(&caller, target, &path, kind, view.share);
+    controller.set_fault(&caller, target, &path, (kind, view.share), None);
 }
 
 pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
@@ -210,6 +249,7 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         let picked = field == view.field;
         let typing = if picked { cursor } else { "" };
         let (label, value, note) = match field {
+            Field::Preset => ("PRESET", format!("◀ {} ▶", PRESETS[view.preset]), PRESET_NOTES[view.preset]),
             Field::To => {
                 let name = choices.get(view.target).map_or(String::new(), |(label, _)| label.clone());
                 let host = if view.host.is_empty() { HOST } else { &view.host };
@@ -234,7 +274,11 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
     }
     let set: Vec<_> = controller.faults().iter().filter(|fault| fault.caller == caller.key).collect();
     lines.push(Vec::new());
-    lines.push(vec![seg(format!(" ON {}'S CALLS", caller.name.to_uppercase()), C::DarkCyan)]);
+    let mut head = vec![seg(format!(" ON {}'S CALLS", caller.name.to_uppercase()), C::DarkCyan)];
+    if controller.faults_kept() {
+        head.push(seg("   kept beyond this session", C::DarkGray));
+    }
+    lines.push(head);
     if set.is_empty() {
         lines.push(vec![seg("   none yet", C::DarkGray)]);
     }
@@ -242,7 +286,12 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         let to_app = fault.to_app.as_deref().and_then(|key| controller.app(key));
         let to = to_app.map_or(fault.target.clone(), |app| app.name.clone());
         let hits = controller.fault_hits(fault.id);
-        let answered = if hits > 0 { format!("   {hits} answered") } else { String::new() };
+        let left = fault.until.map(|until| until.saturating_duration_since(ui.now).as_secs_f64().ceil());
+        let answered = match (hits, left) {
+            (0, None) => String::new(),
+            (hits, None) => format!("   {hits} answered"),
+            (hits, Some(left)) => format!("   {hits} answered · {}s left", left as u64),
+        };
         lines.push(vec![
             seg(format!("   → {}", pad(&to, 24)), C::White),
             seg(pad(&fault.said(), 30), C::Yellow),

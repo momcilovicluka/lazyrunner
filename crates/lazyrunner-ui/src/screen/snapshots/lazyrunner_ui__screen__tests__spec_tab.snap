@@ -4,14 +4,14 @@ expression: screen.frame()
 ---
   K  E ⇄ REQUESTS   M  A  T  P  D  ~  d
  requests  endpoints  spec    4 shown · 1 error · avg 400 ms
- Tab requests · j k choose · Enter fill it in and send · y copy as curl · r read the documents again
- Esc back
+ Tab requests · j k choose · Enter fill it in and send · l its request · y copy as curl · Y as .http
+ r read again · Esc back
  Orders · 2 endpoints · /swagger/v1/swagger.json
    Orders
-     GET     /api/orders/{id}                      2× · p95 12 ms      One order
-     DELETE  /api/orders/{id}                      not called          Cancel it
+      GET      /api/orders/{id}                      2× · p95 12 ms        One order
+      DELETE   /api/orders/{id}                      not called            Cancel it
    in the log, not in the document
-     POST    /api/orders                           1× in the log
+      POST     /api/orders                           1× in the log
 
 
 
