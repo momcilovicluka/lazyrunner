@@ -475,6 +475,7 @@ Content-Length: {}
             exact: None,
             db: None,
             ended: None,
+            outside: false,
         };
         let fall = traces.waterfall(&request).expect("its trace");
         assert!(fall.exact && (fall.ms - 100.0).abs() < 0.001);

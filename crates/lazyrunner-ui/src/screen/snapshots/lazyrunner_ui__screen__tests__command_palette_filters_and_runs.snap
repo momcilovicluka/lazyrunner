@@ -4,7 +4,7 @@ expression: screen.frame()
 ---
 
   ┌─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ › rest▏                                                                                    60 commands │
+  │ › rest▏                                                                                    62 commands │
   │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  ◆  Restart Orders  rebuild if it changed                                                          r   │
   │  ▸  Restart all  rebuild if anything changed                                                       R   │
@@ -16,11 +16,11 @@ expression: screen.frame()
   │  ≡  [ ] Request timelines from the .NET apps' OpenTelemetry spans                              ,   t   │
   │  ≡  [x] Keep the session: reopen with the apps and the screen it had                           ,   k   │
   │  ≡  Run the startup checklist now (and check for an update)                                    ,   r   │
+  │  ◆  Share Orders through a tunnel (again: stop)  devtunnel or ngrok; the tool's own login      Alt+s   │
   │  ≡  Settings (on/off toggles, r checklist)  auto-restart, auto-start, checklist…                   ,   │
   │  ✱  Tests: run the project's test suites  dotnet test, jest, vitest - several at once in the bac…  T   │
   │  ◧  Marks: every column's, to jump to                                                              '   │
   │  ✱  What changed for running on the last branch switch  settings keys, packages, migrations,…  Alt+g   │
-  │  ≡  [x] Startup checklist when lazyrunner opens                                                ,   w   │
   │ type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 

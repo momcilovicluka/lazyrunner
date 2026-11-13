@@ -34,6 +34,7 @@ pub mod session;
 pub mod suites;
 pub mod test_history;
 pub mod tools;
+pub mod tunnel;
 pub mod watcher;
 pub mod waterfall;
 
@@ -75,6 +76,11 @@ pub enum Tag {
     },
     /// dotnet ef, for the migrations view.
     Migration {
+        job: u64,
+    },
+    /// A tunnel sharing an app (#102).
+    Tunnel {
+        key: String,
         job: u64,
     },
 }

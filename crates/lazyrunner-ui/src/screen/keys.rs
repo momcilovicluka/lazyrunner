@@ -92,7 +92,10 @@ pub fn press(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
 fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
     let name = match key_name(&key) {
         // The Alt+letters that are actions of their own (a search's Alt+r and Alt+c are the search's).
-        name if matches!(name.as_str(), "d" | "f" | "b" | "p" | "l" | "g") && key.modifiers == KeyModifiers::ALT => {
+        name if matches!(name.as_str(), "d" | "f" | "b" | "p" | "l" | "g" | "s" | "S")
+            && key.modifiers.contains(KeyModifiers::ALT)
+            && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+        {
             format!("Alt+{name}")
         }
         name => name,
@@ -804,6 +807,11 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Launch => super::launch::open(ui, controller),
         Run::LogLevels => super::log_levels::open(ui, controller),
         Run::BranchChanges => super::branch_changes::open(ui),
+        Run::Share(anonymous) => {
+            if let Some(key) = controller.apps.get(ui.focus).map(|app| app.key.clone()) {
+                controller.share(&key, *anonymous);
+            }
+        }
         Run::Timeline => super::timeline::open(ui),
         Run::Diff => super::diff::toggle(ui, controller),
         Run::Profile if controller.profiling.is_some() => controller.stop_profile(),
