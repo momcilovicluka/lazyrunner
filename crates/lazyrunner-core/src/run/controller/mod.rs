@@ -12,7 +12,9 @@ mod handover;
 mod health;
 pub use health::TARGETS;
 mod crashes;
+mod log_levels;
 pub use crashes::{LOOP_CRASHES, Recovery};
+pub use log_levels::{CATEGORIES, DEFAULT, LEVELS, LogLevel};
 mod hooks;
 mod impact;
 mod launch;
@@ -300,6 +302,8 @@ pub struct Controller {
     pub resume: Option<crate::run::session::Snapshot>,
     /// The apps that crashed and start again by themselves (#99).
     recoveries: crashes::Recoveries,
+    /// The apps' log levels set from lazyrunner (#101), kept ones loaded from the state folder.
+    log_levels: log_levels::LogLevels,
     /// The spans the apps sent (#97), and the port lazyrunner receives them on.
     pub traces: crate::run::otlp::Traces,
     pub otlp_port: Option<u16>,
@@ -328,6 +332,7 @@ impl Controller {
         let mut log_problems = Vec::new();
         let mut runs = diff::load(&state_dir);
         let audits = crate::run::audit::load(&state_dir);
+        let kept_levels = log_levels::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
             state.previous = runs.remove(&state.key);
@@ -464,6 +469,7 @@ impl Controller {
             session_started: Instant::now(),
             resume: None,
             recoveries: Default::default(),
+            log_levels: kept_levels,
             traces: Default::default(),
             otlp_port,
             task_results: HashMap::new(),

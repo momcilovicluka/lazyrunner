@@ -60,6 +60,8 @@ pub enum Run {
     Marks,
     Sheet,
     Launch,
+    /// `Alt+l`: the focused .NET app's log levels (#101).
+    LogLevels,
     Timeline,
     Diff,
     /// Alt+b: the build as a map (#82).
@@ -186,6 +188,15 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Tools", "p", "Run the focused app on another launch profile or npm variant", "", Run::Launch)
             .safe()
             .focused(),
+        action(
+            "Tools",
+            "Alt+l",
+            "Log levels of the focused app",
+            "Debug, EF Core's SQL, HttpClient's calls - restarts it",
+            Run::LogLevels,
+        )
+        .safe()
+        .focused(),
         action(
             "Tools",
             "y",

@@ -15,7 +15,7 @@ use lazyrunner_core::changelog::Line;
 use lazyrunner_core::config::Toggle;
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::paths::Paths;
-use lazyrunner_core::profile::{ProfileDirs, import};
+use lazyrunner_core::profile::{AppKind, ProfileDirs, import};
 use lazyrunner_core::run::app::Status as AppStatus;
 use lazyrunner_core::run::checks::Status;
 use lazyrunner_core::run::controller::Setup;
@@ -2571,6 +2571,28 @@ async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_c
     screen.render(160, 30);
     screen.press("Esc");
     assert!(!screen.render(160, 30).contains("new problem"));
+}
+
+// ---------------------------------------------------------------- log levels (#101)
+
+#[tokio::test]
+async fn alt_l_sets_a_dotnet_apps_log_level_and_its_title_says_so_while_an_npm_app_has_none() {
+    let mut screen = screen("log-levels", json!({}));
+    let npm = screen.controller.apps.iter().position(|app| !matches!(app.kind, AppKind::Dotnet { .. })).unwrap();
+    screen.ui.focus = npm;
+    screen.press("Alt+l");
+    assert!(screen.ui.overlay.is_none() && screen.last_log().starts_with("Log levels are for .NET apps"));
+    screen.ui.focus = 0;
+    screen.press("Alt+l");
+    insta::assert_snapshot!("log_levels_box", screen.frame());
+    let frame = screen.frame();
+    assert!(frame.contains("Microsoft.EntityFrameworkCore.Database.Command") && frame.contains("its own"), "{frame}");
+    screen.press("h Enter");
+    assert_eq!(screen.controller.log_levels(&screen.controller.apps[0].key)[0].level, "Debug");
+    assert!(screen.last_log().ends_with("Default at Debug from its next start"), "{}", screen.last_log());
+    screen.press("Esc");
+    let title = screen.frame().lines().next().unwrap_or_default().to_string();
+    assert!(title.contains(&format!("{} · Debug", screen.controller.apps[0].name)), "{title}");
 }
 
 // ---------------------------------------------------------------- restart after a crash (#99)
