@@ -372,7 +372,7 @@ fn edges(
         let dashed = link.lazy || link.implicit;
         edges.push(graph::Edge { from, to, color, dashed, label, quiet: look.bare && !top, top });
         let flash = (color == C::Red && pulse).then_some(C::White);
-        motions.push(Motion { shown: reveal(link.from, link.to), dot: None, color: flash });
+        motions.push(Motion { shown: reveal(link.from, link.to), dot: None, color: flash, ..Motion::default() });
     }
     for &(one, other, count) in &shown.shares {
         let (Some(from), Some(to)) = (index(one), index(other)) else { continue };

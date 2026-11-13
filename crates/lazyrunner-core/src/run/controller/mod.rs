@@ -15,7 +15,7 @@ mod crashes;
 mod faults;
 mod log_levels;
 mod tunnels;
-pub use crashes::{LOOP_CRASHES, Recovery};
+pub use crashes::{Crash, LOOP_CRASHES, Recovery};
 pub use log_levels::{CATEGORIES, DEFAULT, LEVELS, LogLevel};
 pub use tunnels::Tunnel;
 mod hooks;
@@ -303,8 +303,11 @@ pub struct Controller {
     pub session_started: Instant,
     /// The session kept when lazyrunner last closed, until it's resumed (or set aside) at the start (#85).
     pub resume: Option<crate::run::session::Snapshot>,
+    /// The sessions kept that can be resumed instead, the newest first.
+    pub resume_choices: Vec<crate::run::session::Snapshot>,
     /// The apps that crashed and start again by themselves (#99).
     recoveries: crashes::Recoveries,
+    crash_history: crashes::History,
     /// The apps' log levels set from lazyrunner (#101), kept ones loaded from the state folder.
     log_levels: log_levels::LogLevels,
     /// What changed for running on the last branch switch (#104): from, to, and the changes.
@@ -477,7 +480,9 @@ impl Controller {
             session: HashMap::new(),
             session_started: Instant::now(),
             resume: None,
+            resume_choices: Vec::new(),
             recoveries: Default::default(),
+            crash_history: Default::default(),
             log_levels: kept_levels,
             branch_changes: None,
             tunnels: Default::default(),

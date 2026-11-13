@@ -182,8 +182,19 @@ fn encode(text: &str) -> String {
         .collect()
 }
 
-/// Sends `method` to `url` with these headers and, when given, a JSON body: its status and how long it took (ms).
-pub fn send(method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) -> Result<(u16, f64), String> {
+/// What came back from a send: its status, how long it took (ms), and the start of its body.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Sent {
+    pub status: u16,
+    pub ms: f64,
+    pub body: String,
+}
+
+/// How much of an answer's body is kept.
+const MOST_BODY: u64 = 4096;
+
+/// Sends `method` to `url` with these headers and, when given, a JSON body: what came back.
+pub fn send(method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) -> Result<Sent, String> {
     let agent: ureq::Agent =
         ureq::Agent::config_builder().timeout_global(Some(SEND_TIMEOUT)).http_status_as_error(false).build().into();
     let mut request = ureq::http::Request::builder().method(method).uri(url);
@@ -195,8 +206,13 @@ pub fn send(method: &str, url: &str, headers: &[(String, String)], body: Option<
     }
     let request = request.body(body.unwrap_or_default().to_string()).map_err(|error| error.to_string())?;
     let started = Instant::now();
-    let response = agent.run(request).map_err(|error| error.to_string())?;
-    Ok((response.status().as_u16(), started.elapsed().as_secs_f64() * 1000.0))
+    let mut response = agent.run(request).map_err(|error| error.to_string())?;
+    let ms = started.elapsed().as_secs_f64() * 1000.0;
+    let status = response.status().as_u16();
+    let mut answer = String::new();
+    let mut reader = std::io::Read::take(response.body_mut().as_reader(), MOST_BODY);
+    let _ = std::io::Read::read_to_string(&mut reader, &mut answer);
+    Ok(Sent { status, ms, body: answer })
 }
 
 /// A route as the requests view groups them, its parameters' names left out: `/api/orders/{}`.
@@ -284,8 +300,8 @@ mod tests {
             lower
         });
         let url = format!("http://127.0.0.1:{port}/api/orders");
-        let (status, _) = send("POST", &url, &[("X-Tenant".into(), "a".into())], Some(r#"{"name":"x"}"#)).unwrap();
-        assert_eq!(status, 201);
+        let sent = send("POST", &url, &[("X-Tenant".into(), "a".into())], Some(r#"{"name":"x"}"#)).unwrap();
+        assert_eq!(sent.status, 201);
         let asked = asked.join().unwrap();
         assert!(asked.starts_with("post /api/orders"), "{asked}");
         assert!(asked.contains("x-tenant: a") && asked.contains("content-type: application/json"), "{asked}");

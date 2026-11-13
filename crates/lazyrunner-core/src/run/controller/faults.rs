@@ -24,6 +24,9 @@ pub(super) struct Faults {
     server: Option<faults::Server>,
     built: HashMap<String, (PathBuf, Instant)>,
     building: Option<Building>,
+    /// The kept ones were read in; they're kept as they change (`Ctrl+S` in the box).
+    loaded: bool,
+    keeping: bool,
 }
 
 struct Building {
@@ -50,8 +53,8 @@ impl Controller {
         caller: &str,
         (target, to_app): (String, Option<String>),
         path: &str,
-        kind: Kind,
-        share: u8,
+        (kind, share): (Kind, u8),
+        lasts: Option<std::time::Duration>,
     ) {
         let Some(app) = self.app(caller).cloned() else { return };
         if matches!(app.kind, AppKind::Command(_)) {
@@ -69,8 +72,9 @@ impl Controller {
         }
         self.faults.next_id += 1;
         let share = share.clamp(1, 100);
-        let fault =
-            Fault { id: self.faults.next_id, caller: caller.into(), target, to_app, path: path.into(), kind, share };
+        let until = lasts.map(|lasts| (self.now)() + lasts);
+        let id = self.faults.next_id;
+        let fault = Fault { id, caller: caller.into(), target, to_app, path: path.into(), kind, share, until };
         self.add_log(format!("⚡ {} → {}: {}", app.name, fault.target, fault.said()), Hue::Yellow);
         self.faults.list.push(fault);
         self.publish_faults();
@@ -108,6 +112,39 @@ impl Controller {
         if let Err(error) = faults::write(&self.faults_file(), port, &self.faults.list) {
             self.add_log(format!("✗ Couldn't write the faults for the apps: {error}"), Hue::Red);
         }
+        if self.faults.keeping
+            && let Err(error) = faults::keep(&self.state_dir.join(faults::KEPT_FILE), &self.faults.list)
+        {
+            self.add_log(format!("✗ Couldn't keep the faults: {error}"), Hue::Red);
+        }
+    }
+
+    /// `Ctrl+S` in the faults box: the faults (and those set after) are set again when lazyrunner opens.
+    pub fn keep_faults(&mut self) {
+        self.faults.keeping = true;
+        self.publish_faults();
+        let count = self.faults.list.iter().filter(|fault| fault.until.is_none()).count();
+        let plural = if count == 1 { "" } else { "s" };
+        self.add_log(format!("⚡ {count} fault{plural} kept: set again when lazyrunner opens"), Hue::Cyan);
+    }
+
+    /// Whether the faults are kept beyond this session.
+    pub fn faults_kept(&self) -> bool {
+        self.faults.keeping
+    }
+
+    /// The faults kept from before, set again once, as lazyrunner opens.
+    fn load_kept_faults(&mut self) {
+        self.faults.loaded = true;
+        let kept = faults::kept(&self.state_dir.join(faults::KEPT_FILE));
+        if kept.is_empty() {
+            return;
+        }
+        self.faults.keeping = true;
+        for fault in kept {
+            let target = (fault.target, fault.to_app);
+            self.set_fault(&fault.caller, target, &fault.path, (fault.kind, fault.share), None);
+        }
     }
 
     /// A .NET caller has its hook: built already (it starts again when it started before), or built now.
@@ -137,6 +174,16 @@ impl Controller {
 
     /// A hook that's built: the .NET apps that wait for it start again with it.
     pub(super) fn tick_faults(&mut self) {
+        if !self.faults.loaded {
+            self.load_kept_faults();
+        }
+        let now = (self.now)();
+        let before = self.faults.list.len();
+        self.faults.list.retain(|fault| fault.until.is_none_or(|until| now < until));
+        if self.faults.list.len() < before {
+            self.publish_faults();
+            self.add_log("⚡ The chaos is over: those faults are gone", Hue::Cyan);
+        }
         let Some(building) = &self.faults.building else { return };
         let outcome = match building.result.try_recv() {
             Ok(outcome) => outcome,
@@ -204,7 +251,7 @@ mod tests {
         let npm = controller.apps.iter().find(|app| matches!(app.kind, crate::profile::AppKind::Npm { .. })).unwrap();
         let (caller, target) = (npm.key.clone(), controller.apps[0].key.clone());
         let to = (format!("localhost:{}", controller.port(&target).unwrap_or(0)), Some(target.clone()));
-        controller.set_fault(&caller, to, "/api", Kind::Fail(503), 30);
+        controller.set_fault(&caller, to, "/api", (Kind::Fail(503), 30), None);
         let written = crate::json::read(&controller.state_folder().join(crate::run::faults::FILE)).unwrap();
         assert_eq!(written["faults"][0]["caller"], caller.as_str());
         assert_eq!(written["faults"][0]["status"], 503);

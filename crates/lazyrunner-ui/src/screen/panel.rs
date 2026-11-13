@@ -139,9 +139,8 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     segs.push(
         seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta).at(Target::Branch),
     );
-    let changed = controller.branch_changes.as_ref().map_or(0, |(_, _, changes)| changes.len());
-    if changed > 0 {
-        segs.push(seg(format!(" · {changed} changed"), C::Yellow).at(Target::Branch)); // a click shows them (Alt+g)
+    if let Some(chip) = super::branch_changes::chip(ui, controller) {
+        segs.push(chip.at(Target::Branch)); // a click shows them (Alt+g)
     }
     segs.extend([
         seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),
@@ -321,6 +320,9 @@ fn notice(ui: &Ui, controller: &Controller) -> Vec<Seg> {
             seg("[!]", C::Cyan),
             seg(" kills it and starts", C::Red),
         ];
+    }
+    if let Some(banner) = super::crashes::held_banner(ui, controller) {
+        return banner;
     }
     if let Some(busy) = ui.busy {
         let marker = if ui.reduced_motion { "●" } else { super::columns::spinner(ui) };

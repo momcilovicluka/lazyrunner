@@ -162,8 +162,10 @@ pub fn bar(ui: &Ui, open: Screen, cells: usize) -> Vec<Seg> {
 }
 
 /// How long a new screen slides in, and how far (a share of the width).
-const SLIDE: std::time::Duration = std::time::Duration::from_millis(140);
+const SLIDE: std::time::Duration = std::time::Duration::from_millis(220);
 const SLIDE_SHARE: f64 = 0.25;
+/// How far the slide springs past its place.
+const SPRING: f64 = 1.70158;
 /// How long a key that did nothing shakes the hints.
 pub const SHAKE: std::time::Duration = std::time::Duration::from_millis(160);
 
@@ -178,17 +180,25 @@ fn place(screen: Screen) -> usize {
 }
 
 /// A screen just switched to slides in from the side of its place in the bar, easing out.
+/// Ease-out with a slight overshoot: past 1 a little before it settles at 1.
+fn overshoot(t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0) - 1.0;
+    1.0 + (SPRING + 1.0) * t.powi(3) + SPRING * t.powi(2)
+}
+
 pub fn slide(ui: &Ui, body: Vec<Vec<Seg>>, cells: usize) -> Vec<Vec<Seg>> {
     let Some((from, to, at)) = ui.screen_change.filter(|(.., at)| moving(ui, *at, SLIDE)) else { return body };
     let t = ui.now.saturating_duration_since(at).as_secs_f64() / SLIDE.as_secs_f64();
-    let offset = ((1.0 - t) * (1.0 - t) * cells as f64 * SLIDE_SHARE).round() as usize;
-    if offset == 0 {
+    let direction = if place(to) > place(from) { 1.0 } else { -1.0 };
+    // Springy: it overshoots its place a little and settles back.
+    let shift = ((1.0 - overshoot(t)) * cells as f64 * SLIDE_SHARE * direction).round() as isize;
+    if shift == 0 {
         return body;
     }
-    let from_right = place(to) > place(from);
+    let offset = shift.unsigned_abs();
     body.into_iter()
         .map(|line| {
-            if from_right {
+            if shift > 0 {
                 let mut shifted = vec![seg(" ".repeat(offset), C::Gray)];
                 shifted.extend(line);
                 super::columns::fit(shifted, cells)

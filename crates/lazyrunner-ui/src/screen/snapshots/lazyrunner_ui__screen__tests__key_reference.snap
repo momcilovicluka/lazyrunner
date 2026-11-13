@@ -4,18 +4,19 @@ expression: screen.frame()
 ---
 
 
-
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
-  │ You use most                                                                    y           Copy (yan… │
-  │   ?           Key reference ×1                                                  D           Durations… │
-  │ Run                                                                             E           Problems … │
-  │   Space       Start / stop the focused app                                      H           Requests:… │
-  │   u U         Start · focused / all                                             M           Migration… │
-  │   s S         Stop · focused / all                                              A           Audit: ou… │
-  │   r R         Restart · focused / all                                           P           Ports: wh… │
-  │   b B         Build · focused / all                                             K           Stack: wh… │
-  │   .           Repeat the last action                                            K Tab       Code map:… │
-  │   q           Quit                                                              T           Tests: ru… │
+  │ You use most                                                                    Alt+S       Share the… │
+  │   ?           Key reference ×1                                                  Alt+q       Show the … │
+  │ Run                                                                             y           Copy (yan… │
+  │   Space       Start / stop the focused app                                      D           Durations… │
+  │   u U         Start · focused / all                                             E           Problems … │
+  │   s S         Stop · focused / all                                              H           Requests:… │
+  │   r R         Restart · focused / all                                           M           Migration… │
+  │   b B         Build · focused / all                                             A           Audit: ou… │
+  │   .           Repeat the last action                                            P           Ports: wh… │
+  │   Alt+.       Repeat one of the last few actions                                K           Stack: wh… │
+  │   q           Quit                                                              K Tab       Code map:… │
+  │   Alt+x       The focused app's crashes this session                            T           Tests: ru… │
   │ Tools                                                                           L           lazygit: … │
   │   d           Switch database                                                   x           Menu for … │
   │   i           Install packages: npm ci or npm install                           F           Follow th… │
@@ -28,6 +29,5 @@ expression: screen.frame()
   │   Alt+l       Log levels of the focused app                                     m           Mark a li… │
   │   Alt+g       What changed for running on the last branch switch                [           Older mark │
   │   Alt+s       Share the focused app through a tunnel (again: stop)              ]           Newer mark │
-  │   Alt+S       Share the focused app with anyone who has the link                '           Marks: ev… │
   │ / filters · any key closes · : searches every command · lowercase = focused app, uppercase = all apps  │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

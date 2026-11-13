@@ -1,7 +1,8 @@
 //! The database screen (`d`): the connection strings in the user secrets, each with whether its server answers -
 //! checked as the screen opens, the dots breathing meanwhile - the apps that use it, its pending migrations and when
 //! you last switched to it. `Enter` switches and restarts the APIs; `n` adds one (a copy), `/` filters, `y` copies a
-//! row, `h` `l` another key, `Esc` goes back.
+//! row, `h` `l` another key, `Esc` goes back. Its rows come in one after another as it opens, and each answer flashes
+//! as it arrives.
 
 use std::collections::HashMap;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -36,6 +37,23 @@ const LABEL_CELLS: usize = 34;
 const ANSWER_CELLS: usize = 15;
 const APPS_CELLS: usize = 26;
 const PENDING_CELLS: usize = 12;
+/// Each row comes in this long after the one above it, dim at first for this long; an answer flashes this long.
+const ROW_STAGGER: Duration = Duration::from_millis(35);
+const ROW_DIM: Duration = Duration::from_millis(120);
+const ANSWER_FLASH: Duration = Duration::from_millis(500);
+
+/// The screen's motion: when it opened, and when each server's answer came in.
+#[derive(Debug, Default)]
+pub struct Motion {
+    opened: Option<Instant>,
+    answered: HashMap<String, Instant>,
+}
+
+impl Motion {
+    pub fn opened(now: Instant) -> Self {
+        Self { opened: Some(now), answered: HashMap::new() }
+    }
+}
 
 /// A server's host and port from its connection string: `host`, `host,port`, `tcp:host,port`, `host\instance`; none
 /// for a local named instance or a pipe.
@@ -82,15 +100,30 @@ fn reach_of(ui: &Ui, server: &str) -> Option<Reach> {
     ui.db_reach.as_ref()?.lock().ok()?.get(server).copied()
 }
 
-/// Whether a server is still being checked (its dot breathes).
+/// Whether a server is still being checked (its dot breathes), rows still come in, or an answer flashes.
 pub fn animating(ui: &Ui) -> bool {
-    ui.picker.is_some()
-        && !ui.reduced_motion
-        && ui
-            .db_reach
-            .as_ref()
-            .and_then(|reach| reach.lock().ok().map(|known| known.values().any(|reach| *reach == Reach::Checking)))
-            .unwrap_or(false)
+    let checking = ui
+        .db_reach
+        .as_ref()
+        .and_then(|reach| reach.lock().ok().map(|known| known.values().any(|reach| *reach == Reach::Checking)))
+        .unwrap_or(false);
+    let since = |at: &Instant| ui.now.saturating_duration_since(*at);
+    let rows = ui.picker.as_ref().map_or(0, |picker| picker.entries().len()) as u32;
+    let coming = ui.db_motion.opened.is_some_and(|at| since(&at) < ROW_STAGGER * rows + ROW_DIM);
+    let flashing = ui.db_motion.answered.values().any(|at| since(at) < ANSWER_FLASH);
+    ui.picker.is_some() && !ui.reduced_motion && (checking || coming || flashing)
+}
+
+/// Notes when each server's answer came in (it flashes then).
+fn note_answers(ui: &mut Ui) {
+    let Some(known) = ui.db_reach.as_ref().and_then(|reach| reach.lock().ok().map(|known| known.clone())) else {
+        return;
+    };
+    for (server, reach) in known {
+        if reach != Reach::Checking && !ui.db_motion.answered.contains_key(&server) {
+            ui.db_motion.answered.insert(server, ui.now);
+        }
+    }
 }
 
 /// The answer cell: answering in so many ms, not answering, being checked (breathing), or a local instance.
@@ -136,7 +169,16 @@ fn row(ui: &Ui, controller: &Controller, entry: &Entry, picked: bool) -> Vec<Seg
     };
     let last = controller.config[SWITCHED][&entry.label].as_str().and_then(ago).unwrap_or_else(|| "-".to_string());
     let answer = answer(ui, &entry.server);
-    let answer = seg(pad(&answer.text, ANSWER_CELLS), answer.fg);
+    let flash = ui
+        .db_motion
+        .answered
+        .get(&entry.server)
+        .is_some_and(|at| !ui.reduced_motion && ui.now.saturating_duration_since(*at) < ANSWER_FLASH);
+    let answer = if flash {
+        on(pad(&answer.text, ANSWER_CELLS), C::Black, answer.fg)
+    } else {
+        seg(pad(&answer.text, ANSWER_CELLS), answer.fg)
+    };
     if picked {
         let text = format!("{label}{}{}{}{last}", answer.text, pad(&apps, APPS_CELLS), pending.text);
         return vec![on(text, C::FocusText, C::FocusBack)];
@@ -151,6 +193,7 @@ fn row(ui: &Ui, controller: &Controller, entry: &Entry, picked: bool) -> Vec<Seg
 }
 
 pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    note_answers(ui);
     let cursor = ui.cursor().to_string();
     let Some(picker) = ui.picker.as_ref() else { return Vec::new() };
     let entries = picker.entries();
@@ -199,8 +242,18 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     if index >= top + room {
         top = index + 1 - room;
     }
-    for (at, entry) in entries.iter().enumerate().skip(top).take(room) {
-        lines.push(aim(super::columns::fit(row(ui, controller, entry, at == index), cells), Target::Item(at)));
+    let opened = ui.db_motion.opened.filter(|_| !ui.reduced_motion).map(|at| ui.now.saturating_duration_since(at));
+    for (shown, (at, entry)) in entries.iter().enumerate().skip(top).take(room).enumerate() {
+        let comes = ROW_STAGGER * shown as u32;
+        let mut line = super::columns::fit(row(ui, controller, entry, at == index), cells);
+        match opened {
+            Some(since) if since < comes => line = Vec::new(),
+            Some(since) if since < comes + ROW_DIM && at != index => {
+                line.iter_mut().for_each(|part| part.fg = C::DarkGray);
+            }
+            _ => {}
+        }
+        lines.push(aim(line, Target::Item(at)));
     }
     if let Some(name) = picker.new_name.clone() {
         lines.push(Vec::new());

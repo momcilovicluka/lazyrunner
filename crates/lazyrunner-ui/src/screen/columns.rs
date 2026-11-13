@@ -183,7 +183,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
             if ui.focus == keys[i] || ui.focus == keys[i + 1] {
                 (C::FocusBorder, "┃", "┳")
             } else {
-                (border(controller, keys[i]), "│", "┬")
+                (super::crashes::border(ui, controller, keys[i]), "│", "┬")
             }
         })
         .collect();
@@ -285,6 +285,7 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let chip = lazyrunner_core::apptypes::language(app)
         .filter(|_| !ui.nerd && app.icon.is_none())
         .map_or(String::new(), |language| format!("{} ", icons::language_chip(language)));
+    let name = super::session::typed(ui, &app.key, name);
     let text = format!(" {marker}{icon} {chip}{name} ");
     // An action's flash wins; else the chip moves as the app changes state.
     let mut segs = if ui.motion.title_lit(index, ui.now) {
@@ -307,9 +308,7 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         segs.push(recovery_chip(ui, recovery));
     }
     if let Some(tunnel) = controller.tunnel(&app.key) {
-        // Shared through a tunnel (#102): its public host, or that it's on its way.
-        let host = tunnel.url.as_deref().map_or("…", |url| url.trim_start_matches("https://"));
-        segs.push(seg(format!(" ⇄ {host}"), C::Cyan));
+        segs.extend(super::share::chip(ui, controller, &app.key, tunnel));
     }
     let status = status(ui, controller, index);
     segs.extend(services(ui, controller, &app.key, cells.saturating_sub(width(&segs) + width(&status) + 2)));
@@ -321,19 +320,30 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     let mut segs = ui.scrolling_row(segs, chip_parts + 1, cells);
     let used = width(&segs);
     let rule = if focused { "━" } else { "─" };
-    segs.push(seg(format!(" {}", rule.repeat(cells.saturating_sub(used + 1))), border(controller, index)));
+    let length = cells.saturating_sub(used + 1);
+    // While it waits to start again after a crash, the rule drains with the wait.
+    let drained = controller.recovery(&app.key).and_then(|recovery| recovery.left(ui.now));
+    let drained = drained.map(|(_, share)| ((share * length as f64).ceil() as usize).min(length));
+    match drained {
+        Some(lit) => {
+            segs.extend([seg(format!(" {}", rule.repeat(lit)), C::Yellow), seg(rule.repeat(length - lit), C::DarkGray)])
+        }
+        None => segs.push(seg(format!(" {}", rule.repeat(length)), super::crashes::border(ui, controller, index))),
+    }
     if focused {
-        // The focused pane's whole title bar takes the theme's focus colours (the state chip keeps its own).
-        for seg in segs.iter_mut().skip(chip_parts) {
-            seg.fg = C::FocusText;
+        // The focused pane's whole title bar takes the theme's focus colours (the state chip and a draining rule keep
+        // their own).
+        let keep = if drained.is_some() { 2 } else { 0 };
+        let count = segs.len();
+        for (at, seg) in segs.iter_mut().enumerate().skip(chip_parts) {
+            if at + keep < count {
+                seg.fg = C::FocusText;
+            }
             seg.bg = Some(C::FocusBack);
         }
     }
     fit(segs, cells)
 }
-
-/// The cells of the bar a crashed app's wait drains along.
-const RECOVERY_BAR: usize = 4;
 
 /// An app that starts again after a crash (#99): held after a loop (red), the wait to its next start draining with
 /// the seconds left, or how many times it started again.
@@ -343,11 +353,7 @@ fn recovery_chip(ui: &Ui, recovery: &lazyrunner_core::run::controller::Recovery)
         return seg(format!(" {icon} held"), C::Red);
     }
     match recovery.left(ui.now) {
-        Some((left, share)) => {
-            let full = ((share * RECOVERY_BAR as f64).ceil() as usize).min(RECOVERY_BAR);
-            let bar = format!("{}{}", "▰".repeat(full), "▱".repeat(RECOVERY_BAR - full));
-            seg(format!(" {icon} {} · {}s {bar}", recovery.restarts, left.as_secs_f64().ceil()), C::Yellow)
-        }
+        Some((left, _)) => seg(format!(" {icon} {} · {}s", recovery.restarts, left.as_secs_f64().ceil()), C::Yellow),
         None => seg(format!(" {icon} {}", recovery.restarts), C::DarkYellow),
     }
 }

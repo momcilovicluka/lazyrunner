@@ -207,7 +207,8 @@ at once while the palette wipes away.
 | `u` / `U` | Start the focused app / start everything (builds first if the code changed) |
 | `s` / `S` | Stop the focused app (or cancel its build or `npm ci`) / stop everything, cancelling a running build - `S` also cancels it from inside the `,` and `x` menus, which stay open |
 | `r` / `R` | Restart the focused app / everything (rebuild if anything changed) |
-| `.` | Repeat the last action that changed something, as in vim: a start, stop, restart or build (on the apps it acted on then, not on what has the focus now), `npm ci` or install, a task, a test run (the same suites or test), a request sent again (`p` in `H`), applying the pending migrations (asking again). Not views, scrolling, searches or settings. The hints say what it would do (`. restart Orders`) and the palette lists it first; with nothing to repeat it shakes the hints |
+| `.` | Repeat the last action that changed something, as in vim: a start, stop, restart or build (on the apps it acted on then, not on what has the focus now), `npm ci` or install, a task, a test run (the same suites or test), a request sent again (`p` in `H`), applying the pending migrations (asking again). Not views, scrolling, searches or settings. The hints say what it would do (`. restart Orders`) and the palette lists it first; with nothing to repeat it shakes the hints. A count first repeats a test run that many times, one after another (`3.`) |
+| `Alt+.` | Pick one of the **last 5 repeatable actions** to do again (it's then what `.` repeats) |
 | `b` / `B` | Build the focused app / every app that builds (but the ones `S` leaves running): a full build, never skipped, that leaves them **stopped** (a running one is stopped first - it locks its build output). `u` / `U` then start them without building again. npm apps have no separate build step |
 | `!` | Kill whatever holds a port the apps need (offered when a port is taken); with no port in the way, the port map (`P`) |
 | `q` / `Ctrl+C` | Quit: stop everything, back to the prompt |
@@ -221,9 +222,11 @@ at once while the palette wipes away.
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
 | `p` | Run the focused app on another launch profile (a .NET app's, from its `launchSettings.json`, with their URLs) or npm variant: `Enter` restarts it on the one picked (`●` marks the one it runs), remembered for this branch in lazyrunner's state, not the shared profile. Its column's title says so (`Orders · Orders-Https`); picking the profile's own forgets the choice |
-| `Alt+l` | A .NET app's **log levels**: the default, EF Core's SQL (`Microsoft.EntityFrameworkCore.Database.Command`), HttpClient's calls, ASP.NET Core and its own namespace, each at Trace, Debug, Information or Warning. `j` `k` pick a category, `h` `l` a level, `Enter` sets it - restarting the app when it runs - `x` gives the category back to its own settings, `r` all of them, `s` keeps them on this machine (else they're for this session). They go after lazyrunner's own `--Logging` arguments, so they win; the column's title says `Debug` (or `log*`) while they differ |
-| `Alt+g` | **What changed for running** on the last branch switch (or a click on the branch in the status line): of what git says changed, what makes the apps run differently rather than their code - the profile, an app's `appsettings*.json` (the keys whose values changed, never the values), `launchSettings.json` and project file, an npm app's `package.json` / lock, migrations added or removed, `.env` files. Each with its fix - `Enter` runs `npm ci`, opens `M` or reloads the profile. On a switch the log sums it up (`main → feature/x: Orders appsettings (2 keys), web package-lock, 1 migration`) and the status line says `· 3 changed`; opened on another branch than the session it closed on, the checklist's Branch row says what changed since |
-| `Alt+s` / `Alt+S` | **Share the focused app through a tunnel** - `devtunnel` (Microsoft Dev Tunnels) or `ngrok`, whichever is installed (`"tunnelTool"` picks one) - for a phone, a webhook or a teammate. lazyrunner runs the tool beside the app on its port and copies its public URL as it comes; the column's title shows it (`⇄ k3x9-47201.euw.devtunnels.ms`). `Alt+s` keeps the tool's own login required (devtunnel's default), `Alt+S` lets anyone with the link in (ngrok is public either way). Again stops it; it stops too when the app has been down 10 s (a restart keeps it) and with lazyrunner. Requests that came through it show `⇄` in `H` |
+| `Alt+l` | A .NET app's **log levels**: the default, EF Core's SQL (`Microsoft.EntityFrameworkCore.Database.Command`), HttpClient's calls, ASP.NET Core and its own namespace, each at Trace, Debug, Information or Warning. `j` `k` pick a category, `h` `l` a level, `Enter` sets it - restarting the app when it runs - `x` gives the category back to its own settings, `r` all of them, `s` keeps them on this machine (else they're for this session). They go after lazyrunner's own `--Logging` arguments, so they win; the column's title says `Debug` (or `log*`) while they differ. Each category says how many lines it logged the last minute, the loudest ones show under them, and the levels are a slider whose knob snaps as `Enter` sets one |
+| `Alt+g` | **What changed for running** on the last branch switch (or a click on the branch in the status line): of what git says changed, what makes the apps run differently rather than their code - the profile, an app's `appsettings*.json` (the keys whose values changed, never the values), `launchSettings.json` and project file, an npm app's `package.json` / lock, migrations added or removed, `.env` files. Each with its fix - `Enter` runs `npm ci`, opens `M` or reloads the profile. On a switch the log sums it up (`main → feature/x: Orders appsettings (2 keys), web package-lock, 1 migration`) and the status line says `· 3 changed`; opened on another branch than the session it closed on, the checklist's Branch row says what changed since. `d` shows a settings file's keys that changed (`+` `-` `~`, never their values); a change whose fix ran is ticked off once it's done |
+| `Alt+s` / `Alt+S` | **Share the focused app through a tunnel** - `devtunnel` (Microsoft Dev Tunnels) or `ngrok`, whichever is installed (`"tunnelTool"` picks one) - for a phone, a webhook or a teammate. lazyrunner runs the tool beside the app on its port and copies its public URL as it comes; the column's title shows it (`⇄ k3x9-47201.euw.devtunnels.ms`). `Alt+s` keeps the tool's own login required (devtunnel's default), `Alt+S` lets anyone with the link in (ngrok is public either way). Again stops it; it stops too when the app has been down 10 s (a restart keeps it) and with lazyrunner. Requests that came through it show `⇄` in `H`. The title spins while the tool connects, then says how many requests came since (`⇄ k3x9-47201.euw.devtunnels.ms · 12 requests`) |
+| `Alt+q` | The shared app's public URL as a **QR code**, for a phone; `y` copies it |
+| `Alt+x` | The focused app's **crashes** this session: a timeline, then each one's time, exit code and the last error it printed. `y` copies that error, `u` starts a held app |
 | `e` | The start sheet: what the focused app is started with - the command line and its folder, the launch profile (its URL) or npm script, the profile's `args`, its environment and the user secrets with their values masked (`Space` shows the picked one for 5 s; a connection string reads `database @ server`). Each variable says where it comes from - `launch`, `profile`, `secrets` or `override` - the one that wins with what it hides under it (a launch profile's variable wins over the profile's `env`, as `dotnet run` has it). **Overrides** are what the app gets on this machine on top, kept in lazyrunner's state and never in a shared file: `a` adds one (`NAME=value`), `Enter` overrides the picked variable (a user secret through its `Section__Key` variable), `d` drops one, `b` keeps one to this branch or gives it back to every branch, and `s` moves one that looks like a secret into the app's user secrets (a value that looks like one is masked, and the log says it's kept in plain text). A .NET app gets them as `dotnet run -e`, which beats its launch profile; an npm app in its environment. They apply from its next start, and its title says `env*` while it has any. `v` shows only the overrides, `V` copies them as what they change. A part that changed since the app started says so, and `r` restarts it; `y` copies the sheet, secrets masked |
 | `y` | Copy from the focused app's output - it asks what: `y` the last error with its stack trace (a failed build's errors with full paths), `e` every error, `w` every warning, `a` both in order (repeats once), `s` the search match, `o` all of it |
 | `D` | **Durations**: how long each build, app start, `npm ci` and test suite took over its last runs (below) |
@@ -370,9 +373,11 @@ focused app's build or take it out of the queue, and `q`.
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
   crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none.
 - **An app that crashes starts again by itself** when its profile says `"restart": "onCrash"`: after a wait that
-  doubles each time (1 s, 2 s, 4 s, at most 30 s), its title counting it down (`↻ 2 · 3s ▰▰▱▱`) - `s` cancels it. After 3
-  crashes within 2 minutes it's held (`↻ held`, a notification) until `u` starts it; once it has stayed up a minute its
-  crashes are forgotten. A stop you asked for, a restart or a branch change never counts, nor a clean exit.
+  doubles each time (1 s, 2 s, 4 s, at most 30 s), its title counting it down (`↻ 2 · 3s`) while the wait drains along
+  the title's rule - `s` cancels it. After 3 crashes within 2 minutes it's held (`↻ held`, its border pulsing red once,
+  a notification, and the status line with its last error) until `u` starts it; once it has stayed up a minute its
+  crashes are forgotten. A stop you asked for, a restart or a branch change never counts, nor a clean exit. `Alt+x`
+  shows its crashes.
 - **After "Ready"**, the log shows a startup timeline per app.
 - **The screens** - Stack `K`, Problems `E`, Requests `H`, Migrations `M`, Audit `A`, Tests `T`, Ports `P`, Durations `D`, Timeline
   `~`, Database `d` - each start with a bar naming them all with their keys, the open one lit (just the keys when the names don't
@@ -430,16 +435,19 @@ secrets masked as in the diagnostics zip.
 When lazyrunner closes it keeps the session for this branch, in the project's state folder: the apps that were
 running, the focused and zoomed column, the open screen (`K` `H` `M` `A` `T` `P` `D` `~`) on the app it was looking
 at - the requests' filter, errors only, endpoint and tab, the tests' filter, the audit's filter - and each column's
-search and `Alt+d` mode. Scroll positions and the jump list aren't kept: the output is new.
+search and `Alt+d` mode. Scroll positions and the jump list aren't kept: the output is new - but a handover (an update
+reopening lazyrunner, the apps' lines carried over) scrolls each column back to where it was.
 
 The next time it opens, the startup checklist offers it in the Project group: `Session · 2 h ago · 3 apps were
 running`, the age green within the hour, in the accent within the day, amber when older - and after a week it isn't
 offered. A session from another branch says so (`· from main`). With auto-start on, the start **starts the apps that
 were running** instead of all of them (`U` still starts everything): a bar fills along the doctor's bottom edge as they
 come up, then it closes. With auto-start off, `f` on the row starts them. `i` on the row starts afresh, the session
-kept as it was (`i` again offers it again); `lazyrunner --fresh` does that from the command line. Once the checklist
-closes the screen comes back as it was, and the resumed columns fade in from the background one after another as their
-apps start (not with reduced motion). An app the session names that the profile no longer has is left out, with a
+kept as it was (`i` again offers it again); `lazyrunner --fresh` does that from the command line. The last 3 sessions
+are kept: `[` `]` on the row pick another (`· 2 of 3`). While the resumed apps come up each has a chip - amber while it
+starts, green once up, red if it stopped. Once the checklist closes - its outline shrinking into the status line - the
+screen comes back as it was, and the resumed columns fade in from the background one after another as their apps
+start, each title typing itself in (not with reduced motion). An app the session names that the profile no longer has is left out, with a
 line in the log. `restoreSession` (`,` then `k`) turns it off.
 
 ## Database (`d`)
@@ -703,10 +711,12 @@ parts it doesn't build; `B` again shows everything.
 the calling app's box and `f`: a fault on its calls to another app (or a host you type) - a **delay** (ms), a **fail**
 (the status it answers with), a **drop** (the connection resets) or a **mock** (a status and a body from a file in the
 repo, for a service that isn't running) - for a share of the calls (`← →` in steps of 10%), on routes starting with a
-path if you give one. `↑ ↓` move between the fields, `← →` change one, typing fills one in, `Enter` sets it, `Del`
+path if you give one - or a **preset**: a slow network (each call waits 1-3 s), flaky (1 in 5 fails with 503), offline
+(every call dropped) or chaos (for 30 s, half wait up to 2 s and 3 in 10 fail with 500). `↑ ↓` move between the fields, `← →` change one, typing fills one in, `Enter` sets it, `Del`
 takes that target's away and `Esc` goes back to the map, where the edge is dashed in amber and says its fault
-(`⚡ 500 · 30% /api`) - an edge of its own when no call was seen yet. `F` on the map takes every fault away. Faults are
-for this session only, and the app's code doesn't change: an npm app's calls (http, https and `fetch`) go through
+(`⚡ 500 · 30% /api`), a `↯` running along it - red once its faults answered 10 calls - and an edge of its own when no
+call was seen yet. `F` on the map takes every fault away. Faults are for this session only unless `Ctrl+S` in the box
+keeps them (set again when lazyrunner opens), and the app's code doesn't change: an npm app's calls (http, https and `fetch`) go through
 lazyrunner's call hook, which reads them as they change; a .NET app's go through a startup hook
 (`DOTNET_STARTUP_HOOKS`) lazyrunner builds with `dotnet` for the app's target framework the first time (kept in its
 state folder), so a running .NET app starts again once to load it. A failed or mocked call is answered by lazyrunner's
@@ -845,8 +855,10 @@ whether it was called this session (`2× · p95 12 ms`) or `not called`; under t
 document doesn't. `Enter` fills one in: its path, query and header parameters (their examples or defaults put in, the
 required ones marked `*`) and its JSON body, made from the schema. `↑` `↓` (or `Tab`) move between the fields, typing
 changes the one picked, and `Enter` sends it - any method, with its body - from lazyrunner: the request comes in like
-any other, so the requests tab shows it, and the log says how it went. `y` copies the picked endpoint as curl, `r`
-reads the documents again.
+any other, so the requests tab shows it, and its answer shows under the list - its status, how long it took, its body
+(JSON laid out) - where `l` opens its request in the requests tab. The values sent are remembered for that endpoint
+(`◆`) for the next time. `y` copies the picked endpoint as curl, `Y` as a `.http` request, `r` reads the documents
+again.
 
 ## Tests (`T`)
 
@@ -931,13 +943,17 @@ entries alike but for what changes every time (ids, times, ports, numbers) are o
 compares runs with. Each row: how many times (it rolls up, and pulses as it rises), the apps (`Orders ×38 · Billing
 ×1`), when last, `new` when its app's last run didn't have it, `fixed?` once every app it happened in has started again
 and it hasn't come back, and its message - errors first. The picked one's details: its message, how often and since
-when, a chart of when it happened this session, and an occurrence's lines, their stack frames links.
+when, a chart of when it happened this session, and an occurrence's lines, their stack frames links - and when it was
+first seen soon after its app (re)started, that (`↳ first seen 3s after Orders restarted`). Each row has a sparkline of
+when too, and a red or amber edge.
 
 `j` `k` pick one, `Enter` jumps to its occurrence in its column (a jump: `Ctrl+O` comes back), `n` `N` step through its
 occurrences, `s` sorts by count, latest or first seen, `/` filters, `v` shows errors only, `y` copies it as Markdown -
-its message, count, apps and lines. It counts what the columns still have. A new problem while it's closed puts an `E`
-chip in the panel's header (`E 2 new problems`), which opens it on the first of them; a new one while it's open slides
-in.
+its message, count, apps and lines. `m` mutes the picked problem for the session - off the list and the chip, the
+header counting them - and `u` shows the muted ones, dim; `a` groups them by app. It counts what the columns still
+have. A new problem while it's closed puts an `E`
+chip in the panel's header (`E 2 new problems`), which opens it on the first of them; a new one while it's open drops
+in with a flash, and a `fixed?` one sorts last and dims.
 
 ## Durations (`D`)
 
@@ -999,6 +1015,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `run_action` | Any action by its key, on an app, as your key would |
 | `press_keys` | Keys as the key reference names them (`"g g"`, `"Ctrl+o"`, `"Esc"`), for what no tool covers; answers with the screen after. It waits while you type in a prompt |
 | `switch_database`, `install_packages`, `apply_migrations`, `kill_port_holder`, `set_setting` | The database by name, `npm ci` / `npm install`, a DbContext's pending migrations or one to move to, what holds a needed port, a setting |
+| `add_database` | A connection string added to secrets.json as `n` on the database screen does: a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet - or, with `switch` (and `confirm`), the one in use |
 
 What can't be undone or takes something away from you - quitting, killing a port's holder, reverting a migration,
 switching the database, clearing the output, reopening lazyrunner, the git tool over the screen - needs
@@ -1006,8 +1023,11 @@ switching the database, clearing the output, reopening lazyrunner, the git tool 
 
 **Follow mode** (`F`) lets you watch it work: the screen goes where the agent looks - the column whose output it reads,
 scrolled to the lines it read; the requests view with its filters; the tests view on its suite; the migrations view;
+the database screen on the connection string it adds or switches to;
 the stack map, the code map, the ports, the audit, the durations, the timeline, an app's start sheet, your marks or the
-changelog, whichever it reads - and outlines what it read for a few seconds. Your keys rest meanwhile (all but `F`, and
+changelog, whichever it reads - and outlines what it read for a few seconds. When it asks you first (switching the
+database, reverting a migration), the screen already shows what it asks about. The agent is told to work through
+lazyrunner's tools rather than by hand - `add_database` rather than editing secrets.json - so you see it. Your keys rest meanwhile (all but `F`, and
 `Ctrl+C`; the mouse too), the header says whom you follow, and the keys row tells its last calls in words. `F` again
 gives you the keys back and puts the screen back as it was; the places the agent took you stay in the jump list
 (`Ctrl+O`); `F` once more follows again, on the screen the agent is at. With `followAgent` (`, F`, on by default) an

@@ -32,6 +32,10 @@ const PULSE_STEP: u128 = 200;
 const DOT_SPEED: f64 = 4.0;
 const DOT_PER_CALL: f64 = 6.0;
 const DOT_FASTEST: f64 = 30.0;
+/// A faulted edge's spark runs this fast, and from this many hits the edge turns from amber to red.
+const FAULT_SPEED: f64 = 6.0;
+const HOT_HITS: usize = 10;
+const SPARK: &str = "↯";
 /// A box's edge kept this far from the view's side when it scrolls to the picked one.
 const MARGIN: usize = 2;
 
@@ -384,7 +388,33 @@ fn motion(ui: &Ui, opened: Instant, traffic: &Traffic, dots: &mut Dots, edge: &s
     let dot = (traffic.per_second > 0.0).then_some((travelled, traffic.dot));
     let pulse = traffic.last_failed.map(|at| ui.now.saturating_duration_since(at)).filter(|since| *since < PULSE);
     let color = pulse.filter(|since| (since.as_millis() / PULSE_STEP).is_multiple_of(2)).map(|_| C::White);
-    Motion { shown, dot, color }
+    Motion { shown, dot, color, ..Motion::default() }
+}
+
+/// A faulted edge's motion: a spark running along it, whatever its traffic.
+fn spark(ui: &Ui, opened: Instant, dots: &mut Dots, edge: &str, color: C) -> Motion {
+    if !moving(ui) {
+        return Motion::default();
+    }
+    let shown = ui.now.saturating_duration_since(opened).as_secs_f64() / REVEAL.as_secs_f64();
+    let travelled = dots.advance(&format!("fault:{edge}"), FAULT_SPEED, ui.now);
+    Motion { shown, dot: Some((travelled, color)), color: None, glyph: SPARK }
+}
+
+/// The faults on `from`'s calls to `to`: what each does, and how many calls they answered - amber, red once hot.
+fn faulted(controller: &Controller, from: &str, to: &str) -> Option<(String, C)> {
+    let set: Vec<&lazyrunner_core::run::faults::Fault> = controller
+        .faults()
+        .iter()
+        .filter(|fault| fault.caller == from && fault.to_app.as_deref() == Some(to))
+        .collect();
+    if set.is_empty() {
+        return None;
+    }
+    let hits: usize = set.iter().map(|fault| controller.fault_hits(fault.id)).sum();
+    let said = set.iter().map(|fault| fault.said()).collect::<Vec<_>>().join(" · ");
+    let label = if hits > 0 { format!("⚡ {said} · {hits} hit") } else { format!("⚡ {said}") };
+    Some((label, if hits >= HOT_HITS { C::Red } else { C::Yellow }))
 }
 
 /// The map's parts with `detail` in its boxes, from `figures` (the edges as [`Controller::stack_edges`] has them).
@@ -406,21 +436,18 @@ fn model(
     for edge in figures.iter().cloned() {
         let (Some(from), Some(to)) = (at(&edge.from), at(&edge.to)) else { continue };
         let (color, label) = look(&edge);
-        // A fault on its calls (#105) draws it dashed in amber, saying the fault.
-        let set: Vec<String> = controller
-            .faults()
-            .iter()
-            .filter(|fault| fault.caller == edge.from && fault.to_app.as_deref() == Some(edge.to.as_str()))
-            .map(|fault| fault.said())
-            .collect();
-        let (color, label, dashed) = if set.is_empty() {
-            (color, label, edge.seen == 0)
-        } else {
-            (C::Yellow, format!("⚡ {}", set.join(" · ")), true)
-        };
-        edges.push(graph::Edge { from, to, color, dashed, label, quiet: false, top: false });
+        // A fault on its calls (#105) draws it dashed in amber (red once it answered many), a spark running along it.
         let id = format!("{}>{}", edge.from, edge.to);
-        motions.push(motion(ui, opened, &Traffic::of(&edge), dots, &id));
+        match faulted(controller, &edge.from, &edge.to) {
+            None => {
+                edges.push(graph::Edge { from, to, color, dashed: edge.seen == 0, label, quiet: false, top: false });
+                motions.push(motion(ui, opened, &Traffic::of(&edge), dots, &id));
+            }
+            Some((label, color)) => {
+                edges.push(graph::Edge { from, to, color, dashed: true, label, quiet: false, top: false });
+                motions.push(spark(ui, opened, dots, &id, color));
+            }
+        }
         kept.push(edge);
     }
     // A fault on calls the map hasn't seen yet still shows: its own dashed amber edge.
@@ -432,10 +459,11 @@ fn model(
         if drawn.contains(&pair) {
             continue;
         }
+        let Some((label, color)) = faulted(controller, &pair.0, &pair.1) else { continue };
+        let id = format!("{}>{}", pair.0, pair.1);
         drawn.push(pair);
-        let label = format!("⚡ {}", fault.said());
-        edges.push(graph::Edge { from, to, color: C::Yellow, dashed: true, label, quiet: false, top: false });
-        motions.push(Motion::default());
+        edges.push(graph::Edge { from, to, color, dashed: true, label, quiet: false, top: false });
+        motions.push(spark(ui, opened, dots, &id, color));
     }
     let users = controller.database_users();
     let host = controller.database_service().map(|(host, _)| host);
@@ -527,6 +555,7 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     let busy_database = controller.database_users().iter().any(|key| controller.database_commands(key) > 0);
     ui.now.saturating_duration_since(opened) < REVEAL
         || busy_database
+        || controller.faults().iter().any(|fault| fault.to_app.is_some())
         || controller.stack_edges().iter().any(|edge| edge.calls > 0 || pulsing(edge))
 }
 

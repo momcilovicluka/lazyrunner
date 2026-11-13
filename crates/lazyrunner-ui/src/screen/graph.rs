@@ -43,18 +43,22 @@ pub struct Edge {
     pub top: bool,
 }
 
+/// A call travelling along an edge.
+const DOT: &str = "•";
+
 /// How an edge is drawn this frame: how much of it is in (0 to 1), a dot of a colour that has moved this many cells
-/// along it (around and around), and a colour over its own.
+/// along it (around and around) drawn as `glyph`, and a colour over its own.
 #[derive(Clone, Copy, Debug)]
 pub struct Motion {
     pub shown: f64,
     pub dot: Option<(f64, C)>,
     pub color: Option<C>,
+    pub glyph: &'static str,
 }
 
 impl Default for Motion {
     fn default() -> Self {
-        Self { shown: 1.0, dot: None, color: None }
+        Self { shown: 1.0, dot: None, color: None, glyph: DOT }
     }
 }
 
@@ -496,7 +500,7 @@ impl Map {
         if let Some((moved, dot)) = motion.dot {
             let at = (moved.max(0.0) as usize) % path.len().saturating_sub(1).max(1);
             if let Some(cell) = self.cell(path[at].0, path[at].1) {
-                cell.text = Some("•".into());
+                cell.text = Some(motion.glyph.into());
                 cell.color = dot;
             }
         }

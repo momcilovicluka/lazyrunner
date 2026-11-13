@@ -1,6 +1,7 @@
 //! The screen kept with the session (#85): the focused and zoomed column, the open screen - on the app it looked at,
 //! with its filters - each column's search and `Alt+d` mode. It comes back once the startup checklist closes; the
-//! resumed columns fade in from the background one after another as their apps start (not with reduced motion).
+//! resumed columns fade in from the background one after another as their apps start, each title typing itself in
+//! (not with reduced motion). A handover (an update reopening lazyrunner) keeps where each column was scrolled too.
 
 use std::time::{Duration, Instant};
 
@@ -16,6 +17,8 @@ use super::{Overlay, Search, Ui, diff, requests};
 /// How long a resumed column takes to fade in, and how long after the one before it starts.
 const FADE: Duration = Duration::from_millis(450);
 const STAGGER: Duration = Duration::from_millis(150);
+/// The cursor a title types itself in behind.
+const TYPING: &str = "▏";
 const STACK_TABS: [(Tab, &str); 3] = [(Tab::Map, "map"), (Tab::Code, "code"), (Tab::Health, "health")];
 
 /// What the screen shows now, to keep with the session.
@@ -33,6 +36,15 @@ pub fn snapshot(ui: &Ui, controller: &Controller) -> Value {
         "app": screen.and_then(|_| screens::looked_at(ui, controller)).and_then(key_of),
         "stackTab": tab,
     });
+    let scrolls: serde_json::Map<String, Value> = controller
+        .states
+        .iter()
+        .filter(|state| state.scroll > 0)
+        .map(|state| (state.key.clone(), json!(state.scroll)))
+        .collect();
+    if !scrolls.is_empty() {
+        view["scrolls"] = Value::Object(scrolls);
+    }
     if let Some(search) = ui.search.as_ref().filter(|search| !search.query.is_empty()) {
         view["search"] = json!({
             "app": search.key, "query": search.query, "regex": search.regex, "case": search.case, "filter": search.filter,
@@ -54,8 +66,9 @@ pub fn snapshot(ui: &Ui, controller: &Controller) -> Value {
     view
 }
 
-/// The session's screen back, once the start is under way; its apps fade in as they run.
-pub fn restore(ui: &mut Ui, controller: &mut Controller) {
+/// The session's screen back, once the start is under way; its apps fade in as they run. After a `handover` the
+/// columns are scrolled back as they were (their lines came along).
+pub fn restore(ui: &mut Ui, controller: &mut Controller, handover: bool) {
     let Some(snapshot) = controller.resume.take() else { return };
     let view = snapshot.view;
     let keys: Vec<String> = controller.apps.iter().map(|app| app.key.clone()).collect();
@@ -64,6 +77,12 @@ pub fn restore(ui: &mut Ui, controller: &mut Controller) {
         ui.focus = at;
     }
     ui.zoom = view["zoom"].as_bool().unwrap_or(false);
+    if handover {
+        for state in &mut controller.states {
+            let kept = view["scrolls"][&state.key].as_u64().unwrap_or(0) as usize;
+            state.scroll = kept.min(state.output.len().saturating_sub(1));
+        }
+    }
     let changes: Vec<usize> =
         view["changes"].as_array().into_iter().flatten().filter_map(Value::as_str).filter_map(place).collect();
     for at in changes {
@@ -131,6 +150,21 @@ pub fn step(ui: &mut Ui, controller: &Controller) {
         ui.fades.insert(key.clone(), at);
         ui.restoring.retain(|waiting| *waiting != key);
     }
+}
+
+/// A resumed column's title as far as it has typed itself in, with a cursor while it types.
+pub fn typed(ui: &Ui, key: &str, text: String) -> String {
+    let Some(at) = ui.fades.get(key) else { return text };
+    let share = fade_share(ui.now, *at);
+    if share >= 1.0 {
+        return text;
+    }
+    let count = text.chars().count();
+    let shown = ((share * count as f64).ceil() as usize).clamp(1, count.max(1));
+    let mut typed: String = text.chars().take(shown).collect();
+    typed.push_str(TYPING);
+    typed.extend(std::iter::repeat_n(' ', count.saturating_sub(shown)));
+    typed
 }
 
 /// Whether a resumed column is fading in.

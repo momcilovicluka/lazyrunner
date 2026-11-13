@@ -1,5 +1,5 @@
 //! Follow mode (`F`): the screen follows an agent working over MCP - the column, the lines, the requests, the suite,
-//! the migrations, the stack or code map, the ports, the audit, the durations, the timeline, the start sheet or the
+//! the migrations, the database screen (on the connection string it adds or switches to), the stack or code map, the ports, the audit, the durations, the timeline, the start sheet or the
 //! marks it reads come into view, what it read outlined for a few seconds - while your keys rest (all but `F` and
 //! `Ctrl+C`; the mouse too). `F` again gives them back and puts the screen back as it was; the places the agent took
 //! you stay in the jump list (`Ctrl+O`); `F` once more follows again, on the screen the agent is at. With
@@ -17,6 +17,7 @@ use serde_json::Value;
 use super::actions::Run;
 use super::jumps::{self, Place};
 use super::motion::Spot;
+use super::mouse::Target;
 use super::requests::{self, Tab};
 use super::seg::{Seg, on, seg};
 use super::suites::{self, Row};
@@ -144,7 +145,26 @@ fn open_view(ui: &mut Ui, controller: &mut Controller, kind: &str, run: Run) {
 
 /// Brings what the agent read into view; what it did, in words.
 fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result: &Value) -> Option<String> {
+    if !matches!(op, "switch_database" | "add_database") {
+        ui.picker = None; // the database screen would hide the view it goes to
+    }
     match op {
+        "switch_database" | "add_database" => {
+            database_view(ui, controller, args);
+            result["doing"].as_str().map(str::to_string)
+        }
+        "kill_port_holder" => {
+            open_view(ui, controller, "ports", Run::Ports);
+            result["doing"].as_str().map(str::to_string)
+        }
+        "install_packages" | "run_task" => {
+            close_view(ui);
+            if let Some(app) = app_of(controller, &args["app"]) {
+                ui.focus = app;
+                ui.motion.flash(Spot::Title(app), ui.now);
+            }
+            result["doing"].as_str().map(str::to_string)
+        }
         "logs" => {
             let app = app_of(controller, &result["app"])?;
             // Each line after its number and a space.
@@ -182,7 +202,7 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             let read = suite.map_or("read the test suites".to_string(), |suite| format!("read {suite}'s results"));
             Some(result["doing"].as_str().map_or(read, str::to_string))
         }
-        "migrations" | "check_migrations" => {
+        "migrations" | "check_migrations" | "apply_migrations" => {
             if !matches!(ui.overlay, Some(Overlay::Migrations { .. })) {
                 ui.overlay = Some(Overlay::Migrations { index: 0, picking: None });
             }
@@ -278,6 +298,32 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             Some(format!("read {}'s build", result["app"].as_str().unwrap_or_default()))
         }
         _ => result["doing"].as_str().map(str::to_string),
+    }
+}
+
+/// The database screen, read again, on the connection string the agent added, switched to or asks about (its `name`,
+/// else what it copies `from`) - the row pressed, as a click would.
+fn database_view(ui: &mut Ui, controller: &mut Controller, args: &Value) {
+    close_view(ui);
+    super::keys::run(ui, controller, &Run::Database);
+    let key = args["key"].as_str();
+    let Some(picker) = ui.picker.as_mut() else { return };
+    if let Ok(text) = std::fs::read_to_string(&picker.path) {
+        picker.groups = lazyrunner_core::run::secrets::groups(&text); // as the agent left it
+    }
+    let named = |wanted: &str| {
+        picker.groups.iter().enumerate().find_map(|(group, (_, entries))| {
+            let found = entries.iter().position(|entry| {
+                (entry.label.eq_ignore_ascii_case(wanted) || entry.database.eq_ignore_ascii_case(wanted))
+                    && key.is_none_or(|key| entry.key.eq_ignore_ascii_case(key))
+            });
+            found.map(|at| (group, at))
+        })
+    };
+    let found = args["name"].as_str().and_then(named).or_else(|| args["from"].as_str().and_then(named));
+    if let Some((group, at)) = found {
+        (picker.group, picker.index, picker.filter) = (group, at, String::new());
+        ui.motion.flash(Spot::Clicked(Target::Item(at)), ui.now);
     }
 }
 

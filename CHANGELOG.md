@@ -3,6 +3,21 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.96.0] - 2026-11-13
+
+### Added
+- Problems (`E`): `m` mutes a problem for the session - off the list and the chip, the header counting them, `u` shows them dim - and `a` groups them by app. Each row has a sparkline of when and a red or amber edge; the details say when it was first seen soon after its app (re)started (`↳ first seen 3s after Orders restarted`). A new one drops in with a flash, and a `fixed?` one sorts last and dims over a second.
+- Repeat: a count before `.` repeats a test run that many times, one after another (`3.`); `Alt+.` picks one of the last 5 repeatable actions. The `.` hint pulses when what it would repeat changes.
+- Crashes: `Alt+x` shows the focused app's crashes this session - a timeline, then each one's time, exit code and the last error it printed (`y` copies it, `u` starts a held app). A held app's border pulses red once and the status line says so, with its last error; the wait before a restart drains along the title's rule.
+- Log levels (`Alt+l`): each category's lines a minute, the loudest categories under them, and the levels drawn as a slider whose knob snaps (and the title flashes) as `Enter` sets one.
+- Branch changes (`Alt+g`): `d` shows a settings file's keys that changed (`+` `-` `~`, values masked), each kind has its icon, and a change whose fix ran is ticked off once done (`✓ 2 of 3 fixed`). The status line's chip slides in and glows amber a moment.
+- The spec tab: `Y` copies an endpoint as a `.http` request; a form remembers the values last sent (`◆` marks the endpoint); after `Enter` the answer shows under the list - its status, time and body - and `l` opens its request in the requests tab. Methods are pills, and a `↗` rises from the form as it's sent.
+- Tunnels: `Alt+q` shows the shared URL as a QR code, for a phone. The title says how many requests came since it was shared, spins while the tool connects, and a shimmer runs along the host as it's copied.
+- Faults: presets - a slow network (1-3 s), flaky (20% fail with 503), offline, and 30 s of chaos - and `Ctrl+S` keeps the faults beyond this session. A `↯` runs along a faulted edge on the map, which turns red once its faults answered 10 calls.
+- Session: `[` `]` on the checklist's session row pick among the last 3 sessions kept; the resumed apps show as chips while they come up; a resumed column's title types itself in; a handover (an update reopening lazyrunner) keeps where each column was scrolled. The checklist's outline shrinks into the status line as it closes.
+- The database screen's rows come in one after another and each server's answer flashes as it arrives; switching screens slides with a little spring.
+- Agents: `add_database` adds a connection string to secrets.json as `n` on the database screen does - a copy of one there with another database, not in use yet, or (`switch`, after `confirm`) the one in use. Following an agent, the database screen opens on the connection string it adds or switches to, its row pressed as a click would; installing packages, applying migrations, killing a port's holder and running a task go to their views too, and when the agent asks you first the screen already shows what it asks about. Its instructions tell it to work through lazyrunner's tools rather than by hand, so you see it.
+
 ## [1.95.0] - 2026-11-13
 
 ### Added

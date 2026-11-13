@@ -34,6 +34,8 @@ pub enum Run {
     Problems,
     /// `.`: the last action that changed something, again (#103).
     Repeat,
+    /// `Alt+.`: one of the last few, again.
+    RepeatHistory,
     Tests,
     Requests,
     Migrations,
@@ -66,6 +68,10 @@ pub enum Run {
     BranchChanges,
     /// `Alt+s` / `Alt+S`: share the focused app through a tunnel - anyone with the link may open it - or stop (#102).
     Share(bool),
+    /// `Alt+q`: the shared app's public URL as a QR code.
+    ShareQr,
+    /// `Alt+x`: the focused app's crashes this session.
+    Crashes,
     Timeline,
     Diff,
     /// Alt+b: the build as a map (#82).
@@ -161,6 +167,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         action("Run", "S", "Stop all", "also cancels a running build", Run::StopAll),
         action("Run", "R", "Restart all", "rebuild if anything changed", Run::RestartAll),
         action("Run", ".", &repeat, "the last start, stop, build, test run, request or task", Run::Repeat).safe(),
+        action(
+            "Run",
+            "Alt+.",
+            "Repeat one of the last few actions",
+            "3. repeats a test run 3 times",
+            Run::RepeatHistory,
+        )
+        .safe(),
         action("Run", "B", "Build all", "full build of every app that builds, leaves them stopped", Run::BuildAll),
     ];
     if !controller.conflicts.is_empty() {
@@ -219,6 +233,12 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         .safe()
         .focused(),
         action("Tools", "Alt+S", "Share the focused app with anyone who has the link", "", Run::Share(true))
+            .safe()
+            .focused(),
+        action("Tools", "Alt+q", "Show the shared app's public URL as a QR code", "for a phone", Run::ShareQr)
+            .safe()
+            .focused(),
+        action("Run", "Alt+x", "The focused app's crashes this session", "when, exit codes, last errors", Run::Crashes)
             .safe()
             .focused(),
         action(

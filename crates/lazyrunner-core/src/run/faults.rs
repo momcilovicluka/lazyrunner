@@ -25,7 +25,7 @@ pub const PATH_PREFIX: &str = "/__lazyrunner_fault/";
 pub const HEADER: &str = "x-lazyrunner-fault";
 /// The .NET startup hook's source, and the folder it's built in (its version in the name: a new source builds anew).
 const HOOK_SOURCE: &str = include_str!("fault-hook.cs");
-const HOOK_FOLDER: &str = "fault-hook-1";
+const HOOK_FOLDER: &str = "fault-hook-2";
 const HOOK_NAME: &str = "LazyrunnerFaults";
 const DEFAULT_FRAMEWORK: &str = "net8.0";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -36,6 +36,8 @@ const JSON: &str = "application/json";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
     Delay(u64),
+    /// A delay somewhere between these many ms (a slow network).
+    Between(u64, u64),
     Fail(u16),
     Drop,
     /// A canned response: its status, its body and the file it came from.
@@ -49,7 +51,7 @@ pub enum Kind {
 impl Kind {
     pub fn name(&self) -> &'static str {
         match self {
-            Self::Delay(_) => "delay",
+            Self::Delay(_) | Self::Between(..) => "delay",
             Self::Fail(_) => "fail",
             Self::Drop => "drop",
             Self::Mock { .. } => "mock",
@@ -68,6 +70,8 @@ pub struct Fault {
     pub path: String,
     pub kind: Kind,
     pub share: u8,
+    /// When it ends by itself (chaos for a while); none: when taken away.
+    pub until: Option<std::time::Instant>,
 }
 
 impl Fault {
@@ -75,6 +79,7 @@ impl Fault {
     pub fn said(&self) -> String {
         let what = match &self.kind {
             Kind::Delay(ms) => format!("+{ms} ms"),
+            Kind::Between(least, most) => format!("+{least}–{most} ms"),
             Kind::Fail(status) => status.to_string(),
             Kind::Drop => "drop".into(),
             Kind::Mock { status, .. } => format!("mock {status}"),
@@ -85,16 +90,66 @@ impl Fault {
     }
 
     fn to_json(&self) -> Value {
-        let (ms, status) = match &self.kind {
-            Kind::Delay(ms) => (*ms, 0),
-            Kind::Fail(status) | Kind::Mock { status, .. } => (0, *status),
-            Kind::Drop => (0, 0),
+        let (ms, ms_max, status) = match &self.kind {
+            Kind::Delay(ms) => (*ms, *ms, 0),
+            Kind::Between(least, most) => (*least, *most, 0),
+            Kind::Fail(status) | Kind::Mock { status, .. } => (0, 0, *status),
+            Kind::Drop => (0, 0, 0),
         };
         json!({
             "id": self.id, "caller": self.caller, "target": self.target, "path": self.path, "share": self.share,
-            "kind": self.kind.name(), "ms": ms, "status": status,
+            "kind": self.kind.name(), "ms": ms, "ms_max": ms_max, "status": status,
         })
     }
+}
+
+/// The faults kept beyond this session (`Ctrl+S` in the faults box), in the state folder.
+pub const KEPT_FILE: &str = "faults-kept.json";
+
+/// Keeps `faults` (the ones that don't end by themselves), all they need to be set again.
+pub fn keep(file: &Path, faults: &[Fault]) -> Result<()> {
+    let kept: Vec<Value> = faults
+        .iter()
+        .filter(|fault| fault.until.is_none())
+        .map(|fault| {
+            let mut kept = fault.to_json();
+            kept["to_app"] = json!(fault.to_app);
+            if let Kind::Mock { body, file, .. } = &fault.kind {
+                (kept["body"], kept["file"]) = (json!(body), json!(file));
+            }
+            kept
+        })
+        .collect();
+    crate::config::write(file, &Value::Array(kept))
+}
+
+/// The faults kept, to set again (their ids anew).
+pub fn kept(file: &Path) -> Vec<Fault> {
+    let Some(Value::Array(kept)) = crate::json::read(file) else { return Vec::new() };
+    let text = |value: &Value| value.as_str().unwrap_or_default().to_string();
+    kept.iter()
+        .filter_map(|fault| {
+            let (ms, most) = (fault["ms"].as_u64().unwrap_or(0), fault["ms_max"].as_u64().unwrap_or(0));
+            let status = u16::try_from(fault["status"].as_u64().unwrap_or(500)).unwrap_or(500);
+            let kind = match fault["kind"].as_str()? {
+                "delay" if most > ms => Kind::Between(ms, most),
+                "delay" => Kind::Delay(ms),
+                "drop" => Kind::Drop,
+                "mock" => Kind::Mock { status, body: text(&fault["body"]), file: text(&fault["file"]) },
+                _ => Kind::Fail(status),
+            };
+            Some(Fault {
+                id: 0,
+                caller: text(&fault["caller"]),
+                target: text(&fault["target"]),
+                to_app: fault["to_app"].as_str().map(str::to_string),
+                path: text(&fault["path"]),
+                kind,
+                share: u8::try_from(fault["share"].as_u64().unwrap_or(100)).unwrap_or(100),
+                until: None,
+            })
+        })
+        .collect()
 }
 
 /// Writes `faults` for the hooks, with the fault server's port.
@@ -248,6 +303,7 @@ mod tests {
             path: String::new(),
             kind,
             share: 100,
+            until: None,
         }
     }
 
