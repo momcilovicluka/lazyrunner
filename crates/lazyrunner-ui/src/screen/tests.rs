@@ -2574,6 +2574,30 @@ async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_c
     assert!(!screen.render(160, 30).contains("new problem"));
 }
 
+// ---------------------------------------------------------------- faults on the calls between apps (#105)
+
+#[tokio::test]
+async fn f_on_the_map_sets_a_fault_on_an_apps_calls_its_edge_says_it_and_f_takes_them_away() {
+    let mut screen = screen("faults", json!({}));
+    let npm = screen.controller.apps.iter().position(|app| matches!(app.kind, AppKind::Npm { .. })).unwrap();
+    screen.ui.overlay = Some(Overlay::Stack { index: npm, opened: screen.ui.now });
+    screen.press("f");
+    let frame = screen.render(160, 40);
+    assert!(frame.contains("Faults on") && frame.contains("◀ fail ▶") && frame.contains("none yet"), "{frame}");
+    screen.press("Down Down Backspace Backspace Backspace 5 0 3 Enter");
+    let fault = screen.controller.faults().first().cloned().expect("set");
+    assert_eq!(fault.caller, screen.controller.apps[npm].key);
+    assert_eq!(fault.kind, lazyrunner_core::run::faults::Kind::Fail(503));
+    assert!(screen.render(160, 40).contains("503"), "listed under the app's calls");
+    screen.press("Esc");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Stack { .. })), "back to the map");
+    let map = screen.render(160, 40);
+    let edge = map.lines().find(|line| line.contains('⚡')).unwrap_or_default();
+    assert!(edge.contains("503") && edge.contains('┄'), "its edge, dashed, says it: {map}");
+    screen.press("F");
+    assert!(screen.controller.faults().is_empty());
+}
+
 // ---------------------------------------------------------------- share through a tunnel (#102)
 
 #[tokio::test]

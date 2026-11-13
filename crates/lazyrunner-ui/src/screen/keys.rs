@@ -498,6 +498,9 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         Some(Overlay::BranchChanges { .. }) => super::branch_changes::key(ui, controller, name),
         Some(Overlay::Timeline(_)) => super::timeline::key(ui, controller, name, key),
         Some(Overlay::Durations { .. }) => super::durations::key(ui, controller, name),
+        Some(Overlay::Faults(_)) => {
+            super::faults::key(ui, controller, name, key);
+        }
         Some(Overlay::Problems(_)) => super::problems::key(ui, controller, name),
         // The views' own keys first; the rest do what they do on the columns (, settings, d database, ...).
         Some(Overlay::Tests { .. }) => {

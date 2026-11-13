@@ -16,6 +16,7 @@ pub mod copy;
 pub mod database;
 pub mod diff;
 pub mod durations;
+pub mod faults;
 pub mod flame;
 pub mod follow;
 pub mod graph;
@@ -259,6 +260,8 @@ pub enum Overlay {
         index: usize,
         opened: Instant,
     },
+    /// `f` on the stack map: faults on an app's calls (#105).
+    Faults(Box<faults::View>),
     /// `Alt+p`, or `p` on a Health card or a Map box: an app's CPU as a flame chart (#83).
     Flame(Box<flame::View>),
     /// `K`, then Tab twice: the stack's health (#35); the picked card (then the slowest endpoints), and when it opened.
@@ -312,6 +315,7 @@ impl Overlay {
             Self::Checklist(_) => "checklist",
             Self::Changelog { .. } => "changelog",
             Self::Durations { .. } => "durations",
+            Self::Faults(_) => "faults",
             Self::Problems(_) => "problems",
             Self::Marks { .. } => "marks",
             Self::Sheet { .. } => "sheet",
@@ -931,6 +935,7 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         Some(Overlay::Palette { .. }) => return palette::rows(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
         Some(Overlay::Durations { .. }) => return durations::rows(ui, controller, width, rows),
+        Some(Overlay::Faults(_)) => return faults::rows(ui, controller, width, rows),
         Some(Overlay::Problems(_)) => return problems::rows(ui, controller, width, rows),
         Some(Overlay::Marks { .. }) => return marks::rows(ui, controller, width, rows),
         Some(Overlay::Sheet { .. }) => return sheet::rows(ui, controller, width, rows),

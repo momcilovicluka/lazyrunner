@@ -406,10 +406,36 @@ fn model(
     for edge in figures.iter().cloned() {
         let (Some(from), Some(to)) = (at(&edge.from), at(&edge.to)) else { continue };
         let (color, label) = look(&edge);
-        edges.push(graph::Edge { from, to, color, dashed: edge.seen == 0, label, quiet: false, top: false });
+        // A fault on its calls (#105) draws it dashed in amber, saying the fault.
+        let set: Vec<String> = controller
+            .faults()
+            .iter()
+            .filter(|fault| fault.caller == edge.from && fault.to_app.as_deref() == Some(edge.to.as_str()))
+            .map(|fault| fault.said())
+            .collect();
+        let (color, label, dashed) = if set.is_empty() {
+            (color, label, edge.seen == 0)
+        } else {
+            (C::Yellow, format!("⚡ {}", set.join(" · ")), true)
+        };
+        edges.push(graph::Edge { from, to, color, dashed, label, quiet: false, top: false });
         let id = format!("{}>{}", edge.from, edge.to);
         motions.push(motion(ui, opened, &Traffic::of(&edge), dots, &id));
         kept.push(edge);
+    }
+    // A fault on calls the map hasn't seen yet still shows: its own dashed amber edge.
+    let mut drawn: Vec<(String, String)> = kept.iter().map(|edge| (edge.from.clone(), edge.to.clone())).collect();
+    for fault in controller.faults() {
+        let Some(to_app) = fault.to_app.clone() else { continue };
+        let (Some(from), Some(to)) = (at(&fault.caller), at(&to_app)) else { continue };
+        let pair = (fault.caller.clone(), to_app);
+        if drawn.contains(&pair) {
+            continue;
+        }
+        drawn.push(pair);
+        let label = format!("⚡ {}", fault.said());
+        edges.push(graph::Edge { from, to, color: C::Yellow, dashed: true, label, quiet: false, top: false });
+        motions.push(Motion::default());
     }
     let users = controller.database_users();
     let host = controller.database_service().map(|(host, _)| host);
@@ -454,6 +480,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             let key = controller.apps[picked].key.clone();
             super::flame::start(ui, controller, &key);
         }
+        "f" if picked < count => super::faults::open(ui, picked),
+        "F" => controller.clear_faults(None, None),
         "Enter" if picked < count => {
             ui.overlay = None;
             ui.focus = picked;
@@ -607,7 +635,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let shown: Vec<calls::Edge> = edges.iter().filter(|edge| known(&edge.from) && known(&edge.to)).cloned().collect();
     let below = figures(controller, &shown, controller.apps.get(picked).map(|app| app.key.as_str()));
     let hint = " h j k l choose an app · Enter its column · c its code · Tab the code map · H M A T P its requests, \
-                migrations, audit, tests, port · Esc back";
+                migrations, audit, tests, port · f faults on its calls · F take them all away · Esc back";
     let keys = super::viewbar::keys(hint, width);
     let map_rows = rows.saturating_sub(2 + keys.len() + below.len() + 1).max(3);
     let mut dots = std::mem::take(&mut ui.stack_dots);
