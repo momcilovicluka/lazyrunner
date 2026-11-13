@@ -2573,6 +2573,31 @@ async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_c
     assert!(!screen.render(160, 30).contains("new problem"));
 }
 
+// ---------------------------------------------------------------- branch changes (#104)
+
+#[tokio::test]
+async fn what_a_branch_switch_changed_shows_on_the_status_line_and_alt_g_lists_it_with_its_fixes() {
+    use lazyrunner_core::run::branch_changes::{Change, Fix};
+    let mut screen = screen("branch-changes", json!({}));
+    let change = |text: &str, fix| Change { app: None, text: text.into(), short: text.into(), fix };
+    let changes = vec![
+        change("Orders appsettings.Development.json (1 key: Db)", None),
+        change("1 migration added - M shows them", Some(Fix::Migrations)),
+    ];
+    screen.controller.branch_changes = Some(("main".into(), "feature/x".into(), changes));
+    assert!(screen.frame().contains("· 2 changed"), "{}", screen.frame());
+    screen.press("Alt+g");
+    let frame = screen.frame();
+    assert!(
+        frame.contains("main → feature/x") && frame.contains("(1 key: Db)") && frame.contains("Enter: M"),
+        "{frame}"
+    );
+    let status = agent(&mut screen, "status", json!({}), None);
+    assert_eq!(status["result"]["branch_changes"]["changes"][1], "1 migration added - M shows them", "{status}");
+    screen.press("Esc");
+    assert!(screen.ui.overlay.is_none());
+}
+
 // ---------------------------------------------------------------- log levels (#101)
 
 #[tokio::test]

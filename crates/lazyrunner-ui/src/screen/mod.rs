@@ -5,6 +5,7 @@
 pub mod about;
 pub mod actions;
 pub mod audit;
+pub mod branch_changes;
 pub mod bundle;
 pub mod checklist;
 pub mod code;
@@ -201,6 +202,10 @@ pub enum Overlay {
         app: usize,
         index: usize,
     },
+    /// `Alt+g`: what changed for running on the last branch switch (#104); the picked change.
+    BranchChanges {
+        index: usize,
+    },
     /// `Alt+l`: a .NET app's log levels (#101); the picked category and level.
     LogLevels {
         app: usize,
@@ -311,6 +316,7 @@ impl Overlay {
             Self::Sheet { .. } => "sheet",
             Self::Launch { .. } => "launch",
             Self::LogLevels { .. } => "log levels",
+            Self::BranchChanges { .. } => "branch changes",
             Self::Timeline(_) => "timeline",
             Self::Tests { .. } => "tests",
             Self::Requests(_) => "requests",
@@ -922,6 +928,7 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         Some(Overlay::Sheet { .. }) => return sheet::rows(ui, controller, width, rows),
         Some(Overlay::Launch { .. }) => return launch::rows(ui, controller, width, rows),
         Some(Overlay::LogLevels { .. }) => return log_levels::rows(ui, controller, width, rows),
+        Some(Overlay::BranchChanges { .. }) => return branch_changes::rows(ui, controller, width, rows),
         Some(Overlay::Timeline(_)) => return timeline::rows(ui, controller, width, rows),
         Some(Overlay::Tests { .. }) => return suites::rows(ui, controller, width, rows),
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),

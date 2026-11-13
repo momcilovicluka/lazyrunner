@@ -62,6 +62,8 @@ pub enum Run {
     Launch,
     /// `Alt+l`: the focused .NET app's log levels (#101).
     LogLevels,
+    /// `Alt+g`: what changed for running on the last branch switch (#104).
+    BranchChanges,
     Timeline,
     Diff,
     /// Alt+b: the build as a map (#82).
@@ -197,6 +199,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         )
         .safe()
         .focused(),
+        action(
+            "Tools",
+            "Alt+g",
+            "What changed for running on the last branch switch",
+            "settings keys, packages, migrations, the profile",
+            Run::BranchChanges,
+        )
+        .safe(),
         action(
             "Tools",
             "y",

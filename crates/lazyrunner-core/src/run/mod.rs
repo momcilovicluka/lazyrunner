@@ -5,6 +5,7 @@
 
 pub mod app;
 pub mod audit;
+pub mod branch_changes;
 pub mod build;
 pub mod build_map;
 pub mod calls;

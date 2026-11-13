@@ -304,6 +304,8 @@ pub struct Controller {
     recoveries: crashes::Recoveries,
     /// The apps' log levels set from lazyrunner (#101), kept ones loaded from the state folder.
     log_levels: log_levels::LogLevels,
+    /// What changed for running on the last branch switch (#104): from, to, and the changes.
+    pub branch_changes: Option<(String, String, Vec<crate::run::branch_changes::Change>)>,
     /// The spans the apps sent (#97), and the port lazyrunner receives them on.
     pub traces: crate::run::otlp::Traces,
     pub otlp_port: Option<u16>,
@@ -470,6 +472,7 @@ impl Controller {
             resume: None,
             recoveries: Default::default(),
             log_levels: kept_levels,
+            branch_changes: None,
             traces: Default::default(),
             otlp_port,
             task_results: HashMap::new(),

@@ -136,8 +136,14 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(seg("   ", C::Gray));
         segs.push(seg(chip, color).at(Target::Health)); // a click opens the Health tab
     }
+    segs.push(
+        seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta).at(Target::Branch),
+    );
+    let changed = controller.branch_changes.as_ref().map_or(0, |(_, _, changes)| changes.len());
+    if changed > 0 {
+        segs.push(seg(format!(" · {changed} changed"), C::Yellow).at(Target::Branch)); // a click shows them (Alt+g)
+    }
     segs.extend([
-        seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta),
         seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),
         seg(controller.db_label.clone().unwrap_or_else(|| "n/a".into()), C::Yellow),
     ]);
