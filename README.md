@@ -825,6 +825,15 @@ browser, `o` opens the selected row's app log, `c` clears the list, `Esc` / `q` 
 row stays put as new ones arrive. The last 5,000 are kept while lazyrunner runs (lazyrunner's own response-time probe
 isn't among them); the full lines are still in each app's log file.
 
+**The spec tab** (`Tab` twice) lists each running .NET app's endpoints from its OpenAPI document - read from the
+profile's `swagger` path, else `/swagger/v1/swagger.json` or `/openapi/v1.json` - by tag: method, route, summary, and
+whether it was called this session (`2× · p95 12 ms`) or `not called`; under them, what the app's log has that the
+document doesn't. `Enter` fills one in: its path, query and header parameters (their examples or defaults put in, the
+required ones marked `*`) and its JSON body, made from the schema. `↑` `↓` (or `Tab`) move between the fields, typing
+changes the one picked, and `Enter` sends it - any method, with its body - from lazyrunner: the request comes in like
+any other, so the requests tab shows it, and the log says how it went. `y` copies the picked endpoint as curl, `r`
+reads the documents again.
+
 ## Tests (`T`)
 
 `T` finds the project's test suites and lists them on the left - the backend, then the frontend, and in each the

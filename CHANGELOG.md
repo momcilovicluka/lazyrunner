@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.93.0] - 2026-11-13
+
+### Added
+- A spec tab in `H`: each running .NET app's endpoints from its OpenAPI document (the profile's `swagger` path, `/swagger/v1/swagger.json` or `/openapi/v1.json`), by tag, each saying whether it was called this session and its p95 - and what the app's log has that the document doesn't. `Enter` fills one in - its path, query and header parameters and a JSON body made from its schema - and `Enter` again sends it, any method with its body; the request shows in the requests tab. `y` copies it as curl, `r` reads the documents again (#100).
+
 ## [1.92.0] - 2026-11-13
 
 ### Added

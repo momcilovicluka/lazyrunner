@@ -52,6 +52,7 @@ pub mod seen;
 pub mod seg;
 pub mod session;
 pub mod sheet;
+pub mod spec;
 pub mod spinner;
 pub mod stack;
 pub mod status;
@@ -447,6 +448,8 @@ pub struct Ui {
     pub problems: problems::Cache,
     /// What `.` does again: the last action that changed something (#103).
     pub again: Option<repeat::Again>,
+    /// The running .NET apps' OpenAPI documents, as the requests view's spec tab reads them (#100).
+    pub specs: spec::Specs,
     /// Each app's state as its title last showed it, and its last change (the title's motion).
     pub phases: phases::Phases,
     /// The panel's newest log line, and when it came (it slides in).
@@ -573,6 +576,7 @@ impl Ui {
             seen: seen::Seen::default(),
             problems: problems::Cache::default(),
             again: None,
+            specs: spec::Specs::new(),
             phases: phases::Phases::default(),
             log_newest: None,
             replays: Vec::new(),
@@ -771,6 +775,7 @@ impl Ui {
             || session::animating(self)
             || durations::animating(self)
             || problems::animating(self)
+            || spec::animating(self)
             || phases::animating(self)
             || panel::sliding(self)
             || controller.test_watch.runs_in(self.now).is_some()

@@ -115,6 +115,7 @@ fn screen(label: &str, config: Value) -> Screen {
     controller.db_label = Some("ShopLocal @ localhost".into());
     controller.log.clear();
     let started = Instant::now();
+    controller.session_started = started; // the session counts from the frozen clock, however long setting up took
     let (mut ui, _) = Ui::new(&controller, None, started);
     ui.opener = opened;
     ui.machine_memory = || 16_384.0;
@@ -2571,6 +2572,39 @@ async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_c
     screen.render(160, 30);
     screen.press("Esc");
     assert!(!screen.render(160, 30).contains("new problem"));
+}
+
+// ---------------------------------------------------------------- endpoints from the spec (#100)
+
+#[tokio::test]
+async fn the_spec_tab_lists_an_apps_documented_endpoints_and_fills_one_in_to_send() {
+    let mut screen = screen("spec", json!({}));
+    with_requests(&mut screen);
+    let document = json!({ "paths": { "/api/orders/{id}": {
+        "get": { "tags": ["Orders"], "summary": "One order",
+                 "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }] },
+        "delete": { "tags": ["Orders"], "summary": "Cancel it",
+                    "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }] }
+    } } });
+    let operations = lazyrunner_core::run::openapi::parse(&document);
+    let ready = super::spec::Loaded::Ready { from: "/swagger/v1/swagger.json".into(), operations };
+    screen.ui.specs.insert("orders".into(), ready);
+    screen.press("H Tab Tab");
+    insta::assert_snapshot!("spec_tab", screen.frame());
+    let frame = screen.render(160, 30);
+    let called =
+        frame.lines().find(|line| line.contains("GET") && line.contains("/api/orders/{id}")).unwrap_or_default();
+    assert!(called.contains("2× · p95"), "called twice this session: {frame}");
+    assert!(frame.contains("not called") && frame.contains("in the log, not in the document"), "{frame}");
+    screen.press("j Enter Enter");
+    assert!(screen.last_log().starts_with("id needs a value"), "a path parameter is needed: {}", screen.last_log());
+    screen.press("4 2");
+    assert!(screen.render(160, 30).contains("42"), "typed into the field");
+    screen.press("Enter");
+    assert!(screen.last_log().starts_with("Sending DELETE /api/orders/{id} to"), "{}", screen.last_log());
+    assert!(!screen.ui.replays.is_empty(), "it's on its way; how it went comes to the log");
+    let Some(Overlay::Requests(view)) = &screen.ui.overlay else { panic!("still in H") };
+    assert_eq!(view.tab, super::requests::Tab::Requests, "where the request shows up");
 }
 
 // ---------------------------------------------------------------- branch changes (#104)
