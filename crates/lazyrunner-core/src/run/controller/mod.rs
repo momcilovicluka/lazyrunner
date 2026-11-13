@@ -11,6 +11,8 @@ pub mod compose;
 mod handover;
 mod health;
 pub use health::TARGETS;
+mod crashes;
+pub use crashes::{LOOP_CRASHES, Recovery};
 mod hooks;
 mod impact;
 mod launch;
@@ -296,6 +298,8 @@ pub struct Controller {
     pub session_started: Instant,
     /// The session kept when lazyrunner last closed, until it's resumed (or set aside) at the start (#85).
     pub resume: Option<crate::run::session::Snapshot>,
+    /// The apps that crashed and start again by themselves (#99).
+    recoveries: crashes::Recoveries,
     /// The spans the apps sent (#97), and the port lazyrunner receives them on.
     pub traces: crate::run::otlp::Traces,
     pub otlp_port: Option<u16>,
@@ -459,6 +463,7 @@ impl Controller {
             session: HashMap::new(),
             session_started: Instant::now(),
             resume: None,
+            recoveries: Default::default(),
             traces: Default::default(),
             otlp_port,
             task_results: HashMap::new(),
@@ -764,6 +769,7 @@ impl Controller {
             }
         }
         self.ready_pending.retain(|key| !keys.contains(key));
+        self.forget_crashes(&keys);
         for key in &keys {
             self.probes.remove(key); // results in flight belong to the old servers
         }

@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.90.0] - 2026-11-13
+
+### Added
+- An app whose profile says `"restart": "onCrash"` starts again by itself after a crash, after a wait that doubles each time (1 s, 2 s, 4 s, at most 30 s), its title counting it down (`↻ 2 · 3s ▰▰▱▱`, `s` cancels it). A crash loop - 3 crashes within 2 minutes - is held until `u`, with a line in the log and a desktop notification; once the app has stayed up a minute its crashes are forgotten. A stop you asked for, a restart, a branch change or a clean exit never counts. `get_status` says `restarting in 4s (2 of 3)` / `held after 3 crashes` (#99).
+
 ## [1.89.0] - 2026-11-13
 
 ### Added

@@ -11,7 +11,10 @@ use crate::paths::Paths;
 use crate::profile::{ProfileDirs, import};
 use crate::testing::{TempDir, sample_profile, sample_repo};
 
-fn controller(temp: &TempDir, config: serde_json::Value) -> (Controller, mpsc::UnboundedReceiver<crate::run::Event>) {
+pub(super) fn controller(
+    temp: &TempDir,
+    config: serde_json::Value,
+) -> (Controller, mpsc::UnboundedReceiver<crate::run::Event>) {
     let repo = sample_repo(&temp.join("repo"));
     let paths = Paths {
         config_file: temp.join("config.json"),

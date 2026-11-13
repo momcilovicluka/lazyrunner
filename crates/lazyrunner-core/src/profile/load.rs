@@ -380,6 +380,7 @@ fn to_app(app: &Value) -> App {
         env,
         depends_on,
         health,
+        restart_on_crash: text(field(app, "restart")) == super::RESTART_ON_CRASH,
     }
 }
 

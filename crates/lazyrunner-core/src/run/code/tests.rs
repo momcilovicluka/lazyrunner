@@ -30,6 +30,7 @@ fn dotnet_app(key: &str, project: &str) -> App {
         env: Vec::new(),
         depends_on: Vec::new(),
         health: crate::profile::Health::default(),
+        restart_on_crash: false,
     }
 }
 

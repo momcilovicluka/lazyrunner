@@ -297,6 +297,9 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         let chip = format!(" {} {} {}", icons::icon(ui.nerd, Icon::Warn), scan.count(worst), worst.name());
         segs.push(seg(chip, C::Red));
     }
+    if let Some(recovery) = controller.recovery(&app.key) {
+        segs.push(recovery_chip(ui, recovery));
+    }
     let status = status(ui, controller, index);
     segs.extend(services(ui, controller, &app.key, cells.saturating_sub(width(&segs) + width(&status) + 2)));
     let port = seg(controller.port(&app.key).map_or("  ".into(), |port| format!(" :{port}  ")), C::DarkGray);
@@ -316,6 +319,26 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         }
     }
     fit(segs, cells)
+}
+
+/// The cells of the bar a crashed app's wait drains along.
+const RECOVERY_BAR: usize = 4;
+
+/// An app that starts again after a crash (#99): held after a loop (red), the wait to its next start draining with
+/// the seconds left, or how many times it started again.
+fn recovery_chip(ui: &Ui, recovery: &lazyrunner_core::run::controller::Recovery) -> Seg {
+    let icon = icons::icon(ui.nerd, Icon::Reload);
+    if recovery.held {
+        return seg(format!(" {icon} held"), C::Red);
+    }
+    match recovery.left(ui.now) {
+        Some((left, share)) => {
+            let full = ((share * RECOVERY_BAR as f64).ceil() as usize).min(RECOVERY_BAR);
+            let bar = format!("{}{}", "▰".repeat(full), "▱".repeat(RECOVERY_BAR - full));
+            seg(format!(" {icon} {} · {}s {bar}", recovery.restarts, left.as_secs_f64().ceil()), C::Yellow)
+        }
+        None => seg(format!(" {icon} {}", recovery.restarts), C::DarkYellow),
+    }
 }
 
 /// A progress bar that glides towards its target and shimmers while it waits; `id` keeps its position.
@@ -571,6 +594,7 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     let outlined =
         |state: &AppState| state.ready_at.is_some_and(|(_, at)| ui.now.saturating_duration_since(at) < READY_OUTLINE);
     controller.states.iter().any(outlined)
+        || controller.restarting()
         || (!ui.reduced_motion && controller.apps.iter().any(|app| breathing(&app.key)))
 }
 

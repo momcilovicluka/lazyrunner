@@ -59,8 +59,22 @@ pub const FIELDS: Fields = Fields {
         "migrations",
         "dependsOn",
         "health",
+        "restart",
     ],
-    npm: &["key", "name", "icon", "nerdIcon", "type", "dir", "variants", "env", "tests", "dependsOn", "health"],
+    npm: &[
+        "key",
+        "name",
+        "icon",
+        "nerdIcon",
+        "type",
+        "dir",
+        "variants",
+        "env",
+        "tests",
+        "dependsOn",
+        "health",
+        "restart",
+    ],
     command: &[
         "key",
         "name",
@@ -85,6 +99,7 @@ pub const FIELDS: Fields = Fields {
         "env",
         "dependsOn",
         "health",
+        "restart",
     ],
     compose: &["key", "name", "icon", "nerdIcon", "type", "file", "cwd", "services", "env", "dependsOn"],
     command_ready: &["port", "line", "http", "orPort"],
@@ -331,6 +346,10 @@ fn check_app<'a>(app: &'a Value, index: usize, keys: &mut HashMap<String, &'a Va
     let health = field(app, "health");
     if !health.is_null() {
         check_health(health, &format!("{at}.health"), problems);
+    }
+    let restart = field(app, "restart");
+    if !restart.is_null() && !restart.as_str().is_some_and(|value| super::RESTARTS.contains(&value)) {
+        problems.push(format!("{at}.restart is \"never\" or \"onCrash\""));
     }
     let kind = field(app, "type").as_str().map(str::to_lowercase);
     match kind.as_deref() {
