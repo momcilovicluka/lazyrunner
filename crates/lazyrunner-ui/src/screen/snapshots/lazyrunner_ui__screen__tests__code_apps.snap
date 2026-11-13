@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: frame
 ---
- ⋈ STACK   H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline  d Database
+ ⋈ STACK   E  H  M  A  T  P  D  ~  d
  Map  Code  Health    2 apps
  h j k l choose · Enter inside · Backspace out · / search · g its graph · f focus (+ - how far) · z Z zoom
  r implied edges · t tests · a all projects · c cycles · b the build (w follow it · B it alone) · o open

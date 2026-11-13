@@ -29,6 +29,8 @@ pub struct Seen {
     pending: Option<HashSet<(String, String)>>,
     /// The audit's findings then: each vulnerable package's app and name.
     findings: Option<HashSet<(String, String)>>,
+    /// The problems' shapes when the Problems screen was last open.
+    problems: Option<HashSet<u64>>,
     /// The chips shown last frame: a new one pops in.
     shown: Vec<&'static str>,
 }
@@ -48,6 +50,7 @@ fn open_view(ui: &Ui) -> Option<View> {
         Overlay::Tests { .. } => Some(View::Tests),
         Overlay::Migrations { .. } => Some(View::Migrations),
         Overlay::Audit { .. } => Some(View::Audit),
+        Overlay::Problems(_) => Some(View::Problems),
         _ => None,
     })
 }
@@ -88,6 +91,10 @@ pub fn update(ui: &mut Ui, controller: &Controller) {
     }
     if seen.findings.is_none() || open == Some(View::Audit) {
         seen.findings = Some(findings(controller));
+    }
+    super::problems::refresh(ui, controller);
+    if ui.seen.problems.is_none() || open == Some(View::Problems) {
+        ui.seen.problems = Some(super::problems::shapes(ui));
     }
     let keys: Vec<&'static str> = chips(ui, controller).iter().map(|chip| chip.key).collect();
     for key in keys.iter().filter(|key| !ui.seen.shown.contains(key)) {
@@ -180,6 +187,11 @@ pub fn chips(ui: &Ui, controller: &Controller) -> Vec<Chip> {
         let color = if *worst >= Severity::High { C::Red } else { C::Yellow };
         chips.push(Chip { key: "A", label, color, view: View::Audit });
     }
+    let (problems, error) = ui.seen.problems.as_ref().map_or((0, false), |seen| super::problems::news(ui, seen));
+    if problems > 0 {
+        let label = format!("{problems} new problem{}", plural(problems));
+        chips.push(Chip { key: "E", label, color: if error { C::Red } else { C::Yellow }, view: View::Problems });
+    }
     chips
 }
 
@@ -237,6 +249,10 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, view: View) {
             if let (Some(at), Some(Overlay::Migrations { index, .. })) = (at, &mut ui.overlay) {
                 *index = at;
             }
+        }
+        View::Problems => {
+            let seen = ui.seen.problems.clone().unwrap_or_default();
+            super::problems::open_on_news(ui, controller, &seen);
         }
         View::Audit => {
             let first = new_findings(ui, controller).into_iter().next().map(|(app, ..)| app);

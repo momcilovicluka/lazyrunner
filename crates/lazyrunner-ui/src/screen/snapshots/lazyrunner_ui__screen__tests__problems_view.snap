@@ -1,0 +1,24 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+  K △ PROBLEMS   H  M  A  T  P  D  ~  d
+  2 problems · 1 error · 1 warning · by count
+ j k choose · Enter its line · n N its occurrences · s sort · / filter · v errors only · y copy · Esc closes
+
+ ✗     3  Orders ×2 · Billing ×1  0s ago             fail: Api.Orders[9]
+ !     1  Billing ×1              0s ago             warn: a slow query
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ fail: Api.Orders[9]
+ 3 times · first 0s ago
+ Orders ×2 · Billing ×1
+
+ WHEN, THIS SESSION
+ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█
+
+ OCCURRENCE 3 OF 3 · Billing · 0s ago
+ fail: Api.Orders[9]
+       Order 9 was not found
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ↶ 1/1   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   /  search   U  start all     :  commands   x  menu   ?  keys   ,  settings   q  quit

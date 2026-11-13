@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-  K Stack  H Requests  M Migrations   Audit ⚗ TESTS   P Ports  D Durations  ~ Timeline  d Database
+  K Stack  E Problems  H Requests  M Migrations   Audit ⚗ TESTS   P Ports  D Durations  ~ Timeline  d Database
   3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky  affected
  j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all
  Alt+r run the affected · l its tests · f / F failed again · Alt+f flaky again · [ ] a run · a / A watch

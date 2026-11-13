@@ -7,26 +7,26 @@ expression: screen.frame()
 
 
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
-  │ You use most                                                                    M           Migration… │
-  │   ?           Key reference ×1                                                  A           Audit: ou… │
-  │ Run                                                                             P           Ports: wh… │
-  │   Space       Start / stop the focused app                                      K           Stack: wh… │
-  │   u U         Start · focused / all                                             K Tab       Code map:… │
-  │   s S         Stop · focused / all                                              T           Tests: ru… │
-  │   r R         Restart · focused / all                                           L           lazygit: … │
-  │   b B         Build · focused / all                                             x           Menu for … │
-  │   q           Quit                                                              F           Follow th… │
-  │ Tools                                                                         View                   … │
-  │   d           Switch database                                                   /           Search th… │
-  │   i           Install packages: npm ci or npm install                           z           Zoom the … │
-  │   i c         npm ci                                                            Ctrl+O      Jump back… │
-  │   i n         npm install                                                       Alt+→       Jump forw… │
-  │   w W         Open in the browser · focused / all                               f           Filter th… │
-  │   o           Open the focused app's log file                                   m           Mark a li… │
-  │   e           Start sheet: what the focused app is started with                 [           Older mark │
-  │   p           Run the focused app on another launch profile or npm variant      ]           Newer mark │
-  │   y           Copy (yank)                                                       '           Marks: ev… │
-  │   D           Durations                                                         ~           Timeline:… │
-  │   H           Requests: what the .NET apps served                               Alt+d       What's ne… │
+  │ You use most                                                                    H           Requests:… │
+  │   ?           Key reference ×1                                                  M           Migration… │
+  │ Run                                                                             A           Audit: ou… │
+  │   Space       Start / stop the focused app                                      P           Ports: wh… │
+  │   u U         Start · focused / all                                             K           Stack: wh… │
+  │   s S         Stop · focused / all                                              K Tab       Code map:… │
+  │   r R         Restart · focused / all                                           T           Tests: ru… │
+  │   b B         Build · focused / all                                             L           lazygit: … │
+  │   q           Quit                                                              x           Menu for … │
+  │ Tools                                                                           F           Follow th… │
+  │   d           Switch database                                                 View                   … │
+  │   i           Install packages: npm ci or npm install                           /           Search th… │
+  │   i c         npm ci                                                            z           Zoom the … │
+  │   i n         npm install                                                       Ctrl+O      Jump back… │
+  │   w W         Open in the browser · focused / all                               Alt+→       Jump forw… │
+  │   o           Open the focused app's log file                                   f           Filter th… │
+  │   e           Start sheet: what the focused app is started with                 m           Mark a li… │
+  │   p           Run the focused app on another launch profile or npm variant      [           Older mark │
+  │   y           Copy (yank)                                                       ]           Newer mark │
+  │   D           Durations                                                         '           Marks: ev… │
+  │   E           Problems                                                          ~           Timeline:… │
   │ / filters · any key closes · : searches every command · lowercase = focused app, uppercase = all apps  │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

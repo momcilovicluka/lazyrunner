@@ -2521,6 +2521,58 @@ async fn with_links_on_alt_click_off_a_plain_click_opens_a_link() {
     assert_eq!(OPENED.with(|opened| opened.borrow().clone()), ["http://localhost:47202/"]);
 }
 
+// ---------------------------------------------------------------- problems (#98)
+
+/// An error entry - its header and an indented message, red - with `id` in both, then a plain line.
+fn fail(screen: &mut Screen, app: usize, id: u32) {
+    let at = screen.ui.now;
+    let output = &mut screen.controller.states[app].output;
+    output.push_hued(&format!("fail: Api.Orders[{id}]"), Some(Hue::Red), at);
+    output.push_hued(&format!("      Order {id} was not found"), Some(Hue::Red), at);
+    output.push("info: carrying on", at);
+}
+
+#[tokio::test]
+async fn e_groups_errors_alike_but_for_their_ids_across_the_apps_and_enter_jumps_to_one() {
+    let mut screen = screen("problems", json!({}));
+    for (app, id) in [(0, 7), (0, 8), (1, 9)] {
+        fail(&mut screen, app, id);
+    }
+    let at = screen.ui.now;
+    screen.controller.states[1].output.push_hued("warn: a slow query", Some(Hue::Yellow), at);
+    screen.press("E");
+    insta::assert_snapshot!("problems_view", screen.frame());
+    let frame = screen.render(160, 30);
+    let (first, second) = (screen.controller.apps[0].name.clone(), screen.controller.apps[1].name.clone());
+    assert!(frame.contains("2 problems · 1 error · 1 warning"), "{frame}");
+    let row = frame.lines().find(|line| line.contains("fail: Api.Orders[9]")).expect("one row, its newest text");
+    assert!(row.contains(&format!("{first} ×2 · {second} ×1")) && row.contains("    3"), "{row}");
+    assert!(frame.contains("OCCURRENCE 3 OF 3"), "the newest's lines in the details: {frame}");
+    screen.press("n");
+    assert!(screen.render(160, 30).contains("OCCURRENCE 2 OF 3"), "n: the one before");
+    screen.press("Enter");
+    assert!(screen.ui.overlay.is_none() && screen.ui.focus == 0, "Enter: its line, in its column");
+    screen.press("E / s l o w Enter");
+    let frame = screen.render(160, 30);
+    assert!(frame.contains("warn: a slow query") && !frame.contains("fail: Api"), "the filter: {frame}");
+}
+
+#[tokio::test]
+async fn a_new_problem_while_e_is_closed_gets_a_chip_and_opening_it_clears_the_chip() {
+    let mut screen = screen("problems-chip", json!({}));
+    fail(&mut screen, 0, 1);
+    assert!(!screen.render(160, 30).contains("new problem"), "what was there at the first look is seen");
+    screen.controller.states[1].output.push_hued("warn: disk almost full", Some(Hue::Yellow), screen.ui.now);
+    let frame = screen.render(160, 30);
+    assert!(frame.contains("1 new problem"), "{frame}");
+    screen.press("E");
+    let Some(Overlay::Problems(view)) = &screen.ui.overlay else { panic!("E opens it") };
+    assert_eq!(view.index, 1, "on the new one");
+    screen.render(160, 30);
+    screen.press("Esc");
+    assert!(!screen.render(160, 30).contains("new problem"));
+}
+
 // ---------------------------------------------------------------- the session (#85)
 
 fn resume(screen: &mut Screen, running: &[&str], view: Value) {

@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-  K Stack  H Requests  M Migrations  A Audit  T Tests  P Ports  D Durations  ~ Timeline DB DATABASE
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
  DefaultConnection · secrets.json · 2 connection strings · the active one ●
  j k choose · Enter switch + restart the APIs · n new (a copy) · / filter · y copy row · Esc back
 

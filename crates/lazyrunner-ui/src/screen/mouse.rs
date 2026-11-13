@@ -193,6 +193,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         || super::flame::click(ui, target, double)
         || super::code::click(ui, controller, target, double)
         || super::durations::click(ui, target)
+        || super::problems::click(ui, target)
     {
         return;
     }

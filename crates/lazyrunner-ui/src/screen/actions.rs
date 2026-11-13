@@ -31,6 +31,7 @@ pub enum Run {
     OpenLog,
     Copy,
     Durations,
+    Problems,
     Tests,
     Requests,
     Migrations,
@@ -195,6 +196,14 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Durations",
             "build, start and npm ci times over the last runs: what got slower",
             Run::Durations,
+        )
+        .safe(),
+        action(
+            "Tools",
+            "E",
+            "Problems",
+            "every app's errors and warnings, grouped: how often, where, since when",
+            Run::Problems,
         )
         .safe(),
         action(
