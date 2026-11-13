@@ -94,8 +94,16 @@ fn find_project(paths: &Paths) -> Result<Project> {
     )
 }
 
+/// How lazyrunner opens: whether it starts the apps, and whether it leaves the session kept when it last closed
+/// (`--fresh`, #85).
+#[derive(Clone, Copy, Debug)]
+pub struct Opening {
+    pub start_now: bool,
+    pub fresh: bool,
+}
+
 /// `lazyrunner` and `lazyrunner start`: opens the project here (or tells the open lazyrunner to start it).
-pub fn start(explicit: bool) -> Result<()> {
+pub fn start(explicit: bool, fresh: bool) -> Result<()> {
     let paths = Paths::from_env(&install_dir());
     let project = find_project(&paths)?;
     if !confirm_trust(&project, &paths)? {
@@ -110,7 +118,7 @@ pub fn start(explicit: bool) -> Result<()> {
     }
     let config = ConfigFile::new(&paths.config_file).load(Some(&project.id));
     let start_now = explicit || lazyrunner_core::config::Toggle::AutoStartOnOpen.read(&config);
-    run(project, paths, None, start_now)
+    run(project, paths, None, Opening { start_now, fresh })
 }
 
 /// The trust question on the terminal (answered already when the profile is trusted as it is).
@@ -141,7 +149,7 @@ pub fn run_root(
     root: &Path,
     headless: Option<(u16, u16)>,
     ipc: Option<String>,
-    start_now: bool,
+    opening: Opening,
     handover: Option<(PathBuf, Vec<u64>)>,
     notes: Vec<String>,
 ) -> Result<()> {
@@ -152,11 +160,11 @@ pub fn run_root(
     if !trust::is_trusted(&project, &paths.trust_store()) {
         bail!("lazyrunner: {} isn't trusted yet - run lazyrunner in that repo to review it.", project.path.display());
     }
-    run_with(project, paths, headless, ipc, start_now, handover, notes)
+    run_with(project, paths, headless, ipc, opening, handover, notes)
 }
 
-fn run(project: Project, paths: Paths, ipc: Option<String>, start_now: bool) -> Result<()> {
-    run_with(project, paths, None, ipc, start_now, None, Vec::new())
+fn run(project: Project, paths: Paths, ipc: Option<String>, opening: Opening) -> Result<()> {
+    run_with(project, paths, None, ipc, opening, None, Vec::new())
 }
 
 /// Runs the project, and again each time it asks to be reopened (another project, or its profile reloaded).
@@ -165,15 +173,16 @@ fn run_with(
     paths: Paths,
     headless: Option<(u16, u16)>,
     ipc: Option<String>,
-    start_now: bool,
+    opening: Opening,
     handover: Option<(PathBuf, Vec<u64>)>,
     notes: Vec<String>,
 ) -> Result<()> {
-    let (mut project, mut start_now, mut notes, mut handover) = (project, start_now, notes, handover);
+    let (mut project, mut opening, mut notes, mut handover) = (project, opening, notes, handover);
     let binary = Binary::now();
     loop {
-        let finished =
-            run_once(project.clone(), paths.clone(), headless, ipc.clone(), start_now, notes, handover.take());
+        let finished = run_once(project.clone(), paths.clone(), headless, ipc.clone(), opening, notes, handover.take());
+        // A reopen resumes the session this one kept as it closed.
+        opening.fresh = false;
         let Finished { exit, handover: passed, notes: carried } = finished.inspect_err(|_| {
             // A reopen may have left the last frame on screen: the error shows on the shell's screen.
             let _ = ratatui::crossterm::execute!(io::stdout(), ratatui::crossterm::terminal::LeaveAlternateScreen);
@@ -181,14 +190,14 @@ fn run_with(
         match exit {
             Exit::Quit => return Ok(()),
             Exit::Reopen { root, start } => {
-                start_now = start;
+                opening.start_now = start;
                 notes = carried;
                 if let Some(passed) = passed {
                     // The next lazyrunner (the new binary after an update, or this one again) takes the running
                     // apps over. Only comes back when it couldn't be started: the apps stopped, so they start again.
                     let error = binary.run_next(&root, start, Some(passed), &notes, headless, ipc.as_deref());
                     notes.push(format!("✗ Couldn't start the next lazyrunner ({error:#}) - the apps start again."));
-                    start_now = true;
+                    opening.start_now = true;
                 } else if binary.replaced() {
                     // Only comes back when the new binary couldn't be started: this one carries on.
                     let error = binary.run_next(&root, start, None, &notes, headless, ipc.as_deref());
@@ -288,7 +297,7 @@ fn run_once(
     paths: Paths,
     headless: Option<(u16, u16)>,
     ipc: Option<String>,
-    start_now: bool,
+    opening: Opening,
     notes: Vec<String>,
     handover: Option<(PathBuf, Vec<u64>)>,
 ) -> Result<Finished> {
@@ -310,7 +319,8 @@ fn run_once(
         frame_dump: std::env::var_os("LAZYRUNNER_FRAME_DUMP").map(PathBuf::from),
         colors: ColorMode::detect(),
         headless: headless.is_some(),
-        start_now,
+        start_now: opening.start_now,
+        fresh: opening.fresh,
         notes,
         handover_handles: handover.as_ref().map(|(_, handles)| handles.clone()).unwrap_or_default(),
         handover: handover.map(|(file, _)| file),

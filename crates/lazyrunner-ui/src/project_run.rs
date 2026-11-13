@@ -51,6 +51,8 @@ pub struct ProjectOptions {
     pub headless: bool,
     /// Start everything right away (autoStartOnOpen, `lazyrunner start`).
     pub start_now: bool,
+    /// `--fresh`: the session kept when lazyrunner last closed isn't resumed (#85).
+    pub fresh: bool,
     /// Said in the log at the start (why lazyrunner reopened on this project, say).
     pub notes: Vec<String>,
     /// The handover file of the lazyrunner this one takes the running apps over from.
@@ -84,6 +86,9 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
     let state_dir = paths.state_dir.clone();
     let profiles = paths.profiles.clone();
     let mut controller = Controller::new(Setup { project, root, paths, events, guard })?;
+    if !options.fresh {
+        controller.load_session();
+    }
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<ipc::Request>();
     for name in &options.ipc {
         match ipc::listen(name) {
@@ -118,6 +123,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         // Taking over from the previous lazyrunner: its apps keep running; no checklist, no auto-start.
         log_whats_new(&mut controller, &whats_new);
         take_over(&mut controller, file, &options.handover_handles);
+        screen::session::restore(&mut ui, &mut controller);
         quiet = None;
     } else if controller.setting(Toggle::StartupChecklist) {
         let checklist = Checklist::start(&controller, false, &whats_new, options.start_now);
@@ -126,7 +132,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
     } else {
         log_whats_new(&mut controller, &whats_new);
         quiet = quiet_update(&controller);
-        begin(&mut controller, options.start_now);
+        begin(&mut ui, &mut controller, options.start_now, false);
     }
 
     let mut dumps: Vec<oneshot::Sender<Value>> = Vec::new();
@@ -323,6 +329,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
             ui.exit = None;
         }
         if let Some(mut exit) = ui.exit.clone().filter(|_| git_tool.is_none()) {
+            controller.save_session(screen::session::snapshot(&ui, &controller));
             let mut handover = None;
             let mut notes = Vec::new();
             if let Exit::Reopen { root, .. } = &exit
@@ -413,15 +420,18 @@ fn open_git_tool(controller: &mut Controller, opened_beside: &mut Option<Instant
 }
 
 /// After the checklist (or without it): start everything, or say how.
-fn begin(controller: &mut Controller, start_now: bool) {
-    if start_now {
+/// The start once the checklist is done: the session's apps (all when it had none), unless the checklist
+/// `started` them already; then the session's screen.
+fn begin(ui: &mut Ui, controller: &mut Controller, start_now: bool, started: bool) {
+    if start_now && !started && controller.start_resumed().is_empty() {
         controller.start(None, false);
-    } else {
+    } else if !start_now && !started {
         controller.add_log(
             "Ready - press U to start everything (auto-start when lazyrunner opens is off: , then u turns it on).",
             Hue::Cyan,
         );
     }
+    screen::session::restore(ui, controller);
 }
 
 fn update_checklist(ui: &mut Ui, controller: &mut Controller, still_checking: &mut Option<StillChecking>) {
@@ -432,13 +442,14 @@ fn update_checklist(ui: &mut Ui, controller: &mut Controller, still_checking: &m
     let Some(Overlay::Checklist(checklist)) = ui.overlay.take() else { return };
     ui.last_checks = Some((ui.now, checklist.items.clone()));
     let (manual, start_after, updated_to) = (checklist.manual, checklist.start_after, checklist.updated_to.clone());
+    let resumed = checklist.session.done;
     if let Some(still) = checklist.still_checking() {
         *still_checking = Some(still); // a checklist opened by hand (, r) never has one: keeps the startup's
     }
     if let Some(version) = updated_to {
         after_update(ui, controller, &version, manual, start_after);
     } else if !manual {
-        begin(controller, start_after);
+        begin(ui, controller, start_after, resumed);
     }
 }
 

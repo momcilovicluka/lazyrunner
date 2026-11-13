@@ -152,6 +152,7 @@ pub fn fit(segs: Vec<Seg>, cells: usize) -> Vec<Seg> {
 
 /// The body rows, `rows` high: the apps side by side, or top to bottom (`"layout"`).
 pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> Vec<Vec<Seg>> {
+    super::session::step(ui, controller);
     ui.body_rows = rows.saturating_sub(2);
     let count = controller.apps.len();
     if count == 0 {
@@ -240,11 +241,9 @@ fn pane(
         aim(info(ui, controller, index, cells), Target::Title(index)),
     ];
     let scroll = ui.motion.scroll(index, controller.states[index].scroll, ui.now);
-    pane.extend(
-        body(ui, controller, index, cells, rows.saturating_sub(2), scroll, found, base)
-            .into_iter()
-            .map(|row| aim(row, Target::Output(index))),
-    );
+    let output = body(ui, controller, index, cells, rows.saturating_sub(2), scroll, found, base);
+    let output = super::session::faded(ui, &controller.states[index].key, output);
+    pane.extend(output.into_iter().map(|row| aim(row, Target::Output(index))));
     pane.truncate(rows);
     pane
 }

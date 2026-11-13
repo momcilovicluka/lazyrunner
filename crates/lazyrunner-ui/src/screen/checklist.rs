@@ -19,6 +19,7 @@ use lazyrunner_core::changelog::{self, Entry, Line};
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::checks::{self, Kind, Outcome, Status};
+use lazyrunner_core::run::session::Snapshot;
 use lazyrunner_core::update;
 
 /// Each check shows its spinner at least this long, so every tick can be seen.
@@ -38,6 +39,8 @@ const COUNTDOWN: Duration = Duration::from_secs(3);
 const TICK: Duration = Duration::from_millis(40);
 /// A finished check's mark is bright this long as it lands.
 pub const LAND: Duration = Duration::from_millis(120);
+/// The longest the doctor waits for the resumed apps to come up before it closes anyway.
+const RESUME_MOST: Duration = Duration::from_secs(120);
 /// What frees the ports Windows reserved: for an elevated terminal, which lazyrunner isn't.
 pub const WINNAT: &str = "net stop winnat; net start winnat";
 
@@ -58,6 +61,8 @@ pub enum Fix {
     Audit,
     /// Install dotnet-trace, for Alt+p's profiles (#83).
     DotnetTrace,
+    /// Start the apps that were running when lazyrunner closed (#85), with auto-start off.
+    Resume,
 }
 
 impl Fix {
@@ -76,6 +81,7 @@ impl Fix {
             Self::Winnat => format!("`{WINNAT}` in an elevated terminal"),
             Self::Audit => "see them and fix them in the audit view (`A`)".into(),
             Self::DotnetTrace => format!("`{}`", lazyrunner_core::run::profile::INSTALL),
+            Self::Resume => "start the apps that were running (`f`)".into(),
         }
     }
 
@@ -89,6 +95,7 @@ impl Fix {
             Self::Winnat => "f copies the fix",
             Self::Audit => "f opens the audit",
             Self::DotnetTrace => "f installs it",
+            Self::Resume => "f starts them",
         }
     }
 }
@@ -120,6 +127,26 @@ pub struct Item {
     pub name: String,
     pub status: Status,
     pub detail: String,
+}
+
+/// The session kept when lazyrunner last closed (#85), as the doctor offers it.
+#[derive(Default)]
+pub struct Resume {
+    /// It has apps to start.
+    offered: bool,
+    /// They were started (`f`, or as the start): what comes after starts nothing more.
+    pub done: bool,
+    /// `i` set it aside: the start starts afresh.
+    aside: Option<Snapshot>,
+    /// The resumed apps coming up while the doctor waits for them.
+    coming: Option<Coming>,
+}
+
+/// The resumed apps, how many of them are up, and since when the doctor waits.
+struct Coming {
+    keys: Vec<String>,
+    up: usize,
+    since: Instant,
 }
 
 enum Phase {
@@ -178,6 +205,8 @@ pub struct Checklist {
     ignored: Vec<bool>,
     /// The project it checks, for its header.
     pub project: String,
+    /// The session it offers to resume.
+    pub session: Resume,
     /// When the checks started, and when the last of them was done.
     started: Option<Instant>,
     finished: Option<Instant>,
@@ -249,6 +278,10 @@ impl Checklist {
             held: false,
             flashed: None,
             project: controller.project.name.clone(),
+            session: Resume {
+                offered: controller.resume.as_ref().is_some_and(|snapshot| !snapshot.running.is_empty()),
+                ..Resume::default()
+            },
             started: Some(Instant::now()),
             finished: None,
         }
@@ -392,6 +425,9 @@ impl Checklist {
             (Kind::Tool, Status::Skip) if item.detail.contains(lazyrunner_core::run::profile::INSTALL) => {
                 Some(Fix::DotnetTrace)
             }
+            (Kind::Session(_), Status::Ok) if self.session.offered && !self.session.done && !self.starts() => {
+                Some(Fix::Resume)
+            }
             _ => None,
         }
     }
@@ -422,8 +458,59 @@ impl Checklist {
                 self.items[index].detail = "installing…".into();
                 self.rows[index].fixing = Some(fix);
             }
+            Fix::Resume => {
+                self.session.done = !controller.start_resumed().is_empty();
+                if self.session.done {
+                    self.items[index].detail.push_str(" · resumed");
+                }
+            }
             Fix::Database | Fix::Winnat | Fix::Audit => {}
         }
+    }
+
+    /// `i` on the session's row: starts afresh, the session set aside (kept as it was), or offers it again. False
+    /// when the picked row isn't the session's.
+    pub fn set_aside(&mut self, controller: &mut Controller) -> bool {
+        let index = self.selected;
+        let is_session = self.rows.get(index).is_some_and(|row| matches!(row.kind, Kind::Session(_)));
+        if !is_session || self.session.done {
+            return is_session;
+        }
+        let item = &mut self.items[index];
+        if let Some(snapshot) = controller.resume.take() {
+            (item.status, item.detail) = (Status::Skip, "starting afresh - the session is kept as it was".into());
+            self.session.aside = Some(snapshot);
+        } else if let Some(snapshot) = self.session.aside.take() {
+            let now = chrono::Local::now().fixed_offset();
+            (item.status, item.detail) = (Status::Ok, snapshot.summary(&controller.branch, now));
+            controller.resume = Some(snapshot);
+        }
+        true
+    }
+
+    /// As the start comes: the session's apps start, and the doctor waits for them to come up; false when there
+    /// are none to resume.
+    fn begin_resuming(&mut self, controller: &mut Controller, now: Instant) -> bool {
+        if !self.session.offered || self.session.done || controller.resume.is_none() {
+            return false;
+        }
+        let keys = controller.start_resumed();
+        self.session.done = !keys.is_empty();
+        if self.session.done {
+            self.session.coming = Some(Coming { keys, up: 0, since: now });
+        }
+        self.session.done
+    }
+
+    /// While the resumed apps come up: how many are, and whether they all have (or stopped trying) - then it closes.
+    fn resumed_up(&mut self, controller: &Controller, now: Instant) -> bool {
+        let Some(coming) = &mut self.session.coming else { return true };
+        let up = |key: &String| controller.is_running(key) && !controller.getting_ready().contains(key);
+        let settled = |key: &String| up(key) || (controller.building.is_none() && !controller.is_running(key));
+        coming.up = coming.keys.iter().filter(|key| up(key)).count();
+        let total = coming.keys.len();
+        self.footer = format!("resuming the session - {} of {total} up · any key continues", coming.up);
+        coming.keys.iter().all(settled) || now.saturating_duration_since(coming.since) >= RESUME_MOST
     }
 
     /// `a`: every safe fix, one after another.
@@ -649,6 +736,9 @@ impl Checklist {
     /// How much of a timed hold is left (1 to 0), for the bar that drains along the box; none while it waits for a
     /// key, or for a hold too short to show one.
     pub fn draining(&self, now: Instant) -> Option<f64> {
+        if let Some(coming) = &self.session.coming {
+            return Some(coming.up as f64 / coming.keys.len().max(1) as f64); // fills as they come up
+        }
         let Phase::Holding { from, until: Some(until), .. } = self.phase else { return None };
         let total = until.saturating_duration_since(from);
         if total < BAR_MIN_HOLD || self.skip {
@@ -770,8 +860,11 @@ impl Checklist {
         }
         self.steer_hold(now);
         let Phase::Holding { until, .. } = self.phase else { return false };
+        if self.session.coming.is_some() {
+            return self.skip || self.resumed_up(controller, now);
+        }
         if self.skip || until.is_some_and(|until| now >= until) {
-            return true;
+            return self.skip || !self.starts() || !self.begin_resuming(controller, now);
         }
         let problems = (0..self.items.len()).filter(|&index| self.is_problem(index)).count();
         let blocking = (0..self.items.len())
@@ -840,7 +933,7 @@ impl Checklist {
     pub fn blocks(&self, index: usize) -> &'static str {
         let (Some(item), Some(row)) = (self.items.get(index), self.rows.get(index)) else { return "" };
         match &row.kind {
-            Kind::Version | Kind::Branch => "nothing",
+            Kind::Version | Kind::Branch | Kind::Session(_) => "nothing",
             Kind::Update => "nothing - this version goes on running",
             Kind::Project => "nothing until the profile is reloaded (, then p)",
             Kind::Ports => "the apps whose ports are taken: they can't listen on them",
@@ -981,6 +1074,7 @@ impl Checklist {
             held: false,
             flashed: None,
             project: String::new(),
+            session: Resume::default(),
             started: None,
             finished: None,
         }
@@ -996,6 +1090,7 @@ fn kind_of(name: &str) -> Kind {
         "Database" => Kind::Database,
         "Profile" => Kind::Project,
         "Branch" => Kind::Branch,
+        checks::SESSION_CHECK => Kind::Session(lazyrunner_core::run::session::Freshness::Recent),
         _ if name.ends_with(" packages") => Kind::Packages(name.trim_end_matches(" packages").to_lowercase()),
         _ => Kind::Tool,
     }
@@ -1011,6 +1106,26 @@ mod tests {
 
     fn item_named(name: &str, status: Status) -> Item {
         Item { name: name.into(), status, detail: String::new() }
+    }
+
+    #[test]
+    fn with_auto_start_off_f_resumes_the_session_and_i_on_its_row_starts_afresh_or_offers_it_again() {
+        let (_temp, mut controller) = crate::screen::tests::controller("checklist-session");
+        let at = chrono::Local::now().fixed_offset().to_rfc3339();
+        let running = vec!["orders".to_string()];
+        controller.resume = Some(Snapshot { at, branch: controller.branch.clone(), running, view: Default::default() });
+        let mut list = Checklist::fixed(vec![item_named(checks::SESSION_CHECK, Status::Ok)], Vec::new(), "");
+        (list.session.offered, list.selected) = (true, 0);
+        assert_eq!(list.fix_of(0), Some(Fix::Resume), "auto-start is off: f starts them");
+        assert!(list.set_aside(&mut controller), "i on the session's row");
+        assert!(controller.resume.is_none(), "set aside: the start starts afresh");
+        assert_eq!((list.items[0].status, list.fix_of(0)), (Status::Skip, None));
+        list.set_aside(&mut controller);
+        assert!(controller.resume.is_some() && list.items[0].status == Status::Ok, "i again offers it again");
+        list.start_after = true;
+        assert_eq!(list.fix_of(0), None, "with auto-start the start resumes it");
+        let mut other = Checklist::fixed(vec![item(Status::Ok)], Vec::new(), "");
+        assert!(!other.set_aside(&mut controller), "another row's i ignores as before");
     }
 
     #[test]

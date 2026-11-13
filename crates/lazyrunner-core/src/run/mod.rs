@@ -28,6 +28,7 @@ pub mod ports;
 pub mod profile;
 pub mod requests;
 pub mod secrets;
+pub mod session;
 pub mod suites;
 pub mod test_history;
 pub mod tools;

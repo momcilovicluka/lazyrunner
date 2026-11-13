@@ -29,6 +29,8 @@ pub enum Icon {
     Reload,
     Readme,
     Changelog,
+    /// The session resumed (#85).
+    History,
     Releases,
     License,
     Bug,
@@ -150,6 +152,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Readme, true) => "\u{f02d}", // book
         (Icon::Changelog, false) => "✦",
         (Icon::Changelog, true) => "\u{f1da}", // history
+        (Icon::History, false) => "↺",
+        (Icon::History, true) => "\u{f02da}", // md history
         (Icon::Releases, false) => "⇩",
         (Icon::Releases, true) => "\u{f02b}", // tag
         (Icon::License, false) => "§",
@@ -308,6 +312,7 @@ pub fn check(name: &str) -> Option<Icon> {
         "Database" => Some(Icon::Database),
         "Profile" => Some(Icon::Folder),
         "Vulnerabilities" => Some(Icon::Shield),
+        lazyrunner_core::run::checks::SESSION_CHECK => Some(Icon::History),
         lazyrunner_core::run::checks::DOCKER_CHECK => Some(Icon::Docker),
         _ if name.ends_with(" packages") => Some(Icon::Package),
         _ => None,
@@ -370,6 +375,7 @@ mod tests {
             Icon::Reload,
             Icon::Readme,
             Icon::Changelog,
+            Icon::History,
             Icon::Releases,
             Icon::License,
             Icon::Bug,

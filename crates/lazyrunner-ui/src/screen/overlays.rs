@@ -466,6 +466,16 @@ fn check_name(nerd: bool, name: &str, language: Option<&str>) -> String {
     }
 }
 
+/// A kept session's age: within the hour green, within the day the accent, older amber.
+fn age_color(freshness: lazyrunner_core::run::session::Freshness) -> C {
+    use lazyrunner_core::run::session::Freshness;
+    match freshness {
+        Freshness::Recent => C::Green,
+        Freshness::Today => C::Cyan,
+        Freshness::Older => C::Yellow,
+    }
+}
+
 fn status_color(status: Status) -> C {
     match status {
         Status::Pending | Status::Skip => C::DarkGray,
@@ -733,10 +743,11 @@ fn check_row(ui: &Ui, list: &Checklist, index: usize, width: usize, slowest: Dur
     }
     let dim = status == Status::Skip;
     let detail = if ignored { format!("{} · ignored for this run", item.detail) } else { item.detail.clone() };
-    let detail_color = match item.status {
+    let detail_color = match (item.status, &row.kind) {
         _ if dim => C::DarkGray,
-        Status::Ok => C::Gray,
-        other => status_color(other),
+        (Status::Ok, Kind::Session(freshness)) => age_color(*freshness),
+        (Status::Ok, _) => C::Gray,
+        (other, _) => status_color(other),
     };
     let segs = vec![
         edge,

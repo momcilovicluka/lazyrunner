@@ -20,6 +20,8 @@ const SQL_PORT: u16 = 1433;
 /// A tool that hasn't printed its version by then is hung (a broken install, a prompt nobody sees).
 const TOOL_TIMEOUT: Duration = Duration::from_secs(10);
 const TOOL_POLL: Duration = Duration::from_millis(20);
+/// The session's row (#85).
+pub const SESSION_CHECK: &str = "Session";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -61,6 +63,8 @@ pub enum Kind {
     Packages(String),
     Project,
     Branch,
+    /// The session kept when lazyrunner last closed (#85), and how old it is.
+    Session(crate::run::session::Freshness),
 }
 
 /// The checklist's groups, in its order.
@@ -77,7 +81,7 @@ impl Kind {
     pub fn group(&self) -> Group {
         match self {
             Self::Version | Self::Tool => Group::Environment,
-            Self::Project | Self::Ports | Self::Branch => Group::Project,
+            Self::Project | Self::Ports | Self::Branch | Self::Session(_) => Group::Project,
             Self::Database => Group::Database,
             Self::Packages(_) | Self::Audit => Group::Packages,
             Self::Update => Group::Update,
@@ -92,6 +96,7 @@ impl Kind {
             Self::Project => 2,
             Self::Ports => 3,
             Self::Branch => 4,
+            Self::Session(_) => 5,
             Self::Database => 5,
             Self::Packages(_) => 6,
             Self::Audit => 7,
@@ -250,6 +255,11 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
         }
     }
     checks.push(check(Kind::Branch, "Branch", move || (Status::Ok, branch)));
+    if let Some(snapshot) = &controller.resume {
+        let now = chrono::Local::now().fixed_offset();
+        let (summary, freshness) = (snapshot.summary(&controller.branch, now), snapshot.freshness(now));
+        checks.push(check(Kind::Session(freshness), SESSION_CHECK, move || (Status::Ok, summary)));
+    }
     checks
 }
 

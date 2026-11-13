@@ -170,6 +170,7 @@ See [projects/README.md](projects/README.md) for full examples and recipes.
 ```
 lazyrunner            open lazyrunner in this terminal and start everything (unless auto-start is off)
 lazyrunner start      the same, but always starts; if lazyrunner is open in another terminal, starts what is stopped there
+lazyrunner --fresh    either of them, without resuming the last session (below)
 lazyrunner stop       stop everything in the open lazyrunner (also cancels a running build)
 lazyrunner restart    stop, rebuild if anything changed, run again
 lazyrunner profile …  init / check a project profile (above)
@@ -386,7 +387,7 @@ Turn it off with `,` then `w`.
 
 It's laid out as a doctor: a header with the project, a bar of the checks done (`7 / 10 checks`), how many passed,
 warned, are blocked and were skipped, how long they took and the slowest; then the checks under their groups' headers:
-Environment (lazyrunner, git, the .NET SDK, Node.js / npm), Project (the profile, the ports, the branch), Database,
+Environment (lazyrunner, git, the .NET SDK, Node.js / npm), Project (the profile, the ports, the branch, the session), Database,
 Packages and Update - each header with its group's worst result and time, every group open unless the terminal is too
 short for them all. Each check shows how long it took with a bar of that against the slowest, and a `FIX` tag when it
 has one; a failed check has a red edge and a warning an amber one, a skipped one is dimmed. Beside the list (under the
@@ -414,6 +415,23 @@ start until it's fixed or `Enter` starts anyway, and once nothing blocks it any 
 - to the start; `Esc` holds it there. `c` copies it all as a Markdown report for an issue - lazyrunner's version, the
 project and its apps with their ports and folders, each check's result and time, and what fixes the problems, with
 secrets masked as in the diagnostics zip.
+
+## Session
+
+When lazyrunner closes it keeps the session for this branch, in the project's state folder: the apps that were
+running, the focused and zoomed column, the open screen (`K` `H` `M` `A` `T` `P` `D` `~`) on the app it was looking
+at - the requests' filter, errors only, endpoint and tab, the tests' filter, the audit's filter - and each column's
+search and `Alt+d` mode. Scroll positions and the jump list aren't kept: the output is new.
+
+The next time it opens, the startup checklist offers it in the Project group: `Session · 2 h ago · 3 apps were
+running`, the age green within the hour, in the accent within the day, amber when older - and after a week it isn't
+offered. A session from another branch says so (`· from main`). With auto-start on, the start **starts the apps that
+were running** instead of all of them (`U` still starts everything): a bar fills along the doctor's bottom edge as they
+come up, then it closes. With auto-start off, `f` on the row starts them. `i` on the row starts afresh, the session
+kept as it was (`i` again offers it again); `lazyrunner --fresh` does that from the command line. Once the checklist
+closes the screen comes back as it was, and the resumed columns fade in from the background one after another as their
+apps start (not with reduced motion). An app the session names that the profile no longer has is left out, with a
+line in the log. `restoreSession` (`,` then `k`) turns it off.
 
 ## Database (`d`)
 
@@ -1178,6 +1196,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `restartOnCodeChange` | `false` | Rebuild + restart the running .NET apps when code changes |
 | `notifications` | `true` | Desktop notifications (none while the terminal has the focus) |
 | `startupChecklist` | `true` | The startup checklist |
+| `restoreSession` | `true` | Keep the session when lazyrunner closes and resume it when it opens: the apps that were running and the screen (see Session) |
 | `panelLogLines` | `5` | How many recent events the panel shows |
 | `theme` | `default` | A theme's id (a built-in one, or a file in `themes` without `.json`) |
 | `autoUpdate` | `true` | Install a newer lazyrunner when it opens |
