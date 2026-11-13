@@ -207,6 +207,7 @@ at once while the palette wipes away.
 | `u` / `U` | Start the focused app / start everything (builds first if the code changed) |
 | `s` / `S` | Stop the focused app (or cancel its build or `npm ci`) / stop everything, cancelling a running build - `S` also cancels it from inside the `,` and `x` menus, which stay open |
 | `r` / `R` | Restart the focused app / everything (rebuild if anything changed) |
+| `.` | Repeat the last action that changed something, as in vim: a start, stop, restart or build (on the apps it acted on then, not on what has the focus now), `npm ci` or install, a task, a test run (the same suites or test), a request sent again (`p` in `H`), applying the pending migrations (asking again). Not views, scrolling, searches or settings. The hints say what it would do (`. restart Orders`) and the palette lists it first; with nothing to repeat it shakes the hints |
 | `b` / `B` | Build the focused app / every app that builds (but the ones `S` leaves running): a full build, never skipped, that leaves them **stopped** (a running one is stopped first - it locks its build output). `u` / `U` then start them without building again. npm apps have no separate build step |
 | `!` | Kill whatever holds a port the apps need (offered when a port is taken); with no port in the way, the port map (`P`) |
 | `q` / `Ctrl+C` | Quit: stop everything, back to the prompt |

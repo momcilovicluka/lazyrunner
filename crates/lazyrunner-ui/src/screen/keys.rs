@@ -288,6 +288,7 @@ fn action_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
         return;
     }
     ui.motion.flash(Spot::Hint(name.to_string()), ui.now);
+    super::repeat::note(ui, controller, &action.run);
     run(ui, controller, &action.run);
 }
 
@@ -678,6 +679,7 @@ fn run_from_overlay(ui: &mut Ui, controller: &mut Controller, action: &Action, k
     if !keep_open {
         controller.add_log(format!("▸ {}", action.label), Hue::DarkGray);
     }
+    super::repeat::note(ui, controller, &action.run);
     run(ui, controller, &action.run);
 }
 
@@ -769,6 +771,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::Copy => ui.overlay = Some(Overlay::Copy { index: 0 }),
         Run::Durations => super::durations::open(ui, controller),
         Run::Problems => super::seen::open(ui, controller, super::jumps::View::Problems),
+        Run::Repeat => super::repeat::repeat(ui, controller),
         Run::Tests => super::seen::open(ui, controller, super::jumps::View::Tests),
         Run::Requests => super::seen::open(ui, controller, super::jumps::View::Requests),
         Run::Migrations => super::seen::open(ui, controller, super::jumps::View::Migrations),

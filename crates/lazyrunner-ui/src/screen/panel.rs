@@ -174,6 +174,7 @@ pub fn sliding(ui: &Ui) -> bool {
 /// The keys that matter now, as keycaps: on the left the alerts and what the focused app can do as it is, on the
 /// right what's always there (: and ? reach everything else). A key just pressed lights its keycap.
 fn hints(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
+    let repeat = super::repeat::said(ui, controller);
     let mut now: Vec<(&str, &str, C)> = Vec::new();
     if !controller.conflicts.is_empty() {
         now.push(("!", "kill port user", C::Red));
@@ -182,6 +183,9 @@ fn hints(ui: &Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
         now.push(("i", "install", C::Yellow));
     }
     now.extend(focused_hints(ui, controller));
+    if let Some(said) = &repeat {
+        now.push((".", said.as_str(), C::Gray));
+    }
     let always = [
         (":", "commands", C::Gray),
         ("x", "menu", C::Gray),

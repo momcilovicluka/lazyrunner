@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.89.0] - 2026-11-13
+
+### Added
+- `.` repeats the last action that changed something, as in vim: a start, stop, restart or build on the apps it acted on then (not on what has the focus now), `npm ci` or install, a task, a test run (the same suites or test), a request sent again, applying the pending migrations (asking again). The panel's hints say what it would do (`. restart Orders`), the palette lists it first (`Repeat: restart Orders`), and with nothing to repeat it shakes the hints (#103).
+
+### Fixed
+- The About box's session time counts from the frame's clock, as the rest of the screen does.
+
 ## [1.88.0] - 2026-11-13
 
 ### Added
