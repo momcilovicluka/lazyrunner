@@ -104,12 +104,15 @@ try {
     const same = wanted.toLowerCase() === String(host).toLowerCase() || (loopback(wanted) && loopback(host));
     return same && (!wantedPort || wantedPort === String(at));
   };
+  // Each matching fault rolls its own share: of two on the same calls, the second can strike where the first didn't.
   const find = (host, at, route) => {
     load();
-    const fault = faults.find(
-      (each) => targets(each.target, host, at) && route.toLowerCase().startsWith(String(each.path || '').toLowerCase()),
+    return faults.find(
+      (each) =>
+        targets(each.target, host, at) &&
+        route.toLowerCase().startsWith(String(each.path || '').toLowerCase()) &&
+        Math.random() * 100 < each.share,
     );
-    return fault && Math.random() * 100 < fault.share ? fault : undefined;
   };
   // A delay's wait: its ms, or somewhere up to its ms_max (a slow network).
   const waitOf = (fault) => (fault.ms_max > fault.ms ? fault.ms + Math.random() * (fault.ms_max - fault.ms) : fault.ms);
@@ -137,6 +140,10 @@ try {
       const through = (connect, extra = {}) => original.call(this, { ...options, ...extra, agent: undefined, createConnection: connect }, ...rest);
       if (fault.kind === 'delay') {
         const real = secure ? tls.connect : net.createConnection;
+        // Marked: the .NET app it goes to doesn't fault it again as a browser app's call (a dev server's proxy).
+        const marked = Array.isArray(options.headers)
+          ? {}
+          : { headers: { ...(options.headers || {}), 'x-lazyrunner-faulted': String(fault.id) } };
         return through((opts, done) => {
           setTimeout(() => {
             try {
@@ -145,7 +152,7 @@ try {
               done(error);
             }
           }, waitOf(fault));
-        });
+        }, marked);
       }
       if (fault.kind === 'drop') return through((opts, done) => process.nextTick(() => done(dropped())));
       const headers = { ...(options.headers || {}), 'x-lazyrunner-fault': String(fault.id) };

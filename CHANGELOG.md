@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.96.1] - 2026-11-16
+
+### Fixed
+- Faults on a frontend's calls did nothing when the browser made them - and a frontend's API calls mostly come from the browser, not its dev server, where lazyrunner's hook was. Now the .NET app they go to applies the fault as they arrive: the hook loads there too (it starts again once) and puts a first middleware in its pipeline for the calls whose `Origin` or `Referer` is the frontend's port; a failed or mocked answer carries the CORS headers the browser needs to see its status. The faults box says where a frontend's faults apply.
+- Of several faults on the same calls - the chaos preset sets two - only the first was ever tried, so chaos never failed a call; each one now rolls its own share.
+
+### Changed
+- The README's recording shows more: the stack map with the calls moving, a fault and the failures it brings, a search, the Problems screen, the code map and the Health tab, the timeline, the requests view, the durations and the palette. New screenshots of the screens it didn't show.
+
 ## [1.96.0] - 2026-11-13
 
 ### Added

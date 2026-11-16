@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use crossterm::event::KeyEvent;
 use lazyrunner_core::output::Hue;
+use lazyrunner_core::profile::AppKind;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::faults::Kind;
 
@@ -17,15 +18,15 @@ use super::seg::{Seg, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
-const INNER: usize = 92;
+const INNER: usize = 104;
 const LABEL_CELLS: usize = 9;
 const VALUE_CELLS: usize = 44;
 const KINDS: [&str; 4] = ["delay", "fail", "drop", "mock"];
 /// What each kind's value starts at: ms to wait, the status to answer with, nothing, a mock's status.
 const VALUES: [&str; 4] = ["800", "500", "", "200"];
 const SHARE_STEP: u8 = 10;
-const FOOTER: &str = "↑ ↓ a field · ← → change it · type into it · Enter sets the fault · Del takes this target's away · \
-     Ctrl+S keeps them · Esc the map";
+const FOOTER: &str =
+    "↑ ↓ a field · ← → change it · type into it · Enter sets it · Del this target's away · Ctrl+S keeps them · Esc map";
 const HOST: &str = "a host you type…";
 /// The ready-made faults: a name, and what each sets - its kind, share and how long it lasts.
 const PRESETS: [&str; 5] = ["none", "slow network", "flaky", "offline", "chaos"];
@@ -237,6 +238,20 @@ fn set(controller: &mut Controller, view: &View, choices: &[Choice]) {
     controller.set_fault(&caller, target, &path, (kind, view.share), None);
 }
 
+/// Where an npm app's faults apply: its dev server's own calls, and - its browser's calls never pass through it - the
+/// calls that arrive in a .NET app it targets.
+fn browser_note(controller: &Controller, target: Option<&Choice>) -> Vec<Seg> {
+    let dotnet = |key: &String| controller.app(key).is_some_and(|app| matches!(app.kind, AppKind::Dotnet { .. }));
+    match target {
+        Some((_, Some((_, to)))) if dotnet(to) => {
+            let name = controller.app(to).map_or(to.as_str(), |app| app.name.as_str());
+            let said = format!(" ◆ Its browser's calls too: {name} faults them as they arrive (it starts again once)");
+            vec![seg(said, C::DarkCyan)]
+        }
+        _ => vec![seg(" ◆ Only its dev server's own calls: the browser's go straight to the target", C::DarkGray)],
+    }
+}
+
 pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some(Overlay::Faults(view)) = &ui.overlay else { return Vec::new() };
     let Some(caller) = controller.apps.get(view.caller) else { return Vec::new() };
@@ -271,6 +286,9 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             seg(pad(&value, VALUE_CELLS), if picked { C::Cyan } else { C::Gray }),
             seg(note, C::DarkGray),
         ]);
+    }
+    if matches!(caller.kind, AppKind::Npm { .. }) {
+        lines.extend([Vec::new(), browser_note(controller, choices.get(view.target))]);
     }
     let set: Vec<_> = controller.faults().iter().filter(|fault| fault.caller == caller.key).collect();
     lines.push(Vec::new());

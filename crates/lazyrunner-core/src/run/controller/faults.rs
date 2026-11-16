@@ -74,13 +74,27 @@ impl Controller {
         let share = share.clamp(1, 100);
         let until = lasts.map(|lasts| (self.now)() + lasts);
         let id = self.faults.next_id;
-        let fault = Fault { id, caller: caller.into(), target, to_app, path: path.into(), kind, share, until };
+        let from_port = self.port(caller);
+        let fault = Fault {
+            id,
+            caller: caller.into(),
+            target,
+            to_app: to_app.clone(),
+            from_port,
+            path: path.into(),
+            kind,
+            share,
+            until,
+        };
         self.add_log(format!("⚡ {} → {}: {}", app.name, fault.target, fault.said()), Hue::Yellow);
         self.faults.list.push(fault);
         self.publish_faults();
-        if let AppKind::Dotnet { project, .. } = &app.kind {
-            let framework = faults::target_framework(&self.root.join(project));
-            self.hook_for(caller, &framework);
+        // The hook goes into a .NET caller (its own calls) and a .NET app called (the calls a browser app makes to it).
+        for key in std::iter::once(caller.to_string()).chain(to_app) {
+            if let Some(AppKind::Dotnet { project, .. }) = self.app(&key).map(|app| app.kind.clone()) {
+                let framework = faults::target_framework(&self.root.join(project));
+                self.hook_for(&key, &framework);
+            }
         }
     }
 
@@ -164,9 +178,11 @@ impl Controller {
         }
         let (sender, result) = channel();
         let (state_dir, wanted) = (self.state_dir.clone(), framework.to_string());
-        std::thread::spawn(move || {
-            let _ = sender.send(faults::build_hook(&state_dir, &wanted));
-        });
+        if !cfg!(any(test, feature = "test-support")) {
+            std::thread::spawn(move || {
+                let _ = sender.send(faults::build_hook(&state_dir, &wanted));
+            });
+        }
         self.add_log(format!("⚡ Building lazyrunner's fault hook for {framework} (once)…"), Hue::DarkGray);
         let waiting = vec![caller.to_string()];
         self.faults.building = Some(Building { framework: framework.to_string(), waiting, result });
@@ -208,7 +224,8 @@ impl Controller {
     }
 
     /// `command` with what the hooks need: an npm app its key (its call hook reads the faults beside it); a .NET app,
-    /// once its framework's hook is built, the hook, the faults file and its key.
+    /// once its framework's hook is built, the hook (also as a hosting startup, for the calls that come to it), the
+    /// faults file and its key.
     pub(super) fn with_fault_hook(&self, key: &str, mut command: ServerCommand) -> ServerCommand {
         let Some(app) = self.app(key) else { return command };
         let hook = match &app.kind {
@@ -222,25 +239,33 @@ impl Controller {
         };
         command.spec.env.push((OsString::from(faults::ENV_APP), OsString::from(key)));
         if let Some(hook) = hook {
-            let name = OsString::from(faults::ENV_HOOKS);
-            let joined = match std::env::var_os(faults::ENV_HOOKS).filter(|before| !before.is_empty()) {
-                Some(before) => {
-                    let mut joined = before;
-                    joined.push(if cfg!(windows) { ";" } else { ":" });
-                    joined.push(hook.as_os_str());
-                    joined
-                }
-                None => hook.into_os_string(),
-            };
-            command.spec.env.push((name, joined));
+            let separator = if cfg!(windows) { ";" } else { ":" };
+            let hooks = joined(faults::ENV_HOOKS, hook.as_os_str(), separator);
+            command.spec.env.push((OsString::from(faults::ENV_HOOKS), hooks));
+            let startups = joined(faults::ENV_HOSTING_STARTUP, faults::HOOK_NAME.as_ref(), ";");
+            command.spec.env.push((OsString::from(faults::ENV_HOSTING_STARTUP), startups));
             command.spec.env.push((OsString::from(faults::ENV_FILE), self.faults_file().into_os_string()));
         }
         command
     }
 }
 
+/// `value` after what the variable `name` holds already (`separator` between), or alone.
+fn joined(name: &str, value: &std::ffi::OsStr, separator: &str) -> OsString {
+    match std::env::var_os(name).filter(|before| !before.is_empty()) {
+        Some(mut before) => {
+            before.push(separator);
+            before.push(value);
+            before
+        }
+        None => value.to_os_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use crate::run::faults::Kind;
     use crate::testing::TempDir;
 
@@ -255,12 +280,12 @@ mod tests {
         let written = crate::json::read(&controller.state_folder().join(crate::run::faults::FILE)).unwrap();
         assert_eq!(written["faults"][0]["caller"], caller.as_str());
         assert_eq!(written["faults"][0]["status"], 503);
+        assert_eq!(written["faults"][0]["to_app"], target.as_str(), "the app called faults a browser app's calls");
+        assert_eq!(written["faults"][0]["from_port"], controller.port(&caller).map_or(json!(null), |port| json!(port)));
         assert!(written["port"].as_u64().unwrap_or(0) > 0, "the fault server listens");
-        assert!(
-            controller.log.back().unwrap().text.ends_with("503 · 30% /api"),
-            "{}",
-            controller.log.back().unwrap().text
-        );
+        assert!(controller.log.iter().any(|entry| entry.text.ends_with("503 · 30% /api")), "{:?}", controller.log);
+        let building = controller.log.back().unwrap().text.clone();
+        assert!(building.starts_with("⚡ Building lazyrunner's fault hook"), "the app called gets it too: {building}");
         controller.clear_faults(Some(&caller), Some(&target));
         assert!(controller.faults().is_empty());
         let written = crate::json::read(&controller.state_folder().join(crate::run::faults::FILE)).unwrap();

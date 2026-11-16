@@ -9,7 +9,7 @@
 <text x="64.4" y="97.7" fill="#94e2d5" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ › </text>
 <text x="98.0" y="97.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">start</text>
 <text x="140.0" y="97.7" fill="#94e2d5" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▏</text>
-<text x="1274.0" y="97.7" fill="#6c7086" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">32 commands</text>
+<text x="1274.0" y="97.7" fill="#6c7086" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">43 commands</text>
 <text x="1366.4" y="97.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="64.4" y="115.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="81.2" y="115.7" fill="#6c7086" textLength="1285.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</text>
@@ -132,91 +132,102 @@
 <rect x="1299.2" y="354.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1332.8" y="354.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="64.4" y="367.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="114.8" y="367.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] L open</text>
-<text x="198.8" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
-<text x="215.6" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="224.0" y="367.7" fill="#ffffff" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he git tool beside l</text>
-<text x="392.0" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
-<text x="400.4" y="367.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">zy</text>
-<text x="417.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
-<text x="425.6" y="367.7" fill="#ffffff" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">unner (Windows </text>
-<text x="551.6" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">T</text>
-<text x="560.0" y="367.7" fill="#ffffff" textLength="739.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">erminal)                                                                                </text>
+<text x="114.8" y="367.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[x] Keep the </text>
+<text x="224.0" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="232.4" y="367.7" fill="#ffffff" textLength="142.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ession: reopen wi</text>
+<text x="375.2" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="383.6" y="367.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">h the </text>
+<text x="434.0" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="442.4" y="367.7" fill="#ffffff" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">pps and the sc</text>
+<text x="560.0" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="568.4" y="367.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">een i</text>
+<text x="610.4" y="367.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="618.8" y="367.7" fill="#ffffff" textLength="680.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> had                                                                             </text>
 <text x="1299.2" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1332.8" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> g </text>
+<text x="1332.8" y="367.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> k </text>
 <text x="1366.4" y="367.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1299.2" y="372.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1332.8" y="372.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="64.4" y="385.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
-<text x="114.8" y="385.7" fill="#ffffff" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Nerd Font icon</text>
-<text x="266.0" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
-<text x="274.4" y="385.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> (</text>
-<text x="291.2" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="299.6" y="385.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he termin</text>
-<text x="375.2" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
-<text x="383.6" y="385.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">l's font a Ne</text>
-<text x="492.8" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
-<text x="501.2" y="385.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">d Fon</text>
-<text x="543.2" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="551.6" y="385.7" fill="#ffffff" textLength="747.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Mono)                                                                                   </text>
+<text x="114.8" y="385.7" fill="#ffffff" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] L open</text>
+<text x="198.8" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="215.6" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="224.0" y="385.7" fill="#ffffff" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he git tool beside l</text>
+<text x="392.0" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="400.4" y="385.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">zy</text>
+<text x="417.2" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="425.6" y="385.7" fill="#ffffff" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">unner (Windows </text>
+<text x="551.6" y="385.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">T</text>
+<text x="560.0" y="385.7" fill="#ffffff" textLength="739.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">erminal)                                                                                </text>
 <text x="1299.2" y="385.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
-<text x="1332.8" y="385.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
+<text x="1332.8" y="385.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> g </text>
 <text x="1366.4" y="385.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<rect x="1299.2" y="390.0" width="25.2" height="18" fill="#6c7086"/>
 <rect x="1332.8" y="390.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="64.4" y="403.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
-<text x="114.8" y="403.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Run Order</text>
-<text x="190.4" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
-<text x="198.8" y="403.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> on ano</text>
-<text x="257.6" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="266.0" y="403.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">her l</text>
-<text x="308.0" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
-<text x="316.4" y="403.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">unch p</text>
-<text x="366.8" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
-<text x="375.2" y="403.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ofile or npm varian</text>
-<text x="534.8" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
-<text x="1332.8" y="403.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> p </text>
+<text x="64.4" y="403.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ≡  </text>
+<text x="114.8" y="403.7" fill="#ffffff" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">[ ] Nerd Font icon</text>
+<text x="266.0" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="274.4" y="403.7" fill="#ffffff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> (</text>
+<text x="291.2" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="299.6" y="403.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">he termin</text>
+<text x="375.2" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="383.6" y="403.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">l's font a Ne</text>
+<text x="492.8" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="501.2" y="403.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">d Fon</text>
+<text x="543.2" y="403.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="551.6" y="403.7" fill="#ffffff" textLength="747.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Mono)                                                                                   </text>
+<text x="1299.2" y="403.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> , </text>
+<text x="1332.8" y="403.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> i </text>
 <text x="1366.4" y="403.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1332.8" y="408.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="64.4" y="421.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="114.8" y="421.7" fill="#ffffff" textLength="235.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Stack: which app calls which</text>
-<text x="350.0" y="421.7" fill="#6c7086" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  from the calls they make and dependsOn - calls a second, p95, failures</text>
-<text x="1332.8" y="421.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> K </text>
+<text x="64.4" y="421.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="114.8" y="421.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Run Order</text>
+<text x="190.4" y="421.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">s</text>
+<text x="198.8" y="421.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> on ano</text>
+<text x="257.6" y="421.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="266.0" y="421.7" fill="#ffffff" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">her l</text>
+<text x="308.0" y="421.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">a</text>
+<text x="316.4" y="421.7" fill="#ffffff" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">unch p</text>
+<text x="366.8" y="421.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">r</text>
+<text x="375.2" y="421.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ofile or npm varian</text>
+<text x="534.8" y="421.7" fill="#f9e2af" textLength="8.4" lengthAdjust="spacingAndGlyphs" text-decoration="underline" xml:space="preserve">t</text>
+<text x="1332.8" y="421.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> p </text>
 <text x="1366.4" y="421.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1332.8" y="426.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="64.4" y="439.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="114.8" y="439.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Durations</text>
-<text x="190.4" y="439.7" fill="#6c7086" textLength="562.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build, start and npm ci times over the last runs: what got slower</text>
-<text x="1332.8" y="439.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> D </text>
+<text x="114.8" y="439.7" fill="#ffffff" textLength="235.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Stack: which app calls which</text>
+<text x="350.0" y="439.7" fill="#6c7086" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  from the calls they make and dependsOn - calls a second, p95, failures</text>
+<text x="1332.8" y="439.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> K </text>
 <text x="1366.4" y="439.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1332.8" y="444.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="64.4" y="457.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
-<text x="114.8" y="457.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Layout: auto → next</text>
-<text x="274.4" y="457.7" fill="#6c7086" textLength="630.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto (stacked when narrow) / columns side by side / stacked top to bottom</text>
-<text x="1332.8" y="457.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> | </text>
+<text x="64.4" y="457.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ▸  </text>
+<text x="114.8" y="457.7" fill="#ffffff" textLength="184.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Repeat the last action</text>
+<text x="299.6" y="457.7" fill="#6c7086" textLength="470.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the last start, stop, build, test run, request or task</text>
+<text x="1332.8" y="457.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> . </text>
 <text x="1366.4" y="457.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1290.8" y="462.0" width="67.2" height="18" fill="#6c7086"/>
-<text x="64.4" y="475.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
-<text x="114.8" y="475.7" fill="#ffffff" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Reload window</text>
-<text x="224.0" y="475.7" fill="#6c7086" textLength="722.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the settings and themes read again, the terminal set up again; the apps keep running</text>
-<text x="1290.8" y="475.7" fill="#ffffff" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Ctrl+R </text>
+<rect x="1299.2" y="462.0" width="58.8" height="18" fill="#6c7086"/>
+<text x="64.4" y="475.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="114.8" y="475.7" fill="#ffffff" textLength="378.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Show the shared app's public URL as a QR code</text>
+<text x="492.8" y="475.7" fill="#6c7086" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  for a phone</text>
+<text x="1299.2" y="475.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Alt+q </text>
 <text x="1366.4" y="475.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1332.8" y="480.0" width="25.2" height="18" fill="#6c7086"/>
-<text x="64.4" y="493.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
-<text x="114.8" y="493.7" fill="#ffffff" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Widen the focused column</text>
-<text x="316.4" y="493.7" fill="#6c7086" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  taller when the apps are stacked</text>
-<text x="1332.8" y="493.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> + </text>
+<rect x="1299.2" y="480.0" width="58.8" height="18" fill="#6c7086"/>
+<text x="64.4" y="493.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
+<text x="114.8" y="493.7" fill="#ffffff" textLength="361.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Share Orders through a tunnel (again: stop)</text>
+<text x="476.0" y="493.7" fill="#6c7086" textLength="352.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  devtunnel or ngrok; the tool's own login</text>
+<text x="1299.2" y="493.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Alt+s </text>
 <text x="1366.4" y="493.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <rect x="1332.8" y="498.0" width="25.2" height="18" fill="#6c7086"/>
 <text x="64.4" y="511.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ✱  </text>
-<text x="114.8" y="511.7" fill="#ffffff" textLength="268.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Ports: who holds each app's port</text>
-<text x="383.6" y="511.7" fill="#6c7086" textLength="621.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  free, its app, something else, reserved by Windows - and the last minute</text>
-<text x="1332.8" y="511.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> P </text>
+<text x="114.8" y="511.7" fill="#ffffff" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Durations</text>
+<text x="190.4" y="511.7" fill="#6c7086" textLength="562.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  build, start and npm ci times over the last runs: what got slower</text>
+<text x="1332.8" y="511.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> D </text>
 <text x="1366.4" y="511.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
-<rect x="1299.2" y="516.0" width="58.8" height="18" fill="#6c7086"/>
-<text x="64.4" y="529.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◆  </text>
-<text x="114.8" y="529.7" fill="#ffffff" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">What's new since the last run</text>
-<text x="358.4" y="529.7" fill="#6c7086" textLength="302.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  the rest dims; n N step through it</text>
-<text x="1299.2" y="529.7" fill="#ffffff" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Alt+d </text>
+<rect x="1332.8" y="516.0" width="25.2" height="18" fill="#6c7086"/>
+<text x="64.4" y="529.7" fill="#94e2d5" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│  ◧  </text>
+<text x="114.8" y="529.7" fill="#ffffff" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Layout: auto → next</text>
+<text x="274.4" y="529.7" fill="#6c7086" textLength="630.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  auto (stacked when narrow) / columns side by side / stacked top to bottom</text>
+<text x="1332.8" y="529.7" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> | </text>
 <text x="1366.4" y="529.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
 <text x="64.4" y="547.7" fill="#94e2d5" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ </text>
 <text x="81.2" y="547.7" fill="#6c7086" textLength="1285.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">type to search · ↑↓ or Alt+j k choose · Enter run · Esc close                                                                                            </text>

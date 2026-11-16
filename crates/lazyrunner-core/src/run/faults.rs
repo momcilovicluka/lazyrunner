@@ -1,7 +1,9 @@
 //! Faults on the calls between apps (#105): a call from one app to another (or to a host) delayed, failed with a
 //! status, dropped, or answered with a canned response - for a share of the calls, on a route's prefix. They're kept
 //! in `faults.json` in the project's state folder, which an npm app's call hook and a .NET app's startup hook read as
-//! they change; a failed or mocked call goes to lazyrunner's fault server, which answers it.
+//! they change; a failed or mocked call goes to lazyrunner's fault server, which answers it. A browser app's calls
+//! never pass through its dev server: the .NET app they go to faults them as they arrive (by their Origin or Referer,
+//! the browser app's port), through the same hook loaded as a hosting startup.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -19,14 +21,16 @@ pub const FILE: &str = "faults.json";
 pub const ENV_FILE: &str = "LAZYRUNNER_FAULTS";
 pub const ENV_APP: &str = "LAZYRUNNER_APP";
 pub const ENV_HOOKS: &str = "DOTNET_STARTUP_HOOKS";
+/// Where ASP.NET Core finds the hook's middleware for the calls that come to the app.
+pub const ENV_HOSTING_STARTUP: &str = "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES";
 /// Where a failed or mocked call goes on the fault server, by the fault's id.
 pub const PATH_PREFIX: &str = "/__lazyrunner_fault/";
 /// The header a Node app's failed or mocked call carries its fault's id in.
 pub const HEADER: &str = "x-lazyrunner-fault";
 /// The .NET startup hook's source, and the folder it's built in (its version in the name: a new source builds anew).
 const HOOK_SOURCE: &str = include_str!("fault-hook.cs");
-const HOOK_FOLDER: &str = "fault-hook-2";
-const HOOK_NAME: &str = "LazyrunnerFaults";
+const HOOK_FOLDER: &str = "fault-hook-3";
+pub const HOOK_NAME: &str = "LazyrunnerFaults";
 const DEFAULT_FRAMEWORK: &str = "net8.0";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const MOST_HEAD: usize = 64 * 1024;
@@ -60,13 +64,15 @@ impl Kind {
 }
 
 /// A fault on `caller`'s calls to `target` (`host:port`, or a host) - `to_app` when it's another app - on routes
-/// starting with `path`, for `share` percent of them.
+/// starting with `path`, for `share` percent of them. `from_port` is the caller's port: a browser app's calls carry it
+/// in their Origin, and `to_app` faults them there.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fault {
     pub id: u64,
     pub caller: String,
     pub target: String,
     pub to_app: Option<String>,
+    pub from_port: Option<u16>,
     pub path: String,
     pub kind: Kind,
     pub share: u8,
@@ -97,7 +103,8 @@ impl Fault {
             Kind::Drop => (0, 0, 0),
         };
         json!({
-            "id": self.id, "caller": self.caller, "target": self.target, "path": self.path, "share": self.share,
+            "id": self.id, "caller": self.caller, "target": self.target, "to_app": self.to_app,
+            "from_port": self.from_port, "path": self.path, "share": self.share,
             "kind": self.kind.name(), "ms": ms, "ms_max": ms_max, "status": status,
         })
     }
@@ -113,7 +120,6 @@ pub fn keep(file: &Path, faults: &[Fault]) -> Result<()> {
         .filter(|fault| fault.until.is_none())
         .map(|fault| {
             let mut kept = fault.to_json();
-            kept["to_app"] = json!(fault.to_app);
             if let Kind::Mock { body, file, .. } = &fault.kind {
                 (kept["body"], kept["file"]) = (json!(body), json!(file));
             }
@@ -143,6 +149,7 @@ pub fn kept(file: &Path) -> Vec<Fault> {
                 caller: text(&fault["caller"]),
                 target: text(&fault["target"]),
                 to_app: fault["to_app"].as_str().map(str::to_string),
+                from_port: None,
                 path: text(&fault["path"]),
                 kind,
                 share: u8::try_from(fault["share"].as_u64().unwrap_or(100)).unwrap_or(100),
@@ -270,7 +277,8 @@ pub fn build_hook(state_dir: &Path, framework: &str) -> Result<PathBuf, String> 
     let project = format!(
         "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>{framework}</TargetFramework>\n    \
          <Nullable>enable</Nullable>\n    <AssemblyName>{HOOK_NAME}</AssemblyName>\n    <ImplicitUsings>disable</ImplicitUsings>\n  \
-         </PropertyGroup>\n</Project>\n"
+         </PropertyGroup>\n  <ItemGroup>\n    <FrameworkReference Include=\"Microsoft.AspNetCore.App\" />\n  </ItemGroup>\n\
+         </Project>\n"
     );
     let written = std::fs::create_dir_all(&dir)
         .and_then(|()| std::fs::write(dir.join(format!("{HOOK_NAME}.csproj")), project))
@@ -300,6 +308,7 @@ mod tests {
             caller: "web".into(),
             target: "localhost:47201".into(),
             to_app: None,
+            from_port: None,
             path: String::new(),
             kind,
             share: 100,
@@ -331,10 +340,16 @@ mod tests {
     fn faults_are_written_for_the_hooks_and_say_themselves_short() {
         let temp = TempDir::new("faults");
         let file = temp.join(FILE);
-        let delayed = Fault { share: 30, path: "/api".into(), ..fault(3, Kind::Delay(800)) };
+        let to_app = Some("orders".to_string());
+        let delayed =
+            Fault { share: 30, path: "/api".into(), to_app, from_port: Some(4200), ..fault(3, Kind::Delay(800)) };
         write(&file, 5000, std::slice::from_ref(&delayed)).unwrap();
         let written = crate::json::read(&file).unwrap();
         assert_eq!(written["port"], 5000);
+        assert_eq!(
+            (&written["faults"][0]["to_app"], &written["faults"][0]["from_port"]),
+            (&json!("orders"), &json!(4200))
+        );
         assert_eq!(written["faults"][0]["kind"], "delay");
         assert_eq!(written["faults"][0]["ms"], 800);
         assert_eq!(delayed.said(), "+800 ms · 30% /api");

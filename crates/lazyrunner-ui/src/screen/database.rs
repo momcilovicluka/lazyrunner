@@ -139,11 +139,11 @@ fn answer(ui: &Ui, server: &str) -> Seg {
     }
 }
 
-/// How long ago an RFC 3339 time was.
+/// How long ago an RFC 3339 time was, as the checklist says it: `12 min ago`, `2 h ago`, `3 d ago`.
 fn ago(at: &str) -> Option<String> {
     let at = chrono::DateTime::parse_from_rfc3339(at).ok()?;
-    let seconds = (chrono::Local::now().fixed_offset() - at).num_seconds().max(0) as f64;
-    Some(format!("{} ago", lazyrunner_core::run::format_duration(seconds)))
+    let seconds = (chrono::Local::now().fixed_offset() - at).num_seconds().max(0) as u64;
+    Some(lazyrunner_core::run::session::ago(Duration::from_secs(seconds)))
 }
 
 /// An entry's row: active or not, its database and server, whether it answers, the apps on it, its pending
