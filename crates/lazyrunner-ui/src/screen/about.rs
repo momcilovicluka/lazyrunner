@@ -9,7 +9,7 @@ use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use lazyrunner_core::changelog;
 use lazyrunner_core::contributors;
 use lazyrunner_core::output::Hue;
-use lazyrunner_core::run::{Controller, format_duration};
+use lazyrunner_core::run::{Controller, format_age};
 use lazyrunner_core::update::{self, DEFAULT_REPO};
 use unicode_width::UnicodeWidthStr;
 
@@ -297,7 +297,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
 /// This session in numbers, counting up as the box opens: how long lazyrunner has run, its builds (and failed ones),
 /// the apps up, crashes, requests served, test runs.
 fn session(ui: &mut Ui, controller: &Controller) -> Vec<Vec<Seg>> {
-    let up = format_duration(ui.now.saturating_duration_since(controller.session_started).as_secs_f64());
+    let up = format_age(ui.now.saturating_duration_since(controller.session_started).as_secs_f64());
     let count = |event: &str| controller.session.get(event).copied().unwrap_or(0) as f64;
     let mut roll = |id: &str, value: f64| ui.roll(&format!("about:{id}"), value, true, false).0.round() as u64;
     let builds = roll("builds", count("build.passed") + count("build.failed"));

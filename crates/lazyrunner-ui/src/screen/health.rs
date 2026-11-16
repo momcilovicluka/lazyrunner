@@ -8,7 +8,7 @@
 use std::time::{Duration, Instant};
 
 use lazyrunner_core::run::Controller;
-use lazyrunner_core::run::format_duration;
+use lazyrunner_core::run::format_age;
 use lazyrunner_core::run::health::{Breach, Metric};
 use lazyrunner_core::run::requests::{Endpoint, endpoints};
 
@@ -394,7 +394,7 @@ fn state_line(ui: &Ui, controller: &Controller, index: usize) -> Vec<Seg> {
     let more = if more > 0 { format!(" +{more}") } else { String::new() };
     if let Some(breach) = worst(controller, key, now) {
         let what = format!("{} {}", breach.metric.name(), breach.metric.say(breach.value));
-        let lasted = format_duration(now.saturating_duration_since(breach.since).as_secs_f64());
+        let lasted = format_age(now.saturating_duration_since(breach.since).as_secs_f64());
         if breach.alert() {
             let (icon, hint, color) = if breach.acknowledged {
                 (Icon::Acknowledged, " · ack", C::Yellow)

@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.96.4] - 2026-11-16
+
+### Fixed
+- When the startup doctor installed an update, lazyrunner reopened with the doctor's closing outline still on screen: the last frame before the reopen drew it, and the new lazyrunner never drew over it. The outline doesn't show while lazyrunner reopens or quits.
+- How long ago something was, and spans that can run long, counted in minutes only (`last start 10068m15s ago`). Past an hour they go up to hours, days, weeks and years (`6d 23h ago`): a stopped column's last start and build, the stack map's boxes, Problems, crashes, marks, Health's alerts and About's up time.
+
 ## [1.96.3] - 2026-11-16
 
 ### Fixed

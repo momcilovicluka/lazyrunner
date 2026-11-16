@@ -4998,3 +4998,16 @@ async fn an_agent_adds_a_database_copy_and_following_it_the_database_screen_open
     assert_eq!(picker.entries()[picker.index].database, "ShopCopy", "on the row it added");
     assert!(matches!(add(&mut screen, &args), Err(("nothing_to_do", _))), "it's there already");
 }
+
+// ---------------------------------------------------------------- the startup doctor closing
+
+#[tokio::test]
+async fn the_doctors_outline_shrinks_away_but_not_into_a_reopen_it_would_stay_under() {
+    let mut screen = screen("doctor-ghost", json!({}));
+    screen.ui.overlay = None;
+    screen.ui.last_checks = Some((screen.ui.now, Vec::new()));
+    assert!(super::ghost::animating(&screen.ui), "it shrinks as the doctor closes");
+    screen.ui.exit = Some(super::Exit::Reopen { root: PathBuf::new(), start: false });
+    super::reload::farewell(&mut screen.ui);
+    assert!(!super::ghost::animating(&screen.ui), "not in the frame left on screen for the next lazyrunner");
+}

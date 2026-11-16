@@ -11,7 +11,7 @@ use lazyrunner_core::run::app::{AppState, Status};
 use lazyrunner_core::run::audit::Severity;
 use lazyrunner_core::run::compose::{self as services_of, State};
 use lazyrunner_core::run::controller::compose;
-use lazyrunner_core::run::format_duration;
+use lazyrunner_core::run::{format_age, format_duration};
 use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
 
@@ -684,7 +684,7 @@ fn bright(color: C) -> C {
 fn ago(at: &str) -> Option<String> {
     let at = chrono::DateTime::parse_from_rfc3339(at).ok()?;
     let seconds = (chrono::Local::now().fixed_offset() - at).num_seconds().max(0) as f64;
-    Some(format_duration(seconds))
+    Some(format_age(seconds))
 }
 
 /// A stopped app's last runs, from the durations: its last start and how long it took, its last build against its

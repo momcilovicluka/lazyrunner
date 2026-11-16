@@ -12,11 +12,13 @@ use super::theme::C;
 const GHOST: Duration = Duration::from_millis(350);
 const DOCTOR_CELLS: f64 = 154.0;
 
-/// How far it has shrunk (0 to 1, eased), while it shrinks.
+/// How far it has shrunk (0 to 1, eased), while it shrinks; never while lazyrunner reopens (an update the doctor
+/// installed): the last frame stays on screen under the next lazyrunner, which would never clear the outline.
 fn progress(ui: &Ui) -> Option<f64> {
     let (closed, _) = ui.last_checks.as_ref()?;
     let since = ui.now.saturating_duration_since(*closed);
-    if ui.reduced_motion || ui.overlay.is_some() || since >= GHOST {
+    let leaving = ui.exit.is_some() || ui.reload.is_some();
+    if ui.reduced_motion || ui.overlay.is_some() || leaving || since >= GHOST {
         return None;
     }
     let share = since.as_secs_f64() / GHOST.as_secs_f64();
