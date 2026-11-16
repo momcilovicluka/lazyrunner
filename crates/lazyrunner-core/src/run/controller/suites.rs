@@ -533,7 +533,16 @@ impl Controller {
             0
         };
         suite.status = if suite.failed > 0 { Status::Failed } else { Status::Passed };
+        let kept = if failed_only {
+            suite.save_merged(&dir).err()
+        } else {
+            let _ = std::fs::remove_file(suite.merged_file(&dir));
+            None
+        };
         let (passed, failed, skipped) = (suite.passed, suite.failed, suite.skipped);
+        if let Some(error) = kept {
+            self.add_log(format!("! {name}'s results since its last full run aren't saved ({error})"), Hue::Yellow);
+        }
         self.test_history.record_on(key, code.as_deref(), base.as_ref(), &ran_now);
         if !failed_only {
             self.test_history.set_base(key, base);
@@ -1016,9 +1025,15 @@ mod tests {
         let cart = sample.suite("npm:cart").unwrap();
         assert_eq!((cart.status, cart.passed, cart.failed), (Status::Passed, 2, 0));
         assert!(log(&sample).contains("✓ cart (1 test again) - 2 passed"), "{}", log(&sample));
-        let mut reloaded = Suite::new("npm:cart", "cart", cart.runner.clone());
-        reloaded.load_last(&sample.tests_dir());
-        assert_eq!(reloaded.failed, 1, "a restart shows the last full run");
+        let restart = |sample: &Controller| {
+            let mut reloaded = Suite::new("npm:cart", "cart", Runner::Npm { dir: temp.join("cart"), vitest: false });
+            reloaded.load_last(&sample.tests_dir());
+            (reloaded.passed, reloaded.failed)
+        };
+        assert_eq!(restart(&sample), (2, 0), "a restart shows the tests run again too");
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert_eq!(restart(&sample), (1, 1), "until it runs whole");
     }
 
     #[tokio::test]

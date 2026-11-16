@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::time::Instant;
 
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
 use super::child::Child;
 use crate::json;
@@ -87,7 +88,8 @@ impl Runner {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Outcome {
     Passed,
     Failed,
@@ -95,13 +97,20 @@ pub enum Outcome {
 }
 
 /// One test's result.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TestResult {
     pub name: String,
     pub outcome: Outcome,
     pub ms: f64,
     pub message: String,
     pub stack: String,
+}
+
+/// A suite's results since a run of some of its tests, kept until its next full run.
+#[derive(Deserialize)]
+struct Merged {
+    seconds: f64,
+    tests: Vec<TestResult>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -219,6 +228,17 @@ impl Suite {
         dir.join(format!("{}.rerun.{}", self.file_name(), self.runner.extension()))
     }
 
+    /// The results since a run of some tests, merged into the last full run's; gone once it runs whole.
+    pub fn merged_file(&self, dir: &Path) -> PathBuf {
+        dir.join(format!("{}.merged.json", self.file_name()))
+    }
+
+    /// Keeps the results a run of some tests merged in, so a restart shows them.
+    pub fn save_merged(&self, dir: &Path) -> std::io::Result<()> {
+        let merged = json!({ "seconds": self.seconds, "tests": self.tests });
+        std::fs::write(self.merged_file(dir), serde_json::to_vec(&merged)?)
+    }
+
     pub fn log_file(&self, dir: &Path) -> PathBuf {
         dir.join(format!("{}.log", self.file_name()))
     }
@@ -234,10 +254,19 @@ impl Suite {
         self.tests = tests;
     }
 
-    /// The last full run's results, if there is one (after a restart).
+    /// The last results, if there are some (after a restart): the last full run's, with the runs of some of its tests
+    /// since merged in.
     pub fn load_last(&mut self, dir: &Path) {
-        let file = self.results_file(dir);
-        let Ok((tests, seconds)) = read_results(&self.runner, &file) else { return };
+        let merged = self.merged_file(dir);
+        let kept = json::read_text(&merged).ok().and_then(|text| serde_json::from_str::<Merged>(&text).ok());
+        let (tests, seconds, file) = match kept {
+            Some(Merged { seconds, tests }) => (tests, Some(seconds), merged),
+            None => {
+                let file = self.results_file(dir);
+                let Ok((tests, seconds)) = read_results(&self.runner, &file) else { return };
+                (tests, seconds, file)
+            }
+        };
         self.set_tests(tests);
         self.seconds = seconds.unwrap_or_default();
         self.status = if self.failed > 0 { Status::Failed } else { Status::Passed };
@@ -246,12 +275,14 @@ impl Suite {
 
     /// A run of the `requested` tests only: their results replace the last ones (jest and vitest also list the
     /// file's other tests, as skipped: those keep theirs). A file that failed as a whole and now loads drops out; a
-    /// new failure joins. Returns how many of the requested tests ran.
+    /// requested test the last run didn't have joins, and so does a new failure. Returns how many of the requested
+    /// tests ran.
     pub fn merge(&mut self, fresh: Vec<TestResult>, requested: &[String]) -> usize {
+        let asked = |name: &String| requested.contains(name);
         let mut ran = 0;
         let mut merged = Vec::new();
         for test in std::mem::take(&mut self.tests) {
-            if !requested.contains(&test.name) {
+            if !asked(&test.name) {
                 merged.push(test);
                 continue;
             }
@@ -264,11 +295,13 @@ impl Suite {
                 None => merged.push(test),
             }
         }
-        let new_failures: Vec<TestResult> = fresh
+        let joining: Vec<TestResult> = fresh
             .into_iter()
-            .filter(|new| new.outcome == Outcome::Failed && !merged.iter().any(|test| test.name == new.name))
+            .filter(|new| new.outcome == Outcome::Failed || asked(&new.name))
+            .filter(|new| !merged.iter().any(|test| test.name == new.name))
             .collect();
-        merged.extend(new_failures);
+        ran += joining.iter().filter(|new| asked(&new.name)).count();
+        merged.extend(joining);
         self.set_tests(merged);
         ran
     }
@@ -708,6 +741,25 @@ mod tests {
         assert_eq!(suite.tests[0], test("a", Outcome::Passed), "not asked for: kept");
         assert_eq!(suite.tests[1], test("b", Outcome::Passed), "in its place");
         assert!(suite.merge(vec![test("d", Outcome::Failed)], &[]) == 0 && suite.failed == 1, "a new failure joins");
+        let written = vec![test("e", Outcome::Passed), test("f", Outcome::Passed)];
+        assert_eq!(suite.merge(written, &["e".to_string()]), 1, "a test written since the last run counts");
+        let names: Vec<&str> = suite.tests.iter().map(|test| test.name.as_str()).collect();
+        assert_eq!(names, ["a", "b", "c", "d", "e"], "it joins; one not asked for that passed doesn't");
+    }
+
+    #[test]
+    fn the_results_merged_since_the_last_full_run_outlast_a_restart() {
+        let temp = TempDir::new("suites-merged");
+        let mut suite = Suite::new("npm:x", "X", Runner::Npm { dir: "x".into(), vitest: false });
+        let failed = test("b", Outcome::Failed);
+        suite.set_tests(vec![test("a", Outcome::Passed), TestResult { message: "Expected 2".into(), ..failed }]);
+        suite.seconds = 3.5;
+        suite.save_merged(temp.path()).unwrap();
+        let mut restarted = Suite::new("npm:x", "X", suite.runner.clone());
+        restarted.load_last(temp.path());
+        assert_eq!(restarted.tests, suite.tests);
+        assert_eq!((restarted.status, restarted.seconds), (Status::Failed, 3.5));
+        assert!(restarted.last_run.is_some());
     }
 
     #[test]
