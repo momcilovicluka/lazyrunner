@@ -749,7 +749,7 @@ repo, for a service that isn't running) - for a share of the calls (`← →` in
 path if you give one - or a **preset**: a slow network (each call waits 1-3 s), flaky (1 in 5 fails with 503), offline
 (every call dropped) or chaos (for 30 s, half wait up to 2 s and 3 in 10 fail with 500). `↑ ↓` move between the fields, `← →` change one, typing fills one in, `Enter` sets it, `Del`
 takes that target's away and `Esc` goes back to the map, where the edge is dashed in amber and says its fault
-(`⚡ 500 · 30% /api`), a `↯` running along it - red once its faults answered 10 calls - and an edge of its own when no
+(`↯ 500 · 30% /api`), a `↯` running along it - red once its faults answered 10 calls - and an edge of its own when no
 call was seen yet. `F` on the map takes every fault away. Faults are for this session only unless `Ctrl+S` in the box
 keeps them (set again when lazyrunner opens), and the app's code doesn't change: an npm app's calls (http, https and `fetch`) go through
 lazyrunner's call hook, which reads them as they change; a .NET app's go through a startup hook

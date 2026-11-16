@@ -113,6 +113,12 @@ pub enum Icon {
     Zip,
     /// A column showing what's new since its last run.
     Diff,
+    /// A fault on an app's calls (#105).
+    Fault,
+    /// The code map's tab, the endpoints' and the spec's.
+    Code,
+    Endpoints,
+    Spec,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -270,6 +276,14 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Zip, true) => "\u{f1c6}", // file archive
         (Icon::Diff, false) => "Δ",
         (Icon::Diff, true) => "\u{e728}", // git compare
+        (Icon::Fault, false) => "↯",
+        (Icon::Fault, true) => "\u{f0e7}", // bolt
+        (Icon::Code, false) => "{",
+        (Icon::Code, true) => "\u{f121}", // code
+        (Icon::Endpoints, false) => "≡",
+        (Icon::Endpoints, true) => "\u{f0ca}", // list
+        (Icon::Spec, false) => "¶",
+        (Icon::Spec, true) => "\u{f15c}", // file text
     }
 }
 
@@ -435,6 +449,10 @@ mod tests {
             Icon::Back,
             Icon::Zip,
             Icon::Diff,
+            Icon::Fault,
+            Icon::Code,
+            Icon::Endpoints,
+            Icon::Spec,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");

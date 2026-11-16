@@ -316,6 +316,6 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             seg(answered, C::DarkGray),
         ]);
     }
-    let title = icons::titled(ui.nerd, Icon::Alert, &format!("Faults on {}'s calls", caller.name));
+    let title = icons::titled(ui.nerd, Icon::Fault, &format!("Faults on {}'s calls", caller.name));
     boxed(&title, lines, FOOTER, cells, rows, inner)
 }

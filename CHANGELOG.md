@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.96.3] - 2026-11-16
+
+### Fixed
+- A fault on the stack map pushed the rest of its edge's row one cell left - into the box it points at, its border out of line - in a terminal that draws `⚡` one cell wide. Faults are marked `↯` now, on the map and in the log, as the spark running along a faulted edge already was.
+
+### Changed
+- With Nerd Font icons (`, i`): a fault is a bolt, on its edge and in the faults box's title; the stack screen's tabs (map, code, health) and the requests view's (requests, endpoints, spec) lead with their icons, each in its own colour while unlit; the sections of Problems' details, Health's slowest endpoints and a failed test's likely cause have theirs; and an app's actions menu has its app's icon in its title.
+
 ## [1.96.2] - 2026-11-16
 
 ### Fixed

@@ -14,6 +14,7 @@ use lazyrunner_core::output::Level;
 use lazyrunner_core::run::{Controller, diff, format_duration};
 
 use super::columns::{SPARKS, chunk, contains_ignore_case, fit, linked};
+use super::icons::Icon;
 use super::mouse::Target;
 use super::seg::{Seg, aim, on, pad, seg};
 use super::theme::C;
@@ -527,12 +528,13 @@ fn details(ui: &mut Ui, controller: &Controller, width: usize) -> Vec<Vec<Seg>> 
         out.push(vec![seg("muted for this session - m unmutes it", C::DarkGray)]);
     }
     let when = chart(ui, &problem, CHART_BARS);
-    out.extend([Vec::new(), vec![seg("WHEN, THIS SESSION", C::DarkCyan)], vec![seg(when, color)]]);
+    let heading = super::viewbar::heading(ui.nerd, (Icon::Timeline, C::Cyan), "WHEN, THIS SESSION", C::DarkCyan);
+    out.extend([Vec::new(), heading, vec![seg(when, color)]]);
     let same = |each: &&Occurrence| each.first == occurrence.first && each.app == occurrence.app;
     let back = problem.occurrences.iter().rev().position(|each| same(&each)).unwrap_or(0);
     let app = controller.apps.get(occurrence.app).map_or("?", |app| app.name.as_str());
     let title = format!("OCCURRENCE {} OF {count} · {app} · {}", count - back, ago(ui, occurrence.at));
-    out.extend([Vec::new(), vec![seg(title, C::DarkCyan)]]);
+    out.extend([Vec::new(), super::viewbar::heading(ui.nerd, (Icon::Bug, C::Red), &title, C::DarkCyan)]);
     for text in lines_of(controller, &occurrence) {
         let found = links::find(&text);
         let ids: Vec<usize> = found

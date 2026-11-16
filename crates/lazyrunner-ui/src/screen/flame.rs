@@ -367,8 +367,8 @@ fn picked_line(profile: &Profile, view: &View) -> Vec<Seg> {
     ]
 }
 
-fn header(controller: &Controller, view: &View, profile: &Profile) -> Vec<Seg> {
-    let mut segs = super::stack::tabs(view.back.unwrap_or(Tab::Health));
+fn header(nerd: bool, controller: &Controller, view: &View, profile: &Profile) -> Vec<Seg> {
+    let mut segs = super::stack::tabs(nerd, view.back.unwrap_or(Tab::Health));
     let name = controller.app(&view.app).map_or(view.app.as_str(), |app| app.name.as_str());
     let kept = controller.profiles_of(&view.app).len();
     let at = profile.at.get(11..19).unwrap_or(&profile.at);
@@ -393,7 +393,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let Some(profile) = profile_of(controller, &current) else { return Vec::new() };
     let hint = " h j k l move · Enter zoom in · Backspace out · / find · [ ] captures · c compare · o its source · \
                 y copy the top · p profile again · + - its length · Esc back";
-    let mut lines = vec![super::columns::fit(header(controller, &current, profile), cells)];
+    let mut lines = vec![super::columns::fit(header(ui.nerd, controller, &current, profile), cells)];
     lines.extend(super::viewbar::keys(hint, cells));
     if current.typing || !current.query.is_empty() {
         lines.push(vec![seg(format!(" /{}{}", current.query, if current.typing { ui.cursor() } else { "" }), C::Cyan)]);

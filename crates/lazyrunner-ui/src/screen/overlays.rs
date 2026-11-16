@@ -189,7 +189,10 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         lines.push(row(i, item));
     }
     if matches!(ui.overlay, Some(Overlay::Menu { .. })) {
-        let name = controller.apps.get(ui.focus).map_or(String::new(), |app| app.name.clone());
+        let name = controller.apps.get(ui.focus).map_or(String::new(), |app| match ui.nerd {
+            true => format!("{} {}", icons::app(true, app, controller.framework(&app.key)), app.name),
+            false => app.name.clone(),
+        });
         boxed(&name, lines, "press a key, or j k + Enter · Esc / x close", cells, rows, inner)
     } else {
         boxed(

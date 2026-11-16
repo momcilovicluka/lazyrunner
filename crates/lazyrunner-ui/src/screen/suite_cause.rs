@@ -7,6 +7,7 @@ use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::cause::{Cause, Lead};
 
 use super::Ui;
+use super::icons::Icon;
 use super::mouse::Target;
 use super::seg::{Seg, seg};
 use super::theme::C;
@@ -43,7 +44,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, key: &str, test: &str, width: 
         return vec![ui.scrolling_row(vec![seg(text, C::DarkGray)], 0, width)];
     }
     let title = format!("    LIKELY CAUSE · changed since it last passed{since}");
-    let mut lines = vec![ui.scrolling_row(vec![seg(title, ACCENT)], 0, width)];
+    let heading = super::viewbar::heading(ui.nerd, (Icon::Idea, C::Yellow), &title, ACCENT);
+    let mut lines = vec![ui.scrolling_row(heading, 0, width)];
     for cause in found.causes.iter().take(SHOWN) {
         lines.push(row(ui, controller, cause, width));
     }
