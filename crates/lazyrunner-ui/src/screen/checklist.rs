@@ -1080,9 +1080,8 @@ fn log_outcome(controller: &mut Controller, name: &str, status: Status, detail: 
     }
 }
 
-#[cfg(test)]
 impl Checklist {
-    /// A checklist with these results, without running any check (the snapshots).
+    /// A checklist with these results, without running any check (the snapshots, the README's screenshots).
     pub fn fixed(items: Vec<Item>, news: Vec<Line>, footer: &str) -> Self {
         let (_, results) = channel();
         let items_len = items.len();
@@ -1123,8 +1122,7 @@ impl Checklist {
     }
 }
 
-/// A check's kind by its name, for checklists made up in tests.
-#[cfg(test)]
+/// A check's kind by its name, for made-up checklists.
 fn kind_of(name: &str) -> Kind {
     match name {
         "lazyrunner" => Kind::Update,

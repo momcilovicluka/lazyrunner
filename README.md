@@ -18,7 +18,7 @@ and zoom.
 
 Inspired by lazygit: one command instead of a row of terminal tabs.
 
-<p align="center"><img src="https://github.com/momcilovicluka/lazyrunner/releases/download/demo/demo.gif" alt="lazyrunner opening the demo shop: trusting its profile, the startup checklist, building and starting two APIs and a frontend, then the requests view, a request's details and the command palette" width="100%"></p>
+<p align="center"><img src="https://github.com/momcilovicluka/lazyrunner/releases/download/demo/demo.gif" alt="lazyrunner opening the demo shop: trusting its profile, the startup checklist, building and starting two APIs and a frontend; then the stack map with the calls moving, a fault set on them and the failures it brings, a search, the Problems screen, the code map and the Health tab, the timeline, the requests view and a request's details, the durations and the command palette" width="100%"></p>
 
 > [!IMPORTANT]
 > lazyrunner is source-available, not open source. It is free to use - personally, for a non-profit, or at work -
@@ -86,7 +86,42 @@ CPU and memory; below them the panel with the branch, the database, the keys tha
     <td align="center"><code>H</code> the requests the APIs served</td>
     <td align="center"><code>, A</code> about lazyrunner</td>
   </tr>
+  <tr>
+    <td><img src="docs/screenshots/stack.svg" alt="The stack map: the shop's apps as boxes, the calls between them per minute, one edge dashed amber with a fault on it, and the calls' p95 and failures under the map"></td>
+    <td><img src="docs/screenshots/faults.svg" alt="The faults box over the map: the chaos preset picked for the shop's calls to Orders, and a 500 for 30% of its calls to Billing already set"></td>
+  </tr>
+  <tr>
+    <td align="center"><code>K</code> the stack map: who calls whom</td>
+    <td align="center"><code>f</code> on the map: faults on an app's calls</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/health.svg" alt="The Health tab: a card per app against its targets, Orders red for its memory over 2 GB for a minute and a half, its targets, slowest endpoints and the alert"></td>
+    <td><img src="docs/screenshots/codemap.svg" alt="The code map: the .NET and TypeScript projects and what each depends on, a cycle and a broken layer rule marked"></td>
+  </tr>
+  <tr>
+    <td align="center"><code>K Tab Tab</code> the stack's health</td>
+    <td align="center"><code>K Tab</code> the code map</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/problems.svg" alt="The Problems screen: every app's errors and warnings grouped, each with its count, apps and a sparkline, and the picked exception's stack"></td>
+    <td><img src="docs/screenshots/timeline.svg" alt="The timeline: every app's output in the order it came, each line with its app, quiet stretches folded"></td>
+  </tr>
+  <tr>
+    <td align="center"><code>E</code> every app's problems, grouped</td>
+    <td align="center"><code>~</code> every app's output, in order</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/spec.svg" alt="The spec tab: the APIs' endpoints from their OpenAPI documents by tag, how often each was called and its p95, and what the log has that the document doesn't"></td>
+    <td><img src="docs/screenshots/database.svg" alt="The database screen: the connection strings in the user secrets, the one in use, whether each server answers and when it was last switched to"></td>
+  </tr>
+  <tr>
+    <td align="center"><code>H Tab Tab</code> the endpoints from the spec</td>
+    <td align="center"><code>d</code> the databases, switched in a key</td>
+  </tr>
 </table>
+
+![The startup doctor: the tools, the project, the database, the packages and the update checked as lazyrunner opens,
+grouped, with how long each took; a warning picked, with what it blocks and the key that fixes it](docs/screenshots/doctor.svg)
 
 ![Beside the .NET and npm apps a Python app - a traceback with its library frames dimmed and its own ones bright - and
 Docker Compose services in one column, each service with a gutter of its own colour and its state in the
@@ -719,8 +754,12 @@ call was seen yet. `F` on the map takes every fault away. Faults are for this se
 keeps them (set again when lazyrunner opens), and the app's code doesn't change: an npm app's calls (http, https and `fetch`) go through
 lazyrunner's call hook, which reads them as they change; a .NET app's go through a startup hook
 (`DOTNET_STARTUP_HOOKS`) lazyrunner builds with `dotnet` for the app's target framework the first time (kept in its
-state folder), so a running .NET app starts again once to load it. A failed or mocked call is answered by lazyrunner's
-fault server on localhost, which counts them (`3 answered`).
+state folder), so a running .NET app starts again once to load it. A frontend's calls mostly come from the browser,
+not its dev server, so no hook in the dev server sees them: a fault on them is applied where they arrive instead - in
+the .NET app they go to, which the same hook gives a first middleware (an ASP.NET Core hosting startup) for the calls
+whose `Origin` or `Referer` is the frontend's port; its failed and mocked answers carry the CORS headers the browser
+needs to show them. The box says which it is. A failed or mocked call is answered by lazyrunner's fault server on
+localhost, which counts them (`3 answered`).
 
 **The Health tab** (`K`, then `Tab` from the Code tab): is the stack well? Its header says it in a line - `● 3
 healthy · △ 1 warning · ✗ 0 failing`, and the stack's last minute: `p95 42 ms · 12.4 req/s · 0.3% 5xx` - and under it

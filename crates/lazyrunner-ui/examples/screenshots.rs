@@ -19,7 +19,7 @@ use lazyrunner_core::run::history::Kind;
 use lazyrunner_core::run::migrations::{Context, Migration, Status as MigrationStatus};
 use lazyrunner_core::run::requests::Finished;
 use lazyrunner_core::run::suites::{Outcome, Runner, Status as SuiteStatus, Suite, TestResult};
-use lazyrunner_core::testing::{TempDir, sample_profile, sample_repo};
+use lazyrunner_core::testing::{BILLING_PORT, ORDERS_PORT, TempDir, sample_profile, sample_repo};
 use lazyrunner_ui::screen::overlays::LOGO;
 use lazyrunner_ui::screen::{self, Overlay, Ui};
 use lazyrunner_ui::svg::{self, FONT};
@@ -32,6 +32,8 @@ const SIZE: (u16, u16) = (170, 40);
 /// A Windows Terminal pane or a laptop screen: narrow enough that the apps stack.
 const NARROW: (u16, u16) = (100, 40);
 const THEME: &str = "catppuccin-mocha";
+/// The made-up machine's memory: not this one's.
+const MACHINE_MEMORY_MB: f32 = 16_384.0;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -39,7 +41,7 @@ async fn main() {
         .nth(1)
         .map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/screenshots"), PathBuf::from);
     std::fs::create_dir_all(&out).expect("the screenshots folder");
-    let scenes: [(&str, Scene, (u16, u16)); 10] = [
+    let scenes: [(&str, Scene, (u16, u16)); 19] = [
         ("overview", overview, SIZE),
         ("languages", languages, SIZE),
         ("palette", palette, SIZE),
@@ -49,6 +51,15 @@ async fn main() {
         ("tests", tests, SIZE),
         ("migrations", migrations, SIZE),
         ("requests", requests, SIZE),
+        ("stack", stack, SIZE),
+        ("faults", faults, SIZE),
+        ("health", health, SIZE),
+        ("codemap", codemap, SIZE),
+        ("problems", problems, SIZE),
+        ("doctor", doctor, SIZE),
+        ("database", database, SIZE),
+        ("spec", spec, SIZE),
+        ("timeline", timeline, SIZE),
         ("about", about, SIZE),
     ];
     for (name, scene, size) in scenes {
@@ -338,6 +349,16 @@ const FAILED_LOG: [(&str, Hue); 10] = [
 /// The requests view: what the APIs served over the last minute, a slow one and a failed one among them - that one
 /// selected, with what it logged.
 fn requests(demo: &mut Demo) {
+    served(demo, today(9, 40, 0));
+    demo.press(KeyCode::Char('H'));
+    for _ in 0..5 {
+        demo.press(KeyCode::Char('j'));
+    }
+    demo.press(KeyCode::Enter);
+}
+
+/// What the APIs served over the last minute: a slow request and a failed one among them, with what it logged.
+fn served(demo: &mut Demo, start: chrono::DateTime<chrono::Local>) {
     let served = [
         ("orders", "GET", "/api/orders?page=1", 200, 14.2, 0),
         ("orders", "GET", "/api/orders/1042", 200, 7.1, 4),
@@ -377,18 +398,323 @@ fn requests(demo: &mut Demo) {
                 state.output.numbered(from, state.output.total()).map(|line| line.text.as_str()),
             );
         }
-        demo.controller.requests.add(app, request, today(9, 40, second));
+        demo.controller.requests.add(app, request, start + chrono::TimeDelta::seconds(second));
     }
-    demo.press(KeyCode::Char('H'));
-    for _ in 0..5 {
-        demo.press(KeyCode::Char('j'));
+}
+
+/// The stack map (K) on Shop: the apps' calls to each other over the last minute, a fault on Shop's to Billing.
+fn stack(demo: &mut Demo) {
+    demo.calls();
+    demo.fault();
+    demo.ui.focus = demo.index("shop");
+    demo.press(KeyCode::Char('K'));
+}
+
+/// The faults box (f on the map) over Shop's calls: the fault already set listed, the chaos preset picked.
+fn faults(demo: &mut Demo) {
+    stack(demo);
+    demo.press(KeyCode::Char('f'));
+    demo.press(KeyCode::Up);
+    for _ in 0..CHAOS_PRESET {
+        demo.press(KeyCode::Right);
     }
-    demo.press(KeyCode::Enter);
+}
+
+/// K's Health tab: Orders' memory over its target for a minute and a half (an alert), the slowest endpoints.
+fn health(demo: &mut Demo) {
+    use lazyrunner_core::run::health::Metric;
+    served(demo, chrono::Local::now() - chrono::TimeDelta::minutes(1));
+    let orders = demo.index("orders");
+    let state = &mut demo.controller.states[orders];
+    state.memory_mb = Some(ORDERS_MEMORY);
+    state.memory_history.clear();
+    for n in 0..30 {
+        state.memory_history.push_back(ORDERS_MEMORY - 1200.0 + n as f32 * 40.0);
+    }
+    let now = demo.ui.now;
+    for ago in [90, 30] {
+        let reading = Some((f64::from(ORDERS_MEMORY), MEMORY_TARGET));
+        demo.controller.health.step("orders", Metric::Memory, reading, now - Duration::from_secs(ago));
+    }
+    for code in [KeyCode::Char('K'), KeyCode::Tab, KeyCode::Tab, KeyCode::Char('v')] {
+        demo.press(code);
+    }
+}
+
+/// K's code map, every project: the shop's .NET projects and TypeScript libraries, what uses what, a cycle between
+/// two libraries and a broken layer rule.
+fn codemap(demo: &mut Demo) {
+    use lazyrunner_core::run::code::{Break, CodeMap, Link};
+    let link = |from, to| Link { from, to, lazy: false, implicit: false };
+    let mut links: Vec<Link> = CODE_LINKS.iter().map(|&(from, to)| link(from, to)).collect();
+    links.push(Link { from: 6, to: 9, lazy: true, implicit: false });
+    let why = "layers: Billing.Core must not reference Orders.Core".to_string();
+    let breaks = vec![Break { from: 3, to: 1, why }];
+    demo.controller.set_code_map(CodeMap { parts: code_parts(), links, breaks, files: Vec::new() });
+    for code in [KeyCode::Char('K'), KeyCode::Tab, KeyCode::Char('a')] {
+        demo.press(code);
+    }
+}
+
+/// The code map's parts: the .NET projects, the TypeScript apps and libraries, then the profile's apps.
+fn code_parts() -> Vec<lazyrunner_core::run::code::Part> {
+    use lazyrunner_core::run::code::{Kind as Part, STACK, Stack};
+    let part = |id: &str, name: &str, kind: Part, app: Option<&str>| {
+        let stack = if id.starts_with("node:") || app.is_some_and(|app| NODE_APPS.contains(&app)) {
+            Stack::Node
+        } else {
+            Stack::Dotnet
+        };
+        let inside = id.starts_with("app:").then(|| STACK.to_string());
+        lazyrunner_core::run::code::Part {
+            id: id.into(),
+            name: name.into(),
+            kind,
+            stack,
+            path: PathBuf::from(format!("/work/shop/{}", id.split_once(':').map_or(id, |(_, path)| path))),
+            framework: (stack == Stack::Dotnet && inside.is_none()).then(|| "net10.0".to_string()),
+            inside,
+            app: app.map(str::to_string),
+            files: 12 + name.len(),
+            packages: if stack == Stack::Dotnet { 3 } else { 0 },
+            modules: if stack == Stack::Node { 4 } else { 0 },
+            tags: Vec::new(),
+        }
+    };
+    let dotnet = |name: &str| format!("dotnet:services/{name}/{name}.csproj");
+    vec![
+        part(&dotnet("Orders.Api"), "Orders.Api", Part::App, Some("orders")),
+        part(&dotnet("Orders.Core"), "Orders.Core", Part::Library, None),
+        part(&dotnet("Billing.Api"), "Billing.Api", Part::App, Some("billing")),
+        part(&dotnet("Billing.Core"), "Billing.Core", Part::Library, None),
+        part(&dotnet("Shared.Kernel"), "Shared.Kernel", Part::Library, None),
+        part("dotnet:tests/Orders.Tests/Orders.Tests.csproj", "Orders.Tests", Part::Tests, None),
+        part("node:web/apps/shop", "shop", Part::App, Some("shop")),
+        part("node:web/apps/console", "console", Part::App, Some("console")),
+        part("node:web/libs/ui", "ui", Part::Library, Some("shop")),
+        part("node:web/libs/data", "data", Part::Library, Some("shop")),
+        part("app:orders", "Orders", Part::App, Some("orders")),
+        part("app:billing", "Billing", Part::App, Some("billing")),
+        part("app:shop", "Shop", Part::App, Some("shop")),
+        part("app:console", "Console", Part::App, Some("console")),
+    ]
+}
+
+/// The Problems screen (E): Billing's unhandled exception four times (its stack in the details), Orders' slow
+/// payment provider and missing orders, the shop's broken import.
+fn problems(demo: &mut Demo) {
+    let now = demo.ui.now;
+    let ago = |seconds: u64| now - Duration::from_secs(seconds);
+    for (seconds, invoice) in [(170, 1042), (95, 1047), (40, 1051), (12, 1058)] {
+        demo.said("billing", &filled(UNHANDLED, invoice), Hue::Red, ago(seconds));
+    }
+    for (seconds, order) in [(140, 1077), (61, 1081)] {
+        demo.said("orders", &filled(NOT_FOUND, order), Hue::Red, ago(seconds));
+    }
+    for (seconds, ms) in [(120, 1204), (50, 954)] {
+        demo.said("orders", &filled(SLOW_PAYMENT, ms), Hue::Yellow, ago(seconds));
+    }
+    demo.said("shop", &filled(UNRESOLVED_IMPORT, 0), Hue::Red, ago(25));
+    demo.press(KeyCode::Char('E'));
+}
+
+/// An entry's lines with `{id}` filled in.
+fn filled(lines: &[&str], id: u32) -> Vec<String> {
+    lines.iter().map(|line| line.replace("{id}", &id.to_string())).collect()
+}
+
+/// The doctor (`,` then `r`): every check passed or warned, each group open, the first warning picked.
+fn doctor(demo: &mut Demo) {
+    use lazyrunner_core::run::checks::Status;
+    use lazyrunner_ui::screen::checklist::{Checklist, Item};
+    let version = format!("v{}", lazyrunner_core::changelog::VERSION);
+    let mut checks = vec![("lazyrunner", Status::Ok, version.as_str(), 240)];
+    checks.extend(CHECKS);
+    let items =
+        checks.iter().map(|&(name, status, detail, _)| Item { name: name.into(), status, detail: detail.into() });
+    let mut list = Checklist::fixed(items.collect(), Vec::new(), "");
+    for (row, &(.., ms)) in list.rows.iter_mut().zip(&checks) {
+        row.took = Some(Duration::from_millis(ms));
+    }
+    let logged = demo.controller.log.len();
+    list.update(demo.ui.now, &mut demo.controller);
+    demo.controller.log.truncate(logged); // its warnings, logged at the real time
+    list.selected = checks.iter().position(|&(_, status, ..)| status == Status::Warn).unwrap_or(0);
+    demo.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+}
+
+/// The database screen (d): the user secrets' connection strings, the local one in use, a server not answering.
+fn database(demo: &mut Demo) {
+    use lazyrunner_ui::screen::Picker;
+    use lazyrunner_ui::screen::database::{Reach, SWITCHED};
+    let path = demo.temp.join("secrets.json");
+    std::fs::write(&path, SECRETS).expect("the made-up secrets");
+    let groups = lazyrunner_core::run::secrets::groups(SECRETS);
+    let mut picker =
+        Picker { path, groups, group: 0, index: 0, top: 0, filter: String::new(), filtering: false, new_name: None };
+    picker.index = picker.active_index();
+    let reach = [("localhost", Reach::Up(2)), ("dev-sql", Reach::Up(38)), ("qa-sql", Reach::Down)];
+    let reach = reach.map(|(server, reach)| (server.to_string(), reach));
+    demo.ui.db_reach = Some(std::sync::Arc::new(std::sync::Mutex::new(reach.into_iter().collect())));
+    for (label, minutes) in [("ShopLocal @ localhost", 12), ("Shop @ dev-sql", 47)] {
+        let at = chrono::Local::now() - chrono::TimeDelta::minutes(minutes);
+        demo.controller.config[SWITCHED][label] = json!(at.to_rfc3339());
+    }
+    demo.ui.picker = Some(picker);
+    demo.buffer(SIZE); // the answers come in; a moment later they no longer flash
+    demo.ui.now += Duration::from_secs(1);
+}
+
+/// H's spec tab: what the APIs' OpenAPI documents say they serve, by tag - how often each endpoint was called this
+/// session and its p95, the ones never called.
+fn spec(demo: &mut Demo) {
+    use lazyrunner_ui::screen::spec::Loaded;
+    served(demo, today(9, 40, 0));
+    for (key, document) in [("orders", orders_document()), ("billing", billing_document())] {
+        let operations = lazyrunner_core::run::openapi::parse(&document);
+        demo.ui.specs.insert(key.into(), Loaded::Ready { from: "/swagger/v1/swagger.json".into(), operations });
+    }
+    for code in [KeyCode::Char('H'), KeyCode::Tab, KeyCode::Tab] {
+        demo.press(code);
+    }
+}
+
+/// An operation of an OpenAPI document: its tag, summary and path parameter.
+fn operation(tag: &str, summary: &str, parameter: Option<&str>) -> serde_json::Value {
+    let parameters: Vec<serde_json::Value> = parameter
+        .map(|name| json!({ "name": name, "in": "path", "required": true, "schema": { "type": "string" } }))
+        .into_iter()
+        .collect();
+    json!({ "tags": [tag], "summary": summary, "parameters": parameters })
+}
+
+fn orders_document() -> serde_json::Value {
+    json!({ "paths": {
+        "/api/orders": { "get": operation("Orders", "A page of orders", None),
+                         "post": operation("Orders", "Place an order", None) },
+        "/api/orders/{id}": { "get": operation("Orders", "One order", Some("id")),
+                              "delete": operation("Orders", "Cancel it", Some("id")) },
+        "/api/orders/{id}/items": { "put": operation("Orders", "Replace its items", Some("id")) },
+        "/api/vouchers": { "get": operation("Vouchers", "Every voucher", None),
+                           "post": operation("Vouchers", "Issue a voucher", None) },
+    } })
+}
+
+fn billing_document() -> serde_json::Value {
+    json!({ "paths": {
+        "/api/invoices": { "get": operation("Invoices", "Every invoice", None) },
+        "/api/invoices/{id}": { "get": operation("Invoices", "One invoice", Some("id")) },
+        "/api/invoices/{id}/send": { "post": operation("Invoices", "Email it", Some("id")) },
+    } })
+}
+
+/// The timeline (~): every app's output in the order it came - the start, a few requests, Billing failing an invoice
+/// and Orders hearing of it - quiet stretches as dim rows.
+fn timeline(demo: &mut Demo) {
+    for state in &mut demo.controller.states {
+        state.output.clear();
+    }
+    let start = demo.ui.now - Duration::from_secs(TIMELINE_SPAN);
+    for (key, ms, line, hue) in TIMELINE {
+        let index = demo.index(key);
+        demo.controller.states[index].add_line(line, hue, start + Duration::from_millis(ms));
+    }
+    demo.press(KeyCode::Char('~'));
 }
 
 fn about(demo: &mut Demo) {
     demo.ui.overlay = Some(Overlay::About { index: 0 });
 }
+
+// ---------------------------------------------------------------- the new scenes' data
+
+/// Chaos is the faults box's fifth preset.
+const CHAOS_PRESET: usize = 4;
+/// The share of Shop's calls to Billing the fault fails, and every how many of them failed already.
+const FAULT_SHARE: u8 = 30;
+const FAILING_EVERY: usize = 3;
+const ORDERS_MEMORY: f32 = 3000.0;
+const MEMORY_TARGET: f64 = 2048.0;
+const NODE_APPS: [&str; 2] = ["shop", "console"];
+/// Who calls whom, what, how often over the last minute and how fast.
+const CALLS: [(&str, u16, &str, &str, usize, f64); 4] = [
+    ("shop", ORDERS_PORT, "GET", "/api/orders?page=1", 18, 14.0),
+    ("shop", BILLING_PORT, "GET", "/api/invoices/1042", 7, 9.0),
+    ("orders", BILLING_PORT, "POST", "/api/invoices", 5, 22.0),
+    ("console", ORDERS_PORT, "GET", "/api/orders/stats", 4, 31.0),
+];
+/// The code map's links, by part: the APIs use their cores, the cores the kernel, Billing.Core reaches into
+/// Orders.Core (the rule it breaks), the web apps use ui and data, and ui and data use each other.
+const CODE_LINKS: [(usize, usize); 11] =
+    [(0, 1), (0, 4), (1, 4), (2, 3), (3, 4), (3, 1), (5, 1), (6, 8), (7, 8), (8, 9), (9, 8)];
+
+const UNHANDLED: &[&str] = &[
+    "fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]",
+    "      An unhandled exception has occurred while executing the request.",
+    "      System.InvalidOperationException: Invoice {id} has no currency.",
+    "         at Shop.Billing.Invoices.InvoiceTotals.Sum(Invoice invoice) in /work/shop/services/Billing.Core/Invoices/InvoiceTotals.cs:line 31",
+    "         at Shop.Billing.Api.InvoicesController.Get(Int32 id) in /work/shop/services/Billing.Api/InvoicesController.cs:line 48",
+    "         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext context)",
+];
+const NOT_FOUND: &[&str] = &["fail: Shop.Orders.Api[0]", "      Order {id} was not found"];
+const SLOW_PAYMENT: &[&str] = &["warn: Shop.Orders.Checkout[0]", "      Payment provider slow ({id} ms)"];
+const UNRESOLVED_IMPORT: &[&str] = &[
+    "09:41:22 [vite] Internal server error: Failed to resolve import \"./Coupon\" from \"src/cart/CartPage.tsx\". Does the file exist?",
+    "  Plugin: vite:import-analysis",
+    "  File: /work/shop/web/apps/shop/src/cart/CartPage.tsx:4:19",
+];
+
+/// The doctor's checks after lazyrunner's own: a name, how it went, what it found and how long it took (ms).
+const CHECKS: [(&str, lazyrunner_core::run::checks::Status, &str, u64); 7] = {
+    use lazyrunner_core::run::checks::Status::{Ok, Warn};
+    [
+        ("git", Ok, "2.47.1", 110),
+        (".NET SDK", Ok, "10.0.100", 420),
+        ("Node.js", Ok, "22.11.0", 90),
+        ("Ports", Ok, "47201, 47202, 47301 and 47303 are free", 30),
+        ("Profile", Ok, "Shop from this repo's lazyrunner.json", 30),
+        ("Web packages", Warn, "web/node_modules is older than package-lock.json - press i (npm ci)", 60),
+        ("Database", Warn, "ShopLocal @ localhost · 1 migration to apply - M shows it", 180),
+    ]
+};
+
+/// The made-up user secrets: the shop's database on this machine (in use), on the dev and QA servers, and a copy.
+const SECRETS: &str = r#"{
+  "DefaultConnection": "Server=localhost;Database=ShopLocal;Trusted_Connection=True;TrustServerCertificate=True",
+  //"DefaultConnection": "Server=localhost;Database=ShopLocal_Copy;Trusted_Connection=True;TrustServerCertificate=True",
+  //"DefaultConnection": "Server=dev-sql;Database=Shop;User Id=shop_dev;Password=made-up-dev",
+  //"DefaultConnection": "Server=qa-sql;Database=ShopQA;User Id=shop_qa;Password=made-up-qa",
+  "AuditConnection": "Server=localhost;Database=ShopAudit;Trusted_Connection=True;TrustServerCertificate=True"
+}
+"#;
+
+/// The timeline's stretch, and what each app printed in it: when (ms in), the line and its level's colour.
+const TIMELINE_SPAN: u64 = 60;
+const TIMELINE: [(&str, u64, &str, Hue); 23] = [
+    ("orders", 0, "info: Microsoft.Hosting.Lifetime[14]", Hue::Gray),
+    ("orders", 0, "      Now listening on: http://localhost:47201", Hue::Gray),
+    ("billing", 380, "info: Microsoft.Hosting.Lifetime[14]", Hue::Gray),
+    ("billing", 380, "      Now listening on: http://localhost:47202", Hue::Gray),
+    ("shop", 1100, "  VITE v5.4.10  ready in 812 ms", Hue::Gray),
+    ("shop", 1100, "  ➜  Local:   http://localhost:47301/", Hue::Gray),
+    ("console", 1600, "  VITE v5.4.10  ready in 604 ms", Hue::Gray),
+    ("docs", 3500, "built in 1204ms.", Hue::Gray),
+    ("orders", 12_000, "info: Shop.Orders.Api[0]", Hue::Gray),
+    ("orders", 12_000, "      GET /api/orders?page=1 200 14 ms", Hue::Gray),
+    ("shop", 18_200, "09:40:12 [vite] hmr update /src/cart/CartPage.tsx", Hue::Gray),
+    ("orders", 24_500, "info: Shop.Orders.Api[0]", Hue::Gray),
+    ("orders", 24_500, "      POST /api/orders 201 42 ms", Hue::Gray),
+    ("billing", 24_560, "info: Shop.Billing.Api[0]", Hue::Gray),
+    ("billing", 24_560, "      POST /api/invoices 201 18 ms", Hue::Gray),
+    ("orders", 31_000, "warn: Shop.Orders.Checkout[0]", Hue::Yellow),
+    ("orders", 31_000, "      Payment provider slow (812 ms)", Hue::Yellow),
+    ("billing", 33_200, "fail: Shop.Billing.Invoices[0]", Hue::Red),
+    ("billing", 33_200, "      Invoice 1042 has no currency", Hue::Red),
+    ("orders", 33_260, "fail: Shop.Orders.Checkout[0]", Hue::Red),
+    ("orders", 33_260, "      Billing answered 500 for order 1042", Hue::Red),
+    ("orders", 47_000, "info: Shop.Orders.Api[0]", Hue::Gray),
+    ("orders", 47_000, "      GET /api/orders/1043 200 6 ms", Hue::Gray),
+];
 
 /// A time today (the views show the day too for an earlier one).
 fn today(hour: u32, minute: u32, second: u32) -> chrono::DateTime<chrono::Local> {
@@ -410,7 +736,7 @@ struct DemoApp {
 }
 
 struct Demo {
-    _temp: TempDir,
+    temp: TempDir,
     controller: Controller,
     ui: Ui,
 }
@@ -443,11 +769,56 @@ impl Demo {
         let (mut ui, _) = Ui::new(&controller, None, started);
         ui.now = started + Duration::from_secs(600);
         ui.motion.enabled = false; // one frame at one instant: a box would still be opening
-        Self { _temp: temp, controller, ui }
+        ui.machine_memory = || MACHINE_MEMORY_MB;
+        Self { temp, controller, ui }
     }
 
     fn press(&mut self, code: KeyCode) {
         screen::keys::press(&mut self.ui, &mut self.controller, KeyEvent::new(code, KeyModifiers::NONE));
+    }
+
+    /// The column of the sample app `key`.
+    fn index(&self, key: &str) -> usize {
+        self.controller.apps.iter().position(|app| app.key == key).expect("a sample app")
+    }
+
+    /// An entry in app `key`'s output: its lines, in one colour, at one moment.
+    fn said(&mut self, key: &str, lines: &[String], hue: Hue, at: Instant) {
+        let index = self.index(key);
+        for line in lines {
+            self.controller.states[index].output.push_hued(line, Some(hue), at);
+        }
+    }
+
+    /// The apps' calls to each other over the last minute (the stack map's edges): some of Shop's to Billing failed.
+    fn calls(&mut self) {
+        use lazyrunner_core::run::calls::Call;
+        let now = Instant::now();
+        let mut calls = Vec::new();
+        for (from, port, method, path, count, ms) in CALLS {
+            for n in 0..count {
+                let failed = from == "shop" && port == BILLING_PORT && n % FAILING_EVERY == 0;
+                let ok = if method == "POST" { 201 } else { 200 };
+                calls.push(Call {
+                    from: from.into(),
+                    method: method.into(),
+                    url: format!("http://localhost:{port}{path}"),
+                    at: now - Duration::from_secs(n as u64 * 3),
+                    ms: Some(ms * (1.0 + (n % 4) as f64 / 3.0)),
+                    status: Some(if failed { 500 } else { ok }),
+                });
+            }
+        }
+        self.controller.calls.add(calls, now);
+    }
+
+    /// A fault on Shop's calls to Billing under /api: a share of them fail with 500. The log stays as it was.
+    fn fault(&mut self) {
+        use lazyrunner_core::run::faults::Kind as Fault;
+        let logged = self.controller.log.len();
+        let target = (format!("localhost:{BILLING_PORT}"), Some("billing".to_string()));
+        self.controller.set_fault("shop", target, "/api", (Fault::Fail(500), FAULT_SHARE), None);
+        self.controller.log.truncate(logged);
     }
 
     /// Every app up for a few minutes, with output, metrics and a log of how they got there.

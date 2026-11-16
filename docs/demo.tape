@@ -1,5 +1,7 @@
 # The README's recording: lazyrunner on the demo shop (examples/demo) - trusting its profile, the startup checklist,
-# building and starting everything, then the requests view. VHS (https://github.com/charmbracelet/vhs) records it;
+# building and starting everything; then the stack map with the shopper's calls moving, a fault set on them and the
+# 500s it brings, a search, the Problems screen, the code map and the Health tab, the timeline, the requests view and
+# a request's details, the durations and the command palette. VHS (https://github.com/charmbracelet/vhs) records it;
 # .github/workflows/demo.yml runs it. Locally, with vhs, dotnet, node and lazyrunner on PATH: vhs docs/demo.tape
 
 Output docs/demo.gif
@@ -43,6 +45,66 @@ Enter
 Wait+Screen@180s /Ready in/
 Sleep 4s
 
+# The stack map, on the shop (the third app): its calls to Orders and Billing travel along the edges.
+Type "3"
+Sleep 400ms
+Type "K"
+Sleep 3.5s
+
+# A fault on the shop's calls to Orders: the chaos preset - for 30 s, half wait up to 2 s and 3 in 10 fail with 500.
+Type "f"
+Sleep 1.5s
+Up
+Sleep 500ms
+Right
+Sleep 350ms
+Right
+Sleep 350ms
+Right
+Sleep 350ms
+Right
+Sleep 1.5s
+Enter
+Sleep 1s
+Escape
+Sleep 3.5s
+Escape
+
+# Back on the columns: the shopper's calls now come back 500, some of them slow.
+Sleep 4s
+
+# A search in the shop's output, filtered to its matches.
+Type "/"
+Sleep 300ms
+Type "500"
+Sleep 800ms
+Tab
+Sleep 2.5s
+Escape
+Sleep 800ms
+
+# Every app's errors and warnings, grouped.
+Type "E"
+Sleep 3.5s
+Escape
+Sleep 500ms
+
+# The code map and the Health tab, beside the map.
+Type "K"
+Sleep 1.5s
+Tab
+Sleep 3s
+Tab
+Sleep 3.5s
+Escape
+Sleep 500ms
+
+# Every app's output in the order it came.
+Type "~"
+Sleep 3s
+Escape
+Sleep 500ms
+
 # The requests the shop's shopper made, and one request's details.
 Type "H"
 Sleep 2.5s
@@ -57,7 +119,13 @@ Sleep 4s
 Escape
 Sleep 300ms
 Escape
-Sleep 1s
+Sleep 800ms
+
+# How long the builds and starts took.
+Type "D"
+Sleep 3s
+Escape
+Sleep 500ms
 
 # The command palette.
 Type ":"
