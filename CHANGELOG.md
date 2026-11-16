@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.96.2] - 2026-11-16
+
+### Fixed
+- Running one test, or a few, that the suite's last full run didn't have - one written since - said `(0 tests again)`, and a new test that passed didn't show at all. It counts now, and joins the suite's results whether it passes or fails.
+- After a restart, a suite showed its last full run's results, as if the tests run on their own since never had. Their results are kept until it runs whole again.
+
 ## [1.96.1] - 2026-11-16
 
 ### Fixed
