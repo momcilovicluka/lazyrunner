@@ -20,7 +20,7 @@ use super::graph::{self, Map, Motion};
 use super::icons::{self, Icon};
 use super::motion::Spot;
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, pad, seg};
+use super::seg::{Seg, aim, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -49,13 +49,15 @@ pub enum Tab {
 }
 
 /// The tabs as a header starts with, `current` lit.
-pub(super) fn tabs(current: Tab) -> Vec<Seg> {
-    [(Tab::Map, " Map "), (Tab::Code, " Code "), (Tab::Health, " Health ")]
-        .into_iter()
-        .map(
-            |(tab, label)| if tab == current { on(label, C::FocusText, C::FocusBack) } else { seg(label, C::DarkGray) },
-        )
-        .collect()
+pub(super) fn tabs(nerd: bool, current: Tab) -> Vec<Seg> {
+    [
+        (Tab::Map, (Icon::Stack, C::Cyan), "Map"),
+        (Tab::Code, (Icon::Code, C::Magenta), "Code"),
+        (Tab::Health, (Icon::Health, C::Red), "Health"),
+    ]
+    .into_iter()
+    .flat_map(|(tab, icon, label)| super::viewbar::tab(nerd, icon, label, tab == current))
+    .collect()
 }
 
 /// `K`: the Stack screen on the tab used last.
@@ -402,7 +404,7 @@ fn spark(ui: &Ui, opened: Instant, dots: &mut Dots, edge: &str, color: C) -> Mot
 }
 
 /// The faults on `from`'s calls to `to`: what each does, and how many calls they answered - amber, red once hot.
-fn faulted(controller: &Controller, from: &str, to: &str) -> Option<(String, C)> {
+fn faulted(nerd: bool, controller: &Controller, from: &str, to: &str) -> Option<(String, C)> {
     let set: Vec<&lazyrunner_core::run::faults::Fault> = controller
         .faults()
         .iter()
@@ -413,7 +415,8 @@ fn faulted(controller: &Controller, from: &str, to: &str) -> Option<(String, C)>
     }
     let hits: usize = set.iter().map(|fault| controller.fault_hits(fault.id)).sum();
     let said = set.iter().map(|fault| fault.said()).collect::<Vec<_>>().join(" · ");
-    let label = if hits > 0 { format!("⚡ {said} · {hits} hit") } else { format!("⚡ {said}") };
+    let mark = icons::icon(nerd, Icon::Fault);
+    let label = if hits > 0 { format!("{mark} {said} · {hits} hit") } else { format!("{mark} {said}") };
     Some((label, if hits >= HOT_HITS { C::Red } else { C::Yellow }))
 }
 
@@ -438,7 +441,7 @@ fn model(
         let (color, label) = look(&edge);
         // A fault on its calls (#105) draws it dashed in amber (red once it answered many), a spark running along it.
         let id = format!("{}>{}", edge.from, edge.to);
-        match faulted(controller, &edge.from, &edge.to) {
+        match faulted(ui.nerd, controller, &edge.from, &edge.to) {
             None => {
                 edges.push(graph::Edge { from, to, color, dashed: edge.seen == 0, label, quiet: false, top: false });
                 motions.push(motion(ui, opened, &Traffic::of(&edge), dots, &id));
@@ -459,7 +462,7 @@ fn model(
         if drawn.contains(&pair) {
             continue;
         }
-        let Some((label, color)) = faulted(controller, &pair.0, &pair.1) else { continue };
+        let Some((label, color)) = faulted(ui.nerd, controller, &pair.0, &pair.1) else { continue };
         let id = format!("{}>{}", pair.0, pair.1);
         drawn.push(pair);
         edges.push(graph::Edge { from, to, color, dashed: true, label, quiet: false, top: false });
@@ -559,12 +562,12 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
         || controller.stack_edges().iter().any(|edge| edge.calls > 0 || pulsing(edge))
 }
 
-fn header(controller: &Controller, figures: &[calls::Edge], width: usize) -> Vec<Seg> {
+fn header(nerd: bool, controller: &Controller, figures: &[calls::Edge], width: usize) -> Vec<Seg> {
     let per_second: f64 = figures.iter().map(|edge| edge.per_second).sum();
     let failing = figures.iter().filter(|edge| edge.failing()).count();
     let apps = controller.apps.len();
     let edges = figures.len() + controller.database_users().len();
-    let mut segs = tabs(Tab::Map);
+    let mut segs = tabs(nerd, Tab::Map);
     segs.push(seg(format!("   {apps} app{} · {edges} edge{}", plural(apps), plural(edges)), C::DarkGray));
     if per_second > 0.0 {
         segs.push(seg(format!(" · {per_second:.1} calls/s"), C::DarkGray));
@@ -672,7 +675,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     ui.stack_dots = dots;
     let picked = picked.min(model.nodes.len().saturating_sub(1));
     let from = map.layout.boxes.get(picked).map_or(0, |at| (at.x + at.w + MARGIN).saturating_sub(room));
-    let mut lines = vec![header(controller, &model.figures, width)];
+    let mut lines = vec![header(ui.nerd, controller, &model.figures, width)];
     lines.extend(keys);
     lines.push(Vec::new());
     for row in map.rows(from, room).into_iter().take(map_rows) {

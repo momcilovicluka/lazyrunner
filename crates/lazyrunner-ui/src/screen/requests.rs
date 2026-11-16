@@ -662,6 +662,7 @@ pub(super) fn cut(text: &str, cells: usize) -> String {
 }
 
 pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let nerd = ui.nerd;
     let cursor = ui.cursor();
     let spin = super::columns::spinner(ui).to_string();
     let opened = match &ui.overlay {
@@ -697,7 +698,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         vec![seg(format!(" ↻ {method} {path}{cursor}"), C::Cyan), seg("   Enter sends it · Esc cancels", C::DarkGray)]
     });
     let height = rows.saturating_sub(3 + keys.len() + running.len() + usize::from(editing.is_some()));
-    let mut out = vec![header(view, controller, &list, width, cursor)];
+    let mut out = vec![header(nerd, view, controller, &list, width, cursor)];
     out.extend(keys);
     out.extend(editing);
     out.extend(running);
@@ -1060,7 +1061,7 @@ fn endpoint_details(
     lines
 }
 
-fn header(view: &View, controller: &Controller, list: &[&Request], width: usize, cursor: &str) -> Vec<Seg> {
+fn header(nerd: bool, view: &View, controller: &Controller, list: &[&Request], width: usize, cursor: &str) -> Vec<Seg> {
     let errors = list.iter().filter(|request| request.status >= 400).count();
     let avg =
         if list.is_empty() { 0.0 } else { list.iter().map(|request| request.ms).sum::<f64>() / list.len() as f64 };
@@ -1078,8 +1079,12 @@ fn header(view: &View, controller: &Controller, list: &[&Request], width: usize,
         filters.push(format!("{method} {endpoint} · {}", app_name(controller, app)));
     }
     let mut segs = Vec::new();
-    for (tab, label) in [(Tab::Requests, " requests "), (Tab::Endpoints, " endpoints "), (Tab::Spec, " spec ")] {
-        segs.push(if view.tab == tab { on(label, C::FocusText, C::FocusBack) } else { seg(label, C::DarkGray) });
+    for (tab, icon, label) in [
+        (Tab::Requests, (Icon::Requests, C::Blue), "requests"),
+        (Tab::Endpoints, (Icon::Endpoints, C::Green), "endpoints"),
+        (Tab::Spec, (Icon::Spec, C::Yellow), "spec"),
+    ] {
+        segs.extend(super::viewbar::tab(nerd, icon, label, view.tab == tab));
     }
     segs.push(seg(format!("   {} shown · ", list.len()), C::DarkGray));
     let plural = if errors == 1 { "" } else { "s" };

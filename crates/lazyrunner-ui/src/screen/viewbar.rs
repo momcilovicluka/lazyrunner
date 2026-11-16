@@ -19,6 +19,29 @@ pub fn chip(nerd: bool, icon: Icon, name: &str) -> Seg {
     on(format!(" {} {} ", icons::icon(nerd, icon), name.to_uppercase()), C::Black, C::Cyan)
 }
 
+/// A tab in a view's header, `lit` when it's the one shown; with Nerd Font icons its icon leads, in its own colour
+/// while unlit.
+pub fn tab(nerd: bool, (icon, hue): (Icon, C), label: &str, lit: bool) -> Vec<Seg> {
+    let mark = icons::icon(true, icon);
+    match (nerd, lit) {
+        (true, true) => vec![on(format!(" {mark} {label} "), C::FocusText, C::FocusBack)],
+        (false, true) => vec![on(format!(" {label} "), C::FocusText, C::FocusBack)],
+        (true, false) => vec![seg(format!(" {mark}"), hue), seg(format!(" {label} "), C::DarkGray)],
+        (false, false) => vec![seg(format!(" {label} "), C::DarkGray)],
+    }
+}
+
+/// A section's heading in a view, in `color`; with Nerd Font icons its icon leads it (after its indent), in its own
+/// colour.
+pub fn heading(nerd: bool, (icon, hue): (Icon, C), text: &str, color: C) -> Vec<Seg> {
+    if !nerd {
+        return vec![seg(text, color)];
+    }
+    let body = text.trim_start();
+    let indent = &text[..text.len() - body.len()];
+    vec![seg(format!("{indent}{} ", icons::icon(true, icon)), hue), seg(body, color)]
+}
+
 /// A view's keys in `cells`, on as many rows as they need - wrapped between keys, a key and what it does never apart.
 pub fn keys(text: &str, cells: usize) -> Vec<Vec<Seg>> {
     wrapped_keys(text, cells).into_iter().map(|row| vec![seg(row, C::DarkGray)]).collect()
@@ -59,6 +82,22 @@ fn fitted(row: &str, cells: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn text(segs: &[Seg]) -> String {
+        segs.iter().map(|each| each.text.as_str()).collect()
+    }
+
+    #[test]
+    fn a_tab_and_a_heading_lead_with_their_icon_only_with_nerd_font_icons() {
+        let bolt = icons::icon(true, Icon::Fault);
+        assert_eq!(text(&tab(false, (Icon::Fault, C::Yellow), "faults", false)), " faults ");
+        let unlit = tab(true, (Icon::Fault, C::Yellow), "faults", false);
+        assert_eq!(text(&unlit), format!(" {bolt} faults "));
+        assert_eq!((unlit[0].fg, unlit[1].fg), (C::Yellow, C::DarkGray), "its icon in its colour");
+        assert_eq!(text(&tab(true, (Icon::Fault, C::Yellow), "faults", true)), format!(" {bolt} faults "));
+        assert_eq!(text(&heading(false, (Icon::Fault, C::Yellow), "  SLOW", C::DarkCyan)), "  SLOW");
+        assert_eq!(text(&heading(true, (Icon::Fault, C::Yellow), "  SLOW", C::DarkCyan)), format!("  {bolt} SLOW"));
+    }
 
     #[test]
     fn keys_wrap_between_keys_and_never_scroll() {

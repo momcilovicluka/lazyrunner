@@ -86,7 +86,7 @@ impl Controller {
             share,
             until,
         };
-        self.add_log(format!("⚡ {} → {}: {}", app.name, fault.target, fault.said()), Hue::Yellow);
+        self.add_log(format!("↯ {} → {}: {}", app.name, fault.target, fault.said()), Hue::Yellow);
         self.faults.list.push(fault);
         self.publish_faults();
         // The hook goes into a .NET caller (its own calls) and a .NET app called (the calls a browser app makes to it).
@@ -109,7 +109,7 @@ impl Controller {
         let gone = before - self.faults.list.len();
         if gone > 0 {
             self.publish_faults();
-            self.add_log(format!("⚡ {gone} fault{} taken away", if gone == 1 { "" } else { "s" }), Hue::Cyan);
+            self.add_log(format!("↯ {gone} fault{} taken away", if gone == 1 { "" } else { "s" }), Hue::Cyan);
         }
     }
 
@@ -139,7 +139,7 @@ impl Controller {
         self.publish_faults();
         let count = self.faults.list.iter().filter(|fault| fault.until.is_none()).count();
         let plural = if count == 1 { "" } else { "s" };
-        self.add_log(format!("⚡ {count} fault{plural} kept: set again when lazyrunner opens"), Hue::Cyan);
+        self.add_log(format!("↯ {count} fault{plural} kept: set again when lazyrunner opens"), Hue::Cyan);
     }
 
     /// Whether the faults are kept beyond this session.
@@ -183,7 +183,7 @@ impl Controller {
                 let _ = sender.send(faults::build_hook(&state_dir, &wanted));
             });
         }
-        self.add_log(format!("⚡ Building lazyrunner's fault hook for {framework} (once)…"), Hue::DarkGray);
+        self.add_log(format!("↯ Building lazyrunner's fault hook for {framework} (once)…"), Hue::DarkGray);
         let waiting = vec![caller.to_string()];
         self.faults.building = Some(Building { framework: framework.to_string(), waiting, result });
     }
@@ -198,7 +198,7 @@ impl Controller {
         self.faults.list.retain(|fault| fault.until.is_none_or(|until| now < until));
         if self.faults.list.len() < before {
             self.publish_faults();
-            self.add_log("⚡ The chaos is over: those faults are gone", Hue::Cyan);
+            self.add_log("↯ The chaos is over: those faults are gone", Hue::Cyan);
         }
         let Some(building) = &self.faults.building else { return };
         let outcome = match building.result.try_recv() {
@@ -212,7 +212,7 @@ impl Controller {
                 self.faults.built.insert(building.framework.clone(), (path, (self.now)()));
                 let running: Vec<String> = building.waiting.into_iter().filter(|key| self.is_running(key)).collect();
                 if running.is_empty() {
-                    self.add_log("⚡ The fault hook is ready: the app gets it from its next start", Hue::Cyan);
+                    self.add_log("↯ The fault hook is ready: the app gets it from its next start", Hue::Cyan);
                 } else {
                     self.restart("to load lazyrunner's fault hook", Some(&running), false);
                 }
@@ -285,7 +285,7 @@ mod tests {
         assert!(written["port"].as_u64().unwrap_or(0) > 0, "the fault server listens");
         assert!(controller.log.iter().any(|entry| entry.text.ends_with("503 · 30% /api")), "{:?}", controller.log);
         let building = controller.log.back().unwrap().text.clone();
-        assert!(building.starts_with("⚡ Building lazyrunner's fault hook"), "the app called gets it too: {building}");
+        assert!(building.starts_with("↯ Building lazyrunner's fault hook"), "the app called gets it too: {building}");
         controller.clear_faults(Some(&caller), Some(&target));
         assert!(controller.faults().is_empty());
         let written = crate::json::read(&controller.state_folder().join(crate::run::faults::FILE)).unwrap();

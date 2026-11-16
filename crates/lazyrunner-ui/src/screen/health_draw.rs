@@ -10,6 +10,7 @@ use lazyrunner_core::run::health::Metric;
 use lazyrunner_core::run::profile::short;
 use lazyrunner_core::run::requests::endpoints;
 
+use super::icons::Icon;
 use super::seg::{Seg, seg};
 use super::theme::C;
 
@@ -217,6 +218,7 @@ pub fn stack_minute(controller: &Controller) -> Option<String> {
 /// The side panel for app `index`: its targets against its readings, its slowest endpoints, its alerts, its last
 /// profile.
 pub fn panel(
+    nerd: bool,
     controller: &Controller,
     index: usize,
     now: std::time::Instant,
@@ -255,7 +257,7 @@ pub fn panel(
         lines.push(row);
     }
     lines.push(Vec::new());
-    lines.push(vec![seg(" SLOWEST ENDPOINTS · 5 min", C::DarkCyan)]);
+    lines.push(super::viewbar::heading(nerd, (Icon::Hourglass, C::Yellow), " SLOWEST ENDPOINTS · 5 min", C::DarkCyan));
     let since = chrono::Local::now() - chrono::Duration::from_std(ENDPOINTS).unwrap_or_default();
     let mine = controller.requests.items.iter().filter(|request| request.app == app.key && request.at >= since);
     let mut slow = endpoints(mine);

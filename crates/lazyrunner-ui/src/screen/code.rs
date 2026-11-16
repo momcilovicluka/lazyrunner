@@ -755,7 +755,7 @@ fn summary(map: &CodeMap, view: &View, parts: &[usize]) -> String {
 
 /// The header: the tabs, the level, then what the map has and how it's shown.
 fn header(ui: &Ui, controller: &Controller, view: &View, shown: Option<&Shown>, width: usize) -> Vec<Seg> {
-    let mut segs = super::stack::tabs(super::stack::Tab::Code);
+    let mut segs = super::stack::tabs(ui.nerd, super::stack::Tab::Code);
     segs.push(seg("   ", C::Gray));
     let (Some(map), Some(shown)) = (controller.code_map(), shown) else {
         segs.push(seg("reading the code…", C::Yellow));

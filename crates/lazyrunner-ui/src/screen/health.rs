@@ -527,7 +527,7 @@ pub fn chip(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
 
 /// The header: the tabs, how many apps are healthy, warning, failing and stopped, the stack's last minute, the alerts.
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
-    let mut segs = super::stack::tabs(super::stack::Tab::Health);
+    let mut segs = super::stack::tabs(ui.nerd, super::stack::Tab::Health);
     let count = |wanted: Condition| {
         (0..controller.apps.len()).filter(|&at| health_draw::condition(controller, at) == wanted).count()
     };
@@ -611,7 +611,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         .as_ref()
         .filter(|editing| editing.app == picked_app)
         .map(|editing| (editing.field, editing.text.as_str()));
-    let panel = if apps > 0 { health_draw::panel(controller, picked_app, ui.now, PANEL, editing) } else { Vec::new() };
+    let panel =
+        if apps > 0 { health_draw::panel(ui.nerd, controller, picked_app, ui.now, PANEL, editing) } else { Vec::new() };
     if side {
         let height = body.len().max(panel.len());
         body.resize(height, Vec::new());

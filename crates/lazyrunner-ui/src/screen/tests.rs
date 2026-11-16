@@ -2592,7 +2592,7 @@ async fn f_on_the_map_sets_a_fault_on_an_apps_calls_its_edge_says_it_and_f_takes
     screen.press("Esc");
     assert!(matches!(screen.ui.overlay, Some(Overlay::Stack { .. })), "back to the map");
     let map = screen.render(160, 40);
-    let edge = map.lines().find(|line| line.contains('⚡')).unwrap_or_default();
+    let edge = map.lines().find(|line| line.contains("↯ 503")).unwrap_or_default();
     assert!(edge.contains("503") && edge.contains('┄'), "its edge, dashed, says it: {map}");
     screen.press("F");
     assert!(screen.controller.faults().is_empty());
