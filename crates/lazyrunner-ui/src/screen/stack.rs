@@ -129,8 +129,7 @@ fn uptime(seconds: u64) -> String {
     match seconds {
         0..60 => format!("{seconds}s"),
         60..3600 => format!("{}m", seconds / 60),
-        3600..86400 => format!("{}h {}m", seconds / 3600, seconds % 3600 / 60),
-        _ => format!("{}d {}h", seconds / 86400, seconds % 86400 / 3600),
+        _ => lazyrunner_core::run::format_age(seconds as f64),
     }
 }
 

@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use lazyrunner_core::links;
 use lazyrunner_core::output::Level;
-use lazyrunner_core::run::{Controller, diff, format_duration};
+use lazyrunner_core::run::{Controller, diff, format_age, format_duration};
 
 use super::columns::{SPARKS, chunk, contains_ignore_case, fit, linked};
 use super::icons::Icon;
@@ -422,7 +422,7 @@ fn note_counts(ui: &mut Ui) {
 }
 
 fn ago(ui: &Ui, at: Instant) -> String {
-    format!("{} ago", format_duration(ui.now.saturating_duration_since(at).as_secs_f64()))
+    format!("{} ago", format_age(ui.now.saturating_duration_since(at).as_secs_f64()))
 }
 
 /// The colour a problem's message has: its severity's, a muted one grey, a fixed? one dimming to grey over `DIM`.

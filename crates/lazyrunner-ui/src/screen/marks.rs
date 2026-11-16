@@ -8,7 +8,7 @@ use std::time::Instant;
 use crossterm::event::KeyEvent;
 
 use lazyrunner_core::output::Hue;
-use lazyrunner_core::run::{Controller, format_duration};
+use lazyrunner_core::run::{Controller, format_age};
 
 use super::columns;
 use super::icons::{self, Icon};
@@ -245,7 +245,7 @@ fn mark_row(
     let line = controller.states[app].output.numbered(number, number).next();
     let (age, text) = match line {
         Some(line) => {
-            let age = format_duration(ui.now.saturating_duration_since(line.born).as_secs_f64());
+            let age = format_age(ui.now.saturating_duration_since(line.born).as_secs_f64());
             (format!("{age} ago"), line.text.trim().to_string())
         }
         None => (String::new(), "(gone from the buffer)".to_string()),

@@ -180,11 +180,41 @@ pub fn format_duration(seconds: f64) -> String {
     }
 }
 
+/// An age, or a span that can run long: as [`format_duration`] under an hour, then in its two largest units -
+/// `3h 20m`, `2d 4h`, `5w 1d`, `1y 6w` - the smaller left out when it's zero.
+pub fn format_age(seconds: f64) -> String {
+    const HOUR: u64 = 60 * 60;
+    const DAY: u64 = 24 * HOUR;
+    const WEEK: u64 = 7 * DAY;
+    const YEAR: u64 = 365 * DAY;
+    let whole = seconds.max(0.0) as u64;
+    let (big, big_unit, small, small_unit) = match whole {
+        0..HOUR => return format_duration(seconds),
+        HOUR..DAY => (whole / HOUR, "h", whole % HOUR / 60, "m"),
+        DAY..WEEK => (whole / DAY, "d", whole % DAY / HOUR, "h"),
+        WEEK..YEAR => (whole / WEEK, "w", whole % WEEK / DAY, "d"),
+        _ => (whole / YEAR, "y", whole % YEAR / WEEK, "w"),
+    };
+    if small == 0 { format!("{big}{big_unit}") } else { format!("{big}{big_unit} {small}{small_unit}") }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn durations_read_like_the_panel_says_them() {
         assert_eq!(super::format_duration(4.7), "4s");
         assert_eq!(super::format_duration(65.2), "1m05s");
+    }
+
+    #[test]
+    fn ages_step_up_from_minutes_to_hours_days_weeks_and_years() {
+        let age = super::format_age;
+        assert_eq!(age(65.2), "1m05s", "under an hour, as a duration");
+        assert_eq!(age(129.0 * 60.0 + 11.0), "2h 9m");
+        assert_eq!(age(3.0 * 3600.0), "3h", "nothing smaller: left out");
+        assert_eq!(age(10068.0 * 60.0 + 15.0), "6d 23h");
+        assert_eq!(age(15.0 * 86400.0), "2w 1d");
+        assert_eq!(age(400.0 * 86400.0), "1y 5w");
+        assert_eq!(age(-3.0), "0s");
     }
 }

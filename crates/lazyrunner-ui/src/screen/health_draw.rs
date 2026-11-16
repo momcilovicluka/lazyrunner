@@ -280,7 +280,7 @@ pub fn panel(
         lines.push(vec![seg(" none", C::DarkGray)]);
     }
     for breach in breaches {
-        let lasted = lazyrunner_core::run::format_duration(now.saturating_duration_since(breach.since).as_secs_f64());
+        let lasted = lazyrunner_core::run::format_age(now.saturating_duration_since(breach.since).as_secs_f64());
         let (mark, color, state) = match () {
             _ if breach.alert() && breach.acknowledged => ("!", C::Yellow, " · acknowledged"),
             _ if breach.alert() => ("!", C::Red, " · a acknowledges"),

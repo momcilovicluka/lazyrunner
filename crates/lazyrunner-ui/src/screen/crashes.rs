@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::controller::Crash;
-use lazyrunner_core::run::{Controller, format_duration};
+use lazyrunner_core::run::{Controller, format_age};
 
 use super::actions::Run;
 use super::icons::{self, Icon};
@@ -60,7 +60,7 @@ fn timeline(crashes: &[Crash], now: Instant, cells: usize) -> Vec<Seg> {
         let at = (crash.at.saturating_duration_since(first).as_secs_f64() / span * (cells - 1) as f64) as usize;
         line[at.min(cells - 1)] = '✗';
     }
-    let ago = format_duration(span);
+    let ago = format_age(span);
     let mut segs = vec![seg(format!(" {ago} ago "), C::DarkGray)];
     let mut run = String::new();
     let mut crossed = false;
@@ -97,7 +97,7 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
     lines.push(timeline(crashes, ui.now, inner.saturating_sub(16).max(8)));
     lines.push(Vec::new());
     for crash in crashes.iter().rev() {
-        let ago = format_duration(ui.now.saturating_duration_since(crash.at).as_secs_f64());
+        let ago = format_age(ui.now.saturating_duration_since(crash.at).as_secs_f64());
         let code = crash.code.map_or("killed".to_string(), |code| format!("exit {code}"));
         let room = inner.saturating_sub(WHEN_CELLS + CODE_CELLS + 4);
         let error = crash.error.as_deref().unwrap_or("no error printed");
