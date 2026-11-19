@@ -682,8 +682,8 @@ fn bright(color: C) -> C {
 
 /// How long ago an RFC 3339 time was, as the panel says durations.
 fn ago(at: &str) -> Option<String> {
-    let at = chrono::DateTime::parse_from_rfc3339(at).ok()?;
-    let seconds = (chrono::Local::now().fixed_offset() - at).num_seconds().max(0) as f64;
+    let at = at.parse::<jiff::Timestamp>().ok()?;
+    let seconds = jiff::Timestamp::now().duration_since(at).as_secs().max(0) as f64;
     Some(format_age(seconds))
 }
 
@@ -728,7 +728,8 @@ fn empty_hint(controller: &Controller, index: usize, focused: bool, search: Opti
             Status::Stopped => match state.started_wall {
                 None => "not started yet".to_string(),
                 Some(at) => {
-                    format!("stopped · started {}", chrono::DateTime::<chrono::Local>::from(at).format("%H:%M"))
+                    let at = jiff::ZonedDateTime::try_from(at).map(|at| at.strftime("%H:%M").to_string());
+                    format!("stopped · started {}", at.unwrap_or_default())
                 }
             },
             Status::Exited(code) => format!("exited · code {}", code.map_or("?".into(), |code| code.to_string())),

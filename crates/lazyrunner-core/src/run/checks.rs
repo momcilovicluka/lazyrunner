@@ -268,7 +268,7 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
         (Status::Ok, format!("{branch} · since {from}: {} (Alt+g once open)", shorts.join(", ")))
     }));
     if let Some(snapshot) = &controller.resume {
-        let now = chrono::Local::now().fixed_offset();
+        let now = jiff::Timestamp::now();
         let (summary, freshness) = (snapshot.summary(&controller.branch, now), snapshot.freshness(now));
         let count = controller.resume_choices.len();
         let summary = if count > 1 { format!("{summary} · 1 of {count} ([ ] another)") } else { summary };

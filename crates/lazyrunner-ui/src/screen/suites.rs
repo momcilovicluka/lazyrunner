@@ -1011,9 +1011,9 @@ fn details(ui: &mut Ui, controller: &Controller, suite: &Suite, width: usize) ->
     let elapsed = |started: Option<Instant>| {
         format_duration(started.map_or(0.0, |started| now.saturating_duration_since(started).as_secs_f64()))
     };
-    let when = suite
-        .last_run
-        .map_or(String::new(), |at| format!("last run {} · {}", at.format("%H:%M:%S"), format_duration(suite.seconds)));
+    let when = suite.last_run.as_ref().map_or(String::new(), |at| {
+        format!("last run {} · {}", at.strftime(lazyrunner_core::time::CLOCK), format_duration(suite.seconds))
+    });
     let mut out = Details { ui, lines: Vec::new(), width };
     out.lines.push(vec![seg(suite.name.clone(), C::White), seg(format!("   {}", suite.runner.group()), C::DarkGray)]);
     if let Some(problem) = suite.needs_packages.as_ref().filter(|_| !suite.is_active()) {

@@ -322,7 +322,7 @@ fn is_id(part: &str) -> bool {
 pub struct Request {
     /// Counts up: tells a request from the ones after it.
     pub seq: u64,
-    pub at: chrono::DateTime<chrono::Local>,
+    pub at: jiff::ZonedDateTime,
     /// The app's key.
     pub app: String,
     pub method: String,
@@ -355,7 +355,7 @@ pub struct Requests {
 }
 
 impl Requests {
-    pub fn add(&mut self, app: &str, request: Finished, at: chrono::DateTime<chrono::Local>) {
+    pub fn add(&mut self, app: &str, request: Finished, at: jiff::ZonedDateTime) {
         self.seq += 1;
         let Finished {
             method,
@@ -568,13 +568,13 @@ mod tests {
         assert_eq!(endpoint("/api/users/@me"), "/api/users/@me", "not a user's name");
         assert_eq!(endpoint("/img/logo@2x.png"), "/img/logo@2x.png", "an image at a scale, not a user's name");
         let mut requests = Requests::default();
-        let now = chrono::Local::now();
+        let now = jiff::ZonedDateTime::now();
         for (path, status, ms) in [("/api/orders/1", 200, 10.0), ("/api/orders/2", 500, 30.0), ("/api/cart", 200, 5.0)]
         {
             requests.add(
                 "orders",
                 Finished { method: "GET".into(), path: path.into(), status, ms, ..Finished::default() },
-                now,
+                now.clone(),
             );
         }
         let summed = endpoints(requests.items.iter());

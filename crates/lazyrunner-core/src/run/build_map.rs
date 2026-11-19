@@ -75,7 +75,7 @@ impl BuildRun {
                 failed: false,
             })
             .collect();
-        let at = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+        let at = jiff::ZonedDateTime::now().strftime(crate::time::RFC_3339_SECONDS).to_string();
         Self { key: key.to_string(), app: app.to_string(), at, projects, seconds: None, ok: None }
     }
 

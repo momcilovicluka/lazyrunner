@@ -79,8 +79,8 @@ fn timeline(crashes: &[Crash], now: Instant, cells: usize) -> Vec<Seg> {
 
 /// A crash's wall-clock time.
 fn clock(ui: &Ui, at: Instant) -> String {
-    let ago = chrono::Duration::from_std(ui.now.saturating_duration_since(at)).unwrap_or_default();
-    (chrono::Local::now() - ago).format("%H:%M:%S").to_string()
+    let ago = ui.now.saturating_duration_since(at);
+    (jiff::ZonedDateTime::now() - ago).strftime(lazyrunner_core::time::CLOCK).to_string()
 }
 
 pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {

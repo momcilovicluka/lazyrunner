@@ -490,7 +490,7 @@ impl Checklist {
             (item.status, item.detail) = (Status::Skip, "starting afresh - the session is kept as it was".into());
             self.session.aside = Some(snapshot);
         } else if let Some(snapshot) = self.session.aside.take() {
-            let now = chrono::Local::now().fixed_offset();
+            let now = jiff::Timestamp::now();
             (item.status, item.detail) = (Status::Ok, snapshot.summary(&controller.branch, now));
             controller.resume = Some(snapshot);
         }
@@ -507,7 +507,7 @@ impl Checklist {
         }
         let Some((at, count)) = controller.pick_session(step) else { return true };
         if let Some(snapshot) = &controller.resume {
-            let now = chrono::Local::now().fixed_offset();
+            let now = jiff::Timestamp::now();
             let summary = snapshot.summary(&controller.branch, now);
             self.session.offered = !snapshot.running.is_empty();
             let item = &mut self.items[index];
@@ -1151,7 +1151,7 @@ mod tests {
     #[test]
     fn with_auto_start_off_f_resumes_the_session_and_i_on_its_row_starts_afresh_or_offers_it_again() {
         let (_temp, mut controller) = crate::screen::tests::controller("checklist-session");
-        let at = chrono::Local::now().fixed_offset().to_rfc3339();
+        let at = lazyrunner_core::time::now_rfc3339();
         let running = vec!["orders".to_string()];
         controller.resume = Some(Snapshot { at, branch: controller.branch.clone(), running, view: Default::default() });
         let mut list = Checklist::fixed(vec![item_named(checks::SESSION_CHECK, Status::Ok)], Vec::new(), "");

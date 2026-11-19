@@ -155,7 +155,7 @@ impl Controller {
             .iter()
             .map(|item| json!({ "id": item.id, "name": item.name, "applied": item.applied }))
             .collect();
-        let at = context.checked_at.map(|at| at.to_rfc3339());
+        let at = context.checked_at.as_ref().map(crate::time::rfc3339);
         saved[context.db.as_str()][key] = json!({ "checkedAt": at, "migrations": items });
         if let Err(error) = crate::config::write(&path, &saved) {
             self.add_log(format!("Couldn't keep the migrations check for the next run: {error}"), Hue::Yellow);
@@ -445,7 +445,7 @@ impl Controller {
         };
         let pending = items.iter().filter(|item| item.applied == Some(false)).count();
         (context.items, context.status, context.error) = (items, Status::Ok, String::new());
-        (context.checked_at, context.db) = (Some(chrono::Local::now()), db.to_string());
+        (context.checked_at, context.db) = (Some(jiff::ZonedDateTime::now()), db.to_string());
         self.save_check(key);
         if pending > 0 {
             let plural = if pending == 1 { "" } else { "s" };
@@ -504,8 +504,8 @@ impl Controller {
 }
 
 /// A check kept by an earlier run: when, and the migrations it found.
-fn saved_check(check: &Value) -> Option<(chrono::DateTime<chrono::Local>, Vec<Migration>)> {
-    let at = chrono::DateTime::parse_from_rfc3339(check["checkedAt"].as_str()?).ok()?.with_timezone(&chrono::Local);
+fn saved_check(check: &Value) -> Option<(jiff::ZonedDateTime, Vec<Migration>)> {
+    let at = crate::time::local(check["checkedAt"].as_str()?)?;
     let items = check["migrations"]
         .as_array()?
         .iter()

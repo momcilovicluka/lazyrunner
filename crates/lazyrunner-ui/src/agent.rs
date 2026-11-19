@@ -306,7 +306,7 @@ fn ms(ms: f64) -> f64 {
 fn request_row(request: &Request) -> Value {
     let mut row = json!({
         "id": request.seq,
-        "at": request.at.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+        "at": request.at.strftime(lazyrunner_core::time::RFC_3339_SECONDS).to_string(),
         "app": request.app,
         "method": request.method,
         "path": request.path,
@@ -529,7 +529,7 @@ fn suite_summary(controller: &Controller, suite: &Suite) -> Value {
         "failed": suite.failed,
         "skipped": suite.skipped,
         "seconds": suite.seconds.round(),
-        "last_run": suite.last_run.map(|at| at.to_rfc3339()),
+        "last_run": suite.last_run.as_ref().map(lazyrunner_core::time::rfc3339),
         "untested": suite.untested,
         "needs_packages": suite.needs_packages,
         "note": suite.note,

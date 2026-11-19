@@ -86,7 +86,7 @@ impl SuiteHistory {
         while self.bases.len() < column {
             self.bases.insert(0, None);
         }
-        self.at.push(chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+        self.at.push(jiff::ZonedDateTime::now().strftime(crate::time::DAY_CLOCK).to_string());
         self.bases.push(base.cloned());
         self.runs.push(code.unwrap_or_default().to_string());
         for test in results {
@@ -263,7 +263,7 @@ impl TestRuns {
 
     /// A run that just finished, now; the oldest go past `RUNS_KEPT`.
     pub fn push(&mut self, passed: usize, failed: usize, errors: usize, seconds: f64) {
-        let at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let at = jiff::ZonedDateTime::now().strftime(crate::time::DAY_CLOCK).to_string();
         self.0.push(TestRun { at, passed, failed, errors, seconds });
         let extra = self.0.len().saturating_sub(RUNS_KEPT);
         self.0.drain(..extra);

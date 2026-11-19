@@ -443,7 +443,7 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
             }
         }
     } else if let Some(at) = scans.values().map(|scan| scan.at).max() {
-        let days = (chrono::Local::now().timestamp() - at) / 86_400;
+        let days = (jiff::Timestamp::now().as_second() - at) / 86_400;
         let (color, nudge) = match days {
             0 => (C::Green, ""),
             _ if days < OLD_DAYS => (C::Gray, ""),

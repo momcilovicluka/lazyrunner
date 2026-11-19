@@ -500,7 +500,7 @@ impl Controller {
         let _ = std::fs::write(suite.log_file(&dir), suite.lines.join("\n") + "\n");
         suite.seconds = suite.started.map_or(0.0, |started| now.saturating_duration_since(started).as_secs_f64());
         suite.finished = Some(now);
-        suite.last_run = Some(chrono::Local::now());
+        suite.last_run = Some(jiff::ZonedDateTime::now());
         let failed_only = std::mem::take(&mut suite.failed_only);
         let requested = std::mem::take(&mut suite.rerun);
         let file = if failed_only { suite.rerun_file(&dir) } else { suite.results_file(&dir) };
@@ -720,7 +720,7 @@ impl Controller {
                 suite.status = Status::Error;
                 suite.note = note.to_string();
                 suite.output = output.iter().cloned().collect();
-                suite.last_run = Some(chrono::Local::now());
+                suite.last_run = Some(jiff::ZonedDateTime::now());
                 suite.failed_only = false;
                 suite.rerun.clear();
             }

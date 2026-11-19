@@ -568,7 +568,7 @@ impl Controller {
         if !switched.is_object() {
             switched = serde_json::json!({});
         }
-        switched[&entry.label] = serde_json::json!(chrono::Local::now().to_rfc3339());
+        switched[&entry.label] = serde_json::json!(crate::time::now_rfc3339());
         self.set_setting(SWITCHED, switched);
         let Some(path) = secrets::secrets_path(&self.root, &self.apps) else {
             self.add_log("No secrets.json: no API has a UserSecretsId.", Hue::Yellow);

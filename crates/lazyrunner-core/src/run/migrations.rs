@@ -155,7 +155,7 @@ pub struct Context {
     pub error: String,
     /// What dotnet ef said last, without its data lines.
     pub output: VecDeque<String>,
-    pub checked_at: Option<chrono::DateTime<chrono::Local>>,
+    pub checked_at: Option<jiff::ZonedDateTime>,
     /// The database it was checked on.
     pub db: String,
     /// Its last `database update`, while this database is picked.
@@ -182,9 +182,9 @@ impl Context {
     /// How a context is told from another: its app and its name.
     /// When it was last checked: the time today, the day and time before (an earlier run's check).
     pub fn checked(&self) -> Option<String> {
-        let at = self.checked_at?;
-        let format = if at.date_naive() == chrono::Local::now().date_naive() { "%H:%M:%S" } else { "%-d %b %H:%M" };
-        Some(at.format(format).to_string())
+        let at = self.checked_at.as_ref()?;
+        let format = if at.date() == jiff::ZonedDateTime::now().date() { crate::time::CLOCK } else { "%-d %b %H:%M" };
+        Some(at.strftime(format).to_string())
     }
 
     pub fn key(&self) -> String {

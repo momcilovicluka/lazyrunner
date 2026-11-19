@@ -282,13 +282,13 @@ fn tests(demo: &mut Demo) {
         test("Orders.Tests.CheckoutTests.PaysTheInvoice", Outcome::Passed, 230.0, "", ""),
         test("Orders.Tests.CheckoutTests.RetriesThePayment", Outcome::Skipped, 0.0, "", ""),
     ]);
-    (orders.status, orders.last_run, orders.seconds) = (SuiteStatus::Failed, Some(at), 6.4);
+    (orders.status, orders.last_run, orders.seconds) = (SuiteStatus::Failed, Some(at.clone()), 6.4);
     let mut billing = Suite::new("dotnet:billing", "Billing.Tests", dotnet("Billing.Tests"));
     billing.set_tests(vec![
         test("Billing.Tests.InvoiceTests.Sums", Outcome::Passed, 9.0, "", ""),
         test("Billing.Tests.InvoiceTests.RoundsTheTax", Outcome::Passed, 6.0, "", ""),
     ]);
-    (billing.status, billing.last_run, billing.seconds) = (SuiteStatus::Passed, Some(at), 2.1);
+    (billing.status, billing.last_run, billing.seconds) = (SuiteStatus::Passed, Some(at.clone()), 2.1);
     let mut shop = Suite::new("npm:shop", "Shop", Runner::Npm { dir: "/work/shop/web/shop".into(), vitest: true });
     shop.set_tests(vec![
         test("CartPage > shows the total", Outcome::Passed, 31.0, "", ""),
@@ -358,7 +358,7 @@ fn requests(demo: &mut Demo) {
 }
 
 /// What the APIs served over the last minute: a slow request and a failed one among them, with what it logged.
-fn served(demo: &mut Demo, start: chrono::DateTime<chrono::Local>) {
+fn served(demo: &mut Demo, start: jiff::ZonedDateTime) {
     let served = [
         ("orders", "GET", "/api/orders?page=1", 200, 14.2, 0),
         ("orders", "GET", "/api/orders/1042", 200, 7.1, 4),
@@ -398,7 +398,7 @@ fn served(demo: &mut Demo, start: chrono::DateTime<chrono::Local>) {
                 state.output.numbered(from, state.output.total()).map(|line| line.text.as_str()),
             );
         }
-        demo.controller.requests.add(app, request, start + chrono::TimeDelta::seconds(second));
+        demo.controller.requests.add(app, request, &start + jiff::SignedDuration::from_secs(second));
     }
 }
 
@@ -423,7 +423,7 @@ fn faults(demo: &mut Demo) {
 /// K's Health tab: Orders' memory over its target for a minute and a half (an alert), the slowest endpoints.
 fn health(demo: &mut Demo) {
     use lazyrunner_core::run::health::Metric;
-    served(demo, chrono::Local::now() - chrono::TimeDelta::minutes(1));
+    served(demo, jiff::ZonedDateTime::now() - jiff::SignedDuration::from_mins(1));
     let orders = demo.index("orders");
     let state = &mut demo.controller.states[orders];
     state.memory_mb = Some(ORDERS_MEMORY);
@@ -557,8 +557,8 @@ fn database(demo: &mut Demo) {
     let reach = reach.map(|(server, reach)| (server.to_string(), reach));
     demo.ui.db_reach = Some(std::sync::Arc::new(std::sync::Mutex::new(reach.into_iter().collect())));
     for (label, minutes) in [("ShopLocal @ localhost", 12), ("Shop @ dev-sql", 47)] {
-        let at = chrono::Local::now() - chrono::TimeDelta::minutes(minutes);
-        demo.controller.config[SWITCHED][label] = json!(at.to_rfc3339());
+        let at = jiff::ZonedDateTime::now() - jiff::SignedDuration::from_mins(minutes);
+        demo.controller.config[SWITCHED][label] = json!(lazyrunner_core::time::rfc3339(&at));
     }
     demo.ui.picker = Some(picker);
     demo.buffer(SIZE); // the answers come in; a moment later they no longer flash
@@ -717,9 +717,9 @@ const TIMELINE: [(&str, u64, &str, Hue); 23] = [
 ];
 
 /// A time today (the views show the day too for an earlier one).
-fn today(hour: u32, minute: u32, second: u32) -> chrono::DateTime<chrono::Local> {
-    let at = chrono::Local::now().date_naive().and_hms_opt(hour, minute, second).expect("a time");
-    at.and_local_timezone(chrono::Local).single().expect("a local time")
+fn today(hour: i8, minute: i8, second: i8) -> jiff::ZonedDateTime {
+    let at = jiff::ZonedDateTime::now().date().at(hour, minute, second, 0);
+    at.to_zoned_datetime(jiff::tz::TimeZone::system()).expect("a local time")
 }
 
 // ---------------------------------------------------------------- the made-up project

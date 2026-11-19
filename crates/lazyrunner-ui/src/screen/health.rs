@@ -141,7 +141,7 @@ fn view(ui: &Ui) -> Option<(usize, Instant)> {
 
 /// The slowest endpoints of the last minutes, slowest first.
 fn slowest(controller: &Controller) -> Vec<Endpoint> {
-    let since = chrono::Local::now() - chrono::Duration::from_std(ENDPOINTS_WINDOW).unwrap_or_default();
+    let since = jiff::ZonedDateTime::now() - ENDPOINTS_WINDOW;
     let recent = controller.requests.items.iter().filter(|request| request.at >= since);
     let mut list = endpoints(recent);
     list.sort_by(|a, b| b.p95.total_cmp(&a.p95));
@@ -154,7 +154,7 @@ fn open_endpoint(ui: &mut Ui, controller: &mut Controller, picked: usize) {
     let apps = controller.apps.len();
     let endpoint = match controller.apps.get(picked) {
         Some(app) => {
-            let since = chrono::Local::now() - chrono::Duration::from_std(ENDPOINTS_WINDOW).unwrap_or_default();
+            let since = jiff::ZonedDateTime::now() - ENDPOINTS_WINDOW;
             let mine = controller.requests.items.iter().filter(|request| request.app == app.key && request.at >= since);
             let mut list = endpoints(mine);
             list.sort_by(|a, b| b.p95.total_cmp(&a.p95));

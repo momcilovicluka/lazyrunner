@@ -46,7 +46,7 @@ const LEFT_OUT: &str = "Masked as the diagnostics zip masks: passwords in connec
 
 /// This run as the snapshot holds it, masked.
 pub fn data(ui: &Ui, controller: &Controller) -> Value {
-    let since = chrono::Local::now() - chrono::Duration::from_std(WINDOW).unwrap_or_default();
+    let since = jiff::ZonedDateTime::now() - WINDOW;
     let apps: Vec<Value> = controller
         .apps
         .iter()
@@ -69,7 +69,7 @@ pub fn data(ui: &Ui, controller: &Controller) -> Value {
         .collect();
     let commit = tools::git(&controller.root, &["rev-parse", "--short", "HEAD"]);
     let taken = json!({
-        "takenAt": chrono::Local::now().to_rfc3339(),
+        "takenAt": lazyrunner_core::time::now_rfc3339(),
         "version": VERSION,
         "project": controller.project.name,
         "branch": controller.branch,
@@ -109,7 +109,7 @@ pub fn take(ui: &mut Ui, controller: &mut Controller) {
     let picture = mask_text(&super::bundle::screen(ui, controller, size));
     let html = page(ui, controller, &taken, &picture);
     let folder = controller.state_folder().join(FOLDER);
-    let name = format!("{PREFIX}{}{EXTENSION}", chrono::Local::now().format("%Y%m%d-%H%M%S"));
+    let name = format!("{PREFIX}{}{EXTENSION}", jiff::ZonedDateTime::now().strftime(lazyrunner_core::time::STAMP));
     let file = folder.join(name);
     match std::fs::create_dir_all(&folder).and_then(|()| std::fs::write(&file, html)) {
         Ok(()) => {

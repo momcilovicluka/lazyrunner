@@ -178,8 +178,8 @@ fn printed(state: &AppState) -> Vec<Seg> {
 /// A .NET app's last build: "built 4m ago in 22s", or "build failed 1m ago".
 fn last_build(controller: &Controller, key: &str) -> Option<Vec<Seg>> {
     let run = controller.durations.item(Kind::Build, key)?.runs.last()?;
-    let at = chrono::DateTime::parse_from_rfc3339(&run.at).ok()?;
-    let ago = uptime((chrono::Local::now().fixed_offset() - at).num_seconds().max(0).unsigned_abs());
+    let at = run.at.parse::<jiff::Timestamp>().ok()?;
+    let ago = uptime(jiff::Timestamp::now().duration_since(at).as_secs().max(0).unsigned_abs());
     Some(if run.ok {
         vec![seg(format!("built {ago} ago in {}", format_duration(run.sec)), C::DarkGray)]
     } else {

@@ -397,7 +397,7 @@ async fn the_timeline_brackets_a_requests_lines_with_its_method_path_and_status(
     let (method, path) = ("POST".to_string(), "/api/invoices".to_string());
     let request =
         Finished { method, path, status: 201, ms: 34.0, exact: Some(vec![first, first + 1]), ..Finished::default() };
-    screen.controller.requests.add("billing", request, chrono::Local::now());
+    screen.controller.requests.add("billing", request, jiff::ZonedDateTime::now());
     screen.press("~");
     let frame = screen.frame();
     let row =
@@ -1180,8 +1180,8 @@ async fn the_migrations_view_shows_what_is_applied_and_asks_before_it_moves() {
     ];
     shop.status = Ef::Ok;
     // Checked today: an earlier day's check would show the day too.
-    let today = chrono::Local::now().date_naive().and_hms_opt(9, 41, 7).unwrap();
-    (shop.checked_at, shop.db) = (today.and_local_timezone(chrono::Local).single(), "ShopLocal".into());
+    let today = jiff::ZonedDateTime::now().date().at(9, 41, 7, 0);
+    (shop.checked_at, shop.db) = (today.to_zoned_datetime(jiff::tz::TimeZone::system()).ok(), "ShopLocal".into());
     screen.controller.contexts = Some(vec![shop]);
     let setup = lazyrunner_core::profile::Migrations { project: None, contexts: vec!["ShopDbContext".into()] };
     screen.controller.apps[0].migrations = Some(setup);
@@ -1209,7 +1209,7 @@ fn with_shop(screen: &mut Screen, items: &[(&str, bool)]) {
     let migration =
         |(id, applied): &(&str, bool)| Migration { id: id.to_string(), name: id[15..].into(), applied: Some(*applied) };
     shop.items = items.iter().map(migration).collect();
-    (shop.status, shop.checked_at, shop.db) = (Ef::Ok, Some(chrono::Local::now()), "ShopLocal".into());
+    (shop.status, shop.checked_at, shop.db) = (Ef::Ok, Some(jiff::ZonedDateTime::now()), "ShopLocal".into());
     screen.controller.contexts = Some(vec![shop]);
     let setup = lazyrunner_core::profile::Migrations { project: None, contexts: vec!["ShopDbContext".into()] };
     screen.controller.apps[0].migrations = Some(setup);
@@ -1346,9 +1346,8 @@ fn a_request_becomes_a_command_for_each_shell() {
 
 /// Requests the sample's .NET apps served, by hand.
 fn with_requests(screen: &mut Screen) {
-    use chrono::TimeZone;
     use lazyrunner_core::run::requests::Finished;
-    let at = chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap();
+    let at = jiff::civil::date(2026, 10, 22).at(9, 41, 7, 0).to_zoned_datetime(jiff::tz::TimeZone::system()).unwrap();
     for (app, method, path, status, ms) in [
         ("orders", "GET", "/api/orders/42", 200, 12.4),
         ("orders", "POST", "/api/orders", 201, 48.0),
@@ -1358,15 +1357,14 @@ fn with_requests(screen: &mut Screen) {
         let (method, path) = (method.to_string(), path.to_string());
         let (length, content) = ("512".into(), "application/json".into());
         let request = Finished { method, path, status, ms, length, content, ..Finished::default() };
-        screen.controller.requests.add(app, request, at);
+        screen.controller.requests.add(app, request, at.clone());
     }
 }
 
 /// The failed request with what it logged meanwhile: a query, the exception; another request ran beside it.
 fn with_logged_request(screen: &mut Screen) {
-    use chrono::TimeZone;
     use lazyrunner_core::run::requests::Finished;
-    let at = chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap();
+    let at = jiff::civil::date(2026, 10, 22).at(9, 41, 7, 0).to_zoned_datetime(jiff::tz::TimeZone::system()).unwrap();
     let now = screen.ui.now;
     let app = screen.controller.states.iter_mut().find(|state| state.key == "billing").expect("the Billing app");
     let from = app.output.total() + 1;
@@ -1421,7 +1419,7 @@ async fn a_request_that_runs_one_query_over_and_over_is_marked_n_plus_one() {
         db,
         ..Finished::default()
     };
-    screen.controller.requests.add("orders", request, chrono::Local::now());
+    screen.controller.requests.add("orders", request, jiff::ZonedDateTime::now());
     screen.press("H");
     assert!(screen.render(160, 30).contains("/api/orders/7/lines  N+1"), "{}", screen.render(160, 30));
     screen.press("Enter");
@@ -1613,7 +1611,6 @@ async fn following_a_test_run_picks_its_test_and_a_look_at_the_status_keeps_it_i
 }
 
 fn with_suites(screen: &mut Screen) {
-    use chrono::TimeZone;
     use lazyrunner_core::run::suites::{Outcome, Runner, Status as SuiteStatus, Suite, TestResult};
     let test = |name: &str, outcome, ms, message: &str, stack: &str| TestResult {
         name: name.into(),
@@ -1622,7 +1619,7 @@ fn with_suites(screen: &mut Screen) {
         message: message.into(),
         stack: stack.into(),
     };
-    let at = chrono::Local.with_ymd_and_hms(2026, 10, 22, 9, 41, 7).unwrap();
+    let at = jiff::civil::date(2026, 10, 22).at(9, 41, 7, 0).to_zoned_datetime(jiff::tz::TimeZone::system()).unwrap();
     let dotnet = |name: &str| Runner::Dotnet { project: format!("/work/sample/tests/{name}/{name}.csproj").into() };
     let mut orders = Suite::new("dotnet:orders", "Orders.Tests", dotnet("Orders.Tests"));
     orders.set_tests(vec![
@@ -1636,7 +1633,7 @@ fn with_suites(screen: &mut Screen) {
         ),
         test("Orders.Tests.CartTests.Later", Outcome::Skipped, 0.0, "", ""),
     ]);
-    (orders.status, orders.last_run, orders.seconds) = (SuiteStatus::Failed, Some(at), 6.4);
+    (orders.status, orders.last_run, orders.seconds) = (SuiteStatus::Failed, Some(at.clone()), 6.4);
     let mut billing = Suite::new("dotnet:billing", "Billing.Tests", dotnet("Billing.Tests"));
     billing.set_tests(vec![test("Billing.Tests.Invoices.Sums", Outcome::Passed, 230.0, "", "")]);
     (billing.status, billing.last_run, billing.seconds) = (SuiteStatus::Passed, Some(at), 2.1);
@@ -1661,7 +1658,7 @@ async fn chips_say_whats_new_since_a_view_was_open_and_open_it_on_the_first_new_
     assert!(frame.contains(" H ") && frame.contains("1 new error"), "{frame}");
     let suites = screen.controller.suites.as_mut().expect("the sample's suites");
     let billing = suites.iter_mut().find(|suite| suite.key == "dotnet:billing").expect("Billing.Tests");
-    (billing.status, billing.last_run) = (SuiteStatus::Failed, Some(chrono::Local::now()));
+    (billing.status, billing.last_run) = (SuiteStatus::Failed, Some(jiff::ZonedDateTime::now()));
     assert!(screen.frame().contains("1 suite done · 1 red"), "{}", screen.frame());
 
     screen.press("H");
@@ -2780,7 +2777,7 @@ async fn dot_repeats_the_last_action_on_the_app_it_acted_on_and_the_hints_and_pa
 
 fn resume(screen: &mut Screen, running: &[&str], view: Value) {
     let running = running.iter().map(|key| key.to_string()).collect();
-    let (at, branch) = (chrono::Local::now().fixed_offset().to_rfc3339(), screen.controller.branch.clone());
+    let (at, branch) = (lazyrunner_core::time::now_rfc3339(), screen.controller.branch.clone());
     screen.controller.resume = Some(lazyrunner_core::run::session::Snapshot { at, branch, running, view });
 }
 
@@ -4808,7 +4805,7 @@ async fn the_health_tab_holds_each_app_to_its_targets_and_says_its_alerts() {
             ms: 40.0 + at as f64 * 35.0,
             ..Finished::default()
         };
-        screen.controller.requests.add("orders", request, chrono::Local::now());
+        screen.controller.requests.add("orders", request, jiff::ZonedDateTime::now());
     }
     let now = screen.ui.now;
     screen.controller.health.step("orders", Metric::Memory, Some((3000.0, 2048.0)), now - Duration::from_secs(90));

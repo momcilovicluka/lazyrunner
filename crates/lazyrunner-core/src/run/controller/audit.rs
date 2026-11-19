@@ -229,7 +229,7 @@ impl Controller {
             return;
         }
         self.audit_retry.done(&key);
-        let at = chrono::Local::now().timestamp();
+        let at = jiff::Timestamp::now().as_second();
         let scan = match result {
             Ok(packages) => {
                 let worst = packages.iter().filter_map(|package| package.severity).max();

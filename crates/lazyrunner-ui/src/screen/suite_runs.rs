@@ -166,7 +166,7 @@ pub fn run_history(controller: &Controller, shown: usize) -> Vec<Vec<Seg>> {
     if runs.is_empty() || shown == 0 {
         return Vec::new();
     }
-    let today = chrono::Local::now().format("%Y-%m-%d ").to_string();
+    let today = format!("{} ", jiff::ZonedDateTime::now().strftime(lazyrunner_core::time::DAY));
     let mut rows = vec![Vec::new(), vec![seg(" RUN HISTORY", C::DarkCyan)]];
     for run in runs.iter().rev().take(shown) {
         let when = match run.at.strip_prefix(&today) {
@@ -220,7 +220,7 @@ pub fn rows(ui: &Ui, controller: &Controller, suite: &Suite) -> Vec<Vec<Seg>> {
         1 => "1 run back".to_string(),
         back => format!("{back} runs back"),
     };
-    let today = chrono::Local::now().format("%Y-%m-%d ").to_string();
+    let today = format!("{} ", jiff::ZonedDateTime::now().strftime(lazyrunner_core::time::DAY));
     let when = history.when(run).map_or(String::new(), |at| format!(" · {}", at.strip_prefix(&today).unwrap_or(at)));
     let code = &history.runs[run];
     let same = if back == 0 {

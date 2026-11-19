@@ -164,7 +164,7 @@ pub fn write(ui: &mut Ui, controller: &mut Controller) {
         controller.log.iter().map(|entry| format!("{} {}", entry.time, mask_text(&entry.text))).collect();
     files.push(("lazyrunner.log".into(), (log.join("\n") + "\n").into_bytes()));
     let about = about(ui, controller, size);
-    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+    let stamp = jiff::ZonedDateTime::now().strftime(lazyrunner_core::time::STAMP);
     let path = controller.state_folder().join(FOLDER).join(format!("lazyrunner-diagnostics-{stamp}.zip"));
     let (send, receive) = std::sync::mpsc::channel();
     ui.replays.push(receive);

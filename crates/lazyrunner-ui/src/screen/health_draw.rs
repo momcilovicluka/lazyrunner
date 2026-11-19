@@ -200,7 +200,7 @@ pub fn capacity(controller: &Controller, machine_memory: f32, cells: usize) -> V
 
 /// The stack's last minute: its p95, its requests a second and their share of 5xx, as the header says them.
 pub fn stack_minute(controller: &Controller) -> Option<String> {
-    let since = chrono::Local::now() - chrono::Duration::from_std(RECENT).unwrap_or_default();
+    let since = jiff::ZonedDateTime::now() - RECENT;
     let mut times: Vec<f64> =
         controller.requests.items.iter().filter(|request| request.at >= since).map(|request| request.ms).collect();
     if times.is_empty() {
@@ -258,7 +258,7 @@ pub fn panel(
     }
     lines.push(Vec::new());
     lines.push(super::viewbar::heading(nerd, (Icon::Hourglass, C::Yellow), " SLOWEST ENDPOINTS · 5 min", C::DarkCyan));
-    let since = chrono::Local::now() - chrono::Duration::from_std(ENDPOINTS).unwrap_or_default();
+    let since = jiff::ZonedDateTime::now() - ENDPOINTS;
     let mine = controller.requests.items.iter().filter(|request| request.app == app.key && request.at >= since);
     let mut slow = endpoints(mine);
     slow.sort_by(|a, b| b.p95.total_cmp(&a.p95));

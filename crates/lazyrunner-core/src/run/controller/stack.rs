@@ -161,12 +161,12 @@ impl Controller {
 
     /// The requests an app served over the last minute, each with how long ago.
     fn served_recently(&self, key: &str) -> Vec<(&Request, std::time::Duration)> {
-        let now = chrono::Local::now();
+        let now = jiff::ZonedDateTime::now();
         self.requests
             .items
             .iter()
             .filter(|request| request.app == key)
-            .filter_map(|request| Some((request, (now - request.at).to_std().ok()?)))
+            .filter_map(|request| Some((request, now.duration_since(&request.at).try_into().ok()?)))
             .filter(|(_, age)| *age <= WINDOW)
             .collect()
     }
