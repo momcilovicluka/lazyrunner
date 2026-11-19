@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use lazyrunner_core::links::{self, Target};
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::profile::AppKind;
-use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::{Controller, tools};
 
 use super::Ui;
 
@@ -66,6 +66,11 @@ pub fn open_file(ui: &Ui, controller: &mut Controller, file: &Path, line: Option
     let editor = controller.config["editor"].as_str().unwrap_or("auto").to_string();
     match links::editor_command(&editor, file, line, column) {
         Some((program, args)) => {
+            let program = if tools::is_wt(&program) {
+                tools::windows_terminal(&controller.config).unwrap_or(program)
+            } else {
+                program
+            };
             let by = program.file_stem().map_or(String::new(), |stem| stem.to_string_lossy().into_owned());
             let batch = program.extension().is_some_and(|extension| {
                 extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
