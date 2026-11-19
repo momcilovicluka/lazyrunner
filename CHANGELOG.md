@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.97.0] - 2026-11-19
+
+### Added
+- The audit (`A`) scans **the rest of the solution** too: the projects of the repo's solution files that no app builds - services the profile doesn't run, tools, test projects. A CI pipeline restores them all and fails on their vulnerable packages, while the audit only looked at what each app reaches, so such a failure came as a surprise. The entry comes after the apps when there's a `.sln` or `.slnx` (up to three folders down); `R` scans it with them, `r` on its own. Its vulnerable packages only, each saying which projects it's in (`direct in Tracking.csproj, Tracking.Domain.csproj`); its fix is a `dotnet add <project> package` in each, from the repo. A solution whose projects the apps or another solution already cover isn't scanned again. `get_audit` lists it, each package with its `projects`.
+
+### Fixed
+- The database screen kept to a narrow table in the top left, cutting `database @ server` off at 34 cells however wide the screen. Each column is as wide as what it holds, the names get what the screen has (cut with `…` only when it hasn't), the gaps widen with what's left, and the picked row is lit across the screen.
+- Following an agent, the tests view it opened for a test run closed again at its next look at the status, so the run was never seen. A look at the status leaves the tests view open while tests run (and the migrations view while they're checked or applied); a test run on its own is picked in its suite, and a filter or search that would hide the suite is set aside.
+
 ## [1.96.4] - 2026-11-16
 
 ### Fixed

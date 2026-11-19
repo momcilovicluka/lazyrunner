@@ -1582,6 +1582,36 @@ async fn in_the_requests_view_filters_copy_and_open_narrow_and_act_on_the_select
 // ---------------------------------------------------------------- the tests view
 
 /// The sample's suites by hand: one failed, one passed, one not run yet.
+#[tokio::test]
+async fn following_a_test_run_picks_its_test_and_a_look_at_the_status_keeps_it_in_view() {
+    use lazyrunner_core::run::suites::Status as SuiteStatus;
+    let mut screen = screen("follow-tests", json!({}));
+    with_suites(&mut screen);
+    screen.ui.follow.on = true;
+    let call = |screen: &mut Screen, op: &str, args: Value| {
+        let result = json!({ "doing": "run" });
+        super::follow::agent_call(&mut screen.ui, &mut screen.controller, op, &args, &result, "claude-code");
+    };
+    let adds = "Orders.Tests.CartTests.Adds";
+    call(&mut screen, "run_tests", json!({ "suite": "dotnet:orders", "test": adds }));
+    let Some(Overlay::Tests { index, picking, .. }) = screen.ui.overlay else { panic!("the tests view") };
+    let orders = &screen.controller.suites.as_deref().unwrap()[0];
+    let picked = picking.and_then(|at| super::suites::test_list(orders).get(at).map(|test| test.name.clone()));
+    assert_eq!((index, picked.as_deref()), (2, Some(adds)), "on Orders.Tests, its test picked");
+
+    screen.controller.suites.as_mut().unwrap()[0].status = SuiteStatus::Running;
+    call(&mut screen, "status", json!({}));
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { .. })), "a look at the status while it runs");
+    screen.controller.suites.as_mut().unwrap()[0].status = SuiteStatus::Passed;
+    call(&mut screen, "status", json!({}));
+    assert!(screen.ui.overlay.is_none(), "once it's done, the status is the columns");
+
+    screen.ui.tests_only = super::suites::Only::Failed;
+    call(&mut screen, "run_tests", json!({ "suite": "Billing.Tests" }));
+    let Some(Overlay::Tests { index, .. }) = screen.ui.overlay else { panic!("the tests view") };
+    assert_eq!((index, screen.ui.tests_only), (4, super::suites::Only::All), "a filter hiding it set aside");
+}
+
 fn with_suites(screen: &mut Screen) {
     use chrono::TimeZone;
     use lazyrunner_core::run::suites::{Outcome, Runner, Status as SuiteStatus, Suite, TestResult};
@@ -3685,6 +3715,7 @@ async fn the_audit_view_opens_on_the_worst_app_lists_its_packages_and_copies_the
         advisories: Vec::new(),
         fix: None,
         via: Vec::new(),
+        projects: Vec::new(),
     };
     let mut json_lib = package("Example.Json", "12.0.1", "13.0.4", Some(Severity::High));
     json_lib.advisories = vec![Advisory {
@@ -4245,6 +4276,7 @@ async fn the_audit_view_cuts_a_long_name_before_its_new_chip_and_asks_before_ins
         advisories: Vec::new(),
         fix: Some(Fix { package: name.into(), version: "1.1.0".into(), major: false }),
         via: Vec::new(),
+        projects: Vec::new(),
     };
     let key = screen.controller.apps[1].key.clone();
     let short = package("Short", Severity::High);
@@ -5010,4 +5042,41 @@ async fn the_doctors_outline_shrinks_away_but_not_into_a_reopen_it_would_stay_un
     screen.ui.exit = Some(super::Exit::Reopen { root: PathBuf::new(), start: false });
     super::reload::farewell(&mut screen.ui);
     assert!(!super::ghost::animating(&screen.ui), "not in the frame left on screen for the next lazyrunner");
+}
+
+// ---------------------------------------------------------------- the audit's rest of the solution
+
+#[tokio::test]
+async fn the_audit_lists_the_rest_of_the_solution_after_the_apps_and_where_each_package_is() {
+    use lazyrunner_core::run::audit::{Fix, Package, REST, Severity};
+    let mut screen = screen("audit-rest", json!({}));
+    let repo = TempDir::new("audit-rest-repo");
+    lazyrunner_core::testing::write(repo.join("Shop.sln"), "");
+    screen.controller.root = repo.path().to_path_buf();
+    let rest = screen.controller.audit_apps().len() - 1;
+    assert_eq!(screen.controller.audit_apps()[rest].key, REST, "a repo with a solution: after the apps");
+    let package = Package {
+        name: "Example.Mapper".into(),
+        current: "16.1.1".into(),
+        wanted: Some("16.1.1".into()),
+        latest: Some("16.3.0".into()),
+        direct: true,
+        severity: Some(Severity::High),
+        advisories: Vec::new(),
+        fix: Some(Fix { package: "Example.Mapper".into(), version: "16.3.0".into(), major: false }),
+        via: Vec::new(),
+        projects: vec![
+            "services/Tracking/Tracking.csproj".into(),
+            "services/Tracking.Domain/Tracking.Domain.csproj".into(),
+        ],
+    };
+    screen.controller.handle(Event::Audit { key: REST.into(), result: Ok(vec![package]) });
+    super::audit::open(&mut screen.ui, &screen.controller);
+    let Some(Overlay::Audit { app, .. }) = &screen.ui.overlay else { panic!("the audit view") };
+    assert_eq!(*app, rest, "it opens on the worst finding");
+    screen.press("l");
+    let frame = screen.render(200, 40);
+    assert!(frame.contains("Rest of the solution"), "{frame}");
+    assert!(frame.contains("direct in Tracking.csproj, Tracking."), "{frame}");
+    assert!(frame.contains("dotnet add services/Tracking/Tracking."), "the fix, per project: {frame}");
 }

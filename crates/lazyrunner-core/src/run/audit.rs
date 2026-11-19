@@ -3,21 +3,36 @@
 //! one list per app: the vulnerable first (the worst first), then the outdated (a new major first). Kept in the state
 //! folder (`audit.json`), so the audit view opens on the last scan. They ask the package feeds, so they run only when
 //! asked, never at startup.
+//!
+//! Beside the apps, **the rest of the solution**: the projects of the repo's solution files that no app builds (a CI
+//! pipeline restores them all, and fails on their vulnerable packages too) - scanned as one, its vulnerable packages
+//! only, each with the projects it's in.
 
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::LazyLock;
 
 use anyhow::{Result, bail};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::json::text as string;
-use crate::profile::{App, AppKind};
+use crate::profile::{App, AppKind, Health};
 use crate::run::tools;
 
 const FILE: &str = "audit.json";
+/// The audit's entry for the solution's projects no app builds: its key, its name and its icons.
+pub const REST: &str = "solution";
+const REST_NAME: &str = "Rest of the solution";
+const REST_ICON: &str = "▣";
+const REST_NERD_ICON: &str = "\u{f1b2}";
+/// How many folders down a solution file is looked for, and the folders it isn't looked for in.
+const SOLUTION_DEPTH: usize = 3;
+const NOT_SEARCHED: [&str; 7] = [".git", "node_modules", "bin", "obj", ".vs", "packages", "TestResults"];
+const SOLUTION_KINDS: [&str; 2] = ["sln", "slnx"];
 
 /// How bad an advisory is, the least first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -94,6 +109,9 @@ pub struct Package {
     pub fix: Option<Fix>,
     /// What it's vulnerable through (npm): other vulnerable packages it depends on.
     pub via: Vec<String>,
+    /// The projects it's in, from the repo (the rest of the solution's scan says them).
+    #[serde(default)]
+    pub projects: Vec<String>,
 }
 
 impl Package {
@@ -252,6 +270,165 @@ pub fn scan(root: &Path, app: &App) -> Result<Vec<Package>> {
     }
 }
 
+/// The repo's solution files (`.sln`, `.slnx`), the shallowest first, at most [`SOLUTION_DEPTH`] folders down - not in
+/// build output, packages or the tools' folders.
+pub fn solutions(root: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut folders = VecDeque::from([(root.to_path_buf(), 0)]);
+    while let Some((folder, depth)) = folders.pop_front() {
+        let Ok(entries) = std::fs::read_dir(&folder) else { continue };
+        let mut entries: Vec<std::fs::DirEntry> = entries.flatten().collect();
+        entries.sort_by_key(std::fs::DirEntry::file_name);
+        for entry in entries {
+            let (path, name) = (entry.path(), entry.file_name());
+            let Ok(kind) = entry.file_type() else { continue };
+            let skipped = NOT_SEARCHED.iter().any(|skip| name.eq_ignore_ascii_case(skip));
+            if kind.is_dir() && depth < SOLUTION_DEPTH && !skipped {
+                folders.push_back((path, depth + 1));
+            } else if kind.is_file()
+                && path.extension().is_some_and(|ext| SOLUTION_KINDS.iter().any(|kind| ext.eq_ignore_ascii_case(kind)))
+            {
+                found.push(path);
+            }
+        }
+    }
+    found
+}
+
+/// The audit's entry for the solution's projects no app builds, when the repo has a solution and a .NET app: a .NET
+/// "app" whose project is the first solution.
+pub fn rest(root: &Path, apps: &[App]) -> Option<App> {
+    if !apps.iter().any(App::is_dotnet) {
+        return None;
+    }
+    let solution = solutions(root).into_iter().next()?;
+    let project = solution.strip_prefix(root).unwrap_or(&solution).to_string_lossy().replace('\\', "/");
+    Some(rest_entry(project))
+}
+
+fn rest_entry(project: String) -> App {
+    App {
+        key: REST.into(),
+        name: REST_NAME.into(),
+        icon: Some(REST_ICON.into()),
+        nerd_icon: Some(REST_NERD_ICON.into()),
+        kind: AppKind::Dotnet { project, launch_profile: String::new(), swagger: None, args: Vec::new() },
+        tests: Vec::new(),
+        migrations: None,
+        env: Vec::new(),
+        depends_on: Vec::new(),
+        health: Health::default(),
+        restart_on_crash: false,
+    }
+}
+
+/// The projects the .NET `apps` build - their own and every one they reference - as the scans compare them.
+pub fn reached(root: &Path, apps: &[App]) -> HashSet<String> {
+    let own = apps.iter().filter_map(|app| match &app.kind {
+        AppKind::Dotnet { project, .. } => Some(root.join(project)),
+        AppKind::Npm { .. } | AppKind::Command(_) => None,
+    });
+    own.flat_map(|project| crate::run::build::projects(&project)).map(|path| project_key(&path)).collect()
+}
+
+/// The projects a solution file lists (`.sln` lines, `.slnx` elements), as the scans compare them; none when it can't
+/// be read.
+fn solution_projects(solution: &Path) -> HashSet<String> {
+    static SLN: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?im)^Project\("[^"]*"\)\s*=\s*"[^"]*",\s*"([^"]+\.\w+proj)""#).expect("a valid pattern")
+    });
+    static SLNX: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#"(?i)<Project\s+Path="([^"]+\.\w+proj)""#).expect("a valid pattern"));
+    let Ok(text) = crate::json::read_text(solution) else { return HashSet::new() };
+    let dir = solution.parent().unwrap_or(Path::new(""));
+    SLN.captures_iter(&text)
+        .chain(SLNX.captures_iter(&text))
+        .map(|found| project_key(&crate::run::build::normalize(&dir.join(crate::profile::native(&found[1])))))
+        .collect()
+}
+
+/// A project's path as the scans compare them: forward slashes, lower case.
+fn project_key(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/").to_lowercase()
+}
+
+/// Scans the projects of the repo's solutions that `reached` leaves out (no app builds them): their vulnerable
+/// packages, each with the projects it's in - a solution whose projects the apps or the solutions before it cover is
+/// skipped. `dotnet list` leaves out a project that was never restored.
+pub fn scan_rest(root: &Path, reached: &HashSet<String>) -> Result<Vec<Package>> {
+    let all = solutions(root);
+    if all.is_empty() {
+        bail!("there's no solution file (.sln, .slnx) in the repo");
+    }
+    let (mut found, mut covered) = (Vec::new(), reached.clone());
+    for solution in &all {
+        let listed = solution_projects(solution);
+        if !listed.is_empty() && listed.is_subset(&covered) {
+            continue;
+        }
+        covered.extend(listed);
+        let run = |extra: &[&str]| {
+            let mut command = Command::new(tools::dotnet());
+            command.arg("list").arg(solution).arg("package").args(extra).args(["--format", "json"]);
+            output(gently(command))
+        };
+        let vulnerable = rest_of(&run(&["--vulnerable", "--include-transitive"])?, reached)?;
+        if dotnet_packages(&vulnerable).is_empty() {
+            continue;
+        }
+        let outdated = rest_of(&run(&["--outdated", "--include-transitive"])?, reached)?;
+        let held = holders(&vulnerable, root);
+        for mut package in dotnet(&vulnerable.to_string(), &outdated.to_string())? {
+            if package.severity.is_none() {
+                continue;
+            }
+            package.projects = held.get(&package.name.to_lowercase()).cloned().unwrap_or_default();
+            add(&mut found, package);
+        }
+    }
+    Ok(sorted(found))
+}
+
+/// A solution's `dotnet list package` report without the projects in `reached` (those an app builds) and without its
+/// problems (a project never restored); it fails only when it lists no project at all.
+fn rest_of(text: &str, reached: &HashSet<String>) -> Result<Value> {
+    let mut report: Value = serde_json::from_str(text)?;
+    let listed = report["projects"].as_array().is_some_and(|projects| !projects.is_empty());
+    let problems = report["problems"].as_array().into_iter().flatten();
+    if !listed
+        && let Some(problem) =
+            problems.into_iter().find(|problem| string(&problem["level"]).eq_ignore_ascii_case("error"))
+    {
+        bail!("{}", string(&problem["text"]));
+    }
+    if let Some(projects) = report["projects"].as_array_mut() {
+        projects.retain(|project| !reached.contains(&project_key(Path::new(&string(&project["path"])))));
+    }
+    report["problems"] = Value::Array(Vec::new());
+    Ok(report)
+}
+
+/// Which projects of `report` hold each package (by its name in lower case), from the repo.
+fn holders(report: &Value, root: &Path) -> HashMap<String, Vec<String>> {
+    let prefix = format!("{}/", project_key(root).trim_end_matches('/'));
+    let mut held: HashMap<String, Vec<String>> = HashMap::new();
+    for project in report["projects"].as_array().into_iter().flatten() {
+        let path = string(&project["path"]).replace('\\', "/");
+        let inside = project_key(Path::new(&path)).starts_with(&prefix);
+        let shown = if inside { path.get(prefix.len()..).unwrap_or(&path).to_string() } else { path.clone() };
+        for framework in project["frameworks"].as_array().into_iter().flatten() {
+            let lists = [&framework["topLevelPackages"], &framework["transitivePackages"]];
+            for item in lists.into_iter().filter_map(|list| list.as_array()).flatten() {
+                let names = held.entry(string(&item["id"]).to_lowercase()).or_default();
+                if !names.contains(&shown) {
+                    names.push(shown.clone());
+                }
+            }
+        }
+    }
+    held
+}
+
 /// `command`, to run in the background without weighing on the machine: below normal priority on Windows (what it
 /// starts inherits it - MSBuild's workers, one per core), so the apps and lazyrunner stay responsive; and without
 /// MSBuild keeping its workers alive after it, which would hold gigabytes for minutes.
@@ -366,6 +543,13 @@ fn add(found: &mut Vec<Package>, package: Package) {
     };
     known.direct |= package.direct;
     known.severity = known.severity.max(package.severity);
+    known.latest = known.latest.take().or(package.latest);
+    known.fix = known.fix.take().or(package.fix);
+    for project in package.projects {
+        if !known.projects.contains(&project) {
+            known.projects.push(project);
+        }
+    }
     for advisory in package.advisories {
         if !known.advisories.iter().any(|other| other.id == advisory.id) {
             known.advisories.push(advisory);
@@ -416,6 +600,7 @@ pub fn npm(audit: &str, outdated: &str, installed: impl Fn(&str) -> Option<Strin
             advisories,
             fix,
             via,
+            projects: Vec::new(),
         });
     }
     for (name, item) in outdated.as_object().into_iter().flatten() {
@@ -435,10 +620,11 @@ fn installed(folder: &Path, name: &str) -> Option<String> {
     optional(&manifest["version"])
 }
 
-/// What fixes `package` in `app`, run in [`folder`]: its fix, else an upgrade to its latest version.
+/// What fixes `package` in `app`, run in [`folder`]: its fix, else an upgrade to its latest version (for the rest of
+/// the solution, in each project it's in).
 pub fn command(app: &App, package: &Package) -> Option<String> {
-    let (dotnet, args) = fix_args(app, package)?;
-    Some(shown(dotnet, &args))
+    let each: Vec<String> = fix_args(app, package).iter().map(|(dotnet, args)| shown(*dotnet, args)).collect();
+    (!each.is_empty()).then(|| each.join(" && "))
 }
 
 /// A command as it's run: the program, then its arguments (quoted when they hold a space).
@@ -492,19 +678,22 @@ pub fn commands(app: &App, packages: &[Package]) -> Vec<String> {
     fixes(app, packages).iter().map(|(dotnet, args)| shown(*dotnet, args)).collect()
 }
 
-/// What runs `package`'s fix: dotnet (true) or npm, with these arguments.
-fn fix_args(app: &App, package: &Package) -> Option<(bool, Vec<String>)> {
-    let (name, version) = target(package)?;
-    Some(match &app.kind {
+/// What runs `package`'s fix: dotnet (true) or npm, with these arguments - for the rest of the solution, a `dotnet
+/// add` in each project it's in.
+fn fix_args(app: &App, package: &Package) -> Vec<(bool, Vec<String>)> {
+    let Some((name, version)) = target(package) else { return Vec::new() };
+    let add = |file: &str| (true, ["add", file, "package", name, "--version", version].map(String::from).to_vec());
+    match &app.kind {
+        AppKind::Dotnet { .. } if app.key == REST => package.projects.iter().map(|project| add(project)).collect(),
         AppKind::Dotnet { project, .. } => {
             let file =
                 Path::new(project).file_name().map_or_else(String::new, |file| file.to_string_lossy().into_owned());
-            (true, vec!["add".into(), file, "package".into(), name.into(), "--version".into(), version.into()])
+            vec![add(&file)]
         }
-        AppKind::Npm { .. } if version.is_empty() => (false, vec!["audit".into(), "fix".into()]),
-        AppKind::Npm { .. } => (false, vec!["install".into(), format!("{name}@{version}")]),
-        AppKind::Command(_) => return None,
-    })
+        AppKind::Npm { .. } if version.is_empty() => vec![(false, vec!["audit".into(), "fix".into()])],
+        AppKind::Npm { .. } => vec![(false, vec!["install".into(), format!("{name}@{version}")])],
+        AppKind::Command(_) => Vec::new(),
+    }
 }
 
 /// Runs the fixes of `packages` in their app's folder, one after another ([`fixes`]), and waits; what went wrong when
@@ -546,9 +735,11 @@ fn run(root: &Path, app: &App, dotnet: bool, args: &[String]) -> Result<()> {
     bail!("{}", line.copied().unwrap_or("it failed"))
 }
 
-/// Where an app's [`command`] runs: a .NET app's project folder, an npm app's, a command app's.
+/// Where an app's [`command`] runs: a .NET app's project folder, an npm app's, a command app's; the repo for the rest
+/// of the solution.
 pub fn folder(root: &Path, app: &App) -> PathBuf {
     match &app.kind {
+        AppKind::Dotnet { .. } if app.key == REST => root.to_path_buf(),
         AppKind::Dotnet { project, .. } => {
             root.join(project).parent().map_or_else(|| root.to_path_buf(), Path::to_path_buf)
         }
@@ -581,6 +772,7 @@ fn blank() -> Package {
         advisories: Vec::new(),
         fix: None,
         via: Vec::new(),
+        projects: Vec::new(),
     }
 }
 
@@ -602,6 +794,84 @@ mod tests {
 
     use super::*;
     use crate::testing::TempDir;
+
+    #[test]
+    fn the_rest_of_the_solution_is_its_projects_no_app_builds_each_package_with_its_projects() {
+        let root = Path::new("C:/work/shop");
+        let project = |path: &str| {
+            let vulnerable = json!({ "severity": "High", "advisoryurl": "https://github.com/advisories/GHSA-1" });
+            let package =
+                json!({ "id": "Example.Mapper", "resolvedVersion": "16.1.1", "vulnerabilities": [vulnerable] });
+            json!({ "path": path, "frameworks": [{ "framework": "net8.0", "topLevelPackages": [package] }] })
+        };
+        let not_restored = json!({ "level": "error", "text": "No assets file was found for Old.csproj" });
+        let report = json!({ "version": 1, "problems": [not_restored], "projects": [
+            project("C:\\work\\shop\\api\\Orders\\Orders.csproj"),
+            project("C:\\work\\shop\\api\\Tracking\\Tracking.csproj"),
+            project("C:\\work\\shop\\api\\Tracking.Domain\\Tracking.Domain.csproj"),
+        ] });
+        let reached = HashSet::from([project_key(Path::new("C:/work/shop/api/Orders/Orders.csproj"))]);
+        let rest = rest_of(&report.to_string(), &reached).unwrap();
+        assert_eq!(rest["projects"].as_array().map(Vec::len), Some(2), "the app's own project left out");
+        let held = holders(&rest, root);
+        let projects = ["api/Tracking/Tracking.csproj", "api/Tracking.Domain/Tracking.Domain.csproj"];
+        assert_eq!(held["example.mapper"], projects, "from the repo, each once");
+        let empty = json!({ "version": 1, "problems": [{ "level": "error", "text": "MSB1009" }], "projects": [] });
+        assert!(rest_of(&empty.to_string(), &reached).is_err(), "nothing listed: what went wrong");
+
+        let fix = Fix { package: "Example.Mapper".into(), version: "16.3.0".into(), major: false };
+        let package = Package {
+            name: "Example.Mapper".into(),
+            severity: Some(Severity::High),
+            fix: Some(fix),
+            projects: projects.map(String::from).to_vec(),
+            ..blank()
+        };
+        let entry = rest_entry("api/Shop.sln".into());
+        let each = "dotnet add api/Tracking/Tracking.csproj package Example.Mapper --version 16.3.0 && dotnet add \
+                    api/Tracking.Domain/Tracking.Domain.csproj package Example.Mapper --version 16.3.0";
+        assert_eq!(command(&entry, &package).as_deref(), Some(each), "in each project it's in");
+        assert_eq!(folder(root, &entry), root, "from the repo");
+    }
+
+    #[test]
+    fn a_solutions_projects_are_read_from_its_file() {
+        let temp = TempDir::new("audit-solution-projects");
+        let sln = concat!(
+            r#"Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tracking", "Tracking\Tracking.csproj", "{1}""#,
+            "\n",
+            r#"Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{2}""#,
+            "\n",
+        );
+        crate::testing::write(temp.join("api/Shop.sln"), sln);
+        crate::testing::write(
+            temp.join("api/Shop.slnx"),
+            "<Solution><Project Path=\"../tools/Tool/Tool.csproj\" /></Solution>",
+        );
+        let key = |path: &str| project_key(&temp.join(path));
+        assert_eq!(solution_projects(&temp.join("api/Shop.sln")), HashSet::from([key("api/Tracking/Tracking.csproj")]));
+        assert_eq!(solution_projects(&temp.join("api/Shop.slnx")), HashSet::from([key("tools/Tool/Tool.csproj")]));
+        assert!(solution_projects(&temp.join("api/Gone.sln")).is_empty());
+    }
+
+    #[test]
+    fn solutions_are_found_a_few_folders_down_but_not_in_build_output_or_packages() {
+        let temp = TempDir::new("audit-solutions");
+        for file in [
+            "api/Shop.sln",
+            "api/tools/Tools.slnx",
+            "api/bin/Debug/Copy.sln",
+            "node_modules/x/X.sln",
+            "a/b/c/d/Deep.sln",
+        ] {
+            crate::testing::write(temp.join(file), "");
+        }
+        let found: Vec<String> = solutions(temp.path())
+            .iter()
+            .map(|path| path.strip_prefix(temp.path()).unwrap().to_string_lossy().replace('\\', "/"))
+            .collect();
+        assert_eq!(found, ["api/Shop.sln", "api/tools/Tools.slnx"]);
+    }
 
     fn dotnet_app() -> App {
         let kind = AppKind::Dotnet {

@@ -257,6 +257,8 @@ pub struct Controller {
     /// app, its command, when).
     audit_batch: Option<(Instant, usize)>,
     audit_install_failed: Option<(String, String, Vec<String>, Instant)>,
+    /// The audit's entry for the solution's projects no app builds, looked for once.
+    audit_rest: std::sync::OnceLock<Option<App>>,
     /// The port map (P): each app's port, who holds it and who held it over the last minute.
     port_map: Ports,
     probes: HashMap<String, Probe>,
@@ -405,6 +407,7 @@ impl Controller {
             audit_landed: HashMap::new(),
             audit_batch: None,
             audit_install_failed: None,
+            audit_rest: std::sync::OnceLock::new(),
             port_map: Ports::default(),
             project,
             apps,

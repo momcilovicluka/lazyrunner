@@ -198,7 +198,7 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
         }
         "tests" | "run_tests" | "stop_tests" => {
             let suite = args["suite"].as_str();
-            tests_view(ui, controller, suite);
+            tests_view(ui, controller, suite, args["test"].as_str());
             let read = suite.map_or("read the test suites".to_string(), |suite| format!("read {suite}'s results"));
             Some(result["doing"].as_str().map_or(read, str::to_string))
         }
@@ -220,7 +220,9 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             result["doing"].as_str().map(str::to_string)
         }
         "status" => {
-            close_view(ui);
+            if !busy_view(ui, controller) {
+                close_view(ui);
+            }
             Some("looked at the status".to_string())
         }
         "audit" => {
@@ -364,16 +366,38 @@ fn requests_view(ui: &mut Ui, controller: &Controller, args: &Value, result: &Va
     ui.motion.look(Spot::LookedRequests(rows.filter_map(|row| row["id"].as_u64()).collect()), ui.now);
 }
 
-/// The tests view on the suite asked about, else on the first.
-fn tests_view(ui: &mut Ui, controller: &Controller, suite: Option<&str>) {
-    let row = suite.and_then(|wanted| {
+/// Whether the open view shows something still at work - tests running, migrations checked or applied: a look at
+/// the status leaves it open.
+fn busy_view(ui: &Ui, controller: &Controller) -> bool {
+    match ui.overlay {
+        Some(Overlay::Tests { .. }) => controller.tests_active(),
+        Some(Overlay::Migrations { .. }) => controller.migrations_active(),
+        _ => false,
+    }
+}
+
+/// The tests view on the suite asked about (else the first) and on its `test` when one runs on its own - your filter
+/// and search set aside when they'd hide the suite.
+fn tests_view(ui: &mut Ui, controller: &Controller, suite: Option<&str>, test: Option<&str>) {
+    let found = suite.and_then(|wanted| {
         let suites = controller.suites.as_deref()?;
-        let at = suites
+        suites
             .iter()
-            .position(|suite| suite.key.eq_ignore_ascii_case(wanted) || suite.name.eq_ignore_ascii_case(wanted))?;
-        suites::list_rows(controller).iter().position(|row| matches!(row, Row::Suite(suite) if *suite == at))
+            .position(|suite| suite.key.eq_ignore_ascii_case(wanted) || suite.name.eq_ignore_ascii_case(wanted))
     });
-    ui.overlay = Some(Overlay::Tests { index: row.unwrap_or(suites::FIRST_SUITE), scroll: 0, picking: None });
+    let row_of = |rows: Vec<Row>| {
+        found.and_then(|at| rows.iter().position(|row| matches!(row, Row::Suite(suite) if *suite == at)))
+    };
+    let mut row = row_of(suites::shown_rows(controller, ui.tests_only, &ui.tests_query));
+    if row.is_none() && found.is_some() {
+        (ui.tests_only, ui.tests_query) = (suites::Only::All, String::new());
+        row = row_of(suites::list_rows(controller));
+    }
+    let picking = found.zip(test).and_then(|(at, test)| {
+        let suite = controller.suites.as_deref()?.get(at)?;
+        suites::test_list(suite).iter().position(|each| each.name == test)
+    });
+    ui.overlay = Some(Overlay::Tests { index: row.unwrap_or(suites::FIRST_SUITE), scroll: 0, picking });
 }
 
 /// The panel's keys row while following: F, and the agent's last calls in words, the newest on the right.

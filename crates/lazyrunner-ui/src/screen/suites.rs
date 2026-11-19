@@ -166,7 +166,7 @@ pub fn list_rows(controller: &Controller) -> Vec<Row> {
 }
 
 /// The list as `v` and `/` narrow it: the suites they admit, under the sides and apps that still have one.
-fn shown_rows(controller: &Controller, only: Only, query: &str) -> Vec<Row> {
+pub(super) fn shown_rows(controller: &Controller, only: Only, query: &str) -> Vec<Row> {
     let rows = list_rows(controller);
     if !only.narrows() && query.is_empty() {
         return rows;
@@ -442,7 +442,7 @@ pub fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, b
 }
 
 /// A suite's tests to pick from: the failed first, then the skipped, then the passed, each by name.
-fn test_list(suite: &Suite) -> Vec<&TestResult> {
+pub(super) fn test_list(suite: &Suite) -> Vec<&TestResult> {
     let rank = |test: &TestResult| match test.outcome {
         Outcome::Failed => 0,
         Outcome::Skipped => 1,

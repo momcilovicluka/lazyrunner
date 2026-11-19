@@ -160,7 +160,7 @@ pub fn references(project: &Path) -> Vec<PathBuf> {
 }
 
 /// A path with `.` and `..` resolved (without touching the disk).
-fn normalize(path: &Path) -> PathBuf {
+pub(crate) fn normalize(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for part in path.components() {
         match part {

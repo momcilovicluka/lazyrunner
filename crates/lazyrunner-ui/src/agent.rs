@@ -835,7 +835,7 @@ fn stack(controller: &Controller) -> Value {
 fn audit(controller: &Controller) -> Value {
     use lazyrunner_core::run::audit::{self, Severity};
     let apps: Vec<Value> = controller
-        .apps
+        .audit_apps()
         .iter()
         .map(|app| {
             let scan = controller.audits().get(&app.key);
@@ -862,6 +862,7 @@ fn audit(controller: &Controller) -> Value {
                             "advisories": advisories,
                             "fix": audit::command(app, package),
                             "in": folder,
+                            "projects": package.projects,
                         })
                     })
                     .collect()
