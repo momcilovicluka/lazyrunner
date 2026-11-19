@@ -8,6 +8,7 @@ use std::process::Command;
 use anyhow::{Result, anyhow, bail};
 
 use super::child::Spec;
+use super::coverage;
 use super::suites::{Runner, dotnet_filter, name_pattern};
 use crate::apptypes::{self, Mode};
 use crate::profile::{
@@ -182,6 +183,11 @@ pub trait Commands: Send + Sync {
         test_command(runner, results, names)
     }
 
+    /// A test suite's full run that also collects its code coverage into the folder `coverage` (#33).
+    fn covered_test(&self, runner: &Runner, results: &Path, coverage: &Path) -> Result<Spec> {
+        covered_test_command(runner, results, coverage)
+    }
+
     /// The build of the test projects in the MSBuild project `project`.
     fn test_build(&self, project: &Path) -> Spec {
         test_build_command(project)
@@ -289,18 +295,35 @@ pub(crate) fn dotnet() -> PathBuf {
 /// A test suite's run: `dotnet test --no-build` writing TRX, or jest / vitest (through npm or Nx) writing their
 /// JSON; `names` narrows it to those tests.
 pub fn test_command(runner: &Runner, results: &Path, names: &[String]) -> Result<Spec> {
+    test_command_with(runner, results, names, None)
+}
+
+/// A test suite's full run collecting its code coverage into `coverage`: `dotnet test` writes its results there too
+/// (coverlet writes into the results folder), so its TRX file is named by its whole path.
+pub fn covered_test_command(runner: &Runner, results: &Path, coverage: &Path) -> Result<Spec> {
+    test_command_with(runner, results, &[], Some(coverage))
+}
+
+fn test_command_with(runner: &Runner, results: &Path, names: &[String], coverage: Option<&Path>) -> Result<Spec> {
     let folder = results.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     let file = results.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
     let output = format!("--outputFile={}", results.display());
     let pattern = (!names.is_empty()).then(|| name_pattern(names));
     match runner {
         Runner::Dotnet { project } => {
+            let (file, folder) = match coverage {
+                Some(dir) => (results.display().to_string(), dir.to_path_buf()),
+                None => (file, folder),
+            };
             let mut args: Vec<OsString> = vec!["test".into(), project.into(), "--no-build".into(), "-nologo".into()];
             args.extend(["--logger".into(), format!("trx;LogFileName={file}").into()]);
             args.extend(["--results-directory".into(), folder.into_os_string()]);
             args.extend(["--logger", "console;verbosity=normal"].map(OsString::from));
             if !names.is_empty() {
                 args.extend(["--filter".into(), dotnet_filter(names).into()]);
+            }
+            if coverage.is_some() {
+                args.extend(coverage::dotnet_args());
             }
             let dir = project.parent().map_or_else(PathBuf::new, Path::to_path_buf);
             Ok(Spec { program: dotnet(), args, dir, env: Vec::new() })
@@ -315,9 +338,11 @@ pub fn test_command(runner: &Runner, results: &Path, names: &[String]) -> Result
                 args.extend(["--run", "--reporter=default", "--reporter=json"].map(OsString::from));
                 args.push(format!("--outputFile.json={}", results.display()).into());
                 args.extend(pattern.into_iter().flat_map(|pattern| ["-t".into(), OsString::from(pattern)]));
+                args.extend(coverage.map(coverage::vitest_args).unwrap_or_default());
             } else {
                 args.extend(["--ci".into(), "--json".into(), output.into()]);
                 args.extend(pattern.map(|pattern| format!("--testNamePattern={pattern}").into()));
+                args.extend(coverage.map(coverage::jest_args).unwrap_or_default());
             }
             Ok(Spec { program, args, dir: dir.clone(), env: Vec::new() })
         }
@@ -329,6 +354,7 @@ pub fn test_command(runner: &Runner, results: &Path, names: &[String]) -> Result
             let mut args: Vec<OsString> = vec![nx.into_os_string(), "test".into(), project.into()];
             args.extend(["--skip-nx-cache".into(), "--ci".into(), "--json".into(), output.into()]);
             args.extend(pattern.map(|pattern| format!("--testNamePattern={pattern}").into()));
+            args.extend(coverage.map(coverage::jest_args).unwrap_or_default());
             // Without its daemon: it would live in this suite's process tree and go when the suite ends, under
             // another suite of the workspace running beside it.
             let env = vec![("NX_DAEMON".into(), "false".into())];
@@ -698,6 +724,22 @@ mod tests {
         write(workspace.join("node_modules/nx/dist/bin/nx.js"), "");
         assert_eq!(nx_script(&workspace), Some(workspace.join("node_modules/nx/./dist/bin/nx.js")));
         assert_eq!(packages_problem(&runner), None);
+    }
+
+    #[test]
+    fn a_dotnet_suite_collects_coverage_into_its_own_folder_only_when_asked() {
+        let runner = Runner::Dotnet { project: "tests/Orders.Tests.csproj".into() };
+        let results = Path::new("state").join("tests").join("orders.trx");
+        let args = |spec: Spec| spec.args.iter().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+        let plain = args(test_command(&runner, &results, &[]).unwrap());
+        assert!(plain.contains(&"trx;LogFileName=orders.trx".to_string()), "{plain:?}");
+        assert!(!plain.iter().any(|arg| arg == "--collect"), "coverage off: the same command as ever");
+        let coverage = Path::new("state").join("tests").join("coverage").join("orders");
+        let covered = args(covered_test_command(&runner, &results, &coverage).unwrap());
+        assert!(covered.contains(&format!("trx;LogFileName={}", results.display())), "{covered:?}");
+        let folder = covered.iter().position(|arg| arg == "--results-directory").map(|at| covered[at + 1].clone());
+        assert_eq!(folder, Some(coverage.display().to_string()), "coverlet writes into the results folder");
+        assert!(covered.ends_with(&["--collect".to_string(), "XPlat Code Coverage".to_string()]));
     }
 
     #[test]

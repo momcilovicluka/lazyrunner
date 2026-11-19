@@ -65,6 +65,8 @@ pub enum Kind {
     Branch,
     /// The session kept when lazyrunner last closed (#85), and how old it is.
     Session(crate::run::session::Freshness),
+    /// What collecting code coverage needs, with the `coverage` setting on (#33).
+    Coverage,
 }
 
 /// The checklist's groups, in its order.
@@ -83,7 +85,7 @@ impl Kind {
             Self::Version | Self::Tool => Group::Environment,
             Self::Project | Self::Ports | Self::Branch | Self::Session(_) => Group::Project,
             Self::Database => Group::Database,
-            Self::Packages(_) | Self::Audit => Group::Packages,
+            Self::Packages(_) | Self::Audit | Self::Coverage => Group::Packages,
             Self::Update => Group::Update,
         }
     }
@@ -100,6 +102,7 @@ impl Kind {
             Self::Database => 5,
             Self::Packages(_) => 6,
             Self::Audit => 7,
+            Self::Coverage => 8,
             Self::Update => 7,
         }
     }
@@ -246,6 +249,12 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
     }
     if controller.apps.iter().any(|app| app.command().is_none()) {
         checks.push(audit_check(controller));
+    }
+    if controller.setting(crate::config::Toggle::Coverage) {
+        let (root, apps) = (controller.root.clone(), controller.apps.clone());
+        checks.push(check(Kind::Coverage, super::coverage_needs::CHECK, move || {
+            super::coverage_needs::report(&root, &apps)
+        }));
     }
     checks.push(project_check(controller));
     let mut branch = controller.branch.clone();

@@ -460,7 +460,7 @@ pub(crate) struct MenuToggle {
 }
 
 /// The , menu's toggles, by their group ([`setting_group`]).
-const MENU_TOGGLES: [MenuToggle; 15] = [
+const MENU_TOGGLES: [MenuToggle; 16] = [
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
     MenuToggle { letter: "w", toggle: Toggle::StartupChecklist, label: "Startup checklist when lazyrunner opens" },
     MenuToggle { letter: "v", toggle: Toggle::AutoUpdate, label: "Auto-update lazyrunner when it opens" },
@@ -477,6 +477,7 @@ const MENU_TOGGLES: [MenuToggle; 15] = [
     MenuToggle { letter: "a", toggle: Toggle::AutoRestartOnBranchChange, label: "Auto-restart on branch change" },
     MenuToggle { letter: "s", toggle: Toggle::StopFrontendOnStop, label: "Stop/Restart all include the frontend" },
     MenuToggle { letter: "e", toggle: Toggle::RestartOnCodeChange, label: "Restart the APIs when code changes" },
+    MenuToggle { letter: "C", toggle: Toggle::Coverage, label: "Code coverage on full test runs (slower)" },
     MenuToggle { letter: "m", toggle: Toggle::Mouse, label: "Mouse: click and scroll (off: select text)" },
     MenuToggle { letter: "f", toggle: Toggle::ReducedMotion, label: "Reduced motion: no blinking, spinners or fades" },
     MenuToggle {
@@ -510,7 +511,8 @@ pub fn setting_group(toggle: Toggle) -> &'static str {
         | Toggle::StopFrontendOnStop
         | Toggle::RestartOnCodeChange
         | Toggle::SkipUnchangedBuilds
-        | Toggle::Notifications => "Running",
+        | Toggle::Notifications
+        | Toggle::Coverage => "Running",
         Toggle::Mouse | Toggle::ReducedMotion | Toggle::NerdIcons | Toggle::LinksOnAltClick => "Display",
         Toggle::GitBeside | Toggle::FollowAgent | Toggle::OpenTelemetry => "Integrations",
     }

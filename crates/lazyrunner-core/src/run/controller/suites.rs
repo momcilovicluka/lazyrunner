@@ -8,10 +8,12 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use super::Controller;
+use crate::config::Toggle;
 use crate::output::{Hue, strip_ansi};
 use crate::profile::AppKind;
 use crate::run::build::{self, ToolLine};
 use crate::run::child::Child;
+use crate::run::coverage;
 use crate::run::history::Kind;
 use crate::run::suites::{self, MAX_OUTPUT, Outcome, Runner, Status, Suite};
 use crate::run::{Tag, format_duration};
@@ -98,6 +100,7 @@ impl Controller {
                 Some(at) => {
                     let mut known = known.remove(at);
                     known.app = suite.app; // the profile may have changed
+                    known.coverage.coverlet = suite.coverage.coverlet;
                     suites.push(known);
                 }
                 None => suites.push(suite),
@@ -436,6 +439,7 @@ impl Controller {
         suite.rerun = names.clone();
         let runner = suite.runner.clone();
         let name = suite.name.clone();
+        let coverage = self.coverage_dir(key);
         if too_many {
             self.add_log(
                 format!("{name}: too many failed tests to name on a command line - all of it runs"),
@@ -455,9 +459,13 @@ impl Controller {
         suite.started = Some(now);
         suite.job = job;
         suite.status = Status::Running;
+        suite.coverage.collecting = coverage.is_some();
         let spawned = std::fs::create_dir_all(&dir)
             .map_err(anyhow::Error::from)
-            .and_then(|()| self.commands.test(&runner, &file, &names))
+            .and_then(|()| match &coverage {
+                Some(folder) => self.commands.covered_test(&runner, &file, folder),
+                None => self.commands.test(&runner, &file, &names),
+            })
             .and_then(|spec| {
                 let tag = Tag::Suite { key: key.to_string(), job };
                 Ok(Child::spawn(&spec, tag, self.events.clone(), self.guard.as_ref())?)
@@ -503,6 +511,7 @@ impl Controller {
         suite.last_run = Some(jiff::ZonedDateTime::now());
         let failed_only = std::mem::take(&mut suite.failed_only);
         let requested = std::mem::take(&mut suite.rerun);
+        let collected = std::mem::take(&mut suite.coverage.collecting);
         let file = if failed_only { suite.rerun_file(&dir) } else { suite.results_file(&dir) };
         let (name, seconds) = (suite.name.clone(), suite.seconds);
         let tests = match suites::read_results(&suite.runner, &file) {
@@ -551,11 +560,14 @@ impl Controller {
         if let Err(error) = self.test_history.save(&dir) {
             self.add_log(format!("! The tests' history isn't saved ({error})"), Hue::Yellow);
         }
-        let note = if failed_only {
+        let mut note = if failed_only {
             String::new()
         } else {
             self.record_duration_as(Kind::Test, key, &name, seconds, failed == 0)
         };
+        if collected {
+            note.push_str(&self.read_coverage(key, now));
+        }
         let again =
             if failed_only { format!(" ({ran} test{} again)", if ran == 1 { "" } else { "s" }) } else { String::new() };
         let skipped = if skipped > 0 { format!(", {skipped} skipped") } else { String::new() };
@@ -566,6 +578,47 @@ impl Controller {
         } else {
             self.add_log(format!("✓ {name}{again} - {passed} passed{skipped} ({took}){note}"), Hue::Green);
         }
+    }
+
+    /// The folder suite `key`'s run collects its code coverage into, emptied, when it collects it: the setting is on,
+    /// it runs whole, and (.NET) its project references coverlet (#33).
+    fn coverage_dir(&self, key: &str) -> Option<PathBuf> {
+        let suite = self.suite(key)?;
+        let wanted = self.setting(Toggle::Coverage) && !suite.failed_only;
+        if !wanted || !coverage::collects(&suite.runner, suite.coverage.coverlet) {
+            return None;
+        }
+        let folder = coverage::run_dir(&self.tests_dir(), &suite.file_name());
+        let _ = std::fs::remove_dir_all(&folder);
+        Some(folder)
+    }
+
+    /// A run's coverage, kept with the suite's runs before; what the log line adds (` · coverage 78.4% (+1.2)`), or
+    /// why there's none.
+    fn read_coverage(&mut self, key: &str, now: Instant) -> String {
+        let dir = self.tests_dir();
+        let Some(suite) = self.suite_mut(key) else { return String::new() };
+        let folder = coverage::run_dir(&dir, &suite.file_name());
+        let found = coverage::collect(&suite.runner, &folder);
+        let name = suite.name.clone();
+        let coverage = match found {
+            Ok(coverage) => {
+                suite.coverage.read_at = Some(now);
+                coverage
+            }
+            Err(why) => {
+                self.add_log(format!("! {name}: no coverage ({why})"), Hue::Yellow);
+                return String::new();
+            }
+        };
+        let percent = coverage.percent;
+        self.coverage.record(key, coverage);
+        if let Err(error) = self.coverage.save(&dir) {
+            self.add_log(format!("! The coverage isn't saved ({error})"), Hue::Yellow);
+        }
+        let change = self.coverage.suite(key).and_then(coverage::SuiteCoverage::change);
+        let change = change.map_or(String::new(), |change| format!(" ({change:+.1})"));
+        format!(" · coverage {percent:.1}%{change}")
     }
 
     /// Every suite of the run is done: one line, and a notification when something failed.
@@ -788,6 +841,14 @@ mod tests {
 
         fn test_build(&self, project: &Path) -> Spec {
             shell("exit 0".into(), project.parent().expect("the tests folder"))
+        }
+
+        /// The run, and a coverage summary: 3 of 4 lines covered.
+        fn covered_test(&self, runner: &Runner, results: &Path, coverage: &Path) -> anyhow::Result<Spec> {
+            let summary =
+                r#"{"total":{"lines":{"total":4,"covered":3}},"/w/cart.ts":{"lines":{"total":4,"covered":3}}}"#;
+            crate::testing::write(coverage.join("coverage-summary.json"), summary);
+            self.test(runner, results, &[])
         }
     }
 
@@ -1034,6 +1095,32 @@ mod tests {
         sample.run_tests(&keys(&["cart"]), false);
         run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
         assert_eq!(restart(&sample), (1, 1), "until it runs whole");
+    }
+
+    #[tokio::test]
+    async fn a_full_run_collects_coverage_with_the_setting_on_and_a_run_of_the_failed_tests_doesnt() {
+        let temp = TempDir::new("suites-coverage");
+        let (mut sample, mut events) = controller(&temp);
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert!(sample.coverage.suite("npm:cart").is_none(), "the setting is off: no coverage");
+        assert!(!log(&sample).contains("coverage"), "{}", log(&sample));
+
+        sample.set_toggle(crate::config::Toggle::Coverage, true);
+        sample.run_tests(&keys(&["cart"]), false);
+        assert!(sample.suite("npm:cart").unwrap().coverage.collecting, "its row says so while it runs");
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert!(log(&sample).contains("· coverage 75.0%"), "{}", log(&sample));
+        let cart = sample.suite("npm:cart").unwrap();
+        assert!(!cart.coverage.collecting && cart.coverage.read_at.is_some());
+        sample.run_tests(&keys(&["cart"]), true);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert_eq!(sample.coverage.suite("npm:cart").map(|runs| runs.runs.len()), Some(1), "failed tests only: none");
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert!(log(&sample).contains("· coverage 75.0% (+0.0)"), "{}", log(&sample));
+        let kept = crate::run::coverage::CoverageHistory::load(&sample.tests_dir());
+        assert_eq!(kept.suite("npm:cart").map(|runs| runs.runs.len()), Some(2), "kept for a restart");
     }
 
     #[tokio::test]

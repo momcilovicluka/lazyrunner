@@ -201,14 +201,17 @@ pub fn app_error(ui: &mut Ui, controller: &mut Controller, app: usize) {
     open(ui, controller, found, &format!("{name}'s last error"));
 }
 
-/// O on a suite: its first failed test, as the tests view lists them.
+/// O on a suite: its first failed test, as the tests view lists them; without one, the files whose coverage changed
+/// most, each at its first line not covered (#33).
 pub fn suite(ui: &mut Ui, controller: &mut Controller, key: &str) {
     let failed = controller.suite(key).and_then(|suite| {
         let list = super::suites::test_list(suite);
         list.into_iter().find(|test| test.outcome == Outcome::Failed).map(|test| test.name.clone())
     });
+    let covered = super::coverage::places(controller, key);
     match failed {
         Some(name) => test(ui, controller, key, &name),
+        None if !covered.is_empty() => open(ui, controller, covered, "the suite's coverage"),
         None => controller.add_log("No failed test in that suite - l picks one, O opens it", Hue::DarkGray),
     }
 }

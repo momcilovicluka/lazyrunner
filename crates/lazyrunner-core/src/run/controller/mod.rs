@@ -8,6 +8,7 @@ mod builds;
 mod causes;
 mod code_map;
 pub mod compose;
+mod coverage;
 mod handover;
 mod health;
 pub use health::TARGETS;
@@ -227,6 +228,8 @@ pub struct Controller {
     pub test_history: super::test_history::TestHistory,
     /// The project's last test runs, all suites together (tests/test-runs.json).
     pub test_runs: super::test_history::TestRuns,
+    /// Each suite's last full runs' code coverage (tests/coverage.json, #33).
+    pub coverage: super::coverage::CoverageHistory,
     /// The code this test run runs on, worked out when its first suite starts.
     tests_code: Option<Option<String>>,
     /// What this test run runs on, for what a change affects (#78).
@@ -300,6 +303,8 @@ pub struct Controller {
     pub profiles: HashMap<String, Vec<crate::run::profile::Profile>>,
     pub last_profiled: Option<(String, Instant)>,
     pub installing_trace: bool,
+    /// What collecting coverage needs being added (the startup checklist's fix, #33).
+    pub installing_coverage: bool,
     /// What happened this session, by the hooks' event names (the About box counts them), and when it began.
     pub session: HashMap<&'static str, usize>,
     pub session_started: Instant,
@@ -389,6 +394,7 @@ impl Controller {
             suites: None,
             test_history: super::test_history::TestHistory::load(&state_dir.join("tests")),
             test_runs: super::test_history::TestRuns::load(&state_dir.join("tests")),
+            coverage: super::coverage::CoverageHistory::load(&state_dir.join("tests")),
             tests_code: None,
             tests_base: None,
             impacts: impact::Impacts::default(),
@@ -480,6 +486,7 @@ impl Controller {
             profiles,
             last_profiled: None,
             installing_trace: false,
+            installing_coverage: false,
             session: HashMap::new(),
             session_started: Instant::now(),
             resume: None,
@@ -750,6 +757,7 @@ impl Controller {
             Event::Audit { key, result } => self.audit_done(key, result),
             Event::Profiled { key, result } => self.profiled(key, result),
             Event::TraceInstalled { result } => self.trace_installed(result),
+            Event::CoverageInstalled { result } => self.coverage_installed(result),
             Event::Spans(spans) => self.traces.add(spans),
             Event::AuditInstalled { key, result } => self.audit_installed(key, result),
             Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),

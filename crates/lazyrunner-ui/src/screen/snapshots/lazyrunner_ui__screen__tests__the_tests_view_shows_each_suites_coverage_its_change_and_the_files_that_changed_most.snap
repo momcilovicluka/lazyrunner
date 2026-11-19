@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+  K Stack  E Problems  H Requests  M Migrations   Audit ⚗ TESTS   P Ports  D Durations  ~ Timeline  d Database
+  3 suites · ✓ 2   ✗ 1   – 1    all  failed  flaky  affected
+ j k choose · 1-9 an app · < > first / last · r run it (a side or an app: all of it) · R run all · Alt+r run the affected · l its tests
+ f / F failed again · Alt+f flaky again · [ ] a run · a / A watch · v all / failed / flaky / affected · / filter · s stop · o log · y copy failures
+ Esc back
+ Backend · dotnet test                             1 failed │ Billing.Tests   .NET · dotnet test
+ 1 Orders                                          1 failed │ ✓ 1 passed   ✗ 0 failed   – 0 skipped   · last run 09:41:07 · 2s
+     ✗ Orders.Tests                     ✓1 ×1 ! no coverlet │
+ 2 Billing                                         1 passed │ COVERAGE 78.0% (−2.1)  ██████▍   was 80.1%
+   ▸ ✓ Billing.Tests               ✓1 78.0% (−2.1) ██████▍  │   changed most since the full run before · O opens them
+ Frontend · vitest · nx test                        not run │   ⠀⠀⠀⠙ ▼ −20.0  70.0%  src/Billing/Invoice.cs:12
+ 3 Shop                                             not run │   ⠀⠀⠀⠒ ▲  +6.0  66.0%  src/Billing/Totals.cs:9
+     · Shop                   not run 62.2% (+1.2) ████▉    │
+     1 project without test files                           │ All 1 tests passed.
+                                                            │
+                                                            │ Slowest:
+                                                            │       230 ms  Billing.Tests.Invoices.Sums
+                                                            │
+                                                            │
+                                                            │
+                                                            │
+                                                            │
+                                                            │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ↶ 1/1   ⚗ ✓2 ✗1   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                                                         :  commands   x  menu   ?  keys   ,  settings   q  quit

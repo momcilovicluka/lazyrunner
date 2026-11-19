@@ -17,6 +17,8 @@ mod code_ts;
 pub mod command;
 pub mod compose;
 pub mod controller;
+pub mod coverage;
+pub mod coverage_needs;
 pub mod diff;
 pub mod faults;
 pub mod health;
@@ -166,6 +168,10 @@ pub enum Event {
     Spans(Vec<otlp::Span>),
     /// dotnet-trace's install (the startup checklist's fix) is done.
     TraceInstalled {
+        result: Result<(), String>,
+    },
+    /// What coverage needs is added (the startup checklist's fix, #33): what didn't add, if something didn't.
+    CoverageInstalled {
         result: Result<(), String>,
     },
 }

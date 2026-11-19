@@ -96,7 +96,8 @@ pub fn update(ui: &mut Ui, controller: &Controller) {
     if ui.seen.problems.is_none() || open == Some(View::Problems) {
         ui.seen.problems = Some(super::problems::shapes(ui));
     }
-    let keys: Vec<&'static str> = chips(ui, controller).iter().map(|chip| chip.key).collect();
+    let mut keys: Vec<&'static str> = chips(ui, controller).iter().map(|chip| chip.key).collect();
+    keys.extend(super::coverage::chip(ui, controller).map(|_| super::coverage::CHIP_KEY));
     for key in keys.iter().filter(|key| !ui.seen.shown.contains(key)) {
         ui.motion.flash(Spot::Hint(format!("new {key}")), ui.now);
     }
@@ -117,7 +118,7 @@ fn red(suite: &Suite) -> bool {
 }
 
 /// The suites that finished a run since, the red ones first.
-fn done_suites<'a>(ui: &Ui, controller: &'a Controller) -> Vec<&'a Suite> {
+pub(super) fn done_suites<'a>(ui: &Ui, controller: &'a Controller) -> Vec<&'a Suite> {
     let (Some(seen), Some(suites)) = (&ui.seen.suites, &controller.suites) else { return Vec::new() };
     let mut done: Vec<&Suite> = suites
         .iter()

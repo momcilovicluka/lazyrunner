@@ -63,6 +63,8 @@ pub enum Fix {
     DotnetTrace,
     /// Start the apps that were running when lazyrunner closed (#85), with auto-start off.
     Resume,
+    /// Add what collecting code coverage needs (#33): coverlet's collector, vitest's coverage provider.
+    Coverage,
 }
 
 impl Fix {
@@ -82,6 +84,7 @@ impl Fix {
             Self::Audit => "see them and fix them in the audit view (`A`)".into(),
             Self::DotnetTrace => format!("`{}`", lazyrunner_core::run::profile::INSTALL),
             Self::Resume => "start the apps that were running (`f`)".into(),
+            Self::Coverage => "add the packages coverage needs (the commands in its details)".into(),
         }
     }
 
@@ -96,6 +99,7 @@ impl Fix {
             Self::Audit => "f opens the audit",
             Self::DotnetTrace => "f installs it",
             Self::Resume => "f starts them",
+            Self::Coverage => "f adds them",
         }
     }
 }
@@ -431,6 +435,7 @@ impl Checklist {
             (Kind::Database, Status::Warn) if item.detail.contains("nothing answers") => Some(Fix::Database),
             (Kind::Update, Status::Warn | Status::Fail) => Some(Fix::Retry),
             (Kind::Audit, Status::Warn) => Some(Fix::Audit),
+            (Kind::Coverage, Status::Warn) => Some(Fix::Coverage),
             (Kind::Tool, Status::Skip) if item.detail.contains(lazyrunner_core::run::profile::INSTALL) => {
                 Some(Fix::DotnetTrace)
             }
@@ -465,6 +470,11 @@ impl Checklist {
             Fix::DotnetTrace => {
                 controller.install_trace();
                 self.items[index].detail = "installing…".into();
+                self.rows[index].fixing = Some(fix);
+            }
+            Fix::Coverage => {
+                controller.install_coverage();
+                self.items[index].detail = "adding…".into();
                 self.rows[index].fixing = Some(fix);
             }
             Fix::Resume => {
@@ -677,12 +687,16 @@ impl Checklist {
     }
 
     /// npm ci running for a check: its last line on the check's; once it's done, the check runs again.
-    /// dotnet-trace's install done: its line is checked again.
+    /// dotnet-trace's install, or what coverage needs, done: its line is checked again.
     fn follow_install(&mut self, controller: &Controller) {
+        let installing = |fix: &Fix| match fix {
+            Fix::DotnetTrace => Some(controller.installing_trace),
+            Fix::Coverage => Some(controller.installing_coverage),
+            _ => None,
+        };
         let installed: Vec<usize> = (0..self.rows.len())
-            .filter(|&index| self.rows[index].fixing == Some(Fix::DotnetTrace))
+            .filter(|&index| self.rows[index].fixing.as_ref().and_then(installing) == Some(false))
             .filter(|&index| !matches!(self.items[index].status, Status::Pending | Status::Running))
-            .filter(|_| !controller.installing_trace)
             .collect();
         if !installed.is_empty() {
             self.check_again(controller, &installed);
@@ -982,6 +996,7 @@ impl Checklist {
             Kind::Database => "the APIs' database calls, and the migrations (M)",
             Kind::Packages(_) => "the app's start, and its tests",
             Kind::Audit => "nothing - the apps run, with packages that have known vulnerabilities",
+            Kind::Coverage => "those suites' code coverage: they run without it",
             Kind::Tool if item.name == "git" => {
                 "the branch, the source checks that skip builds, the test history's code"
             }
@@ -1131,6 +1146,7 @@ fn kind_of(name: &str) -> Kind {
         "Profile" => Kind::Project,
         "Branch" => Kind::Branch,
         checks::SESSION_CHECK => Kind::Session(lazyrunner_core::run::session::Freshness::Recent),
+        lazyrunner_core::run::coverage_needs::CHECK => Kind::Coverage,
         _ if name.ends_with(" packages") => Kind::Packages(name.trim_end_matches(" packages").to_lowercase()),
         _ => Kind::Tool,
     }

@@ -121,6 +121,8 @@ pub enum Icon {
     Spec,
     /// A snapshot of the run (#106).
     Camera,
+    /// A suite's code coverage (#33): none in the plain set, where the `%` says it.
+    Coverage,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -288,6 +290,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Spec, true) => "\u{f15c}", // file text
         (Icon::Camera, false) => "◉",
         (Icon::Camera, true) => "\u{f030}", // camera
+        (Icon::Coverage, false) => "",
+        (Icon::Coverage, true) => "\u{f132}", // shield
     }
 }
 
@@ -332,6 +336,7 @@ pub fn check(name: &str) -> Option<Icon> {
         "Vulnerabilities" => Some(Icon::Shield),
         lazyrunner_core::run::checks::SESSION_CHECK => Some(Icon::History),
         lazyrunner_core::run::checks::DOCKER_CHECK => Some(Icon::Docker),
+        lazyrunner_core::run::coverage_needs::CHECK => Some(Icon::Coverage),
         _ if name.ends_with(" packages") => Some(Icon::Package),
         _ => None,
     }
@@ -458,10 +463,16 @@ mod tests {
             Icon::Endpoints,
             Icon::Spec,
             Icon::Camera,
+            Icon::Coverage,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");
-            assert_eq!(icon(false, each).width(), if each == Icon::Database { 2 } else { 1 }, "{each:?}");
+            let plain = match each {
+                Icon::Database => 2,
+                Icon::Coverage => 0,
+                _ => 1,
+            };
+            assert_eq!(icon(false, each).width(), plain, "{each:?}");
         }
         for framework in ["\u{e753}", "\u{e7ba}", "\u{e6a0}"] {
             assert_eq!(framework.width(), 1);

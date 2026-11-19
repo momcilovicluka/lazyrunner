@@ -520,7 +520,7 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
 
 fn suite_summary(controller: &Controller, suite: &Suite) -> Value {
     let (affected, why) = affected(controller, &suite.key);
-    json!({
+    let mut summary = json!({
         "key": suite.key,
         "name": suite.name,
         "app": suite.app,
@@ -535,7 +535,11 @@ fn suite_summary(controller: &Controller, suite: &Suite) -> Value {
         "note": suite.note,
         "affected": affected,
         "affected_why": why,
-    })
+    });
+    if let Some(coverage) = crate::screen::coverage::json(controller, suite) {
+        summary["coverage"] = coverage;
+    }
+    summary
 }
 
 /// What changed since a failed test last passed (#34): when that was, and each changed source with why it may be the
