@@ -577,6 +577,14 @@ app's two run one after the other (an npm app's side by side). `+` and `-` chang
 its own once the rest are done; only then does it count. Each scan is kept in the state folder (`audit.json`), so `A`
 opens on the last one and says how old it is; a scan that fails keeps the one before, and its time, and says why.
 
+**The rest of the solution** comes after the apps, when the repo has a solution file (`.sln` or `.slnx`, up to three
+folders down): its projects that no app builds - a service the profile doesn't run, a tool, a library only another
+solution uses. A CI pipeline restores them all and fails on their vulnerable packages too, so `R` scans them with the
+apps (`r` on its own): `dotnet list package` over each solution, without the projects the apps build, its vulnerable
+packages only, each saying the projects it's in (`direct in Tracking.csproj, Tracking.Domain.csproj`). Its fix runs from
+the repo, a `dotnet add <project> package` in each of them. A project that was never restored isn't listed by `dotnet
+list` - `dotnet restore` the solution first.
+
 `l` (or `Enter`) goes into the packages and `h` back to the apps; `/` filters the packages by name, `v` shows only the
 vulnerable ones, `e` puts each vulnerable package's advisory on a line under it (`└ title · fixed in 13.0.4 · +2 more`); `y` (or `u`) copies the picked package's fix, `Enter` (or `o`) opens its advisory, and `i` installs
 the fix after a yes (`y` or `Enter`; `n` or `Esc` doesn't) - the app stops first if it runs and starts again after,

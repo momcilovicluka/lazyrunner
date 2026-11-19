@@ -64,8 +64,9 @@ const FOOTNOTE: &str = "counting a package once per app that owns or references 
 
 /// A: the audit view, on the app with the worst finding.
 pub fn open(ui: &mut Ui, controller: &Controller) {
-    let worst = |at: usize| controller.apps.get(at).and_then(|app| controller.audits().get(&app.key)?.worst());
-    let app = (0..controller.apps.len())
+    let apps = controller.audit_apps();
+    let worst = |at: usize| apps.get(at).and_then(|app| controller.audits().get(&app.key)?.worst());
+    let app = (0..apps.len())
         .max_by_key(|&at| (worst(at), std::cmp::Reverse(at)))
         .filter(|&at| worst(at).is_some())
         .unwrap_or(0);
@@ -86,7 +87,7 @@ pub fn open(ui: &mut Ui, controller: &Controller) {
 }
 
 fn scan_of(controller: &Controller, app: usize) -> Option<&AppAudit> {
-    controller.apps.get(app).and_then(|app| controller.audits().get(&app.key))
+    controller.audit_apps().get(app).and_then(|app| controller.audits().get(&app.key))
 }
 
 /// Whether a package's name holds what `/` typed (any case).
@@ -107,7 +108,7 @@ fn shown<'a>(controller: &'a Controller, app: usize, only: bool, filter: &str) -
 /// back out of the packages, then the filter, then close; false for a key it doesn't use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) -> bool {
     let chosen = picked(ui, controller);
-    let apps = controller.apps.len();
+    let apps = controller.audit_apps().len();
     let Some(Overlay::Audit { app, index, packages, only, confirm, batch, expanded, filter, typing, .. }) =
         &mut ui.overlay
     else {
@@ -124,7 +125,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         match (name, floor) {
             (_, Some(floor)) => {
                 *batch = false;
-                if let Some(the_app) = controller.apps.get(*app).cloned() {
+                if let Some(the_app) = controller.audit_apps().get(*app).cloned() {
                     let chosen = fixable(controller, &the_app, floor);
                     if chosen.is_empty() {
                         let text = format!("{}: no {} fix to install", the_app.name, floor.name());
@@ -187,7 +188,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "v" => (*only, *index) = (!*only, 0),
         "e" => *expanded = !*expanded,
         "r" => {
-            if let Some(key) = controller.apps.get(*app).map(|app| app.key.clone()) {
+            if let Some(key) = controller.audit_apps().get(*app).map(|app| app.key.clone()) {
                 controller.audit(Some(&[key]));
             }
         }
@@ -200,10 +201,12 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
                 controller.add_log("There's nothing to install for that - no fixed version is known", Hue::DarkGray)
             }
         },
-        "I" => match controller.apps.get(*app).map(|the_app| fixable(controller, the_app, Severity::Info).len()) {
-            Some(count) if count > 0 => *batch = true,
-            _ => controller.add_log("Nothing vulnerable here has a fix to install", Hue::DarkGray),
-        },
+        "I" => {
+            match controller.audit_apps().get(*app).map(|the_app| fixable(controller, the_app, Severity::Info).len()) {
+                Some(count) if count > 0 => *batch = true,
+                _ => controller.add_log("Nothing vulnerable here has a fix to install", Hue::DarkGray),
+            }
+        }
         "y" | "u" => copy_fix(ui, controller),
         "o" => open_advisory(ui, controller),
         "Escape" if *packages => *packages = false,
@@ -225,7 +228,7 @@ fn fixable(controller: &Controller, app: &App, floor: Severity) -> Vec<Package> 
 fn picked(ui: &Ui, controller: &Controller) -> Option<(App, Package)> {
     let Some(Overlay::Audit { app, index, only, filter, .. }) = &ui.overlay else { return None };
     let package = shown(controller, *app, *only, filter).get(*index).map(|package| (*package).clone())?;
-    Some((controller.apps.get(*app)?.clone(), package))
+    Some((controller.audit_apps().get(*app)?.clone(), package))
 }
 
 /// y: the picked package's fix, or the upgrade to its latest version, for its app's folder; the command lights up.
@@ -307,7 +310,7 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     within(ui, Some(*opened), STAGGER_ALL).is_some()
         || within(ui, *copied, COPY_FLASH).is_some()
         || within(ui, failed, FAILED).is_some()
-        || controller.apps.iter().any(|app| landed(ui, controller, &app.key, SWEEP.max(PULSE)).is_some())
+        || controller.audit_apps().iter().any(|app| landed(ui, controller, &app.key, SWEEP.max(PULSE)).is_some())
 }
 
 /// A severity as the table and the details show it, in capitals: a critical one filled, the others framed.
@@ -430,7 +433,7 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         let names: Vec<&str> = controller
             .auditing()
             .iter()
-            .map(|key| controller.app(key).map_or(key.as_str(), |app| app.name.as_str()))
+            .map(|key| controller.audit_app(key).map_or(key.as_str(), |app| app.name.as_str()))
             .collect();
         header.push(seg(format!(" · {} scanning {}", spin(ui), names.join(", ")), C::Yellow));
         if let Some((done, total)) = controller.audit_batch().filter(|(_, total)| *total > 1) {
@@ -473,7 +476,8 @@ fn hint(packages: bool, only: bool, typing: bool) -> String {
 
 /// The question before `i` installs the picked package's fix: the keys first, a long command cut at the end.
 fn question(controller: &Controller, app: usize, package: Option<&Package>, view_width: usize) -> Vec<Seg> {
-    let (Some(app), Some(package)) = (controller.apps.get(app), package) else { return Vec::new() };
+    let apps = controller.audit_apps();
+    let (Some(app), Some(package)) = (apps.get(app), package) else { return Vec::new() };
     let Some(command) = audit::command(app, package) else { return Vec::new() };
     let stops = if controller.is_running(&app.key) { " - it stops the app and starts it again" } else { "" };
     let text = format!(" y installs · n doesn't - {command} in {}{stops} ", folder(controller, app));
@@ -483,7 +487,8 @@ fn question(controller: &Controller, app: usize, package: Option<&Package>, view
 /// The question before `I` installs many fixes together: how many each choice takes, the keys first; how many are a
 /// new major, and that the app stops.
 fn batch_question(controller: &Controller, app: usize, view_width: usize) -> Vec<Seg> {
-    let Some(app) = controller.apps.get(app) else { return Vec::new() };
+    let apps = controller.audit_apps();
+    let Some(app) = apps.get(app) else { return Vec::new() };
     let count = |floor| fixable(controller, app, floor).len();
     let all = fixable(controller, app, Severity::Info);
     let major = |package: &&Package| {
@@ -532,8 +537,10 @@ fn state(ui: &Ui, controller: &Controller, key: &str) -> Seg {
 /// The apps, each with what its scan says - the selected one lit while the apps have the keys - and a note on how
 /// they're counted.
 fn app_rows(ui: &Ui, controller: &Controller, selected: usize, list_width: usize, focus: bool) -> Vec<Vec<Seg>> {
-    let apps = controller.apps.iter().enumerate();
-    let mut rows: Vec<Vec<Seg>> = apps
+    let listed = controller.audit_apps();
+    let mut rows: Vec<Vec<Seg>> = listed
+        .iter()
+        .enumerate()
         .map(|(at, app)| {
             let state = state(ui, controller, &app.key);
             let icon = icons::app(ui.nerd, app, controller.framework(&app.key));
@@ -784,7 +791,12 @@ fn details(
     let new = controller.audits().get(&app.key).map_or(&[][..], |scan| &scan.new_advisories);
     let room = detail_width.saturating_sub(2).max(10);
     let mut out = vec![vec![seg(format!(" {} ", package.name), C::White), seg(package.current.clone(), C::Gray)]];
+    let projects: Vec<&str> =
+        package.projects.iter().map(|project| project.rsplit('/').next().unwrap_or(project)).collect();
     let how = match (package.direct, package.via.first()) {
+        (direct, _) if !projects.is_empty() => {
+            format!("{} in {}", if direct { "direct" } else { "transitive" }, projects.join(", "))
+        }
         (true, _) => format!("direct dependency of {}", app.name),
         (false, Some(via)) => format!("transitive, via {via}"),
         (false, None) => "transitive".into(),
@@ -910,8 +922,9 @@ fn layout(ui: &Ui, controller: &Controller, view_width: usize, rows: usize) -> O
     else {
         return None;
     };
-    let app_at = controller.apps.len().checked_sub(1).map(|last| (*app).min(last))?;
-    let the_app = &controller.apps[app_at];
+    let apps = controller.audit_apps();
+    let app_at = apps.len().checked_sub(1).map(|last| (*app).min(last))?;
+    let the_app = &apps[app_at];
     let scan = scan_of(controller, app_at);
     let list = shown(controller, app_at, *only, filter);
     let index = (*index).min(list.len().saturating_sub(1));

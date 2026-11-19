@@ -7,6 +7,7 @@ use serde_json::json;
 
 use super::{Controller, parallel};
 use crate::output::Hue;
+use crate::profile::App;
 use crate::run::Event;
 use crate::run::audit::{self, AppAudit, Audits, Package, Severity};
 
@@ -20,6 +21,21 @@ pub(super) struct Installing {
 }
 
 impl Controller {
+    /// The audit's entry for the solution's projects no app builds, when the repo has a solution and a .NET app.
+    fn audit_rest(&self) -> Option<&App> {
+        self.audit_rest.get_or_init(|| audit::rest(&self.root, &self.apps)).as_ref()
+    }
+
+    /// What the audit lists: the apps, then the rest of the solution when there is one.
+    pub fn audit_apps(&self) -> Vec<App> {
+        self.apps.iter().chain(self.audit_rest()).cloned().collect()
+    }
+
+    /// An app the audit lists, by key - the rest of the solution too.
+    pub fn audit_app(&self, key: &str) -> Option<&App> {
+        self.app(key).or_else(|| self.audit_rest().filter(|rest| rest.key == key))
+    }
+
     /// The apps' last scans, by key.
     pub fn audits(&self) -> &Audits {
         &self.audits
@@ -73,7 +89,7 @@ impl Controller {
             self.add_log(format!("Still installing ({command})"), Hue::Gray);
             return;
         }
-        let Some(app) = self.app(key).cloned() else { return };
+        let Some(app) = self.audit_app(key).cloned() else { return };
         let commands = audit::commands(&app, &packages);
         if commands.is_empty() {
             let what = match packages.as_slice() {
@@ -107,7 +123,7 @@ impl Controller {
     /// A fix was installed (or wasn't): said in the log, the app started again if it ran, and scanned again.
     pub(super) fn audit_installed(&mut self, key: String, result: Result<(), String>) {
         let Some(installing) = self.audit_installing.take().filter(|installing| installing.key == key) else { return };
-        let name = self.app(&key).map_or_else(|| key.clone(), |app| app.name.clone());
+        let name = self.audit_app(&key).map_or_else(|| key.clone(), |app| app.name.clone());
         match result {
             Ok(()) => {
                 self.audit_install_failed = None;
@@ -125,12 +141,13 @@ impl Controller {
         self.audit(Some(&[key]));
     }
 
-    /// `r` / `R` in the audit view: scans these apps (every app with none) in the background, `"auditParallelism"` at
-    /// once.
+    /// `r` / `R` in the audit view: scans these apps (every app and the rest of the solution with none) in the
+    /// background, `"auditParallelism"` at once.
     pub fn audit(&mut self, keys: Option<&[String]>) {
-        let keys = keys.map_or_else(|| self.keys(), <[String]>::to_vec);
+        let every = || self.audit_apps().into_iter().map(|app| app.key).collect();
+        let keys = keys.map_or_else(every, <[String]>::to_vec);
         let keys: Vec<String> =
-            keys.into_iter().filter(|key| self.app(key).is_some_and(|app| app.command().is_none())).collect();
+            keys.into_iter().filter(|key| self.audit_app(key).is_some_and(|app| app.command().is_none())).collect();
         let before = self.audits_left();
         if before == 0 {
             self.audit_retry.reset();
@@ -181,15 +198,19 @@ impl Controller {
         }
     }
 
-    /// Scans app `key` in the background.
+    /// Scans app `key` in the background - the rest of the solution without the projects the apps build.
     fn scan_app(&mut self, key: String) {
-        let Some(app) = self.app(&key).cloned() else { return };
+        let Some(app) = self.audit_app(&key).cloned() else { return };
+        let apps = (key == audit::REST).then(|| self.apps.clone());
         let (root, events) = (self.root.clone(), self.events.clone());
         self.auditing.push(key.clone());
         self.audit_retry.together(self.auditing.iter().map(String::as_str));
         tokio::task::spawn_blocking(move || {
-            let result = audit::scan(&root, &app).map_err(|error| error.to_string());
-            let _ = events.send(Event::Audit { key, result });
+            let result = match apps {
+                Some(apps) => audit::scan_rest(&root, &audit::reached(&root, &apps)),
+                None => audit::scan(&root, &app),
+            };
+            let _ = events.send(Event::Audit { key, result: result.map_err(|error| error.to_string()) });
         });
     }
 
@@ -197,7 +218,7 @@ impl Controller {
     /// the next goes. One that failed beside other scans goes again on its own first, once they're done.
     pub(super) fn audit_done(&mut self, key: String, result: Result<Vec<Package>, String>) {
         self.auditing.retain(|scanning| *scanning != key);
-        let name = self.app(&key).map_or_else(|| key.clone(), |app| app.name.clone());
+        let name = self.audit_app(&key).map_or_else(|| key.clone(), |app| app.name.clone());
         if let Err(error) = &result
             && self.audit_retry.again(&key)
         {
@@ -334,6 +355,7 @@ mod tests {
             advisories: Vec::new(),
             fix: None,
             via: Vec::new(),
+            projects: Vec::new(),
         };
         controller.handle(Event::Audit { key: key.clone(), result: Ok(vec![package.clone()]) });
         let said = controller.log.back().map(|entry| entry.text.clone()).unwrap_or_default();

@@ -11,10 +11,11 @@ use std::time::{Duration, Instant};
 
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::secrets::Entry;
+use unicode_width::UnicodeWidthStr;
 
 use super::Ui;
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, pad, seg};
+use super::seg::{Seg, aim, on, pad, seg, take_cells};
 use super::theme::C;
 
 /// Whether a server answered: being checked, answering (in how many ms), or not.
@@ -33,10 +34,14 @@ const TIMEOUT: Duration = Duration::from_millis(1500);
 const SQL_PORT: u16 = 1433;
 /// The config's record of when each database was switched to, by its label.
 pub const SWITCHED: &str = "databaseSwitched";
-const LABEL_CELLS: usize = 34;
-const ANSWER_CELLS: usize = 15;
-const APPS_CELLS: usize = 26;
-const PENDING_CELLS: usize = 12;
+/// The columns' titles; between two columns at least `GAP` cells, at most `MOST_GAP` when the screen is wide; the
+/// database and server never narrower than `LABEL_LEAST`; before them the active one's dot.
+const TITLES: [&str; 5] = ["DATABASE @ SERVER", "ANSWERS", "APPS ON IT", "MIGRATIONS", "SWITCHED TO"];
+const GAP: usize = 2;
+const MOST_GAP: usize = 6;
+const LABEL_LEAST: usize = 24;
+const MARK_CELLS: usize = 3;
+const CUT: &str = "…";
 /// Each row comes in this long after the one above it, dim at first for this long; an answer flashes this long.
 const ROW_STAGGER: Duration = Duration::from_millis(35);
 const ROW_DIM: Duration = Duration::from_millis(120);
@@ -146,11 +151,9 @@ fn ago(at: &str) -> Option<String> {
     Some(lazyrunner_core::run::session::ago(Duration::from_secs(seconds)))
 }
 
-/// An entry's row: active or not, its database and server, whether it answers, the apps on it, its pending
-/// migrations, when it was last switched to.
-fn row(ui: &Ui, controller: &Controller, entry: &Entry, picked: bool) -> Vec<Seg> {
-    let marker = if entry.active { "●" } else { " " };
-    let label = pad(&format!(" {marker} {}", entry.label), LABEL_CELLS);
+/// An entry's columns: its database and server, whether it answers, the apps on it, its pending migrations, when it
+/// was last switched to.
+fn parts(ui: &Ui, controller: &Controller, entry: &Entry) -> [Seg; 5] {
     let apps = if entry.active {
         let users = controller.database_users();
         let names: Vec<&str> =
@@ -162,34 +165,60 @@ fn row(ui: &Ui, controller: &Controller, entry: &Entry, picked: bool) -> Vec<Seg
     let contexts = controller.contexts.as_deref().unwrap_or_default();
     let pending: usize =
         contexts.iter().filter(|context| context.db == entry.database).map(|context| context.pending().len()).sum();
-    let pending = if pending > 0 {
-        seg(pad(&format!("{pending} pending"), PENDING_CELLS), C::Yellow)
-    } else {
-        seg(pad("-", PENDING_CELLS), C::DarkGray)
-    };
+    let pending = if pending > 0 { seg(format!("{pending} pending"), C::Yellow) } else { seg("-", C::DarkGray) };
     let last = controller.config[SWITCHED][&entry.label].as_str().and_then(ago).unwrap_or_else(|| "-".to_string());
-    let answer = answer(ui, &entry.server);
-    let flash = ui
-        .db_motion
-        .answered
-        .get(&entry.server)
-        .is_some_and(|at| !ui.reduced_motion && ui.now.saturating_duration_since(*at) < ANSWER_FLASH);
-    let answer = if flash {
-        on(pad(&answer.text, ANSWER_CELLS), C::Black, answer.fg)
-    } else {
-        seg(pad(&answer.text, ANSWER_CELLS), answer.fg)
-    };
-    if picked {
-        let text = format!("{label}{}{}{}{last}", answer.text, pad(&apps, APPS_CELLS), pending.text);
-        return vec![on(text, C::FocusText, C::FocusBack)];
+    let label = seg(entry.label.clone(), if entry.active { C::Green } else { C::Gray });
+    [label, answer(ui, &entry.server), seg(apps, C::Gray), pending, seg(last, C::DarkGray)]
+}
+
+/// Each column's width and the gap between them for `cells`: each as wide as the most it holds (its title at least);
+/// the database and server get what the others leave, down to [`LABEL_LEAST`]; what's still left widens the gaps.
+fn widths(all: &[[Seg; 5]], cells: usize) -> ([usize; 5], usize) {
+    let most = |at: usize| all.iter().map(|parts| parts[at].text.width()).chain([TITLES[at].width()]).max();
+    let mut widths: [usize; 5] = std::array::from_fn(|at| most(at).unwrap_or_default());
+    let others = MARK_CELLS + widths[1..].iter().sum::<usize>() + GAP * (TITLES.len() - 1);
+    widths[0] = widths[0].min(cells.saturating_sub(others)).max(LABEL_LEAST);
+    let left = cells.saturating_sub(others + widths[0]);
+    (widths, GAP + (left / (TITLES.len() - 1)).min(MOST_GAP - GAP))
+}
+
+/// `text` in `cells`: padded, or cut with `…` when it's longer.
+fn cell(text: &str, cells: usize) -> String {
+    if text.width() <= cells {
+        return pad(text, cells);
     }
-    vec![
-        seg(label, if entry.active { C::Green } else { C::Gray }),
-        answer,
-        seg(pad(&apps, APPS_CELLS), C::Gray),
-        pending,
-        seg(last, C::DarkGray),
-    ]
+    format!("{}{CUT}", take_cells(text, cells.saturating_sub(CUT.width())))
+}
+
+/// An entry's row in the columns' widths: the active one's dot, then its columns (a fresh answer flashing); the
+/// picked one lit across `cells`.
+fn row(
+    entry: &Entry,
+    parts: [Seg; 5],
+    (widths, gap): ([usize; 5], usize),
+    picked: Option<usize>,
+    flash: bool,
+) -> Vec<Seg> {
+    let mark = if entry.active { " ● " } else { "   " };
+    let mut out = vec![seg(mark, C::Green)];
+    for (at, part) in parts.into_iter().enumerate() {
+        let after = if at + 1 == TITLES.len() { 0 } else { gap };
+        let text = pad(&cell(&part.text, widths[at]), widths[at] + after);
+        out.push(if at == 1 && flash { on(text, C::Black, part.fg) } else { Seg { text, ..part } });
+    }
+    match picked {
+        Some(cells) => {
+            let text: String = out.iter().map(|part| part.text.as_str()).collect();
+            vec![on(pad(&text, cells), C::FocusText, C::FocusBack)]
+        }
+        None => out,
+    }
+}
+
+/// Whether `entry`'s server answered a moment ago (its answer flashes).
+fn flashing(ui: &Ui, entry: &Entry) -> bool {
+    let since = ui.db_motion.answered.get(&entry.server).map(|at| ui.now.saturating_duration_since(*at));
+    !ui.reduced_motion && since.is_some_and(|since| since < ANSWER_FLASH)
 }
 
 pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
@@ -222,15 +251,14 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         )]);
     }
     lines.push(Vec::new());
-    let title = format!(
-        " {}{}{}{}{}",
-        pad("  DATABASE @ SERVER", LABEL_CELLS - 1),
-        pad("ANSWERS", ANSWER_CELLS),
-        pad("APPS ON IT", APPS_CELLS),
-        pad("MIGRATIONS", PENDING_CELLS),
-        "SWITCHED TO"
-    );
-    lines.push(vec![seg(title, C::DarkCyan)]);
+    let all: Vec<[Seg; 5]> = entries.iter().map(|entry| parts(ui, controller, entry)).collect();
+    let (widths, gap) = widths(&all, cells);
+    let titles: String = TITLES
+        .iter()
+        .enumerate()
+        .map(|(at, title)| if at + 1 == TITLES.len() { title.to_string() } else { pad(title, widths[at] + gap) })
+        .collect();
+    lines.push(vec![seg(format!("{}{titles}", " ".repeat(MARK_CELLS)), C::DarkCyan)]);
     if entries.is_empty() {
         lines.push(vec![seg("   nothing matches", C::DarkGray)]);
     }
@@ -243,9 +271,10 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         top = index + 1 - room;
     }
     let opened = ui.db_motion.opened.filter(|_| !ui.reduced_motion).map(|at| ui.now.saturating_duration_since(at));
-    for (shown, (at, entry)) in entries.iter().enumerate().skip(top).take(room).enumerate() {
+    for (shown, ((at, entry), parts)) in entries.iter().enumerate().zip(all).skip(top).take(room).enumerate() {
         let comes = ROW_STAGGER * shown as u32;
-        let mut line = super::columns::fit(row(ui, controller, entry, at == index), cells);
+        let picked = (at == index).then_some(cells);
+        let mut line = super::columns::fit(row(entry, parts, (widths, gap), picked, flashing(ui, entry)), cells);
         match opened {
             Some(since) if since < comes => line = Vec::new(),
             Some(since) if since < comes + ROW_DIM && at != index => {
@@ -270,6 +299,29 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn entry(label: &str) -> [Seg; 5] {
+        [
+            seg(label, C::Gray),
+            seg("● 1 ms", C::Green),
+            seg("WebAPI, Admin", C::Gray),
+            seg("-", C::Gray),
+            seg("-", C::Gray),
+        ]
+    }
+
+    #[test]
+    fn the_names_get_the_width_the_screen_has_and_the_gaps_what_is_left() {
+        let long = "shop-orders-data-uat-copy-110320 @ BUILD-MACHINE-01";
+        let all = [entry("shop @ here"), entry(long)];
+        let (wide, gap) = widths(&all, 200);
+        assert_eq!((wide[0], gap), (long.width(), MOST_GAP), "the longest name whole, the gaps at their widest");
+        let (narrow, gap) = widths(&all, 80);
+        assert_eq!((narrow[0], gap), (80 - MARK_CELLS - narrow[1..].iter().sum::<usize>() - GAP * 4, GAP));
+        assert_eq!(widths(&all, 40).0[0], LABEL_LEAST, "never narrower than that");
+        assert_eq!(cell(long, 10), "shop-orde…");
+        assert_eq!(cell("so", 4), "so  ");
+    }
 
     #[test]
     fn a_servers_address_is_its_host_and_port_and_a_local_instance_has_none() {
