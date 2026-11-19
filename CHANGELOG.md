@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.100.0] - 2026-11-19
+
+### Added
+- Code coverage per test suite, and its change: with `coverage` on (`,` then `C`, off by default), a suite's full run collects it - .NET with coverlet's `--collect "XPlat Code Coverage"`, jest and Nx with `--coverage`, vitest with `--coverage.enabled` - and its row in the tests view says `78.4% (+1.2)`, a gain green and a loss red, beside an eighth-block bar with the change drawn at its end. Each suite's last full runs' coverage is kept in the state folder (`tests/coverage.json`), so the change outlasts a restart; a run of the failed tests or of one test doesn't count. A suite's details list the files whose coverage changed most since the full run before, the drops first, each with a braille line of its last runs and a link to its first line not covered, and `O` on a suite without a failed test opens them there (#33).
+- When a run finishes its coverage number and bar ease from the old value to the new, then a glint sweeps once across the change and the bar's changed stretch, green for a gain and red for a loss; the files' trends are braille lines over their last full runs; a `coverage` capsule shows on a suite's row while its run collects it; a suite that lost more than a point gets a panel chip, `T coverage −2.1`, that pops in and opens the tests view on it. None of it moves with reduced motion.
+- With `coverage` on the startup doctor checks that every suite can collect it: a .NET test project needs `coverlet.collector` (in itself or a `Directory.*.props`), a vitest suite `@vitest/coverage-v8` or `@vitest/coverage-istanbul`; jest needs nothing more. Its details give each missing one's command, and `f` runs them (`dotnet add <project> package coverlet.collector`, `npm install -D @vitest/coverage-v8`). Until then such a .NET suite says `no coverlet` and runs as before. With Nerd Font icons coverage has a shield.
+- The MCP's `get_test_results` gives each suite its coverage, its change and the most changed files.
+
 ## [1.99.1] - 2026-11-19
 
 ### Changed

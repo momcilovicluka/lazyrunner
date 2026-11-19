@@ -11,6 +11,7 @@ expression: screen.frame()
                  │  a      ○ Auto-restart on branch change                                  │
                  │  s      ● Stop/Restart all include the frontend                          │
                  │  e      ○ Restart the APIs when code changes                             │
+                 │  C      ○ Code coverage on full test runs (slower)                       │
                  │  m      ● Mouse: click and scroll (off: select text)                     │
                  │  f      ○ Reduced motion: no blinking, spinners or fades                 │
                  │  i      ○ Nerd Font icons (the terminal's font a Nerd Font Mono)         │
@@ -24,7 +25,6 @@ expression: screen.frame()
                  │  p      Reload the project profile                                       │
                  │  P      Open the project profile in your editor  sample.json             │
                  │ press a letter to toggle, or j k + Enter · Esc / , close                 │
-                 └──────────────────────────────────────────────────────────────────────────┘
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

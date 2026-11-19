@@ -5203,3 +5203,184 @@ async fn a_snapshot_is_a_masked_read_only_page_holding_what_get_snapshot_answers
     assert_eq!(answer["result"]["apps"][0]["key"], "orders", "{answer}");
     assert!(!answer.to_string().contains("hunter2"), "masked for an agent too");
 }
+
+// ---------------------------------------------------------------- code coverage (#33)
+
+/// Coverage on; Billing.Tests references coverlet and has two full runs (80.1%, then 78.0%: Invoice.cs lost 20 points,
+/// Totals.cs gained 6), Shop two (61.0%, then 62.2%), and Orders.Tests has no coverlet. Its files are under `root`.
+fn with_coverage(screen: &mut Screen, root: &std::path::Path) {
+    use lazyrunner_core::run::coverage::{Coverage, FileCoverage};
+    with_suites(screen);
+    screen.controller.set_toggle(Toggle::Coverage, true);
+    screen.controller.suites.as_mut().expect("the sample's suites")[1].coverage.coverlet = true;
+    let file = |path: &str, percent, first_uncovered| FileCoverage {
+        path: root.join(path).components().collect::<PathBuf>().display().to_string(),
+        percent,
+        first_uncovered,
+    };
+    let (invoice, totals) = ("src/Billing/Invoice.cs", "src/Billing/Totals.cs");
+    let history = &mut screen.controller.coverage;
+    history.record(
+        "dotnet:billing",
+        Coverage { percent: 80.1, files: vec![file(invoice, 90.0, None), file(totals, 60.0, Some(7))] },
+    );
+    history.record(
+        "dotnet:billing",
+        Coverage { percent: 78.0, files: vec![file(invoice, 70.0, Some(12)), file(totals, 66.0, Some(9))] },
+    );
+    history.record("npm:shop", Coverage { percent: 61.0, files: vec![file("web/shop/src/cart.ts", 50.0, None)] });
+    history.record("npm:shop", Coverage { percent: 62.2, files: vec![file("web/shop/src/cart.ts", 55.0, None)] });
+}
+
+#[tokio::test]
+async fn the_tests_view_shows_each_suites_coverage_its_change_and_the_files_that_changed_most() {
+    let mut screen = screen("snap-tests-coverage", json!({}));
+    with_coverage(&mut screen, std::path::Path::new("/work/sample"));
+    screen.press("T");
+    screen.ui.overlay = Some(Overlay::Tests { index: 4, scroll: 0, picking: None });
+    let frame = screen.render(150, 32);
+    assert!(frame.contains("78.0% (−2.1) ███"), "Billing.Tests, its bar beside it: {frame}");
+    assert!(frame.contains("62.2% (+1.2)"), "Shop: {frame}");
+    assert!(frame.contains("! no coverlet"), "Orders.Tests can't collect it: {frame}");
+    assert!(frame.contains("COVERAGE 78.0% (−2.1)  ██████▍   was 80.1%"), "{frame}");
+    let (invoice, totals) =
+        (frame.find("−20.0  70.0%  src/Billing/Invoice.cs:12"), frame.find("src/Billing/Totals.cs:9"));
+    assert!(invoice.is_some() && invoice < totals, "the drop first, at its first line not covered: {frame}");
+    insta::assert_snapshot!(frame);
+    let narrow = screen.frame();
+    let billing = narrow.lines().find(|line| line.contains("▸ ✓ Billing.Tests")).unwrap_or_default();
+    assert!(billing.contains("78.0% (−2.1) ████▊"), "a shorter bar at 110 columns, not none: {narrow}");
+
+    screen.ui.overlay = Some(Overlay::Tests { index: 2, scroll: 0, picking: None });
+    assert!(screen.render(150, 32).contains("! no coverage - coverlet not referenced"), "said where it applies");
+    let suites = screen.controller.suites.as_mut().expect("the sample's suites");
+    (suites[1].status, suites[1].coverage.collecting) = (lazyrunner_core::run::suites::Status::Running, true);
+    let running = screen.render(150, 32);
+    assert!(running.lines().any(|line| line.contains("Billing.Tests") && line.contains(" coverage ")), "{running}");
+
+    screen.controller.set_toggle(Toggle::Coverage, false);
+    let off = screen.render(150, 32);
+    assert!(!off.contains("78.0%") && !off.contains("no coverlet") && !off.contains(" coverage "), "off: {off}");
+}
+
+#[tokio::test]
+async fn a_finished_runs_coverage_eases_to_its_new_value_then_a_glint_sweeps_its_change() {
+    use super::theme::C;
+    let mut screen = screen("coverage-ease", json!({}));
+    with_coverage(&mut screen, std::path::Path::new("/work/sample"));
+    screen.press("T");
+    let now = screen.ui.now;
+    screen.controller.suites.as_mut().expect("the sample's suites")[1].coverage.read_at = Some(now);
+    let row = |screen: &Screen| {
+        let billing = &screen.controller.suites.as_deref().expect("the sample's suites")[1];
+        super::coverage::row(&screen.ui, &screen.controller, billing, false, 40)
+    };
+    let lit = |segs: &[super::seg::Seg]| segs.iter().filter(|seg| seg.bg == Some(C::Red) && seg.fg == C::Black).count();
+    let text = |segs: &[super::seg::Seg]| segs.iter().map(|seg| seg.text.as_str()).collect::<String>();
+    assert!(text(&row(&screen)).starts_with(" 80.1% (±0.0) ██████▍"), "from the old value, bar and all");
+    assert!(screen.ui.is_animating(&screen.controller));
+    screen.ui.now = now + Duration::from_millis(200);
+    let easing = text(&row(&screen));
+    assert!(!easing.starts_with(" 80.1%") && !easing.starts_with(" 78.0%"), "on its way: {easing}");
+    let mut swept = Vec::new();
+    for millis in (300..800).step_by(50) {
+        screen.ui.now = now + Duration::from_millis(millis);
+        let segs = row(&screen);
+        assert!(text(&segs).starts_with(" 78.0% (−2.1)"), "there by then");
+        swept.push(lit(&segs));
+    }
+    assert!(swept.iter().any(|lit| *lit > 0), "the loss glints red as it sweeps across: {swept:?}");
+    assert_eq!(swept.last(), Some(&0), "once");
+    screen.ui.now = now + Duration::from_secs(1);
+    assert_eq!(lit(&row(&screen)), 0);
+    assert!(!super::coverage::animating(&screen.ui, &screen.controller), "done moving");
+    screen.ui.now = now + Duration::from_millis(400);
+    screen.controller.set_toggle(Toggle::ReducedMotion, true);
+    screen.frame();
+    let still = row(&screen);
+    assert!(text(&still).starts_with(" 78.0% (−2.1)") && lit(&still) == 0, "at once, no glint");
+}
+
+#[tokio::test]
+async fn a_suite_that_lost_more_than_a_point_gets_a_chip_that_opens_the_tests_view_on_it() {
+    let mut screen = screen("coverage-drop", json!({}));
+    with_coverage(&mut screen, std::path::Path::new("/work/sample"));
+    screen.frame();
+    assert!(!screen.frame().contains("coverage −2.1"), "nothing new since lazyrunner knew it");
+    let billing = &mut screen.controller.suites.as_mut().expect("the sample's suites")[1];
+    (billing.last_run, billing.coverage.read_at) = (Some(jiff::ZonedDateTime::now()), Some(screen.ui.now));
+    screen.ui.motion.enabled = true;
+    let frame = screen.frame();
+    assert!(frame.contains(" T  coverage −2.1"), "{frame}");
+    let popping = super::motion::Spot::Hint(format!("new {}", super::coverage::CHIP_KEY));
+    assert!(screen.ui.motion.lit(&popping, screen.ui.now).is_some(), "it pops in as the other chips do");
+    screen.click(Target::CoverageDrop);
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Tests { index: 4, .. })), "on Billing.Tests");
+    screen.frame();
+    assert!(!screen.frame().contains("coverage −2.1"), "having it open cleared the chip");
+}
+
+#[tokio::test]
+async fn o_on_a_suite_without_failures_opens_the_file_that_lost_coverage_at_its_first_uncovered_line() {
+    let mut screen = screen("editor-coverage", json!({ "editor": "myeditor --goto {file}:{line}" }));
+    let repo = TempDir::new("editor-coverage-repo");
+    let invoice: PathBuf = repo.join("src/Billing/Invoice.cs").components().collect();
+    lazyrunner_core::testing::write(&invoice, "");
+    lazyrunner_core::testing::write(repo.join("src/Billing/Totals.cs"), "");
+    screen.controller.root = repo.path().to_path_buf();
+    with_coverage(&mut screen, repo.path());
+    screen.ui.overlay = Some(Overlay::Tests { index: 4, scroll: 0, picking: None });
+    screen.press("O");
+    let Some(Overlay::Places { places, index, .. }) = &screen.ui.overlay else { panic!("it asks which file") };
+    assert_eq!((places.len(), *index), (2, 0), "the drop picked");
+    screen.press("Enter");
+    assert_eq!(last_opened(), Some(format!("myeditor --goto {}:12", invoice.display())));
+}
+
+#[tokio::test]
+async fn an_agent_gets_each_suites_coverage_its_change_and_the_files_that_changed_most() {
+    let mut screen = screen("coverage-agent", json!({}));
+    with_coverage(&mut screen, std::path::Path::new("/work/sample"));
+    let answer = agent(&mut screen, "tests", json!({}), None);
+    let suites = &answer["result"]["suites"];
+    let billing = &suites[1]["coverage"];
+    assert_eq!((billing["percent"].clone(), billing["change"].clone()), (json!(78.0), json!(-2.1)), "{answer}");
+    let invoice = &billing["most_changed_files"][0];
+    assert_eq!(invoice["file"], "src/Billing/Invoice.cs", "{answer}");
+    assert_eq!((invoice["change"].clone(), invoice["first_uncovered_line"].clone()), (json!(-20.0), json!(12)));
+    assert!(suites[0]["coverage"]["missing"].is_string(), "Orders.Tests has no coverlet: {answer}");
+    screen.controller.set_toggle(Toggle::Coverage, false);
+    let off = agent(&mut screen, "tests", json!({}), None);
+    assert!(off["result"]["suites"][1].get("coverage").is_none(), "off: as before");
+}
+
+#[tokio::test]
+async fn the_doctor_checks_what_coverage_needs_only_with_the_setting_on_and_f_adds_it() {
+    use super::checklist::Fix;
+    use lazyrunner_core::run::coverage_needs::CHECK;
+    let mut screen = screen("doctor-coverage", json!({}));
+    let names = |screen: &Screen| -> Vec<String> {
+        lazyrunner_core::run::checks::checks(&screen.controller).into_iter().map(|check| check.name).collect()
+    };
+    assert!(!names(&screen).iter().any(|name| name == CHECK), "coverage off: nothing to check");
+    screen.controller.set_toggle(Toggle::Coverage, true);
+    assert!(names(&screen).iter().any(|name| name == CHECK));
+
+    let detail = "Orders.Tests: no coverlet.collector - `dotnet add tests/Orders.Tests/Orders.Tests.csproj package \
+                  coverlet.collector` - f adds it";
+    let items = vec![Item { name: CHECK.into(), status: Status::Warn, detail: detail.into() }];
+    let mut list = Checklist::fixed(items, Vec::new(), "");
+    assert_eq!(list.fix_of(0), Some(Fix::Coverage));
+    assert!(!Fix::Coverage.safe(), "it changes the projects: f, not a");
+    let now = screen.ui.now;
+    list.update(now, &mut screen.controller);
+    screen.ui.overlay = Some(Overlay::Checklist(Box::new(list)));
+    let frame = screen.render(110, 40);
+    assert!(frame.contains("PACKAGES") && frame.contains("! Coverage") && frame.contains(" FIX "), "{frame}");
+    assert!(frame.contains("f     adds them"), "{frame}");
+    assert!(frame.contains("those suites' code coverage"), "what it blocks: {frame}");
+    let wide = screen.render(220, 40);
+    assert!(wide.contains("coverlet.collector` - f adds it"), "the whole of what fixes it: {wide}");
+    let ok = vec![Item { name: CHECK.into(), status: Status::Ok, detail: "all 3 suites can collect it".into() }];
+    assert_eq!(Checklist::fixed(ok, Vec::new(), "").fix_of(0), None, "both present: nothing to fix");
+}

@@ -138,7 +138,9 @@ pub fn list(apps: &str) -> Vec<Value> {
         tool(
             "get_test_results",
             "A suite's last results: its failed tests with their messages and stacks, each with its likely cause \
-             (the sources changed since it last passed, those in its stack first), and its last output lines.",
+             (the sources changed since it last passed, those in its stack first), and its last output lines; with \
+             the coverage setting on, its code coverage (percent, change since the full run before, the files that \
+             changed most with their first line not covered).",
             json!({ "suite": { "type": "string", "description": "A suite's key or name (list_tests)" } }),
             &["suite"],
             true,

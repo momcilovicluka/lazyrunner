@@ -114,6 +114,12 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(on(format!(" {} ", chip.key), C::Black, if popping { C::White } else { chip.color }).at(target));
         segs.push(seg(format!(" {}", chip.label), chip.color).at(target));
     }
+    if let Some(label) = super::coverage::chip(ui, controller) {
+        let popping = ui.motion.lit(&Spot::Hint(format!("new {}", super::coverage::CHIP_KEY)), ui.now).is_some();
+        segs.push(seg("   ", C::Gray));
+        segs.push(on(" T ", C::Black, if popping { C::White } else { C::Red }).at(Target::CoverageDrop));
+        segs.push(seg(format!(" {label}"), C::Red).at(Target::CoverageDrop));
+    }
     for chip in super::seen::busy(ui, controller) {
         let target = Target::News(chip.view);
         segs.push(seg("   ", C::Gray));

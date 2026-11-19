@@ -39,10 +39,11 @@ pub enum Toggle {
     FollowAgent,
     OpenTelemetry,
     RestoreSession,
+    Coverage,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 17] = [
+    pub const ALL: [Toggle; 18] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -60,6 +61,7 @@ impl Toggle {
         Toggle::FollowAgent,
         Toggle::OpenTelemetry,
         Toggle::RestoreSession,
+        Toggle::Coverage,
     ];
 
     /// Its name in the settings file.
@@ -82,6 +84,7 @@ impl Toggle {
             Toggle::FollowAgent => "followAgent",
             Toggle::OpenTelemetry => "openTelemetry",
             Toggle::RestoreSession => "restoreSession",
+            Toggle::Coverage => "coverage",
         }
     }
 
@@ -94,6 +97,7 @@ impl Toggle {
                 | Toggle::GitBeside
                 | Toggle::CheckMigrationsOnOpen
                 | Toggle::OpenTelemetry
+                | Toggle::Coverage
         )
     }
 
@@ -259,6 +263,7 @@ mod tests {
         assert_eq!(defaults["restartOnCodeChange"], false);
         assert_eq!(defaults["autoRestartOnBranchChange"], false);
         assert_eq!(defaults["reducedMotion"], false);
+        assert_eq!(defaults["coverage"], false, "coverage slows a run: off until asked for");
     }
 
     fn file(name: &str) -> ConfigFile {

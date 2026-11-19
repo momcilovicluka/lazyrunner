@@ -13,6 +13,7 @@ pub mod code_draw;
 pub mod code_search;
 pub mod columns;
 pub mod copy;
+pub mod coverage;
 pub mod crashes;
 pub mod database;
 pub mod diff;
@@ -850,6 +851,7 @@ impl Ui {
             || rail_motion::animating(self)
             || diff::animating(self)
             || suite_runs::animating(self, controller)
+            || coverage::animating(self, controller)
             || migrations_rail::animating(self, controller)
             || columns::animating(self, controller)
             || task_chips::animating(self, controller)

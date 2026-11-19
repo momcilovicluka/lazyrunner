@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-  ┌─ ✧ lazyrunner v<version> · startup doctor ────────────────────────────────────────────────────────────────┐
+  ┌─ ✧ lazyrunner v<version> · startup doctor ───────────────────────────────────────────────────────────────┐
   │  DOCTOR  startup checks                                                                                │
   │ ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 / 5 checks   ✓ 2   ! 1   ✗ 0   – 0                                        │
   │                                                                                                        │
@@ -13,7 +13,7 @@ expression: screen.frame()
   │   · Profile                                                                                            │
   │   ⠋ Ports                                                                                              │
   │  UPDATE ────────────────────────────────────────────────────────────────────────────────────── ✓ 0.0 s │
-  │   ✓ lazyrunner         v<version>                                                                         │
+  │   ✓ lazyrunner         v<version>                                                                        │
   │                                                                                                        │
   │  ✦ What's new                                                                                          │
   │    0.2.0                                                                                               │

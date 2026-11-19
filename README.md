@@ -428,7 +428,8 @@ focused app's build or take it out of the queue, and `q`.
 
 When lazyrunner opens, a short splash checks for a lazyrunner update, git, the .NET SDK and Node.js / npm, whether the
 apps' ports are free, whether the active database's server answers, each npm app's packages against its
-`package-lock.json`, and which project and branch it runs. The checks run side by side. The apps don't wait long for
+`package-lock.json`, and which project and branch it runs - and, with `coverage` on, whether every test suite can
+collect its code coverage. The checks run side by side. The apps don't wait long for
 the update check: once everything else is done it gets 2 s more, then goes on in the background (an update it installs
 is switched to when nothing is in the way). Problems also go to the panel log. Once every check is done, `r` runs the
 ones that failed or warned again - a failed update, a port that was busy - without closing it; any other key closes it.
@@ -460,6 +461,7 @@ turn, and `i` ignores a problem for this run - it holds nothing and counts as sk
 | A port Windows reserved | copies `net stop winnat; net start winnat` for an elevated terminal | no |
 | The database server doesn't answer | the database screen, once the checklist closes | no |
 | The update check failed | checks again | yes |
+| A suite can't collect coverage (`coverage` on): a .NET test project without `coverlet.collector`, a vitest one without a coverage provider | `dotnet add <project> package coverlet.collector`, `npm install -D @vitest/coverage-v8` in the vitest app's folder - each command in the check's details | no |
 
 A fix that worked turns its edge green with a flash; one that didn't pulses red. At startup a failed check holds the
 start until it's fixed or `Enter` starts anyway, and once nothing blocks it any more it counts down - `starting in 3 s`
@@ -563,7 +565,7 @@ shows a place in code:
 | Where | What `O` opens |
 |-------|----------------|
 | A column | The focused app's last error (a failed build's errors) at its own frame |
-| `T` tests | The picked test's failure at its own frame, or a passing .NET test's file at its method (found by its class's name); on a suite, its first failed test |
+| `T` tests | The picked test's failure at its own frame, or a passing .NET test's file at its method (found by its class's name); on a suite, its first failed test - without one, the files whose coverage changed most, at their first line not covered (with `coverage` on) |
 | `E` Problems | The picked problem's own frame, in the occurrence shown |
 | `H` requests | The selected request's exception at its own frame, from its log lines; on the endpoints tab, the endpoint's controller |
 | `K Tab Tab` Health | The picked endpoint's controller, or a picked app's slowest endpoint's |
@@ -998,6 +1000,24 @@ those its stack goes through first (`in its stack`), then those of its project a
 the test never passed in the runs kept, or a commit isn't in the checkout any more. `y` copies it with the failure, and
 the MCP's `get_test_results` gives each failure its `likely_cause`.
 
+**Code coverage:** with `coverage` on (`,` then `C`), a suite's full run collects its code coverage - not a run of its
+failed tests or of one test, which would skew it. A .NET suite runs with `--collect "XPlat Code Coverage"` (coverlet's
+Cobertura file), a jest or Nx one with `--coverage`, a vitest one with `--coverage.enabled`, each into the suite's own
+folder in the state folder (`tests/coverage/`); each suite's last 8 full runs' coverage is kept in
+`tests/coverage.json`, so its change outlasts a restart. The suite's row says `78.4% (+1.2)`, a gain green and a loss
+red, beside a bar of eighth blocks with the change drawn at its end (narrower when the list is), and a `coverage`
+capsule while a run collects it. When a run finishes the number and the bar ease from the old value to the new, then a
+glint sweeps once across the change and the bar's changed stretch, green or red; with reduced motion they change at
+once. Its details start with `COVERAGE 78.0% (−2.1)`, the bar and what it was, then list the files whose coverage changed most since the full run before, the drops first in red,
+each with a braille line of its last full runs and a link to its first line not covered (Cobertura says which; jest's
+summary doesn't, so its files open at the top); `O` on a suite without a failed test opens them. A suite that lost more
+than a point gets a chip in the panel, `T coverage −2.1`, which pops in as the others do and opens the tests view on
+it. A .NET test project needs the `coverlet.collector` package (in itself, or a `Directory.Build.props` or a
+`GlobalPackageReference` above it) - without it the suite says `no coverlet` and isn't asked for coverage - and a
+vitest suite a coverage provider (`@vitest/coverage-v8` or `@vitest/coverage-istanbul`); jest needs nothing more. With
+`coverage` on the startup doctor checks this and its `f` adds what's missing (see Startup checklist). The MCP's `get_test_results` gives each suite its `coverage`: the percent, its change and the
+most changed files.
+
 **Test watch:** `a` watches the selected suites (a side or an app: all of its), `A` all of them; again unwatches. A watched suite (`◉`) runs again when its code is saved, once saving has been quiet for 400 ms: a green one whole, a red one its failed tests, then, if they pass, whole. .NET suites follow the profile's watch folder - only those a save affects: the saved file's project is theirs or one they reference (`<ProjectReference>`, directly or not), and the log says why (`Orders.Tests (references Orders.Core, which changed)`); a file no project owns, such as `Directory.Build.props`, runs them all. npm and Nx suites follow their own folder. A running suite is never cancelled - a save during its run runs it again after - and a suite runs at most every 1.5 s. The header and the panel show `◉ WATCH 2`, and while a save waits a capsule (`▰▰▰▱▱▱▱▱`) that drains over the 400 ms (`rerun in 0.3s` with reduced motion); a suite the watch queues gets one sweep across its row; `s` drops what a save was about to run but keeps the watch. For this session only: lazyrunner never runs tests by itself when it opens. For a new test, `l`, pick it, `a`: the suite watches only that test - a save runs just it - and its row says `pinned: <test>`; `a` on it again stops, `a` on the suite (or `A`) watches all of it again. A pinned test that's gone after a rename stops being watched, with a line in the log. A watched suite (or its pinned test) that turns red or green again gets a desktop notification - the change is what's worth one; a run that stays the same colour notifies nothing.
 
 `l` opens the selected suite's tests (the failed first, then the skipped and the passed) to pick one: `j` `k` choose,
@@ -1067,7 +1087,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_screen` | The screen as you see it, as text |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
-| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, each failure's likely cause, and what a change affects; run all, a suite, its failed tests, one test or the affected suites |
+| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, each failure's likely cause, what a change affects, and each suite's code coverage and its change; run all, a suite, its failed tests, one test or the affected suites |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_audit` | The audit view's last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each (it doesn't scan) |
 | `get_ports` | The port map: each app's port, who holds it (PID, name, command line) and for how long, its last minute, and the ranges Windows reserved |
@@ -1286,7 +1306,8 @@ database, and check, cross, warning, minus and clock marks for passed, failed, e
 checklist's marks too, and an icon for each check). A column says up, watching, stopped or exited with play, eye, stop
 and a crossed circle, its warnings, level filter and search with a warning, a funnel and a magnifier; every box has
 an icon in its title, the theme picker a sun and a moon on its groups and a pin on the project's own theme, and the
-requests view's copy menu a terminal, a globe, JavaScript's logo or a link on each way to copy. An app's `"icon"` is the one it has without them; `"nerdIcon"` in its profile gives it one with
+requests view's copy menu a terminal, a globe, JavaScript's logo or a link on each way to copy, and a suite's code
+coverage a shield. An app's `"icon"` is the one it has without them; `"nerdIcon"` in its profile gives it one with
 them, as PowerShell's lazybms had - `"\uf0ac"` a globe, `"\uf085"` cogs, any icon on
 [the Nerd Fonts cheat sheet](https://www.nerdfonts.com/cheat-sheet). Text written into the columns and the log stays as
 it is.
@@ -1336,6 +1357,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `autoRestartOnBranchChange` | `false` | Restart when the git branch changes |
 | `skipUnchangedBuilds` | `true` | Skip `dotnet build` when nothing in the watched folder changed since the last build |
 | `restartOnCodeChange` | `false` | Rebuild + restart the running .NET apps when code changes |
+| `coverage` | `false` | A test suite's full run collects its code coverage, and the tests view shows it and its change (see Tests) |
 | `notifications` | `true` | Desktop notifications (none while the terminal has the focus) |
 | `startupChecklist` | `true` | The startup checklist |
 | `restoreSession` | `true` | Keep the session when lazyrunner closes and resume it when it opens: the apps that were running and the screen (see Session) |

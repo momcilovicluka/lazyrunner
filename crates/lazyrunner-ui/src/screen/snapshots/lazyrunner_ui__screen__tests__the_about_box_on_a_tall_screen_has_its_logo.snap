@@ -9,7 +9,7 @@ expression: "screen.render(SIZE.0, 44)"
                 │                  ▀▀▀ ▀ ▀ ▀▀▀  ▀  ▀ ▀ ▀▀▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀                  │
                 │                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                  │
                 │                                                                           │
-                │   ⇩ v<version> · released <date>    · windows x86_64 · running Sample       │
+                │   ⇩ v<version> · released <date>    · windows x86_64 · running Sample      │
                 │   Runs a project's .NET and npm apps side by side.                        │
                 │                                                                           │
                 │   This session                                                            │

@@ -171,6 +171,8 @@ pub struct Suite {
     pub base: Option<super::impact::Baseline>,
     /// When its last run finished (while lazyrunner runs).
     pub finished: Option<Instant>,
+    /// Collecting its code coverage (#33).
+    pub coverage: super::coverage::State,
     pub(crate) job: u64,
     pub(crate) child: Option<Child>,
     /// All of the run's output, for its log file.
@@ -204,6 +206,7 @@ impl Suite {
             code: None,
             base: None,
             finished: None,
+            coverage: super::coverage::State::default(),
             job: 0,
             child: None,
             lines: Vec::new(),
@@ -243,7 +246,8 @@ impl Suite {
         dir.join(format!("{}.log", self.file_name()))
     }
 
-    fn file_name(&self) -> String {
+    /// Its name as its files are named.
+    pub fn file_name(&self) -> String {
         self.key.chars().map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c } else { '_' }).collect()
     }
 
@@ -342,7 +346,10 @@ pub fn discover(root: &Path, apps: &[App]) -> Vec<Suite> {
         {
             let name = path.file_stem().map_or(String::new(), |stem| stem.to_string_lossy().into_owned());
             let relative = path.strip_prefix(root).unwrap_or(path).to_string_lossy().replace('\\', "/");
-            suites.push(Suite::new(format!("dotnet:{relative}"), name, Runner::Dotnet { project: path.to_path_buf() }));
+            let mut suite =
+                Suite::new(format!("dotnet:{relative}"), name, Runner::Dotnet { project: path.to_path_buf() });
+            suite.coverage.coverlet = super::coverage::references_coverlet(path, root);
+            suites.push(suite);
         }
     });
     suites.sort_by(|a, b| a.name.cmp(&b.name));

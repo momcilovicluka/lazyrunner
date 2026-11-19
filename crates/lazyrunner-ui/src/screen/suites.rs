@@ -32,6 +32,8 @@ const STRIP_CELLS: usize = 10;
 const PICK_STRIP_CELLS: usize = 5;
 /// A suite's line of times in the list.
 const LIST_LINE_CELLS: usize = 5;
+/// The cells a suite's name keeps in the list (all of a shorter one) before its coverage takes the rest.
+const NAME_KEPT: usize = 14;
 /// The project's runs listed under the list, at most.
 const HISTORY_SHOWN: usize = 6;
 
@@ -792,8 +794,11 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let beside = if badge.is_empty() { 0 } else { badge.chars().count() + 1 };
                 let marked = ui.tests_only == Only::Affected;
                 let width = if marked { width.saturating_sub(super::suite_impact::MARK_CELLS) } else { width };
+                let fixed = summary.chars().count() + beside + 9;
+                let spare = width.saturating_sub(fixed + suite.name.chars().count().min(NAME_KEPT));
+                let cover = super::coverage::row(ui, controller, suite, index == selected, spare);
                 // Its time and a line of its last times, as long as the name keeps some room.
-                let roomy = width.saturating_sub(summary.chars().count() + beside + 9);
+                let roomy = width.saturating_sub(fixed + super::seg::width(&cover));
                 let timed = super::suite_runs::list_line(controller, &suite.key, LIST_LINE_CELLS)
                     .map(|(line, last)| (line, format!(" {}", format_duration(last))))
                     .filter(|(_, last)| roomy >= last.chars().count() + LIST_LINE_CELLS + 1 + 10);
@@ -804,8 +809,9 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let watched = if controller.test_watch.suites.contains(&suite.key) { WATCHED } else { " " };
                 let (line, last) = timed.unwrap_or_default();
                 let row = if index == selected {
-                    let mut row =
-                        vec![on(format!("  {watched}▸ {icon} {name} {summary}{last}"), C::FocusText, C::FocusBack)];
+                    let mut row = vec![on(format!("  {watched}▸ {icon} {name} {summary}"), C::FocusText, C::FocusBack)];
+                    row.extend(cover);
+                    row.push(on(last, C::FocusText, C::FocusBack));
                     if !line.is_empty() {
                         row.push(on(" ", C::FocusText, C::FocusBack));
                         row.extend(line);
@@ -821,8 +827,9 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                         seg(format!(" {icon} "), color),
                         seg(format!("{name} "), name_color),
                         seg(summary, color),
-                        seg(last, C::DarkGray),
                     ];
+                    row.extend(cover);
+                    row.push(seg(last, C::DarkGray));
                     if !line.is_empty() {
                         row.push(seg(" ", C::Gray));
                         row.extend(line);
@@ -1094,6 +1101,11 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
     );
     out.add(&counts, if suite.failed > 0 { C::Red } else { C::Green }, 0);
     out.blank();
+    let coverage = super::coverage::details(out.ui, controller, suite, out.width);
+    if !coverage.is_empty() {
+        out.lines.extend(coverage);
+        out.blank();
+    }
     let runs = super::suite_runs::rows(out.ui, controller, suite);
     if !runs.is_empty() {
         out.lines.extend(runs);
