@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.98.0] - 2026-11-19
+
+### Added
+- `O` opens what's in front of you in your editor (`"editor"`) at its line (#107): the focused app's last error at its own frame; in the tests view the picked test's failure (a passing .NET test's file at its method, found by its class's name), on a suite its first failed test; the picked problem; a request's exception, from its log lines; an endpoint's controller from the requests view and Health, found from its route (best effort: the controller named for its first word, at the line naming its last); the code map's project (at its first build error when its build failed); the app's last error from its crashes; the flame chart's frame. A stack with more than one place of the app's own asks which - the app's own bright, the libraries' dim, the first own one picked, each with its language's icon with Nerd Font icons; the place opened lights up and a `↗` rises from it before the box closes. `Ctrl+Enter` does what `O` does where the terminal tells it from `Enter`. Agents get `open_in_editor`, which asks you first.
+
+### Changed
+- The command palette puts a command that holds what you typed as it is first: `seed` finds "Run task: Seed the database" before a label that only has its letters spread out.
+
 ## [1.97.0] - 2026-11-19
 
 ### Added

@@ -29,6 +29,8 @@ pub enum Run {
     OpenFocused,
     OpenAll,
     OpenLog,
+    /// O: the focused app's last error in the editor, at its own place (#107).
+    OpenInEditor,
     Copy,
     Durations,
     Problems,
@@ -202,6 +204,9 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             .focused(),
         action("Tools", "W", "Open everything in the browser", "every Swagger and npm app", Run::OpenAll).safe(),
         action("Tools", "o", "Open the focused app's log file", "its full output", Run::OpenLog).safe().focused(),
+        action("Tools", "O", "Open the focused app's last error in your editor", "at its own frame", Run::OpenInEditor)
+            .safe()
+            .focused(),
         action("Tools", "e", "Start sheet: what the focused app is started with", "", Run::Sheet).safe().focused(),
         action("Tools", "p", "Run the focused app on another launch profile or npm variant", "", Run::Launch)
             .safe()
@@ -551,7 +556,11 @@ pub fn menu(ui: &Ui, controller: &Controller) -> Vec<Action> {
     items
 }
 
-/// Fuzzy subsequence match: every typed character in order; consecutive and word-start hits score higher.
+/// What a label holding the typed text as it is (`seed` in "Seed the database") scores beyond its letters.
+const WHOLE: u32 = 8;
+
+/// Fuzzy subsequence match: every typed character in order; consecutive and word-start hits score higher, the typed
+/// text as a whole most.
 pub fn fuzzy_score(query: &str, text: &str) -> u32 {
     fuzzy_match(query, text).map_or(0, |(score, _)| score)
 }
@@ -577,6 +586,10 @@ fn fuzzy_match(query: &str, text: &str) -> Option<(u32, Vec<usize>)> {
         }
         positions.push(found);
         from = found + 1;
+    }
+    let typed: String = query.to_lowercase().chars().filter(|c| *c != ' ').collect();
+    if text.iter().collect::<String>().contains(&typed) {
+        score += WHOLE;
     }
     Some((score, positions))
 }

@@ -100,6 +100,11 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         }
         name => name,
     };
+    let name = if name == "Enter" && key.modifiers.contains(KeyModifiers::CONTROL) && !prompt(ui) {
+        "O".to_string()
+    } else {
+        name
+    };
     if name == "Ctrl+C" {
         ui.exit = Some(Exit::Quit);
         return;
@@ -513,6 +518,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
                 from_view(ui, controller, name);
             }
         }
+        Some(Overlay::Places { .. }) => super::editor::key(ui, controller, name),
         Some(Overlay::Copy { index }) => {
             use super::copy::PICKS;
             let pick = match name {
@@ -750,6 +756,7 @@ fn needs_app(action: &Run) -> bool {
             | Run::NpmInstall
             | Run::OpenFocused
             | Run::OpenLog
+            | Run::OpenInEditor
             | Run::Copy
             | Run::Search
             | Run::Widen
@@ -781,6 +788,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::OpenFocused => open_focused(ui, controller, &key),
         Run::OpenAll => open_all(ui, controller),
         Run::OpenLog => open_log(ui, controller),
+        Run::OpenInEditor => super::editor::column(ui, controller),
         Run::Copy => ui.overlay = Some(Overlay::Copy { index: 0 }),
         Run::Durations => super::durations::open(ui, controller),
         Run::Problems => super::seen::open(ui, controller, super::jumps::View::Problems),

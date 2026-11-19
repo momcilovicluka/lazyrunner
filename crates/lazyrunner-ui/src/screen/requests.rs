@@ -371,9 +371,50 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
             let view = view.clone();
             open_log(ui, controller, &view);
         }
+        "O" => {
+            let view = view.clone();
+            open_in_editor(ui, controller, &view);
+        }
         _ => return false,
     }
     true
+}
+
+/// O: the selected request's place in code (from its log lines), or the selected endpoint's controller.
+fn open_in_editor(ui: &mut Ui, controller: &mut Controller, view: &View) {
+    match view.tab {
+        Tab::Requests => {
+            let Some(request) = shown(view, controller).get(view.index).map(|request| (*request).clone()) else {
+                return;
+            };
+            let app = controller.apps.iter().position(|app| app.key == request.app);
+            let lines = log_lines(controller, &request);
+            let found = super::editor::places(controller, app, &lines);
+            super::editor::open(ui, controller, found, &format!("the log of {} {}", request.method, request.path));
+        }
+        Tab::Endpoints => {
+            if let Some(endpoint) = summed(view, controller).into_iter().nth(view.index) {
+                super::editor::handler(ui, controller, &endpoint.endpoint);
+            }
+        }
+        Tab::Spec => {
+            controller.add_log("O opens a request's code or an endpoint's controller - Tab to them", Hue::DarkGray)
+        }
+    }
+}
+
+/// The log lines a request caused, as its details show them.
+fn log_lines(controller: &Controller, request: &Request) -> Vec<String> {
+    let Some(state) = controller.state(&request.app) else { return Vec::new() };
+    match (&request.exact, request.logs) {
+        (Some(numbers), _) => numbers
+            .iter()
+            .filter_map(|number| state.output.numbered(*number, *number).next())
+            .map(|line| line.text.clone())
+            .collect(),
+        (None, Some((first, last))) => state.output.numbered(first, last).map(|line| line.text.clone()).collect(),
+        (None, None) => Vec::new(),
+    }
 }
 
 /// h: from one endpoint's requests back to the endpoints, on its row.

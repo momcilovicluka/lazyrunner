@@ -561,7 +561,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &crossterm
                 .collect();
             super::copy::put(ui.clipboard, controller, &text.join("\n"), "the top frames");
         }
-        "o" => open_source(ui, controller, &profile, current.picked),
+        "o" | "O" => open_source(ui, controller, &profile, current.picked),
         "+" | "=" => controller.set_profile_seconds(controller.profile_seconds() + SECONDS_STEP),
         "-" => controller.set_profile_seconds(controller.profile_seconds().saturating_sub(SECONDS_STEP)),
         "p" => {

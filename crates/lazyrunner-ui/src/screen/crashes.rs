@@ -35,6 +35,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     let Some(key) = controller.apps.get(app).map(|app| app.key.clone()) else { return };
     match name {
         "Escape" | "q" | "Alt+x" => ui.overlay = None,
+        "O" => super::editor::app_error(ui, controller, app),
         "y" => {
             let error = controller.crashes_of(&key).iter().rev().find_map(|crash| crash.error.clone());
             match error {

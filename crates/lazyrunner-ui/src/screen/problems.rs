@@ -266,6 +266,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
         "Enter" | "Space" => jump(ui, controller),
         "y" => copy(ui, controller),
         "m" => mute(ui, controller),
+        "O" => open_in_editor(ui, controller),
         _ => pick(ui, name),
     }
 }
@@ -371,6 +372,14 @@ fn copy(ui: &mut Ui, controller: &mut Controller) {
     text.push("```".to_string());
     let what = format!("the problem ({} times)", problem.occurrences.len());
     super::copy::put(ui.clipboard, controller, &text.join(super::copy::NEWLINE), &what);
+}
+
+/// O: the picked problem's place in code, in the occurrence shown.
+fn open_in_editor(ui: &mut Ui, controller: &mut Controller) {
+    let Some((_, occurrence)) = picked(ui) else { return };
+    let lines = lines_of(controller, &occurrence);
+    let found = super::editor::places(controller, Some(occurrence.app), &lines);
+    super::editor::open(ui, controller, found, "the problem");
 }
 
 /// An occurrence's lines still kept, at most `MOST_LINES`.

@@ -1079,7 +1079,7 @@ async fn i_asks_npm_ci_or_npm_install_and_the_menu_and_palette_have_both() {
     screen.press("j");
     assert!(matches!(screen.ui.overlay, Some(Overlay::Install { index: 1 })));
     screen.press("Esc x");
-    let menu = screen.frame();
+    let menu = screen.render(140, 50);
     assert!(menu.contains("npm ci") && menu.contains("npm install"), "{menu}");
     screen.press("Esc :");
     for key in "install".chars() {
@@ -5079,4 +5079,111 @@ async fn the_audit_lists_the_rest_of_the_solution_after_the_apps_and_where_each_
     assert!(frame.contains("Rest of the solution"), "{frame}");
     assert!(frame.contains("direct in Tracking.csproj, Tracking."), "{frame}");
     assert!(frame.contains("dotnet add services/Tracking/Tracking."), "the fix, per project: {frame}");
+}
+
+// ---------------------------------------------------------------- O: open in the editor (#107)
+
+/// What the editor was last asked to open.
+fn last_opened() -> Option<String> {
+    OPENED.with(|opened| opened.borrow().last().cloned())
+}
+
+#[tokio::test]
+async fn o_opens_the_last_errors_own_frame_and_asks_which_when_the_stack_has_more() {
+    let mut screen = screen("editor-column", json!({ "editor": "myeditor --goto {file}:{line}" }));
+    let repo = TempDir::new("editor-column-repo");
+    let (pricing, cart) = (repo.join("Orders/Pricing.cs"), repo.join("Orders/Cart.cs"));
+    lazyrunner_core::testing::write(&pricing, "");
+    lazyrunner_core::testing::write(&cart, "");
+    screen.controller.root = repo.path().to_path_buf();
+    let frame = |file: &std::path::Path, line: u32| {
+        format!("         at Orders.Pricing.Quote() in {}:line {line}", file.display())
+    };
+    let error = |frames: &[String]| {
+        let mut lines =
+            vec!["fail: Orders.Pricing[0]".to_string(), "      System.InvalidOperationException: no price".into()];
+        lines.extend(frames.iter().cloned());
+        lines
+    };
+    let one = error(&[frame(&pricing, 12)]);
+    screen.output(&one.iter().map(String::as_str).collect::<Vec<_>>());
+    screen.press("O");
+    assert_eq!(last_opened(), Some(format!("myeditor --goto {}:12", pricing.display())), "one place: straight away");
+
+    let two = error(&[frame(&pricing, 12), frame(&cart, 30)]);
+    screen.output(&two.iter().map(String::as_str).collect::<Vec<_>>());
+    screen.press("O");
+    let Some(Overlay::Places { places, index, .. }) = &screen.ui.overlay else { panic!("it asks which") };
+    assert_eq!((places.len(), *index), (2, 0), "the first own place picked");
+    let frame_shown = screen.render(160, 40);
+    assert!(frame_shown.contains("Pricing.cs:12") && frame_shown.contains("Cart.cs:30"), "{frame_shown}");
+    screen.press("j Enter");
+    assert_eq!(last_opened(), Some(format!("myeditor --goto {}:30", cart.display())));
+    assert!(screen.ui.overlay.is_none(), "it closes");
+}
+
+#[tokio::test]
+async fn o_in_the_tests_view_opens_a_failures_frame_or_a_passing_tests_method() {
+    let mut screen = screen("editor-tests", json!({ "editor": "myeditor --goto {file}:{line}" }));
+    let repo = TempDir::new("editor-tests-repo");
+    let cart: std::path::PathBuf = repo.join("tests/Orders.Tests/CartTests.cs").components().collect();
+    lazyrunner_core::testing::write(
+        &cart,
+        "namespace Orders.Tests;\npublic class CartTests\n{\n    public void Adds() { }\n}\n",
+    );
+    screen.controller.root = repo.path().to_path_buf();
+    with_suites(&mut screen);
+    let stack = format!("at Orders.Tests.CartTests.Totals() in {}:line 9", cart.display());
+    screen.controller.suites.as_mut().unwrap()[0].tests[1].stack = stack;
+    screen.ui.overlay = Some(Overlay::Tests { index: 2, scroll: 0, picking: None });
+    screen.press("O");
+    assert_eq!(last_opened(), Some(format!("myeditor --goto {}:9", cart.display())), "the suite's failed test");
+    super::editor::test(&mut screen.ui, &mut screen.controller, "dotnet:orders", "Orders.Tests.CartTests.Adds");
+    assert_eq!(last_opened(), Some(format!("myeditor --goto {}:4", cart.display())), "a passing one: its method");
+}
+
+#[tokio::test]
+async fn an_agent_opens_a_file_in_the_editor_only_after_a_yes() {
+    let mut screen = screen("editor-agent", json!({ "editor": "myeditor --goto {file}:{line}" }));
+    let repo = TempDir::new("editor-agent-repo");
+    let file: std::path::PathBuf = repo.join("src/Orders/Pricing.cs").components().collect();
+    lazyrunner_core::testing::write(&file, "");
+    screen.controller.root = repo.path().to_path_buf();
+    let asked = agent(&mut screen, "open_in_editor", json!({ "file": "Pricing.cs", "line": 7 }), None);
+    assert_eq!(asked["code"], "needs_confirm", "{asked}");
+    let gone = agent(&mut screen, "open_in_editor", json!({ "file": "Gone.cs", "confirm": true }), None);
+    assert_eq!(gone["code"], "not_found", "{gone}");
+    let done = agent(&mut screen, "open_in_editor", json!({ "file": "Pricing.cs", "line": 7, "confirm": true }), None);
+    assert_eq!(done["ok"], true, "{done}");
+    assert_eq!(last_opened(), Some(format!("myeditor --goto {}:7", file.display())));
+}
+
+#[tokio::test]
+async fn the_place_opened_lights_up_and_its_arrow_rises_before_the_chooser_closes() {
+    let mut screen = screen("editor-motion", json!({ "editor": "myeditor --goto {file}:{line}" }));
+    let repo = TempDir::new("editor-motion-repo");
+    let (pricing, cart) = (repo.join("Pricing.cs"), repo.join("Cart.cs"));
+    lazyrunner_core::testing::write(&pricing, "");
+    lazyrunner_core::testing::write(&cart, "");
+    screen.controller.root = repo.path().to_path_buf();
+    let places = [(&pricing, 12), (&cart, 30)].map(|(file, line)| super::editor::Place {
+        file: file.clone(),
+        line: Some(line),
+        column: None,
+        own: true,
+        text: String::new(),
+    });
+    super::editor::open(&mut screen.ui, &mut screen.controller, places.to_vec(), "a stack");
+    (screen.ui.motion.enabled, screen.ui.reduced_motion) = (true, false);
+    screen.render(160, 40);
+    screen.ui.now += std::time::Duration::from_secs(1);
+    screen.render(160, 40);
+    screen.press("Enter");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Places { opening: Some(_), .. })), "it stays a moment");
+    assert!(screen.ui.is_animating(&screen.controller));
+    let shown = screen.render(160, 40);
+    assert!(shown.contains('↗'), "the arrow rises from it: {shown}");
+    screen.ui.now += std::time::Duration::from_millis(500);
+    super::editor::settle(&mut screen.ui);
+    assert!(screen.ui.overlay.is_none(), "then it closes");
 }

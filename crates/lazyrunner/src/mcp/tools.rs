@@ -261,6 +261,19 @@ pub fn list(apps: &str) -> Vec<Value> {
             false,
         )),
         tool(
+            "open_in_editor",
+            "Opens a file of the repo in the user's editor (their \"editor\" setting) at a line and column, as O does \
+             in lazyrunner - to show them the code you're talking about. Needs confirm: true - ask the user first.",
+            json!({
+                "file": { "type": "string" },
+                "line": { "type": "integer" },
+                "column": { "type": "integer" },
+                "confirm": { "type": "boolean" },
+            }),
+            &["file"],
+            false,
+        ),
+        tool(
             "set_setting",
             "Turns a setting (list_actions and get_status show them) on or off; saved, as , does.",
             json!({ "setting": { "type": "string" }, "on": { "type": "boolean" } }),

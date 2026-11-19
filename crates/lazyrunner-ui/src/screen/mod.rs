@@ -17,6 +17,7 @@ pub mod crashes;
 pub mod database;
 pub mod diff;
 pub mod durations;
+pub mod editor;
 pub mod faults;
 pub mod flame;
 pub mod follow;
@@ -292,6 +293,13 @@ pub enum Overlay {
     },
     /// The y/n box before migrations are applied or reverted.
     Confirm(Box<migrations::Confirm>),
+    /// `O`: which place in code to open, when a stack has more than one of the app's own (#107).
+    Places {
+        places: Vec<editor::Place>,
+        index: usize,
+        /// When the picked place was opened: the box stays a moment for it to show (none with reduced motion).
+        opening: Option<Instant>,
+    },
     /// `y`: what to copy from the focused app's output.
     Copy {
         index: usize,
@@ -346,6 +354,7 @@ impl Overlay {
             Self::Requests(_) => "requests",
             Self::Install { .. } => "install",
             Self::Copy { .. } => "copy",
+            Self::Places { .. } => "places",
             Self::Audit { .. } => "audit",
             Self::Ports { .. } => "ports",
             Self::Stack { .. } => "stack",
@@ -825,6 +834,7 @@ impl Ui {
             || share::animating(self, controller)
             || crashes::animating(self, controller)
             || ghost::animating(self)
+            || editor::animating(self)
             || branch_changes::animating(self)
             || spec::animating(self)
             || phases::animating(self)
@@ -883,6 +893,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     seen::update(ui, controller);
     let typing = ui.search.as_ref().is_some_and(|search| search.typing);
     if ui.overlay.is_none() && ui.picker.is_none() && !typing {
+        editor::settle(ui);
         ui.overlay = ui.behind.take(); // what was opened from a view closed: the view again
     }
     // A box that just appeared opens from its middle; the checklist and the theme picker have their own motion.
@@ -995,6 +1006,7 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         Some(Overlay::Requests(_)) => return requests::rows(ui, controller, width, rows),
         Some(Overlay::Install { .. }) => return overlays::install(ui, controller, width, rows),
         Some(Overlay::Copy { .. }) => return overlays::copy(ui, controller, width, rows),
+        Some(Overlay::Places { .. }) => return editor::rows(ui, controller, width, rows),
         Some(Overlay::Migrations { .. }) => return migrations::rows(ui, controller, width, rows),
         Some(Overlay::Audit { .. }) => return audit::rows(ui, controller, width, rows),
         Some(Overlay::Ports { .. }) => return ports::rows(ui, controller, width, rows),
