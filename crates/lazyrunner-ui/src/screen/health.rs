@@ -149,6 +149,28 @@ fn slowest(controller: &Controller) -> Vec<Endpoint> {
     list
 }
 
+/// O: the picked endpoint's controller, or a picked app's slowest endpoint's.
+fn open_endpoint(ui: &mut Ui, controller: &mut Controller, picked: usize) {
+    let apps = controller.apps.len();
+    let endpoint = match controller.apps.get(picked) {
+        Some(app) => {
+            let since = chrono::Local::now() - chrono::Duration::from_std(ENDPOINTS_WINDOW).unwrap_or_default();
+            let mine = controller.requests.items.iter().filter(|request| request.app == app.key && request.at >= since);
+            let mut list = endpoints(mine);
+            list.sort_by(|a, b| b.p95.total_cmp(&a.p95));
+            list.into_iter().next()
+        }
+        None => slowest(controller).into_iter().nth(picked - apps),
+    };
+    match endpoint {
+        Some(endpoint) => super::editor::handler(ui, controller, &endpoint.endpoint),
+        None => controller.add_log(
+            "No requests to it lately - O opens a slow endpoint's controller",
+            lazyrunner_core::output::Hue::DarkGray,
+        ),
+    }
+}
+
 /// The keys of the Health tab; false for one it doesn't use.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     let Some((picked, opened)) = view(ui) else { return false };
@@ -163,6 +185,10 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     let next = match name {
         "," if picked < apps => {
             ui.health_edit = Some(Editing { app: picked, field: 0, text: target_text(controller, picked, 0) });
+            return true;
+        }
+        "O" => {
+            open_endpoint(ui, controller, picked);
             return true;
         }
         "s" => {

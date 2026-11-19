@@ -182,6 +182,22 @@ pub fn install_packages(controller: &mut Controller, args: &Value) -> Result<Str
     Ok(format!("{} for {name}", if fresh { "npm ci" } else { "npm install" }))
 }
 
+/// Opens a file of the repo in the user's editor at a line and column, as `O` does (#107) - after a yes.
+pub fn open_in_editor(ui: &Ui, controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let Some(file) = args["file"].as_str() else { return Err(("bad_args", "which \"file\" to open?".into())) };
+    let found =
+        lazyrunner_core::links::resolve(&controller.root, file).filter(|path| path.starts_with(&controller.root));
+    let Some(path) = found else { return Err(("not_found", "there's no such file in the repo".into())) };
+    if !confirmed(args) {
+        return Err(confirm_first("opening a file in the user's editor"));
+    }
+    let number = |name: &str| args[name].as_u64().and_then(|value| u32::try_from(value).ok());
+    let (line, column) = (number("line"), number("column"));
+    crate::screen::links::open_file(ui, controller, &path, line, column);
+    let shown = path.strip_prefix(&controller.root).unwrap_or(&path).display().to_string().replace('\\', "/");
+    Ok(format!("open {shown}{} in the editor", line.map_or_else(String::new, |line| format!(":{line}"))))
+}
+
 /// Kills what holds a port an app needs, then starts, as `!` does.
 pub fn kill_port_holder(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
     if controller.conflicts.is_empty() {

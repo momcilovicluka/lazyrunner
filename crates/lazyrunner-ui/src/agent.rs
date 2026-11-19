@@ -86,7 +86,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "build_map" => views::build(ui, controller, args),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
         | "run_action" | "press_keys" | "switch_database" | "add_database" | "install_packages"
-        | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile") => {
+        | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile" | "open_in_editor") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
@@ -951,6 +951,7 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
         "install_packages" => drive::install_packages(controller, args)?,
         "apply_migrations" => drive::apply_migrations(controller, args)?,
         "kill_port_holder" => drive::kill_port_holder(controller, args)?,
+        "open_in_editor" => drive::open_in_editor(ui, controller, args)?,
         "set_setting" => drive::set_setting(controller, args)?,
         "run_task" => drive::run_task(controller, args)?,
         "profile" => {

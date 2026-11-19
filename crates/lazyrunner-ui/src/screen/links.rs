@@ -27,8 +27,7 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, link: usize, app: Option<u
     match target {
         Target::Url(url) => open_url(ui, controller, &url),
         Target::File { path, line, column } => {
-            let own = app.and_then(|app| app_folder(controller, app)).and_then(|folder| links::resolve(&folder, &path));
-            let Some(file) = own.or_else(|| links::resolve(&controller.root, &path)) else {
+            let Some(file) = locate(controller, app, &path) else {
                 let root = controller.root.display().to_string();
                 controller.add_log(format!("{path} isn't in {root} (outside build output and packages)"), Hue::Yellow);
                 return;
@@ -36,6 +35,12 @@ pub fn open(ui: &mut Ui, controller: &mut Controller, link: usize, app: Option<u
             open_file(ui, controller, &file, line, column);
         }
     }
+}
+
+/// Where a file a link names is: under `app`'s folder (an Angular app's `libs/...`), else under the repo.
+pub(super) fn locate(controller: &Controller, app: Option<usize>, path: &str) -> Option<std::path::PathBuf> {
+    let own = app.and_then(|app| app_folder(controller, app)).and_then(|folder| links::resolve(&folder, path));
+    own.or_else(|| links::resolve(&controller.root, path))
 }
 
 /// Where an app's own files are: an npm app's folder, a .NET app's project folder.

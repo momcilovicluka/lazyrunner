@@ -519,9 +519,17 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "Escape" | "q" | "K" => ui.overlay = None,
         "Tab" => super::health::open(ui, controller),
         "/" => change(ui, Zoom::Still, |view| (view.typing, view.query, view.choice) = (true, String::new(), 0)),
+        "O" => open_in_editor(ui, controller, &current),
         _ => return map_key(ui, controller, name, &current),
     }
     true
+}
+
+/// O: the picked project in the editor - at its first build error when its build failed.
+fn open_in_editor(ui: &mut Ui, controller: &mut Controller, current: &View) {
+    let Some(map) = controller.code_map() else { return };
+    let Some(path) = shown(ui, map, current).picked.map(|at| map.parts[at].path.clone()) else { return };
+    super::editor::project(ui, controller, &path);
 }
 
 /// `Enter`: into the picked box - an app's projects, a project's namespaces or folders, a folder's modules; what to

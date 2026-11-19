@@ -365,7 +365,8 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             let is_upper = key.len() == 1 && key.chars().all(|c| c.is_ascii_uppercase());
             let verb = |label: &str| label.split_whitespace().next().unwrap_or_default().to_string();
             let twinned = |other: &Action| other.group == action.group && verb(&other.label) == verb(&action.label);
-            if is_upper && all.iter().any(|other| twinned(other) && other.focused && other.key == key.to_lowercase()) {
+            let lower = |other: &&Action| twinned(other) && other.focused && other.key == key.to_lowercase();
+            if is_upper && !action.focused && all.iter().any(|other| lower(&other)) {
                 continue;
             }
             if key == "-" {
@@ -374,6 +375,7 @@ pub fn help(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             let twin = all.iter().find(|other| {
                 twinned(other)
                     && action.focused
+                    && !other.focused
                     && other.key != key
                     && other.key == key.to_uppercase()
                     && key.len() == 1

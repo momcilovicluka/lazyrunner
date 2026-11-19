@@ -339,6 +339,12 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         "s" => controller.add_log("No tests are running.", Hue::DarkGray),
         "o" if !a_suite => controller.add_log("o opens a suite's log - choose one.", Hue::DarkGray),
         "o" => open_log(ui, controller, selected.first()),
+        "O" if !a_suite => controller.add_log("O opens a suite's failed test - choose one.", Hue::DarkGray),
+        "O" => {
+            if let Some(key) = selected.first().cloned() {
+                super::editor::suite(ui, controller, &key);
+            }
+        }
         "y" => copy_failures(ui, controller, &selected, &label),
         _ => return false,
     }
@@ -374,6 +380,11 @@ fn pick_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             if let Some(test) = names.get(*at) {
                 controller.run_test(&key, test);
                 ui.again = Some(super::repeat::Again::Test { suite: key.clone(), test: test.clone() });
+            }
+        }
+        "O" => {
+            if let Some(test) = names.get(*at).cloned() {
+                super::editor::test(ui, controller, &key, &test);
             }
         }
         "y" => {

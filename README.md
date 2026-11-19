@@ -256,6 +256,7 @@ at once while the palette wipes away.
 | `i` | Install an npm app's packages in the background: `c` `npm ci`, `n` `npm install` (it stops the app first and starts it again after) |
 | `w` / `W` | Open the focused app in the browser (Swagger for an API) / open everything |
 | `o` | Open the focused app's full log file (or the failed build's log) |
+| `O` | **Open in your editor**: the focused app's last error at its own frame - and in the views, what they show (below) |
 | `p` | Run the focused app on another launch profile (a .NET app's, from its `launchSettings.json`, with their URLs) or npm variant: `Enter` restarts it on the one picked (`●` marks the one it runs), remembered for this branch in lazyrunner's state, not the shared profile. Its column's title says so (`Orders · Orders-Https`); picking the profile's own forgets the choice |
 | `Alt+l` | A .NET app's **log levels**: the default, EF Core's SQL (`Microsoft.EntityFrameworkCore.Database.Command`), HttpClient's calls, ASP.NET Core and its own namespace, each at Trace, Debug, Information or Warning. `j` `k` pick a category, `h` `l` a level, `Enter` sets it - restarting the app when it runs - `x` gives the category back to its own settings, `r` all of them, `s` keeps them on this machine (else they're for this session). They go after lazyrunner's own `--Logging` arguments, so they win; the column's title says `Debug` (or `log*`) while they differ. Each category says how many lines it logged the last minute, the loudest ones show under them, and the levels are a slider whose knob snaps as `Enter` sets one |
 | `Alt+g` | **What changed for running** on the last branch switch (or a click on the branch in the status line): of what git says changed, what makes the apps run differently rather than their code - the profile, an app's `appsettings*.json` (the keys whose values changed, never the values), `launchSettings.json` and project file, an npm app's `package.json` / lock, migrations added or removed, `.env` files. Each with its fix - `Enter` runs `npm ci`, opens `M` or reloads the profile. On a switch the log sums it up (`main → feature/x: Orders appsettings (2 keys), web package-lock, 1 migration`) and the status line says `· 3 changed`; opened on another branch than the session it closed on, the checklist's Branch row says what changed since. `d` shows a settings file's keys that changed (`+` `-` `~`, never their values); a change whose fix ran is ticked off once it's done |
@@ -552,6 +553,29 @@ bar shows `○ 3` beside the database while migrations are pending on it.
 Under the contexts, **what it does**: the picked migration's steps (the next pending one's when none is picked), read
 from its file - `CreateTable Invoices`, `AddColumn Orders.Currency`, `CreateIndex` - a drop or a delete in red with a
 warning, so you see what applying it will change.
+
+## Open in your editor (`O`)
+
+`O` opens what's in front of you in your editor (`"editor"`) at its line - from the columns and from every view that
+shows a place in code:
+
+| Where | What `O` opens |
+|-------|----------------|
+| A column | The focused app's last error (a failed build's errors) at its own frame |
+| `T` tests | The picked test's failure at its own frame, or a passing .NET test's file at its method (found by its class's name); on a suite, its first failed test |
+| `E` Problems | The picked problem's own frame, in the occurrence shown |
+| `H` requests | The selected request's exception at its own frame, from its log lines; on the endpoints tab, the endpoint's controller |
+| `K Tab Tab` Health | The picked endpoint's controller, or a picked app's slowest endpoint's |
+| `K Tab` code map | The picked project or file - at its first build error when its build failed |
+| `Alt+x` crashes | The app's last error at its own frame |
+| The flame chart | The picked frame's source, as `o` does |
+
+An endpoint's controller is found from its route, best effort: the .NET controller named for its first word
+(`/api/orders/{id}` opens `OrdersController.cs`, `/api/workflow-engine` `WorkflowEngineController.cs`), at the first
+line that names its last word. When a stack has more than one place of the app's own, `O` asks which: a box lists
+them, the app's own bright and the libraries' dim, the first own one picked - `Enter` (or `O` again) opens it, `Esc`
+doesn't. `Ctrl+Enter` does what `O` does where the terminal tells it from `Enter` (Windows Terminal does). An agent
+has `open_in_editor`, after a yes.
 
 ## Audit (`A`)
 
@@ -1062,10 +1086,12 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `run_action` | Any action by its key, on an app, as your key would |
 | `press_keys` | Keys as the key reference names them (`"g g"`, `"Ctrl+o"`, `"Esc"`), for what no tool covers; answers with the screen after. It waits while you type in a prompt |
 | `switch_database`, `install_packages`, `apply_migrations`, `kill_port_holder`, `set_setting` | The database by name, `npm ci` / `npm install`, a DbContext's pending migrations or one to move to, what holds a needed port, a setting |
+| `open_in_editor` | A file of the repo at a line in your editor, as `O` does - to show you the code it's talking about; after `"confirm": true` |
 | `add_database` | A connection string added to secrets.json as `n` on the database screen does: a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet - or, with `switch` (and `confirm`), the one in use |
 
 What can't be undone or takes something away from you - quitting, killing a port's holder, reverting a migration,
-switching the database, clearing the output, reopening lazyrunner, the git tool over the screen - needs
+switching the database, clearing the output, reopening lazyrunner, the git tool over the screen, opening a file in your
+editor - needs
 `"confirm": true`, and the agent is told to ask you first.
 
 **Follow mode** (`F`) lets you watch it work: the screen goes where the agent looks - the column whose output it reads,
