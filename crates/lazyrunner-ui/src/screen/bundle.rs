@@ -83,7 +83,7 @@ fn about(ui: &Ui, controller: &Controller, size: (u16, u16)) -> String {
 }
 
 /// The screen as it is now, drawn once more as a picture.
-fn screen(ui: &mut Ui, controller: &Controller, size: (u16, u16)) -> String {
+pub(crate) fn screen(ui: &mut Ui, controller: &Controller, size: (u16, u16)) -> String {
     let Ok(mut terminal) = Terminal::new(TestBackend::new(size.0, size.1));
     if terminal.draw(|frame| super::draw(frame, ui, controller)).is_err() {
         return String::new();

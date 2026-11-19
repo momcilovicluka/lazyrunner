@@ -19,7 +19,7 @@ use crate::screen::Ui;
 use crate::screen::copy::{self, Pick};
 
 pub(crate) mod drive;
-mod views;
+pub(crate) mod views;
 
 /// The agent protocol this lazyrunner speaks; `lazyrunner mcp` sends it with every request.
 pub const PROTOCOL: u64 = 1;
@@ -59,6 +59,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
     let client = if client.is_empty() { "agent".to_string() } else { client };
     let answer = match request["op"].as_str().unwrap_or_default() {
         "status" => Ok(status(ui, controller)),
+        "snapshot" => Ok(crate::screen::snapshot::data(ui, controller)),
         "logs" => logs(controller, args),
         "errors" => errors(controller, args),
         "tests" => tests(controller, args),
@@ -136,7 +137,7 @@ fn env_overrides(controller: &Controller, key: &str) -> Value {
     Value::Object(overrides.collect())
 }
 
-fn status(ui: &Ui, controller: &Controller) -> Value {
+pub(crate) fn status(ui: &Ui, controller: &Controller) -> Value {
     let apps: Vec<Value> = controller
         .apps
         .iter()
@@ -765,7 +766,7 @@ const FAILED_CALLS_SHOWN: usize = 10;
 /// HttpClient log, by the port a call went to), the profile's dependsOn and the apps' own config (a dev server's proxy,
 /// an environment file) - with each edge's last minute (for a caller that can't log its calls, what the called app
 /// served); the apps that use the database and its commands; and the newest failed calls, with what came back.
-fn stack(controller: &Controller) -> Value {
+pub(crate) fn stack(controller: &Controller) -> Value {
     let now = std::time::Instant::now();
     let apps: Vec<Value> = controller
         .apps

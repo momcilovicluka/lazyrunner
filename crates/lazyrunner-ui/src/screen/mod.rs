@@ -57,6 +57,7 @@ pub mod seg;
 pub mod session;
 pub mod share;
 pub mod sheet;
+pub mod snapshot;
 pub mod spec;
 pub mod spinner;
 pub mod stack;
@@ -525,6 +526,8 @@ pub struct Ui {
     pub hover: Option<mouse::Target>,
     /// The view (tests, requests) a box or the database picker was opened from: it comes back when that closes.
     pub behind: Option<Overlay>,
+    /// When `, A v` last took a snapshot of the run (its shutter, the panel's chip).
+    pub snapshot: Option<Instant>,
     /// Ctrl+R's show while it plays.
     pub reload: Option<reload::Show>,
     /// Ctrl+R: the loop sets the terminal up again (screen, mouse, tab, colours) before the next frame.
@@ -648,6 +651,7 @@ impl Ui {
             link_hint_shown: false,
             hover: None,
             behind: None,
+            snapshot: None,
             reload: None,
             reset_terminal: false,
             started: now,
@@ -835,6 +839,7 @@ impl Ui {
             || crashes::animating(self, controller)
             || ghost::animating(self)
             || editor::animating(self)
+            || snapshot::animating(self)
             || branch_changes::animating(self)
             || spec::animating(self)
             || phases::animating(self)
@@ -945,6 +950,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     theme_picker::paint_ripple(buf, area, ui);
     reload::paint(buf, area, ui);
     ghost::paint(buf, area, ui);
+    snapshot::paint(buf, area, ui);
 }
 
 /// A box opening (`opened` of the way): only its middle rows so far, more the further it has opened.

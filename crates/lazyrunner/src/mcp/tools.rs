@@ -261,6 +261,15 @@ pub fn list(apps: &str) -> Vec<Value> {
             false,
         )),
         tool(
+            "get_snapshot",
+            "This run as a read-only snapshot, as , A v writes it for a teammate: each app's state, port, errors and \
+             last error, the last 5 minutes' requests and slowest endpoints, the tests' failures and likely causes, \
+             Health's alerts, the stack map and what's on screen - masked as the diagnostics zip is.",
+            json!({}),
+            &[],
+            true,
+        ),
+        tool(
             "open_in_editor",
             "Opens a file of the repo in the user's editor (their \"editor\" setting) at a line and column, as O does \
              in lazyrunner - to show them the code you're talking about. Needs confirm: true - ask the user first.",

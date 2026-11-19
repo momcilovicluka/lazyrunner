@@ -816,6 +816,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
         Run::JumpForward => super::jumps::travel(ui, controller, false),
         Run::Follow => super::follow::toggle(ui, controller),
         Run::Diagnostics => super::bundle::write(ui, controller),
+        Run::Snapshot => super::snapshot::take(ui, controller),
         Run::Mark => super::marks::toggle(ui, controller),
         Run::PrevMark => super::marks::jump(ui, controller, true),
         Run::NextMark => super::marks::jump(ui, controller, false),

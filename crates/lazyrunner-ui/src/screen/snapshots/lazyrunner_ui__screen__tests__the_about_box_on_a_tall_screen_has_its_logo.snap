@@ -2,7 +2,6 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: "screen.render(SIZE.0, 44)"
 ---
-
                 ┌─ ✦ About lazyrunner ──────────────────────────────────────────────────────┐
                 │                                                                           │
                 │                  █   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄                  │
@@ -28,6 +27,7 @@ expression: "screen.render(SIZE.0, 44)"
                 │    l  §  License               source-available; free to use, at work too │
                 │    b  ⚑  Report a bug          the bug form, this version filled in       │
                 │    z  ▤  Diagnostics zip       versions, logs and the screen, to attach   │
+                │    v  ◉  Snapshot of this run  a read-only page to hand on                │
                 │    f  ☼  Suggest a feature     the feature form, for your idea            │
                 │    s  ⑂  Source                the code, on GitHub                        │
                 │    u  ⇣  Check for an update   right here, and install it                 │

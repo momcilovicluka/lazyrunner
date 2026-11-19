@@ -5,29 +5,30 @@ expression: screen.frame()
 
 
   ┌─ Keys · lazyrunner v<version> ────────────────────────────────────────────────────────────────────────────┐
-  │ You use most                                                                    Alt+s       Share the… │
-  │   ?           Key reference ×1                                                  Alt+S       Share the… │
-  │ Run                                                                             Alt+q       Show the … │
-  │   Space       Start / stop the focused app                                      y           Copy (yan… │
-  │   u U         Start · focused / all                                             D           Durations… │
-  │   s S         Stop · focused / all                                              E           Problems … │
-  │   r R         Restart · focused / all                                           H           Requests:… │
-  │   b B         Build · focused / all                                             M           Migration… │
-  │   .           Repeat the last action                                            A           Audit: ou… │
-  │   Alt+.       Repeat one of the last few actions                                P           Ports: wh… │
-  │   q           Quit                                                              K           Stack: wh… │
-  │   Alt+x       The focused app's crashes this session                            K Tab       Code map:… │
-  │ Tools                                                                           T           Tests: ru… │
-  │   d           Switch database                                                   L           lazygit: … │
-  │   i           Install packages: npm ci or npm install                           x           Menu for … │
-  │   i c         npm ci                                                            F           Follow th… │
-  │   i n         npm install                                                     View                   … │
-  │   w W         Open in the browser · focused / all                               /           Search th… │
-  │   o           Open the focused app's log file                                   z           Zoom the … │
-  │   O           Open the focused app's last error in your editor                  Ctrl+O      Jump back… │
-  │   e           Start sheet: what the focused app is started with                 Alt+→       Jump forw… │
-  │   p           Run the focused app on another launch profile or npm variant      f           Filter th… │
-  │   Alt+l       Log levels of the focused app                                     m           Mark a li… │
-  │   Alt+g       What changed for running on the last branch switch                [           Older mark │
+  │ You use most                                                                    Alt+S       Share the… │
+  │   ?           Key reference ×1                                                  Alt+q       Show the … │
+  │ Run                                                                             y           Copy (yan… │
+  │   Space       Start / stop the focused app                                      D           Durations… │
+  │   u U         Start · focused / all                                             E           Problems … │
+  │   s S         Stop · focused / all                                              H           Requests:… │
+  │   r R         Restart · focused / all                                           M           Migration… │
+  │   b B         Build · focused / all                                             A           Audit: ou… │
+  │   .           Repeat the last action                                            P           Ports: wh… │
+  │   Alt+.       Repeat one of the last few actions                                K           Stack: wh… │
+  │   q           Quit                                                              K Tab       Code map:… │
+  │   Alt+x       The focused app's crashes this session                            T           Tests: ru… │
+  │ Tools                                                                           L           lazygit: … │
+  │   d           Switch database                                                   x           Menu for … │
+  │   i           Install packages: npm ci or npm install                           F           Follow th… │
+  │   i c         npm ci                                                          View                   … │
+  │   i n         npm install                                                       /           Search th… │
+  │   w W         Open in the browser · focused / all                               z           Zoom the … │
+  │   o           Open the focused app's log file                                   Ctrl+O      Jump back… │
+  │   O           Open the focused app's last error in your editor                  Alt+→       Jump forw… │
+  │   e           Start sheet: what the focused app is started with                 f           Filter th… │
+  │   p           Run the focused app on another launch profile or npm variant      m           Mark a li… │
+  │   Alt+l       Log levels of the focused app                                     [           Older mark │
+  │   Alt+g       What changed for running on the last branch switch                ]           Newer mark │
+  │   Alt+s       Share the focused app through a tunnel (again: stop)              '           Marks: ev… │
   │ / filters · any key closes · : searches every command · lowercase = focused app, uppercase = all apps  │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

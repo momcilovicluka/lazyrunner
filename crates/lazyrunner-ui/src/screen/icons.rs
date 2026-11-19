@@ -119,6 +119,8 @@ pub enum Icon {
     Code,
     Endpoints,
     Spec,
+    /// A snapshot of the run (#106).
+    Camera,
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -284,6 +286,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Endpoints, true) => "\u{f0ca}", // list
         (Icon::Spec, false) => "¶",
         (Icon::Spec, true) => "\u{f15c}", // file text
+        (Icon::Camera, false) => "◉",
+        (Icon::Camera, true) => "\u{f030}", // camera
     }
 }
 
@@ -453,6 +457,7 @@ mod tests {
             Icon::Code,
             Icon::Endpoints,
             Icon::Spec,
+            Icon::Camera,
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");

@@ -90,6 +90,7 @@ fn links() -> Vec<Link> {
             "versions, logs and the screen, to attach",
             Does::Run(Run::Diagnostics),
         ),
+        link("v", Icon::Camera, "Snapshot of this run", "a read-only page to hand on", Does::Run(Run::Snapshot)),
         link(
             "f",
             Icon::Idea,
