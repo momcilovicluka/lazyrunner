@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.98.1] - 2026-11-19
+
+### Fixed
+- An `"editor"` command starting with `wt` (`wt -w 0 new-tab nvim +{line} {file}`) opened in the stable Windows Terminal - a window of its own - when lazyrunner ran in Windows Terminal Preview: `wt` on PATH is one variant's, and `-w 0` means that variant's window. `wt` is now the Windows Terminal lazyrunner runs in, found up the process tree (its package's own `wt`), so the editor opens in a new tab beside lazyrunner; the git tool's pane (`gitBeside`) too. `"terminal"` names one when that isn't found.
+
 ## [1.98.0] - 2026-11-19
 
 ### Added

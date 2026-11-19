@@ -412,7 +412,7 @@ fn open_git_tool(controller: &mut Controller, opened_beside: &mut Option<Instant
         );
         return None;
     }
-    match tool.open_beside(&controller.root) {
+    match tool.open_beside(&controller.root, &controller.config) {
         Ok(()) => {
             *opened_beside = Some(Instant::now());
             controller.add_log(format!("Opened {} beside lazyrunner", tool.name), Hue::Cyan);

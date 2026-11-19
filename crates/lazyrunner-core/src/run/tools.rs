@@ -416,6 +416,75 @@ pub fn branch(git_dir: &Path) -> Option<String> {
     })
 }
 
+/// The Windows Terminal's own program, its command-line one, how far up the process tree it's looked for, and where
+/// the packaged apps' aliases are.
+const TERMINAL_EXE: &str = "WindowsTerminal.exe";
+const WT_EXE: &str = "wt.exe";
+const WT: &str = "wt";
+const MOST_ANCESTORS: usize = 16;
+const APP_ALIASES: [&str; 2] = ["Microsoft", "WindowsApps"];
+
+/// What `wt` runs in a command (the editor's, the git tool's pane): `"terminal"` when the settings name one; else the
+/// `wt` of the Windows Terminal lazyrunner runs in - stable, Preview and Canary each have their own, and `wt` on PATH
+/// is only one of them, which opens its own window; else `wt` on PATH.
+pub fn windows_terminal(config: &serde_json::Value) -> Option<PathBuf> {
+    if let Some(named) = config["terminal"].as_str().map(str::trim).filter(|named| !named.is_empty()) {
+        return Some(find_on_path(named).unwrap_or_else(|| PathBuf::from(named)));
+    }
+    hosting_wt().or_else(|| find_on_path(WT))
+}
+
+/// Whether a command's program is Windows Terminal's `wt` (`wt`, `wt.exe`, a path to one).
+pub fn is_wt(program: &Path) -> bool {
+    program.file_stem().is_some_and(|stem| stem.eq_ignore_ascii_case(WT))
+}
+
+/// The `wt` of the Windows Terminal this process runs in, looked for once.
+fn hosting_wt() -> Option<PathBuf> {
+    static FOUND: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    FOUND
+        .get_or_init(|| {
+            let terminal = hosting_terminal()?;
+            let apps =
+                std::env::var_os("LOCALAPPDATA").map(PathBuf::from)?.join(APP_ALIASES.iter().collect::<PathBuf>());
+            wt_alias(&terminal, &apps).filter(|alias| alias.is_file()).or_else(|| {
+                let beside = terminal.with_file_name(WT_EXE);
+                beside.is_file().then_some(beside)
+            })
+        })
+        .clone()
+}
+
+/// The Windows Terminal this process runs in: the first `WindowsTerminal.exe` up its process tree.
+fn hosting_terminal() -> Option<PathBuf> {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::nothing().with_exe(UpdateKind::OnlyIfNotSet),
+    );
+    let mut pid = sysinfo::get_current_pid().ok()?;
+    for _ in 0..MOST_ANCESTORS {
+        let process = system.process(pid)?;
+        if process.name().eq_ignore_ascii_case(TERMINAL_EXE) {
+            return process.exe().map(Path::to_path_buf);
+        }
+        pid = process.parent()?;
+    }
+    None
+}
+
+/// A packaged Windows Terminal's `wt` alias, from its program's folder:
+/// `…\Microsoft.WindowsTerminalPreview_1.26.3133.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe` is
+/// `<apps>\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\wt.exe`.
+fn wt_alias(terminal: &Path, apps: &Path) -> Option<PathBuf> {
+    let package = terminal.parent()?.file_name()?.to_str()?;
+    let (name, rest) = package.split_once('_')?;
+    let (_, publisher) = rest.rsplit_once("__")?;
+    Some(apps.join(format!("{name}_{publisher}")).join(WT_EXE))
+}
+
 /// Whether a program with this name (`lazygit`, its `.exe` or not) runs with one of `dirs` as its working folder.
 /// Processes whose folder can't be read (another user's, elevated) don't count.
 pub fn running_in(name: &str, dirs: &[&Path]) -> bool {
@@ -483,6 +552,31 @@ mod home_tests {
         assert!(lacks_own_folders(temp.path(), &command));
         std::fs::create_dir_all(temp.join(".venv/Scripts")).unwrap();
         assert!(!lacks_own_folders(temp.path(), &command));
+    }
+}
+
+#[cfg(test)]
+mod terminal_tests {
+    use std::path::{Path, PathBuf};
+
+    use serde_json::json;
+
+    use super::{is_wt, windows_terminal, wt_alias};
+
+    #[test]
+    fn a_terminals_wt_is_its_own_packages_alias_and_the_settings_can_name_one() {
+        let apps = Path::new("C:/Users/me/AppData/Local/Microsoft/WindowsApps");
+        let preview = Path::new(
+            "C:/Program Files/WindowsApps/Microsoft.WindowsTerminalPreview_1.26.3133.0_x64__8wekyb3d8bbwe/WindowsTerminal.exe",
+        );
+        assert_eq!(
+            wt_alias(preview, apps),
+            Some(apps.join("Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe").join("wt.exe"))
+        );
+        assert_eq!(wt_alias(Path::new("C:/tools/terminal/WindowsTerminal.exe"), apps), None, "not a package");
+        let named = windows_terminal(&json!({ "terminal": "C:/tools/wt-canary.exe" }));
+        assert_eq!(named, Some(PathBuf::from("C:/tools/wt-canary.exe")));
+        assert!(is_wt(Path::new("wt")) && is_wt(Path::new("C:/x/WT.EXE")) && !is_wt(Path::new("nvim")));
     }
 }
 

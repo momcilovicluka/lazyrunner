@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use lazyrunner_core::config::Toggle;
 use lazyrunner_core::profile::native;
-use lazyrunner_core::run::tools::{find_on_path, git, running_in};
+use lazyrunner_core::run::tools::{find_on_path, git, running_in, windows_terminal};
 use serde_json::Value;
 
 /// What `"gitTool"` is when the settings don't say.
@@ -76,9 +76,10 @@ impl GitTool {
         running_in(&name, &dirs)
     }
 
-    /// Opens it in a Windows Terminal pane beside this one; returns at once.
-    pub fn open_beside(&self, root: &Path) -> Result<(), String> {
-        let wt = find_on_path("wt").ok_or("Windows Terminal (wt) isn't on PATH")?;
+    /// Opens it in a pane beside this one, in the Windows Terminal lazyrunner runs in (`"terminal"` when set);
+    /// returns at once.
+    pub fn open_beside(&self, root: &Path, config: &Value) -> Result<(), String> {
+        let wt = windows_terminal(config).ok_or("Windows Terminal (wt) isn't on PATH")?;
         Command::new(wt)
             .args(self.split_pane_args(root))
             .spawn()

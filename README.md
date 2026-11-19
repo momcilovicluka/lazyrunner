@@ -1354,7 +1354,8 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `auditParallelism` | `2` | How many apps the audit view (`A`) scans at once, 1 to 8 (`+` / `-` there) |
 | `migrationParallelism` | `3` | How many DbContexts the migrations view (`M`) checks at once, 1 to 8 (`+` / `-` there); a migration runs alone |
-| `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` |
+| `editor` | `"auto"` | Opens a clicked file link: `auto` (VS Code, else Rider, else the default app), `code`, `rider`, `default`, or a command with `{file}`, `{line}`, `{column}` - `wt -w 0 new-tab nvim +{line} {file}` opens a terminal editor in a new tab of the Windows Terminal lazyrunner runs in |
+| `terminal` | `""` | The `wt` that commands starting with `wt` (the editor's, the git tool's pane) run: empty is the Windows Terminal lazyrunner runs in - stable, Preview or Canary, found up the process tree - else `wt` on PATH; a path or name picks one |
 | `hooks` | | Your own commands, run when something happens - see Hooks below |
 | `updateRepoUrl` | | Where updates come from on this machine (a GitHub repo URL; `none`: no updates) |
 | `projects.<id>.theme` | | This project's own theme, instead of `theme` (`t`, then `Tab`) |

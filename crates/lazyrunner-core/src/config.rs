@@ -113,6 +113,7 @@ pub fn defaults() -> Map<String, Value> {
         "theme": "default",
         "gitTool": "lazygit",
         "editor": "auto",
+        "terminal": "",
         "layout": "auto",
         "updateRepoUrl": "",
         "updateBranch": "",
