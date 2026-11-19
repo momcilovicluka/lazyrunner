@@ -57,6 +57,8 @@ pub enum Run {
     JumpForward,
     Follow,
     Diagnostics,
+    /// `, A v`: a read-only snapshot of this run to hand on (#106).
+    Snapshot,
     LevelFilter,
     Mark,
     PrevMark,
@@ -419,6 +421,7 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
         .safe(),
         action("Help", "?", "Key reference", "", Run::Help).safe(),
         action("Help", ", A z", "Diagnostics zip to attach", "", Run::Diagnostics).safe(),
+        action("Help", ", A v", "Snapshot of this run, to hand on", "a read-only page", Run::Snapshot).safe(),
         action("Help", ":", "Command palette", "also Ctrl+P", Run::Palette).safe().alt(&["Ctrl+P"]),
     ]);
     if controller.conflicts.is_empty()

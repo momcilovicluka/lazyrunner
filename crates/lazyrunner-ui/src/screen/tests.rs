@@ -5187,3 +5187,22 @@ async fn the_place_opened_lights_up_and_its_arrow_rises_before_the_chooser_close
     super::editor::settle(&mut screen.ui);
     assert!(screen.ui.overlay.is_none(), "then it closes");
 }
+
+// ---------------------------------------------------------------- a snapshot of the run (#106)
+
+#[tokio::test]
+async fn a_snapshot_is_a_masked_read_only_page_holding_what_get_snapshot_answers() {
+    let mut screen = screen("snapshot", json!({}));
+    screen.output(&["fail: Orders.Db[0]", "      Login failed: Server=db;User Id=sa;Password=hunter2;"]);
+    super::snapshot::take(&mut screen.ui, &mut screen.controller);
+    let folder = screen.controller.state_folder().join("snapshots");
+    let file = std::fs::read_dir(&folder).expect("its folder").flatten().next().expect("written").path();
+    let page = std::fs::read_to_string(&file).expect("readable");
+    assert!(page.contains(r#"<script type="application/json" id="snapshot">"#), "its JSON in it");
+    assert!(page.contains("Login failed") && !page.contains("hunter2"), "the last error, masked");
+    assert!(copied().last().is_some_and(|text| text.ends_with(".html")), "its path copied: {:?}", copied());
+    assert!(super::snapshot::chip(&screen.ui).is_some(), "the panel says so");
+    let answer = agent(&mut screen, "snapshot", json!({}), None);
+    assert_eq!(answer["result"]["apps"][0]["key"], "orders", "{answer}");
+    assert!(!answer.to_string().contains("hunter2"), "masked for an agent too");
+}

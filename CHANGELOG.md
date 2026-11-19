@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.99.0] - 2026-11-19
+
+### Added
+- A snapshot of this run, to hand a teammate or an agent (#106): `, A v` writes one self-contained HTML page - each app's state, port, errors and last error (its own frames bright, the libraries' dim), the last 5 minutes' requests and slowest endpoints, the tests' failures and their likely causes, Health's alerts, the stack map's calls, what's on screen and the screen itself as a picture - in the theme's colours, masked as the diagnostics zip is. Read-only: a picture, not a remote, and it never updates itself. It's kept in the project's state folder (the last 5), its path copied; the screen dims for a moment as it's taken and the panel says so. The JSON in it is what the new `get_snapshot` tool answers.
+
 ## [1.98.1] - 2026-11-19
 
 ### Fixed

@@ -136,6 +136,9 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(seg("   ", C::Gray));
         segs.push(seg(chip, color).at(Target::Health)); // a click opens the Health tab
     }
+    if let Some(chip) = super::snapshot::chip(ui) {
+        segs.push(chip);
+    }
     segs.push(
         seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta).at(Target::Branch),
     );
