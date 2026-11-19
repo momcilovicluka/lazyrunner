@@ -207,8 +207,8 @@ fn copy_timeline(ui: &Ui, controller: &mut Controller, marks: &[(usize, u64)]) {
 
 /// The time of day a line came.
 fn clock(ui: &Ui, born: Instant) -> String {
-    let ago = chrono::TimeDelta::from_std(ui.now.saturating_duration_since(born)).unwrap_or_default();
-    (chrono::Local::now() - ago).format("%H:%M:%S").to_string()
+    let ago = ui.now.saturating_duration_since(born);
+    (jiff::ZonedDateTime::now() - ago).strftime(lazyrunner_core::time::CLOCK).to_string()
 }
 
 /// Focuses `app` and scrolls its marked line `number` into the middle, when the column still shows it.

@@ -260,7 +260,7 @@ impl Traces {
 
     /// The span that served `request`: its app's, its method and path, ending nearest its finish (within 2 s).
     fn server_of(&self, request: &Request) -> Option<&Span> {
-        let finished = request.at.timestamp_nanos_opt()? as u64;
+        let finished = i64::try_from(request.at.timestamp().as_nanosecond()).ok()? as u64;
         let path = request.path.split('?').next().unwrap_or_default();
         self.spans
             .iter()
@@ -430,8 +430,8 @@ Content-Length: {}
 
     #[test]
     fn a_trace_is_decoded_and_its_server_span_gives_the_request_its_exact_nested_timeline() {
-        let at = chrono::Local::now();
-        let end = at.timestamp_nanos_opt().unwrap() as u64;
+        let at = jiff::ZonedDateTime::now();
+        let end = at.timestamp().as_nanosecond() as u64;
         let start = end - 100_000_000;
         let server =
             span_bytes(1, None, SERVER, (start, end), &[("http.request.method", "GET"), ("url.path", "/api/orders")]);

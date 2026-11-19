@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.99.1] - 2026-11-19
+
+### Changed
+- lazyrunner tells and keeps time with jiff instead of chrono, which is no longer maintained: the same times on screen, in the log and in the files it keeps, which read as before (#109).
+
 ## [1.99.0] - 2026-11-19
 
 ### Added

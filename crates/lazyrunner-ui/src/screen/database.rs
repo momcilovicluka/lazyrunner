@@ -146,8 +146,8 @@ fn answer(ui: &Ui, server: &str) -> Seg {
 
 /// How long ago an RFC 3339 time was, as the checklist says it: `12 min ago`, `2 h ago`, `3 d ago`.
 fn ago(at: &str) -> Option<String> {
-    let at = chrono::DateTime::parse_from_rfc3339(at).ok()?;
-    let seconds = (chrono::Local::now().fixed_offset() - at).num_seconds().max(0) as u64;
+    let at = at.parse::<jiff::Timestamp>().ok()?;
+    let seconds = jiff::Timestamp::now().duration_since(at).as_secs().max(0) as u64;
     Some(lazyrunner_core::run::session::ago(Duration::from_secs(seconds)))
 }
 

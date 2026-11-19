@@ -153,7 +153,7 @@ pub struct Suite {
     pub failed: usize,
     pub skipped: usize,
     pub seconds: f64,
-    pub last_run: Option<chrono::DateTime<chrono::Local>>,
+    pub last_run: Option<jiff::ZonedDateTime>,
     /// The output worth showing (passed tests are only counted), the newest last.
     pub output: VecDeque<String>,
     /// Tests the current run has finished.
@@ -270,7 +270,8 @@ impl Suite {
         self.set_tests(tests);
         self.seconds = seconds.unwrap_or_default();
         self.status = if self.failed > 0 { Status::Failed } else { Status::Passed };
-        self.last_run = std::fs::metadata(&file).and_then(|meta| meta.modified()).ok().map(Into::into);
+        let modified = std::fs::metadata(&file).and_then(|meta| meta.modified()).ok();
+        self.last_run = modified.and_then(|at| jiff::ZonedDateTime::try_from(at).ok());
     }
 
     /// A run of the `requested` tests only: their results replace the last ones (jest and vitest also list the
@@ -554,11 +555,9 @@ fn read_trx(text: &str) -> Result<(Vec<TestResult>, Option<f64>), String> {
         })
         .collect();
     let times = document.descendants().find(|node| named(*node, "Times"));
-    let time = |name| {
-        times.and_then(|times| times.attribute(name)).and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
-    };
+    let time = |name| times.and_then(|times| times.attribute(name)).and_then(|at| at.parse::<jiff::Timestamp>().ok());
     let seconds = match (time("start"), time("finish")) {
-        (Some(start), Some(finish)) => Some((finish - start).num_milliseconds() as f64 / 1000.0),
+        (Some(start), Some(finish)) => Some(finish.duration_since(start).as_millis() as f64 / 1000.0),
         _ => None,
     };
     Ok((tests, seconds))

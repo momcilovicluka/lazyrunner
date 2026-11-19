@@ -177,7 +177,7 @@ impl Durations {
         let item = &mut self.items[at];
         item.label = label.to_string();
         let sec = (seconds.max(0.0) * 10.0).round() / 10.0;
-        item.runs.push(Timed { at: chrono::Local::now().to_rfc3339(), sec, ok });
+        item.runs.push(Timed { at: crate::time::now_rfc3339(), sec, ok });
         let extra = item.runs.len().saturating_sub(RUNS_KEPT);
         item.runs.drain(..extra);
         if self.read_only {

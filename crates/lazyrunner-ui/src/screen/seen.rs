@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, Local};
+use jiff::ZonedDateTime;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::audit::Severity;
 use lazyrunner_core::run::requests::Request;
@@ -24,7 +24,7 @@ pub struct Seen {
     /// The newest request's number when the requests view was last open.
     requests: Option<u64>,
     /// Each suite's last finished run then.
-    suites: Option<HashMap<String, Option<DateTime<Local>>>>,
+    suites: Option<HashMap<String, Option<ZonedDateTime>>>,
     /// The pending migrations then: their context's key and their id.
     pending: Option<HashSet<(String, String)>>,
     /// The audit's findings then: each vulnerable package's app and name.
@@ -65,8 +65,8 @@ fn findings(controller: &Controller) -> HashSet<(String, String)> {
         .collect()
 }
 
-fn finished(controller: &Controller) -> HashMap<String, Option<DateTime<Local>>> {
-    controller.suites.iter().flatten().map(|suite| (suite.key.clone(), suite.last_run)).collect()
+fn finished(controller: &Controller) -> HashMap<String, Option<ZonedDateTime>> {
+    controller.suites.iter().flatten().map(|suite| (suite.key.clone(), suite.last_run.clone())).collect()
 }
 
 fn pending(controller: &Controller) -> HashSet<(String, String)> {

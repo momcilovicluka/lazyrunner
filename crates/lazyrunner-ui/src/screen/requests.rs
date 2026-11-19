@@ -616,7 +616,7 @@ fn copy_row(ui: &Ui, controller: &mut Controller, view: &View) {
     let text = match view.tab {
         Tab::Requests => shown(view, controller).get(view.index).map(|request| {
             let (name, url) = (app_name(controller, &request.app), url(controller, request));
-            let at = request.at.format("%Y-%m-%d %H:%M:%S");
+            let at = request.at.strftime(lazyrunner_core::time::DAY_CLOCK);
             format!("{} {url} -> {} in {} ms ({name}, {at})", request.method, request.status, ms(request.ms))
         }),
         Tab::Endpoints => summed(view, controller).get(view.index).map(|endpoint| {
@@ -801,7 +801,7 @@ fn detail(controller: &Controller, request: Option<&Request>) -> String {
     let Some(request) = request else { return String::new() };
     let length = if request.length.is_empty() { String::new() } else { format!(" · {} bytes", request.length) };
     let content = if request.content.is_empty() { String::new() } else { format!(" · {}", request.content) };
-    let (name, at) = (app_name(controller, &request.app), request.at.format("%H:%M:%S"));
+    let (name, at) = (app_name(controller, &request.app), request.at.strftime(lazyrunner_core::time::CLOCK));
     let (method, path, status) = (&request.method, &request.path, request.status);
     format!(" {method} {path}   {status} · {} ms{length}{content} · {name} · {at}", ms(request.ms))
 }
@@ -903,7 +903,7 @@ fn request_details(
         .map(|line| vec![seg(line, C::White)])
         .collect();
     let proto = if request.proto.is_empty() { String::new() } else { format!(" · {}", request.proto) };
-    let (name, at) = (app_name(controller, &request.app), request.at.format("%H:%M:%S"));
+    let (name, at) = (app_name(controller, &request.app), request.at.strftime(lazyrunner_core::time::CLOCK));
     lines.push(vec![
         seg(
             format!("{} {}", request.status, reason(request.status)).trim_end().to_string(),
@@ -1079,7 +1079,7 @@ fn endpoint_details(
         lines.extend(words(&text, width).into_iter().map(|line| vec![seg(line, C::Yellow)]));
     }
     let listed = |request: &Request, first: Seg| {
-        let at = request.at.format("%H:%M:%S");
+        let at = request.at.strftime(lazyrunner_core::time::CLOCK);
         let path = cut(&request.path, width.saturating_sub(20));
         vec![seg("  ", C::Gray), first, seg(format!("  {at}  "), C::DarkGray), seg(path, C::Gray)]
     };
@@ -1186,7 +1186,7 @@ fn request_rows(
     }
     let top = view.index.saturating_sub(height / 2).min(list.len().saturating_sub(height));
     for (index, request) in list.iter().enumerate().skip(top).take(height) {
-        let time = request.at.format("%H:%M:%S").to_string();
+        let time = request.at.strftime(lazyrunner_core::time::CLOCK).to_string();
         let app = pad(&cut(&app_name(controller, &request.app), APP_CELLS), APP_CELLS);
         let n_plus_one = request.db.as_ref().is_some_and(|db| db.repeated.is_some());
         let tag = format!("{}{}", if n_plus_one { "  N+1" } else { "" }, if request.outside { "  ⇄" } else { "" });

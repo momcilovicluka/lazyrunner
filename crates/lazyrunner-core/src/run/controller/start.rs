@@ -448,7 +448,7 @@ impl Controller {
 
 /// The time of day, as pane headers show it.
 pub(super) fn clock() -> String {
-    chrono::Local::now().format("%H:%M:%S").to_string()
+    jiff::ZonedDateTime::now().strftime(crate::time::CLOCK).to_string()
 }
 
 /// Kills another program's process tree (what holds a port lazyrunner needs); true when it is gone.

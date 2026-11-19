@@ -13,7 +13,7 @@ impl Controller {
     pub fn load_session(&mut self) {
         self.resume_choices = Vec::new();
         if self.setting(Toggle::RestoreSession) {
-            let now = chrono::Local::now().fixed_offset();
+            let now = jiff::Timestamp::now();
             self.resume_choices = session::history(&self.state_dir, &self.branch, now);
         }
         self.resume = self.resume_choices.first().cloned();
@@ -35,7 +35,7 @@ impl Controller {
             return;
         }
         let running = self.keys().into_iter().filter(|key| self.is_running(key)).collect();
-        let at = chrono::Local::now().fixed_offset().to_rfc3339();
+        let at = crate::time::now_rfc3339();
         let snapshot = Snapshot { at, branch: self.branch.clone(), running, view };
         if let Err(error) = session::save(&self.state_dir, &snapshot) {
             self.add_log(format!("✗ Couldn't keep the session: {error}"), Hue::Red);

@@ -648,10 +648,10 @@ impl Controller {
     /// A line in the panel's log and in lazyrunner.log.
     pub fn add_log(&mut self, text: impl Into<String>, hue: Hue) {
         let text = text.into();
-        let now = chrono::Local::now();
-        let time = now.format("%H:%M:%S").to_string();
+        let now = jiff::ZonedDateTime::now();
+        let time = now.strftime(crate::time::CLOCK).to_string();
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&self.log_path) {
-            let _ = writeln!(file, "{} {time} {text}", now.format("%Y-%m-%d"));
+            let _ = writeln!(file, "{} {time} {text}", now.strftime(crate::time::DAY));
         }
         self.log.push_back(LogEntry { time, text, hue, task: None });
         while self.log.len() > MAX_LOG_ENTRIES {
@@ -687,7 +687,7 @@ impl Controller {
                     // lazyrunner's own probe of the app isn't one of its requests.
                     if let Some(request) = request.filter(|request| request.path != watch::probe_path(&app)) {
                         self.states[index].requests += 1;
-                        self.requests.add(&key, request, chrono::Local::now());
+                        self.requests.add(&key, request, jiff::ZonedDateTime::now());
                     }
                 }
             }

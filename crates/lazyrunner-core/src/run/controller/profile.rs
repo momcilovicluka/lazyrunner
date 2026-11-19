@@ -65,7 +65,7 @@ impl Controller {
         let (events, state, owned) = (self.events.clone(), self.state_dir.clone(), key.to_string());
         let (sampling, asked) = (running.clone(), stopped.clone());
         tokio::task::spawn_blocking(move || {
-            let at = || chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+            let at = || jiff::ZonedDateTime::now().strftime(crate::time::RFC_3339_SECONDS).to_string();
             let result = if node {
                 profile::ask_node(&state, pid, seconds, &asked)
                     .and_then(|text| profile::from_cpuprofile(&text, &owned, &at(), seconds))

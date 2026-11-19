@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
-use chrono::{DateTime, FixedOffset};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -43,12 +43,12 @@ pub enum Freshness {
 
 impl Snapshot {
     /// How long ago it was kept; none when its time doesn't read.
-    pub fn age(&self, now: DateTime<FixedOffset>) -> Option<Duration> {
-        let at = DateTime::parse_from_rfc3339(&self.at).ok()?;
-        Some(Duration::from_secs((now - at).num_seconds().max(0) as u64))
+    pub fn age(&self, now: Timestamp) -> Option<Duration> {
+        let at = self.at.parse::<Timestamp>().ok()?;
+        Some(Duration::from_secs(now.duration_since(at).as_secs().max(0) as u64))
     }
 
-    pub fn freshness(&self, now: DateTime<FixedOffset>) -> Freshness {
+    pub fn freshness(&self, now: Timestamp) -> Freshness {
         match self.age(now).map_or(u64::MAX, |age| age.as_secs()) {
             age if age < HOUR => Freshness::Recent,
             age if age < DAY => Freshness::Today,
@@ -57,7 +57,7 @@ impl Snapshot {
     }
 
     /// Its row in the startup checklist: `2 h ago · 3 apps were running`, and the branch when it's another.
-    pub fn summary(&self, branch: &str, now: DateTime<FixedOffset>) -> String {
+    pub fn summary(&self, branch: &str, now: Timestamp) -> String {
         let age = self.age(now).map_or_else(|| "some time ago".to_string(), ago);
         let running = match self.running.len() {
             0 => "nothing was running".to_string(),
@@ -103,7 +103,7 @@ pub fn save(state_dir: &Path, snapshot: &Snapshot) -> Result<()> {
 
 /// The snapshots to offer on `branch`, the first resumed unless another is picked: its own (the newest first), then
 /// the other branches' - at most `KEPT`, none older than a week.
-pub fn history(state_dir: &Path, branch: &str, now: DateTime<FixedOffset>) -> Vec<Snapshot> {
+pub fn history(state_dir: &Path, branch: &str, now: Timestamp) -> Vec<Snapshot> {
     let fresh = |snapshot: &Snapshot| snapshot.age(now).is_some_and(|age| age < MOST_AGE);
     let (mut own, mut others) = (Vec::new(), Vec::new());
     for (name, value) in all(state_dir) {
@@ -115,7 +115,7 @@ pub fn history(state_dir: &Path, branch: &str, now: DateTime<FixedOffset>) -> Ve
 }
 
 /// The snapshot to offer on `branch`: its own newest, else the newest of another branch's.
-pub fn load(state_dir: &Path, branch: &str, now: DateTime<FixedOffset>) -> Option<Snapshot> {
+pub fn load(state_dir: &Path, branch: &str, now: Timestamp) -> Option<Snapshot> {
     history(state_dir, branch, now).into_iter().next()
 }
 
@@ -124,8 +124,8 @@ mod tests {
     use super::*;
     use crate::testing::TempDir;
 
-    fn at(text: &str) -> DateTime<FixedOffset> {
-        DateTime::parse_from_rfc3339(text).unwrap()
+    fn at(text: &str) -> Timestamp {
+        text.parse().unwrap()
     }
 
     fn snapshot(branch: &str, at: &str, running: &[&str]) -> Snapshot {

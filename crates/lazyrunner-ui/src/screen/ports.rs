@@ -266,8 +266,8 @@ fn age(took: Duration) -> String {
 
 /// The time of day `at` was: 09:39:58.
 fn clock(ui: &Ui, at: Instant) -> String {
-    let ago = chrono::TimeDelta::from_std(ui.now.saturating_duration_since(at)).unwrap_or_default();
-    (chrono::Local::now() - ago).format("%H:%M:%S").to_string()
+    let ago = ui.now.saturating_duration_since(at);
+    (jiff::ZonedDateTime::now() - ago).strftime(lazyrunner_core::time::CLOCK).to_string()
 }
 
 /// `segs` lit in `color`: a flash.

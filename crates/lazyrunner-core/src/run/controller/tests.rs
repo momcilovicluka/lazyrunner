@@ -155,8 +155,8 @@ async fn a_browser_apps_calls_are_in_its_config_and_their_figures_what_the_api_s
         ms,
         ..Default::default()
     };
-    sample.requests.add("orders", finished(200, 20.0), chrono::Local::now());
-    sample.requests.add("orders", finished(500, 80.0), chrono::Local::now());
+    sample.requests.add("orders", finished(200, 20.0), jiff::ZonedDateTime::now());
+    sample.requests.add("orders", finished(500, 80.0), jiff::ZonedDateTime::now());
     let edges = sample.stack_edges();
     let shop = edges.iter().find(|edge| edge.from == "shop" && edge.to == "orders").expect("still there");
     assert!(shop.served, "a browser app can't log its calls: what orders served stands for them");

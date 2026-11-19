@@ -28,7 +28,7 @@ pub fn lead(lead: &Lead) -> String {
 
 /// When it last passed, as the block says it: "09:41" today, "11-02 09:41" before.
 fn when(at: &str) -> String {
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let today = jiff::ZonedDateTime::now().strftime(lazyrunner_core::time::DAY).to_string();
     let (day, time) = at.split_once(' ').unwrap_or(("", at));
     let time: String = time.chars().take(5).collect();
     if day == today || day.is_empty() { time } else { format!("{} {time}", day.get(5..).unwrap_or(day)) }

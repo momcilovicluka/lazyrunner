@@ -10,7 +10,7 @@
 
 use std::time::{Duration, Instant};
 
-use chrono::{Datelike, NaiveDate};
+use jiff::civil::Date;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::migrations::{Context, Migration, Run, Status};
 
@@ -136,19 +136,20 @@ pub fn bar(done: usize, total: usize) -> String {
     format!("{}{} {done}/{total}", "▰".repeat(filled), "▱".repeat(BAR_CELLS - filled))
 }
 
-fn date(id: &str) -> Option<NaiveDate> {
+fn date(id: &str) -> Option<Date> {
     let stamp = id.split('_').next().filter(|stamp| stamp.len() == 14)?;
-    NaiveDate::parse_from_str(&stamp[..8], "%Y%m%d").ok()
+    Date::strptime("%Y%m%d", &stamp[..8]).ok()
 }
 
-fn month(date: NaiveDate) -> i32 {
-    date.year() * 12 + date.month0() as i32
+fn month(date: Date) -> i32 {
+    i32::from(date.year()) * 12 + i32::from(date.month()) - 1
 }
 
 /// A month's tick: `Apr 2026`, and after a gap how many months on.
 fn tick(month: i32, after: i32) -> String {
-    let start = NaiveDate::from_ymd_opt(month.div_euclid(12), month.rem_euclid(12) as u32 + 1, 1);
-    let name = start.map_or(String::new(), |start| start.format("%b %Y").to_string());
+    let year = i16::try_from(month.div_euclid(12)).ok();
+    let start = year.and_then(|year| Date::new(year, month.rem_euclid(12) as i8 + 1, 1).ok());
+    let name = start.map_or(String::new(), |start| start.strftime("%b %Y").to_string());
     if after >= 2 { format!(" {name}  · {after} months later") } else { format!(" {name}") }
 }
 

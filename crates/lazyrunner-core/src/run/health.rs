@@ -158,7 +158,7 @@ impl Watch {
 
     /// Notes an alert or a recovery in the log, the newest last.
     pub fn note(&mut self, text: &str, recovered: bool) {
-        let at = chrono::Local::now().format("%H:%M:%S").to_string();
+        let at = jiff::ZonedDateTime::now().strftime(crate::time::CLOCK).to_string();
         self.log.push_back(Logged { at, text: text.to_string(), recovered });
         while self.log.len() > LOGGED {
             self.log.pop_front();

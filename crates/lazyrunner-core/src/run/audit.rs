@@ -202,7 +202,7 @@ pub fn compare(before: &[Package], scan: &mut AppAudit) {
 
 /// How long ago Unix time `at` was: `just now`, `5 min ago`, `2 h ago`, `3 d ago`.
 pub fn age(at: i64) -> String {
-    let seconds = (chrono::Local::now().timestamp() - at).max(0);
+    let seconds = (jiff::Timestamp::now().as_second() - at).max(0);
     match seconds {
         0..=59 => "just now".into(),
         60..=3_599 => format!("{} min ago", seconds / 60),
@@ -1013,6 +1013,6 @@ mod tests {
         assert_eq!(scan.fixed, [Fixed { name: "lodash".into(), from: "4.17.19".into(), to: Some("4.18.1".into()) }]);
         assert_eq!(scan.new, ["minimist", "qs"], "a new advisory, a new package");
         assert_eq!(scan.new_advisories, ["GHSA-3", "GHSA-4"]);
-        assert_eq!(age(chrono::Local::now().timestamp() - 7_200), "2 h ago");
+        assert_eq!(age(jiff::Timestamp::now().as_second() - 7_200), "2 h ago");
     }
 }

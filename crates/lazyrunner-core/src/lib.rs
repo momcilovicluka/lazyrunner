@@ -15,4 +15,5 @@ pub mod profiletools;
 pub mod run;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;
+pub mod time;
 pub mod update;

@@ -610,7 +610,7 @@ pub fn extract(archive: &Path, to: &Path) -> io::Result<()> {
 }
 
 fn log(state_dir: &Path, text: &str) {
-    let line = format!("{} {text}\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+    let line = format!("{} {text}\n", jiff::ZonedDateTime::now().strftime(crate::time::DAY_CLOCK));
     if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(state_dir.join("lazyrunner.log")) {
         let _ = file.write_all(line.as_bytes());
     }

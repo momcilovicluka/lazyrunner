@@ -10,9 +10,9 @@ publish.workspace = true
 [dependencies]
 anyhow.workspace = true
 arboard = { version = "3.7.0", default-features = false }
-chrono = "0.4.45"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures-util = "0.3"
+jiff = "1.0.1"
 lazyrunner-core.workspace = true
 notify-rust = "4.18.2"
 qrcode = { version = "0.14.1", default-features = false }

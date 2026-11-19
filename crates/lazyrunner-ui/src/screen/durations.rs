@@ -220,8 +220,8 @@ fn chart(runs: &[Timed], width: usize, height: usize, grown: f64) -> Vec<Vec<Seg
 
 /// When a run finished, as it was recorded: 05 Nov 10:42.
 fn when(run: &Timed) -> String {
-    let at = chrono::DateTime::parse_from_rfc3339(&run.at);
-    at.map_or_else(|_| run.at.clone(), |at| at.format("%d %b %H:%M").to_string())
+    let at = lazyrunner_core::time::as_written(&run.at);
+    at.map_or_else(|| run.at.clone(), |at| at.strftime("%d %b %H:%M").to_string())
 }
 
 /// The picked item's details: its name and kind, its last and usual and the trend, its chart, and its runs, newest

@@ -10,8 +10,6 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant, unmaintained: through notify-rust on Linux, no replacement yet" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names, unmaintained: through notify-rust on Linux, no replacement yet" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive, unmaintained: through notify-rust on Linux, no replacement yet" },
-    # chrono is used throughout; it still works, and moving to a maintained crate is its own change (#109).
-    { id = "RUSTSEC-2026-0543", reason = "chrono, unmaintained: no safe upgrade; the move to a maintained crate is #109" },
 ]
 
 [licenses]
