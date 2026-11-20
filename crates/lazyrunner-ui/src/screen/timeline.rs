@@ -17,7 +17,7 @@ use lazyrunner_core::run::requests::Request;
 
 use super::columns::{contains_ignore_case, fit, line_color};
 use super::icons;
-use super::seg::{Seg, on, pad, seg};
+use super::seg::{Seg, focus_row, pad, seg};
 use super::theme::C;
 use super::timeline_strip;
 use super::{Overlay, Ui};
@@ -347,7 +347,7 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, height: usize) -> Ve
     for (at, row) in all.iter().enumerate().take(end).skip(start) {
         let Some(segs) = draw(ui, controller, row, inner) else { continue };
         drawn.push(if at + 1 == end && scroll > 0 && !matches!(row, Row::Gap(_)) {
-            vec![on(segs.iter().map(|seg| seg.text.as_str()).collect::<String>(), C::FocusText, C::FocusBack)]
+            focus_row(segs, inner)
         } else {
             segs
         });

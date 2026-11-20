@@ -18,7 +18,7 @@ use super::columns::spinner;
 use super::icons::{self, Icon};
 use super::mouse::Target;
 use super::overlays::{LOGO, boxed};
-use super::seg::{Seg, aim, on, pad, seg};
+use super::seg::{Seg, aim, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui, keys};
 
@@ -230,6 +230,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         }
         _ => 0,
     };
+    let bar = ui.motion.bar(index, ui.now);
     let (nerd, animated, tick, seconds) = (ui.nerd, !ui.reduced_motion, ui.tick(), ui.seconds());
     let spin = animated.then(|| spinner(ui).to_string());
     let widest = all
@@ -258,9 +259,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     for (at, link) in all.iter().enumerate() {
         let icon = icons::icon(nerd, link.icon);
         let label = pad(link.label, LABEL_CELLS);
-        let line = if at == index {
-            let row = ui.scrolling_parts(&[&format!(" ▸ {}  {icon}  ", link.key), &label, link.hint], inner);
-            vec![on(row, C::Black, C::Cyan)]
+        let line = if at == bar {
+            let row = vec![
+                seg(format!(" ▸ {}  {icon}  ", link.key), C::White),
+                seg(label, C::White),
+                seg(link.hint, C::Gray),
+            ];
+            super::overlays::on_bar(ui, row, (1, 2), inner)
         } else {
             vec![
                 seg(format!("   {}  ", link.key), C::Cyan),

@@ -25,7 +25,7 @@ use super::theme::C;
 use super::{Overlay, Ui};
 
 /// The edges draw in as it opens; a new failure pulses its edge twice.
-const REVEAL: Duration = Duration::from_millis(300);
+const EDGES_IN: Duration = Duration::from_millis(300);
 const PULSE: Duration = Duration::from_millis(800);
 const PULSE_STEP: u128 = 200;
 /// A dot's speed along a busy edge, cells a second: this, and this much more per call a second, up to the most.
@@ -383,7 +383,7 @@ fn motion(ui: &Ui, opened: Instant, traffic: &Traffic, dots: &mut Dots, edge: &s
         return Motion::default();
     }
     let since = ui.now.saturating_duration_since(opened);
-    let shown = since.as_secs_f64() / REVEAL.as_secs_f64();
+    let shown = since.as_secs_f64() / EDGES_IN.as_secs_f64();
     let speed = (DOT_SPEED + traffic.per_second * DOT_PER_CALL).min(DOT_FASTEST);
     let travelled = dots.advance(edge, if traffic.per_second > 0.0 { speed } else { 0.0 }, ui.now);
     let dot = (traffic.per_second > 0.0).then_some((travelled, traffic.dot));
@@ -397,7 +397,7 @@ fn spark(ui: &Ui, opened: Instant, dots: &mut Dots, edge: &str, color: C) -> Mot
     if !moving(ui) {
         return Motion::default();
     }
-    let shown = ui.now.saturating_duration_since(opened).as_secs_f64() / REVEAL.as_secs_f64();
+    let shown = ui.now.saturating_duration_since(opened).as_secs_f64() / EDGES_IN.as_secs_f64();
     let travelled = dots.advance(&format!("fault:{edge}"), FAULT_SPEED, ui.now);
     Motion { shown, dot: Some((travelled, color)), color: None, glyph: SPARK }
 }
@@ -555,7 +555,7 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     }
     let pulsing = |edge: &calls::Edge| edge.last_failed.is_some_and(|at| ui.now.saturating_duration_since(at) < PULSE);
     let busy_database = controller.database_users().iter().any(|key| controller.database_commands(key) > 0);
-    ui.now.saturating_duration_since(opened) < REVEAL
+    ui.now.saturating_duration_since(opened) < EDGES_IN
         || busy_database
         || controller.faults().iter().any(|fault| fault.to_app.is_some())
         || controller.stack_edges().iter().any(|edge| edge.calls > 0 || pulsing(edge))

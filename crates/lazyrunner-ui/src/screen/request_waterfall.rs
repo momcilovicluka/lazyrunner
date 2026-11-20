@@ -9,10 +9,9 @@ use lazyrunner_core::run::waterfall::{self, Kind, Span, Waterfall};
 
 use super::Ui;
 use super::icons::{self, Icon};
-use super::seg::{Seg, seg};
+use super::seg::{EIGHTHS, Seg, seg};
 use super::theme::C;
 
-pub(super) const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
 /// The spans listed at most; the rest are counted.
 const MOST_SPANS: usize = 8;
 /// A row's label, and its time's cells.

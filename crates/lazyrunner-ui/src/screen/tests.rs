@@ -149,6 +149,15 @@ impl Screen {
         self.render(SIZE.0, SIZE.1)
     }
 
+    /// The frame's cells, colours and all, and its size.
+    fn cells(&mut self) -> (ratatui::buffer::Buffer, ratatui::layout::Rect) {
+        let mut terminal = Terminal::new(TestBackend::new(SIZE.0, SIZE.1)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut self.ui, &self.controller)).unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        let area = buffer.area;
+        (buffer, area)
+    }
+
     fn press(&mut self, spec: &str) {
         for key in crate::keys::parse(spec).unwrap() {
             keys::press(&mut self.ui, &mut self.controller, key);
@@ -291,6 +300,66 @@ async fn focused_app_menu() {
     let mut screen = screen("snap-menu", json!({}));
     screen.press("x");
     insta::assert_snapshot!(screen.frame());
+}
+
+/// Whether the row holding `text` is on the selection bar where `text` starts (its cell on the focus background).
+fn on_the_bar(screen: &mut Screen, text: &str) -> bool {
+    use super::theme::C;
+    let (buffer, area) = screen.cells();
+    let focus = screen.ui.theme.style(C::FocusText, Some(C::FocusBack)).bg;
+    (0..area.height).any(|y| {
+        let row: Vec<&str> = (0..area.width).map(|x| buffer[(x, y)].symbol()).collect();
+        (0..row.len()).any(|x| row[x..].concat().starts_with(text) && buffer[(x as u16, y)].bg == focus.unwrap())
+    })
+}
+
+#[tokio::test]
+async fn the_menus_selection_bar_slides_a_row_at_a_time_then_settles() {
+    let mut screen = screen("menu-bar", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.press("x");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(200);
+    assert!(on_the_bar(&mut screen, "Start / stop the focused app"), "it opens on the first item");
+    screen.press("j j");
+    assert!(on_the_bar(&mut screen, "Start / stop the focused app"), "the bar sets off from where it was");
+    screen.ui.now += super::motion::BAR_STEP;
+    assert!(on_the_bar(&mut screen, "Start the focused app"), "a row on");
+    assert!(!on_the_bar(&mut screen, "Start / stop the focused app"));
+    screen.ui.now += super::motion::BAR_STEP;
+    assert!(on_the_bar(&mut screen, "Stop the focused app"), "and onto the chosen one");
+    assert!(!screen.ui.motion.active(screen.ui.now), "where it settles");
+
+    let mut still = self::screen("menu-bar-still", json!({ "reducedMotion": true }));
+    still.ui.motion.enabled = true;
+    still.press("x");
+    still.frame();
+    still.press("j j");
+    assert!(on_the_bar(&mut still, "Stop the focused app"), "with reduced motion it's there at once");
+}
+
+#[tokio::test]
+async fn the_selected_request_keeps_its_red_status_on_the_bar() {
+    use super::theme::C;
+    let mut screen = screen("requests-selected-colours", json!({}));
+    with_requests(&mut screen);
+    screen.press("H");
+    for _ in 0..4 {
+        if on_the_bar(&mut screen, "/api/invoices/7") {
+            break;
+        }
+        screen.press("j");
+    }
+    assert!(on_the_bar(&mut screen, "/api/invoices/7"), "the failed request chosen: {}", screen.frame());
+    let red = screen.ui.theme.style(C::Red, Some(C::FocusBack));
+    let (buffer, area) = screen.cells();
+    let status = (0..area.height).find_map(|y| {
+        let symbols: Vec<&str> = (0..area.width).map(|x| buffer[(x, y)].symbol()).collect();
+        let at = (0..symbols.len()).find(|&at| symbols[at..].concat().starts_with("500"))?;
+        symbols.concat().contains("/api/invoices/7").then(|| &buffer[(at as u16, y)])
+    });
+    let status = status.expect("its status on screen");
+    assert_eq!((Some(status.fg), Some(status.bg)), (red.fg, red.bg), "a red 500 on the focus colours");
 }
 
 #[tokio::test]
@@ -1267,7 +1336,7 @@ async fn a_run_moves_the_bead_a_node_a_hop_and_says_where_it_failed() {
     let invoices = line_with(&frame, "Invoices");
     assert!(invoices.contains('●') && invoices.contains("Invoices  ◂ applying Refunds…"), "{frame}");
     assert!(line_with(&frame, "  Refunds").contains('○'), "not there yet: {frame}");
-    assert!(frame.contains("▰▰▱▱ 1/2"), "the list's bar: {frame}");
+    assert!(frame.contains("██▱▱ 1/2"), "the list's bar: {frame}");
     run.ended = Some((now - Duration::from_secs(1), Some("Invalid column name 'Total'.".into())));
     set(&mut screen, &run, Ef::Ok);
     let frame = screen.frame();

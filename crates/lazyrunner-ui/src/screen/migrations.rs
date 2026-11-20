@@ -14,7 +14,7 @@ use super::icons::{self, Icon};
 use super::migrations_rail::{self, Look};
 use super::mouse::Target;
 use super::overlays::boxed;
-use super::seg::{Seg, aim, on, pad, seg, take_cells};
+use super::seg::{Seg, aim, focus_row, pad, seg, take_cells};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -331,11 +331,20 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
             };
             let room = list_width.saturating_sub(summary.chars().count() + 7).max(4);
             let name = pad(&cut(&label, room), room);
-            let row = if at == selected {
-                let back = if picking.is_none() { C::FocusBack } else { C::DarkGray };
-                vec![on(pad(&format!(" ▸ {icon} {name} {summary}"), list_width), C::FocusText, back)]
-            } else {
-                vec![seg(format!("   {icon} "), color), seg(format!("{name} "), C::Gray), seg(summary, color)]
+            let marker = if at == selected { " ▸" } else { "  " };
+            let row =
+                vec![seg(format!("{marker} {icon} "), color), seg(format!("{name} "), C::Gray), seg(summary, color)];
+            let row = match (at == selected, picking) {
+                (false, _) => row,
+                (true, None) => focus_row(row, list_width),
+                // While a migration is picked the list's row stays lit, dimmer.
+                (true, Some(_)) => focus_row(row, list_width)
+                    .into_iter()
+                    .map(|part| match part.bg {
+                        Some(C::FocusBack) => Seg { bg: Some(C::DarkGray), ..part },
+                        _ => part,
+                    })
+                    .collect(),
             };
             aim(row, Target::Item(at))
         })
@@ -365,7 +374,7 @@ fn summary(context: &Context, look: &Look) -> (String, String, C) {
         Status::Queued => (mark(Icon::Queued), "queued".into(), C::DarkGray),
         Status::Loading => (spin.to_string(), "checking…".into(), C::Yellow),
         Status::Migrating => match migrations_rail::progress(context, look) {
-            Some((done, total)) => (spin.to_string(), migrations_rail::bar(done, total), C::Yellow),
+            Some((travelled, total)) => (spin.to_string(), migrations_rail::bar(travelled, total), C::Yellow),
             None => (spin.to_string(), "migrating…".into(), C::Yellow),
         },
         Status::Error => (mark(Icon::Warn), "failed".into(), C::Red),

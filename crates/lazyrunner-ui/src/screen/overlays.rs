@@ -14,7 +14,7 @@ use super::columns::{fit, hue_color, spinner};
 use super::icons::{self, Icon};
 use super::motion::{FLASH, Spot};
 use super::mouse::Target;
-use super::seg::{Seg, aim, limit, on, pad, seg, width};
+use super::seg::{Seg, aim, eighths, focus_row, focus_seg, gauge, keycaps, limit, on, pad, seg, width};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -31,6 +31,13 @@ const TWO_PANES_FROM: usize = 110;
 const FIX_CELLS: usize = 6;
 /// A check's row ends with how long it took and a bar of its share: this many cells.
 const TOOK_CELLS: usize = 10;
+/// The cells the x menu's and the settings' keycaps take at least; the install and copy boxes' keycaps; the copy
+/// box's labels.
+const MENU_KEYS: usize = 8;
+const BOX_KEYS: usize = 5;
+const COPY_LABEL: usize = 22;
+/// Where the header's bar of the checks done keeps its glide.
+const DOCTOR_BAR: &str = "doctor:checked";
 pub const WHATS_NEW_MAX_LINES: usize = 12;
 const VERSION: &str = lazyrunner_core::changelog::VERSION;
 
@@ -110,9 +117,23 @@ fn switch(label: &str) -> Option<(bool, &str)> {
     label.strip_prefix("[x] ").map(|rest| (true, rest)).or_else(|| label.strip_prefix("[ ] ").map(|rest| (false, rest)))
 }
 
-/// A selected item in parts (key, label, hint): when it doesn't fit, only its tail scrolls (`Ui::scrolling_parts`).
-fn selected_parts(ui: &Ui, parts: &[&str], inner: usize) -> Vec<Seg> {
-    vec![on(ui.scrolling_parts(parts, inner), C::Black, C::Cyan)]
+/// An item's keys as keycaps after a space, padded to `cells` (a space after them at least): dark, or standing out
+/// on the selection bar, as the palette's are.
+pub(super) fn key_caps(key: &str, on_bar: bool, cells: usize) -> Vec<Seg> {
+    let (fg, bg) = if on_bar { (C::FocusBack, C::FocusText) } else { (C::White, C::DarkGray) };
+    let mut caps = vec![seg(" ", C::Gray)];
+    caps.extend(keycaps(key, fg, bg));
+    caps.push(seg(" ".repeat(cells.saturating_sub(width(&caps)).max(1)), C::Gray));
+    caps
+}
+
+/// A row on the selection bar, `inner` wide, keeping its colours: when it doesn't fit, what's after its first
+/// `keep.1` segments (its hint) scrolls sideways, or all after its first `keep.0` (its keys) when that leaves too
+/// little room.
+pub(super) fn on_bar(ui: &Ui, segs: Vec<Seg>, (keys, named): (usize, usize), inner: usize) -> Vec<Seg> {
+    let tail = ui.scrolling_row(segs.clone(), named, inner);
+    let row = if width(&tail) > inner { ui.scrolling_row(segs, keys, inner) } else { tail };
+    focus_row(row, inner)
 }
 
 /// A box's inner width: room for its widest row, at least `usual` (so boxes keep their size), never more than the
@@ -134,9 +155,10 @@ pub fn menu_items(ui: &Ui, controller: &Controller) -> Vec<Action> {
 pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let items = menu_items(ui, controller);
     const INNER: usize = 64;
+    let keys = items.iter().map(|item| width(&key_caps(&item.key, false, 0))).max().unwrap_or(0).max(MENU_KEYS);
     let widest = items
         .iter()
-        .map(|item| 8 + item.label.width() + if item.hint.is_empty() { 0 } else { 2 + item.hint.width() })
+        .map(|item| keys + item.label.width() + if item.hint.is_empty() { 0 } else { 2 + item.hint.width() })
         .max()
         .unwrap_or(0);
     let inner = fit_inner(cells, INNER, widest);
@@ -147,8 +169,9 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         }
         _ => 0,
     };
+    let bar = ui.motion.bar(index, ui.now);
     let row = |i: usize, item: &Action| {
-        let key = pad(&format!(" {}", item.key), 8);
+        let key = pad(&format!(" {}", item.key), keys);
         let hint = if item.hint.is_empty() { String::new() } else { format!("  {}", item.hint) };
         // A setting's [x] / [ ] is a switch: a green ● on, a dim ○ off.
         let switch = switch(&item.label);
@@ -160,17 +183,16 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             let line = pad(&format!("{key}{label}{hint}"), inner);
             return aim(vec![on(line, C::Black, C::Green)], Target::Item(i));
         }
-        if i == index {
-            let label = if item.hint.is_empty() { label } else { format!("{label}  ") };
-            return aim(selected_parts(ui, &[&key, &label, &item.hint], inner), Target::Item(i));
-        }
-        let mut segs = vec![seg(key, C::Cyan)];
+        let mut segs = key_caps(&item.key, i == bar, keys);
+        let caps = segs.len();
         match switch {
             Some((true, rest)) => segs.extend([seg("● ", C::Green), seg(rest.to_string(), C::White)]),
             Some((false, rest)) => segs.extend([seg("○ ", C::DarkGray), seg(rest.to_string(), C::Gray)]),
             None => segs.push(seg(item.label.clone(), C::White)),
         }
+        let named = segs.len();
         segs.push(seg(hint, C::DarkGray));
+        let segs = if i == bar { on_bar(ui, segs, (caps, named), inner) } else { segs };
         aim(segs, Target::Item(i))
     };
     // The settings by group, a title over each, when there's room for them.
@@ -224,18 +246,16 @@ pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
         }
         _ => 0,
     };
+    let bar = ui.motion.bar(index, ui.now);
     let lines: Vec<Vec<Seg>> = INSTALLS
         .iter()
         .enumerate()
         .map(|(i, (key, command, hint))| {
-            let key = pad(&format!(" {key}"), 5);
-            if i == index {
-                return aim(selected_parts(ui, &[&key, &format!("{command}  "), hint], inner), Target::Item(i));
-            }
-            aim(
-                vec![seg(key, C::Cyan), seg(*command, C::White), seg(format!("  {hint}"), C::DarkGray)],
-                Target::Item(i),
-            )
+            let mut segs = key_caps(key, i == bar, BOX_KEYS);
+            let caps = segs.len();
+            segs.extend([seg(*command, C::White), seg(format!("  {hint}"), C::DarkGray)]);
+            let segs = if i == bar { on_bar(ui, segs, (caps, caps + 1), inner) } else { segs };
+            aim(segs, Target::Item(i))
         })
         .collect();
     let focused = controller.apps.get(ui.focus).map(|app| app.key.as_str());
@@ -265,6 +285,7 @@ pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         _ => 0,
     };
     let counts = counts(ui, controller);
+    let bar = ui.motion.bar(index, ui.now);
     let lines: Vec<Vec<Seg>> = PICKS
         .iter()
         .zip(counts)
@@ -280,13 +301,13 @@ pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
                 }
                 Pick::Search | Pick::Output => plural(count, "line", "lines"),
             };
-            let key = pad(&format!(" {key}"), 5);
-            let label = pad(label, 22);
-            if i == index {
-                return aim(selected_parts(ui, &[&key, &label, &size], INNER), Target::Item(i));
-            }
+            let label = pad(label, COPY_LABEL);
             let color = if count == 0 { C::DarkGray } else { C::White };
-            aim(vec![seg(key, C::Cyan), seg(label, color), seg(size, C::DarkGray)], Target::Item(i))
+            let mut segs = key_caps(key, i == bar, BOX_KEYS);
+            let caps = segs.len();
+            segs.extend([seg(label, color), seg(size, C::DarkGray)]);
+            let segs = if i == bar { on_bar(ui, segs, (caps, caps + 1), INNER) } else { segs };
+            aim(segs, Target::Item(i))
         })
         .collect();
     let app = controller.apps.get(ui.focus).map_or(String::new(), |app| app.name.clone());
@@ -507,6 +528,8 @@ pub fn checklist(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let news_rows = if news.is_empty() { 0 } else { news.len().min(WHATS_NEW_MAX_LINES) + 2 };
     let fold = 7 + groups(list).len() + list.items.len() + news_rows > rows.saturating_sub(4);
     let (mut left, picked) = checks_pane(ui, list, left_width, wide, fold);
+    let checked = list.tally(moving(ui).then_some(ui.now)).done as f64 / list.items.len().max(1) as f64;
+    let checked = if moving(ui) { ui.glide(DOCTOR_BAR, checked) } else { checked };
     let bar = ui.motion.bar(picked, ui.now);
     let bright = ui.motion.lit(&Spot::Wrapped, ui.now).is_some();
     if let Some(row) = left.get_mut(bar) {
@@ -531,7 +554,7 @@ pub fn checklist(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     }
     left.extend([Vec::new(), legend(ui)]);
     let right = if wide { details(ui, list, list.selected, right_width, false) } else { Vec::new() };
-    let mut lines = header(ui, list, inner);
+    let mut lines = header(ui, list, inner, checked);
     lines.push(Vec::new());
     for at in 0..left.len().max(right.len()) {
         let mut row = fit(left.get(at).cloned().unwrap_or_default(), left_width);
@@ -593,17 +616,13 @@ fn checks_pane(ui: &Ui, list: &Checklist, width: usize, wide: bool, fold: bool) 
 /// The selection bar across a row of the checks: in the focus colours, or bright as it goes round the end of the
 /// list. What has colours of its own (a `FIX` tag, a mark landing) keeps them.
 fn light(row: &mut Vec<Seg>, width: usize, bright: bool) {
-    *row = fit(std::mem::take(row), width);
-    for part in row.iter_mut().filter(|part| part.bg.is_none()) {
-        if bright {
-            (part.fg, part.bg) = (C::Black, Some(C::Cyan));
-            continue;
-        }
-        part.bg = Some(C::FocusBack);
-        if matches!(part.fg, C::Gray | C::DarkGray | C::White) {
-            part.fg = C::FocusText;
-        }
-    }
+    *row = fit(std::mem::take(row), width)
+        .into_iter()
+        .map(|part| match part.bg {
+            None if bright => Seg { fg: C::Black, bg: Some(C::Cyan), ..part },
+            _ => focus_seg(part),
+        })
+        .collect();
 }
 
 /// Whether the doctor moves: not with reduced motion, nor in the screen tests' frozen frames.
@@ -617,7 +636,7 @@ fn countdown(ui: &Ui, list: &Checklist, inner: usize) -> Vec<Seg> {
     let Some((left, seconds)) = list.counting_down(ui.now).filter(|_| moving(ui)) else { return Vec::new() };
     let text = format!(" {} starting in {seconds} s  ", icons::icon(ui.nerd, Icon::Hourglass));
     let cells = inner.saturating_sub(text.width());
-    let bar = share_bar(left, cells).trim_end().to_string();
+    let bar = eighths(left, cells).trim_end().to_string();
     let rest = cells.saturating_sub(bar.width());
     vec![seg(text, C::Cyan), seg(bar, C::Cyan), seg("─".repeat(rest), C::DarkGray)]
 }
@@ -663,8 +682,9 @@ fn groups(list: &Checklist) -> Vec<(Group, Vec<usize>)> {
     groups
 }
 
-/// The header: the project, a bar of the checks done, what they found, how long they took and the slowest.
-fn header(ui: &Ui, list: &Checklist, inner: usize) -> Vec<Vec<Seg>> {
+/// The header: the project, a bar of the checks done (`checked`, gliding as they finish), what they found, how long
+/// they took and the slowest.
+fn header(ui: &Ui, list: &Checklist, inner: usize, checked: f64) -> Vec<Vec<Seg>> {
     let total = list.items.len();
     let tally = list.tally(moving(ui).then_some(ui.now));
     let done = tally.done;
@@ -674,12 +694,9 @@ fn header(ui: &Ui, list: &Checklist, inner: usize) -> Vec<Vec<Seg>> {
     }
     first.push(seg(" startup checks", C::DarkGray));
     let cells = (inner / 4).clamp(10, 30);
-    let filled = (done * cells).checked_div(total).unwrap_or(0);
-    let mut second = vec![
-        seg("▰".repeat(filled), C::Green),
-        seg("▱".repeat(cells - filled), C::DarkGray),
-        seg(format!("  {done} / {total} checks   "), C::Gray),
-    ];
+    let (filled, track) = gauge(checked, cells);
+    let mut second =
+        vec![seg(filled, C::Green), seg(track, C::DarkGray), seg(format!("  {done} / {total} checks   "), C::Gray)];
     let kinds =
         [(Status::Ok, C::Green), (Status::Warn, C::Yellow), (Status::Fail, C::Red), (Status::Skip, C::DarkGray)];
     for (at, (status, color)) in kinds.into_iter().enumerate() {
@@ -939,20 +956,9 @@ fn with_took(
     let text = if seconds < 10.0 { format!("{seconds:.1} s") } else { format!("{seconds:.0} s") };
     row.push(seg(format!("{text:>7} "), C::DarkGray));
     if let Some((share, slowest)) = share {
-        row.push(seg(share_bar(share, 2), if slowest { C::Cyan } else { C::DarkGray }));
+        row.push(seg(eighths(share, 2), if slowest { C::Cyan } else { C::DarkGray }));
     }
     row
-}
-
-/// `share` (0 to 1) of `cells` cells, in eighths.
-fn share_bar(share: f64, cells: usize) -> String {
-    const EIGHTHS: [char; 8] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
-    let eighths = (share.clamp(0.0, 1.0) * (cells * 8) as f64).round() as usize;
-    let mut bar = "█".repeat(eighths / 8);
-    if !eighths.is_multiple_of(8) && eighths / 8 < cells {
-        bar.push(EIGHTHS[eighths % 8]);
-    }
-    format!("{bar:<cells$}")
 }
 
 /// A group's icon, for its header with Nerd Font icons.

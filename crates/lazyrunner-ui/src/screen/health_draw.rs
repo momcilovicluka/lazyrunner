@@ -10,8 +10,9 @@ use lazyrunner_core::run::health::Metric;
 use lazyrunner_core::run::profile::short;
 use lazyrunner_core::run::requests::endpoints;
 
+use super::health::Rolled;
 use super::icons::Icon;
-use super::seg::{Seg, seg};
+use super::seg::{EIGHTHS, Seg, eighths, seg};
 use super::theme::C;
 
 /// What a card's chart can draw: `v` steps through them, the same on every card.
@@ -153,28 +154,28 @@ fn megabytes(mb: f64) -> String {
     if mb >= 1024.0 { format!("{:.1} GB", mb / 1024.0) } else { format!("{mb:.0} MB") }
 }
 
-/// The stack's share of the machine: its memory and its CPU, a segment per app in its colour, the rest free.
-pub fn capacity(controller: &Controller, machine_memory: f32, cells: usize) -> Vec<Vec<Seg>> {
+/// The stack's share of the machine: its memory and its CPU, a segment per app in its colour to an eighth of a cell,
+/// the rest free. The readings are the cards' (`rolled`), so the segments glide as their figures roll.
+pub fn capacity(controller: &Controller, rolled: &Rolled, machine_memory: f32, cells: usize) -> Vec<Vec<Seg>> {
     let width = cells.saturating_sub(34).min(CAPACITY);
     if width < 10 {
         return Vec::new();
     }
     let total_memory = f64::from(machine_memory).max(1.0);
+    let reading = |at: usize, metric: Metric| rolled.get(&(at, metric)).map_or(0.0, |(value, _)| *value);
     let used: Vec<(usize, f64, f64)> = (0..controller.apps.len())
         .filter(|&at| controller.states[at].is_running())
-        .map(|at| {
-            let state = &controller.states[at];
-            (at, f64::from(state.memory_mb.unwrap_or(0.0)), f64::from(state.cpu.unwrap_or(0.0)))
-        })
+        .map(|at| (at, reading(at, Metric::Memory), reading(at, Metric::Cpu)))
         .collect();
     let bar = |label: &str, share: &dyn Fn(&(usize, f64, f64)) -> f64, said: String| {
         let mut line = vec![seg(format!(" {label:<7}▕"), C::DarkGray)];
         let mut drawn = 0;
+        let steps = EIGHTHS.len();
         for each in &used {
-            let cells_of = (share(each) * width as f64).round() as usize;
-            let cells_of = cells_of.min(width - drawn);
-            if cells_of > 0 {
-                line.push(seg("█".repeat(cells_of), APPS[each.0 % APPS.len()]));
+            let filled = ((share(each) * (width * steps) as f64).round() as usize).min((width - drawn) * steps);
+            if filled > 0 {
+                let cells_of = filled.div_ceil(steps);
+                line.push(seg(eighths(filled as f64 / (cells_of * steps) as f64, cells_of), APPS[each.0 % APPS.len()]));
                 drawn += cells_of;
             }
         }

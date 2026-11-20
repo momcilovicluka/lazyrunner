@@ -13,7 +13,7 @@ use lazyrunner_core::run::requests::{self, Endpoint, REPLAYABLE, Request, endpoi
 use super::columns::{contains_ignore_case, fit, line_color};
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, pad, seg, take_cells};
+use super::seg::{Seg, aim, focus_row, on, pad, seg, take_cells};
 use super::theme::C;
 use super::{Overlay, Ui, copy};
 
@@ -593,19 +593,18 @@ fn copy_icon(kind: CopyAs) -> Icon {
 }
 
 /// y on a request: what to copy it as, in a box over the list.
-fn copy_menu(ui: &Ui, at: usize, title: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+fn copy_menu(ui: &mut Ui, at: usize, title: &str, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     const INNER: usize = 50;
+    const KEYS: usize = 5;
+    let bar = ui.motion.bar(at, ui.now);
     let lines = COPY_AS
         .iter()
         .enumerate()
         .map(|(choice, (kind, key, label, _))| {
-            let key = pad(&format!(" {key}"), 5);
-            let label = icons::titled(ui.nerd, copy_icon(*kind), label);
-            if choice == at {
-                vec![on(ui.scrolling_parts(&[&key, &label], INNER), C::Black, C::Cyan)]
-            } else {
-                vec![seg(key, C::Cyan), seg(label, C::White)]
-            }
+            let mut segs = super::overlays::key_caps(key, choice == bar, KEYS);
+            let caps = segs.len();
+            segs.push(seg(icons::titled(ui.nerd, copy_icon(*kind), label), C::White));
+            if choice == bar { super::overlays::on_bar(ui, segs, (caps, caps), INNER) } else { segs }
         })
         .collect();
     let title = icons::titled(ui.nerd, Icon::Clipboard, &format!("Copy {title} as"));
@@ -1194,19 +1193,20 @@ fn request_rows(
         let (method, status, took) = (&request.method, request.status, ms(request.ms));
         let mark = if view.baseline == Some(request.seq) { "★" } else { " " };
         let text = format!("{mark}{time:<8}  {app}  {method:<6} {status:>6} {took:>7}  {path}{tag}");
+        let row = vec![
+            seg(mark, C::Yellow),
+            seg(format!("{time:<8}  {app}  {method:<6}"), C::DarkGray),
+            seg(format!(" {status:>6}"), status_color(status)),
+            seg(format!(" {took:>7}"), ms_color(request.ms)),
+            seg(format!("  {path}"), C::Gray),
+            seg(tag, C::Yellow),
+        ];
         let row = if index == view.index {
-            vec![on(pad(&text, width), C::FocusText, C::FocusBack)]
+            focus_row(row, width)
         } else if looked.is_some_and(|read| read.contains(&request.seq)) {
             vec![on(pad(&text, width), C::Black, C::Magenta)]
         } else {
-            vec![
-                seg(mark, C::Yellow),
-                seg(format!("{time:<8}  {app}  {method:<6}"), C::DarkGray),
-                seg(format!(" {status:>6}"), status_color(status)),
-                seg(format!(" {took:>7}"), ms_color(request.ms)),
-                seg(format!("  {path}"), C::Gray),
-                seg(tag, C::Yellow),
-            ]
+            row
         };
         out.push(aim(row, Target::Item(index)));
     }
@@ -1268,20 +1268,14 @@ fn endpoint_rows(
         let name = cut(&endpoint.endpoint, name_cells);
         let (count, errors) = (format!(" {:>6}", endpoint.count), format!(" {:>6}", endpoint.errors));
         let times = [endpoint.avg, endpoint.p95, endpoint.max];
-        let row = if index == view.index {
-            let times: String = times.iter().map(|time| format!(" {:>7}", ms(*time))).collect();
-            let text = format!(" {app}  {:<6}{count}{errors}{times}  {name}", endpoint.method);
-            vec![on(pad(&text, width), C::FocusText, C::FocusBack)]
-        } else {
-            let mut row = vec![
-                seg(format!(" {app}  {:<6}", endpoint.method), C::DarkGray),
-                seg(count, C::Gray),
-                seg(errors, if endpoint.errors > 0 { C::Red } else { C::DarkGray }),
-            ];
-            row.extend(times.iter().map(|time| seg(format!(" {:>7}", ms(*time)), ms_color(*time))));
-            row.push(seg(format!("  {name}"), C::Gray));
-            row
-        };
+        let mut row = vec![
+            seg(format!(" {app}  {:<6}", endpoint.method), C::DarkGray),
+            seg(count, C::Gray),
+            seg(errors, if endpoint.errors > 0 { C::Red } else { C::DarkGray }),
+        ];
+        row.extend(times.iter().map(|time| seg(format!(" {:>7}", ms(*time)), ms_color(*time))));
+        row.push(seg(format!("  {name}"), C::Gray));
+        let row = if index == view.index { focus_row(row, width) } else { row };
         out.push(aim(row, Target::Item(index)));
     }
     out

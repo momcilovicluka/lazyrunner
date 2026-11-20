@@ -15,7 +15,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::Ui;
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, pad, seg, take_cells};
+use super::seg::{Seg, aim, focus_row, on, pad, seg, take_cells};
 use super::theme::C;
 
 /// Whether a server answered: being checked, answering (in how many ms), or not.
@@ -190,8 +190,8 @@ fn cell(text: &str, cells: usize) -> String {
     format!("{}{CUT}", take_cells(text, cells.saturating_sub(CUT.width())))
 }
 
-/// An entry's row in the columns' widths: the active one's dot, then its columns (a fresh answer flashing); the
-/// picked one lit across `cells`.
+/// An entry's row in the columns' widths: the active one's dot, then its columns (a fresh answer flashing); the one
+/// under the selection bar lit across `cells`, keeping its colours.
 fn row(
     entry: &Entry,
     parts: [Seg; 5],
@@ -207,10 +207,7 @@ fn row(
         out.push(if at == 1 && flash { on(text, C::Black, part.fg) } else { Seg { text, ..part } });
     }
     match picked {
-        Some(cells) => {
-            let text: String = out.iter().map(|part| part.text.as_str()).collect();
-            vec![on(pad(&text, cells), C::FocusText, C::FocusBack)]
-        }
+        Some(cells) => focus_row(out, cells),
         None => out,
     }
 }
@@ -223,6 +220,7 @@ fn flashing(ui: &Ui, entry: &Entry) -> bool {
 
 pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     note_answers(ui);
+    let bar = ui.picker.as_ref().map(|picker| picker.index).map_or(0, |index| ui.motion.bar(index, ui.now));
     let cursor = ui.cursor().to_string();
     let Some(picker) = ui.picker.as_ref() else { return Vec::new() };
     let entries = picker.entries();
@@ -273,7 +271,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let opened = ui.db_motion.opened.filter(|_| !ui.reduced_motion).map(|at| ui.now.saturating_duration_since(at));
     for (shown, ((at, entry), parts)) in entries.iter().enumerate().zip(all).skip(top).take(room).enumerate() {
         let comes = ROW_STAGGER * shown as u32;
-        let picked = (at == index).then_some(cells);
+        let picked = (at == bar).then_some(cells);
         let mut line = super::columns::fit(row(entry, parts, (widths, gap), picked, flashing(ui, entry)), cells);
         match opened {
             Some(since) if since < comes => line = Vec::new(),

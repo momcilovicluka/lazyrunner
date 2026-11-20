@@ -10,10 +10,12 @@ use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::impact::{Impact, Why};
 use lazyrunner_core::run::suites::Suite;
 
+use super::icons::Icon;
 use super::mouse::Target;
 use super::seg::{Seg, band, on, seg};
 use super::suites::Only;
 use super::theme::C;
+use super::viewbar::heading;
 use super::{Overlay, Ui};
 
 /// An affected suite's mark, and one it can't be told for.
@@ -174,7 +176,7 @@ pub fn why(ui: &mut Ui, controller: &Controller, suite: &Suite, width: usize) ->
             ]
         }
         Impact::Affected(whys) => {
-            let mut lines = vec![vec![seg("AFFECTED BECAUSE", ACCENT)]];
+            let mut lines = vec![heading(ui.nerd, (Icon::Diff, ACCENT), "AFFECTED BECAUSE", ACCENT)];
             for why in whys.iter().take(WHYS_SHOWN) {
                 lines.extend(reason(ui, controller, why, hops, width));
             }

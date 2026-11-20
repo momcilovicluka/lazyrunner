@@ -9,7 +9,7 @@ use lazyrunner_core::run::{Controller, format_duration};
 use super::Ui;
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, seg};
+use super::seg::{Seg, gauge, seg};
 use super::theme::C;
 
 /// How long a passed task's chip shows, glinting.
@@ -23,11 +23,12 @@ const PULSE_STEP: u128 = 200;
 const BAR_CELLS: usize = 4;
 const GAP: &str = "   ";
 
-/// `▰▰▱▱` as far as `seconds` is through `usual`, and whether it's past it.
+/// `██▌▱` as far as `seconds` is through `usual`, to an eighth of a cell (it fills as the time passes), and whether
+/// it's past it.
 pub fn bar(seconds: f64, usual: f64) -> (String, bool) {
     let through = if usual > 0.0 { seconds / usual } else { 1.0 };
-    let filled = ((through * BAR_CELLS as f64).floor() as usize).min(BAR_CELLS);
-    (format!("{}{}", "▰".repeat(filled), "▱".repeat(BAR_CELLS - filled)), through > 1.0)
+    let (filled, track) = gauge(through, BAR_CELLS);
+    (format!("{filled}{track}"), through > 1.0)
 }
 
 /// The header's task chips.
@@ -88,8 +89,9 @@ mod tests {
     #[test]
     fn the_bar_fills_against_the_usual_time_and_says_when_its_past_it() {
         assert_eq!(bar(0.0, 12.0), ("▱▱▱▱".to_string(), false));
-        assert_eq!(bar(6.5, 12.0), ("▰▰▱▱".to_string(), false));
-        assert_eq!(bar(13.0, 12.0), ("▰▰▰▰".to_string(), true));
+        assert_eq!(bar(6.0, 12.0), ("██▱▱".to_string(), false));
+        assert_eq!(bar(6.75, 12.0), ("██▎▱".to_string(), false), "to an eighth");
+        assert_eq!(bar(13.0, 12.0), ("████".to_string(), true));
     }
 
     #[test]

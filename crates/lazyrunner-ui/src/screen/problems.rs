@@ -39,7 +39,7 @@ const CHART_BARS: usize = 32;
 const PULSE: Duration = Duration::from_millis(400);
 const SLIDE: Duration = Duration::from_millis(200);
 const SLIDE_CELLS: f64 = 12.0;
-const FLASH: Duration = Duration::from_millis(600);
+const APPEARED: Duration = Duration::from_millis(600);
 const DIM: Duration = Duration::from_secs(1);
 /// A row's sparkline bars, and how soon after its app's start a problem's first sight hints at the start.
 const ROW_BARS: usize = 8;
@@ -405,7 +405,7 @@ pub fn animating(ui: &Ui) -> bool {
     let moving = |at: &Instant, length: Duration| ui.now.saturating_duration_since(*at) < length;
     super::stack::moving(ui)
         && (view.counts.values().any(|(_, rose)| rose.as_ref().is_some_and(|at| moving(at, PULSE)))
-            || view.appeared.values().any(|at| moving(at, FLASH))
+            || view.appeared.values().any(|at| moving(at, APPEARED))
             || ui.problems.fixed_at.values().any(|at| moving(at, DIM)))
 }
 
@@ -485,7 +485,7 @@ fn row(ui: &mut Ui, controller: &Controller, problem: &Problem, width: usize) ->
     if rose.is_some_and(|at| moving && since(at) < PULSE) {
         segs[1] = on(segs[1].text.clone(), C::Black, color);
     }
-    let Some(at) = view.appeared.get(&problem.shape).copied().filter(|at| moving && since(*at) < FLASH) else {
+    let Some(at) = view.appeared.get(&problem.shape).copied().filter(|at| moving && since(*at) < APPEARED) else {
         return fit(segs, width);
     };
     let flash = if problem.error { C::DarkRed } else { C::DarkYellow };

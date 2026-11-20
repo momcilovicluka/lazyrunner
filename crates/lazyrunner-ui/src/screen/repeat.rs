@@ -209,10 +209,11 @@ pub fn history_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     }
 }
 
-pub fn history_rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<super::seg::Seg>> {
-    use super::seg::{on, pad, seg};
+pub fn history_rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<super::seg::Seg>> {
+    use super::seg::{focus_row, pad, seg};
     use super::theme::C;
-    let Some(super::Overlay::Repeats { index }) = &ui.overlay else { return Vec::new() };
+    let Some(super::Overlay::Repeats { index }) = ui.overlay else { return Vec::new() };
+    let bar = ui.motion.bar(index, ui.now);
     let inner = cells.saturating_sub(8).clamp(20, 70);
     let lines = ui
         .again_history
@@ -222,7 +223,7 @@ pub fn history_rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize)
             let said = said_of(again, controller).unwrap_or_default();
             let mark = if at == 0 { "." } else { " " };
             let text = pad(&format!(" {mark} {said}"), inner);
-            if at == *index { vec![on(text, C::Black, C::Cyan)] } else { vec![seg(text, C::Gray)] }
+            if at == bar { focus_row(vec![seg(text, C::Gray)], inner) } else { vec![seg(text, C::Gray)] }
         })
         .collect();
     let title = super::icons::titled(ui.nerd, super::icons::Icon::Reload, "Repeat");
