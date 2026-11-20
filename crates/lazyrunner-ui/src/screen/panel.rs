@@ -10,13 +10,14 @@ use super::columns::{self, hue_color};
 use super::icons::{self, Icon};
 use super::motion::Spot;
 use super::mouse::Target;
-use super::seg::{Seg, gauge, limit, on, seg, width};
+use super::seg::{Seg, beads, limit, on, seg, width};
 use super::theme::{C, no_color};
 use super::{Ui, bundle, status};
 
 const SPARKLE: [char; 2] = ['✦', '✧'];
-/// The cells of the header's bar of the apps up while they start, and its spinner with reduced motion.
-const STARTING_BAR: usize = 4;
+/// The header's bar of the apps up while they start, a bead an app, this many at most; and its spinner with reduced
+/// motion.
+const MOST_BEADS: usize = 12;
 const STILL_SPINNER: &str = "●";
 const DEFAULT_LOG_LINES: usize = 5;
 /// "panelLogLines" beyond this is a typo, not a wish.
@@ -139,7 +140,7 @@ fn lead(ui: &Ui, controller: &Controller) -> Vec<Seg> {
                 Some((up, of)) => {
                     let spinner = if reduced { STILL_SPINNER } else { columns::spinner(ui) };
                     segs.push(seg(format!("  {spinner} {}", summary.text), summary.color));
-                    let (filled, track) = gauge(up as f64 / of.max(1) as f64, STARTING_BAR);
+                    let (filled, track) = beads(up, of, MOST_BEADS);
                     segs.extend([seg(" ", C::Gray), seg(filled, C::Green), seg(track, C::DarkGray)]);
                 }
                 None => segs.push(seg(format!("  {}", summary.line(ui.nerd)), summary.color)),

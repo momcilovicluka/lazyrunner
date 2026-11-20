@@ -17,7 +17,7 @@ use lazyrunner_core::run::migrations::{Context, Migration, Run, Status};
 use super::columns::fit;
 use super::motion::ease;
 use super::mouse::Target;
-use super::seg::{Seg, aim, gauge, on, seg};
+use super::seg::{Seg, aim, beads, on, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -36,8 +36,8 @@ const PULSE: Duration = Duration::from_millis(300);
 const SHIMMER: Duration = Duration::from_millis(600);
 /// A ghost path's dashes move a dot this often.
 const FLOW: Duration = Duration::from_millis(90);
-/// The progress bar in the contexts' list.
-const BAR_CELLS: usize = 4;
+/// The progress bar in the contexts' list: a bead a migration, this many at most.
+const MOST_BEADS: usize = 12;
 /// A migration whose name starts with one of these likely drops what it added when it's reverted.
 const DROPS_WHEN_REVERTED: [&str; 2] = ["Add", "Create"];
 /// The rail's braille: its line (the left column of dots), the same dashed (an unreadable history, a failed run's
@@ -132,7 +132,7 @@ pub fn progress(context: &Context, look: &Look) -> Option<(f64, usize)> {
 
 /// `██▌▱ 2/4`: the bead's travel in eighth blocks, and the migrations it has reached.
 pub fn bar(travelled: f64, total: usize) -> String {
-    let (filled, track) = gauge(travelled / total.max(1) as f64, BAR_CELLS);
+    let (filled, track) = beads(travelled.floor() as usize, total, MOST_BEADS);
     format!("{filled}{track} {}/{total}", travelled.floor() as usize)
 }
 
@@ -540,8 +540,9 @@ mod tests {
         );
         assert_eq!((tick(jan, 1), tick(apr, 3)), (" Jan 2026".into(), " Apr 2026  · 3 months later".into()));
         assert!(risky(&items[1]) && !risky(&items[0]) && !risky(&migration("20260101000000_Address")));
-        assert_eq!(bar(1.0, 4), "▰▱▱▱ 1/4");
-        assert_eq!(bar(1.5, 4), "▰▱▱▱ 1/4", "half way to the next: a bead fills once it's reached");
+        assert_eq!(bar(1.0, 4), "▰▰ ▱▱ ▱▱ ▱▱ 1/4", "a bead a migration");
+        assert_eq!(bar(1.5, 4), "▰▰ ▱▱ ▱▱ ▱▱ 1/4", "half way to the next: a bead fills once it's reached");
+        assert_eq!(bar(2.0, 3), "▰▰▰ ▰▰▰ ▱▱▱ 2/3");
     }
 
     #[test]

@@ -23,8 +23,8 @@ const MASKED: &str = "•••";
 /// The status line's chip slides in over this long, then glows amber this long.
 const SLIDE_IN: Duration = Duration::from_millis(300);
 const GLOW: Duration = Duration::from_secs(1);
-/// The bar beside how many of the changes are fixed.
-const FIXED_GAUGE: usize = 10;
+/// The bar beside how many of the changes are fixed: a bead a change, this many at most.
+const MOST_BEADS: usize = 20;
 
 pub fn open(ui: &mut Ui) {
     ui.overlay = Some(Overlay::BranchChanges { index: 0, open: false });
@@ -145,7 +145,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             let done = changes.iter().filter(|change| fixed(ui, controller, change)).count();
             let mut head = vec![seg(format!(" {from} → {to}"), C::Magenta)];
             if done > 0 {
-                let (filled, track) = seg::gauge(done as f64 / changes.len() as f64, FIXED_GAUGE);
+                let (filled, track) = seg::beads(done, changes.len(), MOST_BEADS);
                 head.extend([
                     seg(format!("   ✓ {done} of {} fixed ", changes.len()), C::Green),
                     seg(filled, C::Green),

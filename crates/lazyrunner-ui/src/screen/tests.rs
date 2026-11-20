@@ -1337,7 +1337,7 @@ async fn a_run_moves_the_bead_a_node_a_hop_and_says_where_it_failed() {
     let invoices = line_with(&frame, "Invoices");
     assert!(invoices.contains('●') && invoices.contains("Invoices  ◂ applying Refunds…"), "{frame}");
     assert!(line_with(&frame, "  Refunds").contains('○'), "not there yet: {frame}");
-    assert!(frame.contains("▰▰▱▱ 1/2"), "the list's bar: {frame}");
+    assert!(frame.contains("▰▰▰ ▱▱▱ 1/2"), "the list's bar: {frame}");
     run.ended = Some((now - Duration::from_secs(1), Some("Invalid column name 'Total'.".into())));
     set(&mut screen, &run, Ef::Ok);
     let frame = screen.frame();
@@ -5954,7 +5954,7 @@ async fn a_branch_change_being_fixed_sweeps_its_row_and_the_header_gauges_how_ma
     screen.frame();
     screen.ui.branch_fixes.insert("a".into());
     let frame = screen.frame();
-    assert!(frame.contains("✓ 1 of 2 fixed ▰▰▰▰▰▱▱▱▱▱"), "{frame}");
+    assert!(frame.contains("✓ 1 of 2 fixed ▰▰▰ ▱▱▱"), "{frame}");
     assert!(screen.ui.motion.sweep("branch:a", screen.ui.now).is_some(), "fixed: it sweeps");
     assert!(screen.ui.motion.sweep("branch:b", screen.ui.now).is_none());
 }
