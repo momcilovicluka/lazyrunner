@@ -180,6 +180,43 @@ pub fn release_mouse() {
     }
 }
 
+/// The refresh rate of the fastest display on the desktop, in hertz: what the terminal can show at most (Windows; unknown
+/// elsewhere, and when a display reports only its hardware default).
+pub(crate) fn display_refresh_rate() -> Option<u32> {
+    #[cfg(windows)]
+    // SAFETY: each struct lives on the stack for its call, zeroed with its size set as the API asks; the device name
+    // passed to EnumDisplaySettingsW is the NUL-terminated one EnumDisplayDevicesW just filled in.
+    unsafe {
+        use windows_sys::Win32::Graphics::Gdi::{
+            DEVMODEW, DISPLAY_DEVICE_ATTACHED_TO_DESKTOP, DISPLAY_DEVICEW, ENUM_CURRENT_SETTINGS, EnumDisplayDevicesW,
+            EnumDisplaySettingsW,
+        };
+        /// What a display reports when it only has its hardware's default rate.
+        const HARDWARE_DEFAULT: u32 = 1;
+        let mut fastest = None;
+        for index in 0.. {
+            let mut device: DISPLAY_DEVICEW = std::mem::zeroed();
+            device.cb = size_of::<DISPLAY_DEVICEW>() as u32;
+            if EnumDisplayDevicesW(std::ptr::null(), index, &mut device, 0) == 0 {
+                break;
+            }
+            if device.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP == 0 {
+                continue;
+            }
+            let mut mode: DEVMODEW = std::mem::zeroed();
+            mode.dmSize = size_of::<DEVMODEW>() as u16;
+            if EnumDisplaySettingsW(device.DeviceName.as_ptr(), ENUM_CURRENT_SETTINGS, &mut mode) != 0
+                && mode.dmDisplayFrequency > HARDWARE_DEFAULT
+            {
+                fastest = fastest.max(Some(mode.dmDisplayFrequency));
+            }
+        }
+        fastest
+    }
+    #[cfg(not(windows))]
+    None
+}
+
 /// Windows wakes sleeping threads every 15.6 ms unless a process asks for better; 60 fps needs 1 ms. Windows 11 also
 /// ignores that request while the process's window is hidden or covered (power throttling) unless the process opts out,
 /// which would halve the frame rate whenever another window is on top.

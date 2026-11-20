@@ -16,10 +16,10 @@ use lazyrunner_core::run::format_duration;
 use lazyrunner_core::run::suites::{Outcome, Status, Suite, TestResult};
 use lazyrunner_core::run::test_history::{ABSENT, Story, Tally};
 
-use super::columns::{chunk, fit, linked, spinner};
+use super::columns::{bar, chunk, fit, linked, spinner};
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, aim, band, focus_row, on, pad, seg, take_cells};
+use super::seg::{self, Seg, aim, band, eighths, focus_row, on, pad, seg, take_cells};
 use super::theme::C;
 use super::viewbar::heading;
 use super::{Overlay, Ui, copy};
@@ -52,6 +52,11 @@ const STACK_LINES: usize = 4;
 const PICKED_STACK_LINES: usize = 6;
 const ERROR_LINES: usize = 40;
 const SLOWEST: usize = 5;
+/// The bar before each of the slowest tests, scaled to the slowest.
+const SLOWEST_BAR: usize = 8;
+/// The figures the header and the panel's badge roll: the tests passed, and failed.
+const PASSED_ROLL: &str = "tests:passed";
+const FAILED_ROLL: &str = "tests:failed";
 const SKIPPED_SHOWN: usize = 10;
 /// Ctrl+d / Ctrl+u and the wheel scroll the details this far.
 const PAGE: usize = 10;
@@ -571,7 +576,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let (detail, tail) = match (suite, picking) {
         (Some(suite), Some(at)) => (pick(ui, controller, suite, at, detail_width, height), false),
         (Some(suite), None) => details(ui, controller, suite, detail_width),
-        (None, _) if controller.suites.is_none() => (vec![vec![seg("Looking for tests…", C::DarkGray)]], false),
+        (None, _) if controller.suites.is_none() => {
+            (vec![vec![seg(format!("{} Looking for tests…", waiting(ui)), C::DarkGray)]], false)
+        }
         (None, _) if list_rows.is_empty() && !query.is_empty() => {
             (vec![vec![seg(format!("No suites match /{query} - Esc shows them all."), C::DarkGray)]], false)
         }
@@ -602,15 +609,18 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     out
 }
 
-fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
+fn header(ui: &mut Ui, controller: &Controller, width: usize) -> Vec<Seg> {
     let count = controller.suites.iter().flatten().filter(|suite| !suite.untested).count();
     let totals = controller.test_totals();
-    let (summary, color) = if let Some(running) = status(controller) {
+    let nerd = ui.nerd;
+    let summary = if let Some(running) = status(controller) {
         let building = if controller.test_build.is_some() { " · building" } else { "" };
         let at_once = controller.test_parallelism();
-        (format!("{} {running}{building} · up to {at_once} at once", icon(ui, Status::Running)), C::Yellow)
+        let progress = lone_bar(ui, controller);
+        let spin = icon(ui, Status::Running);
+        vec![seg(format!("{spin} {running}{progress}{building} · up to {at_once} at once"), C::Yellow)]
     } else if totals.ran > 0 {
-        let mark = |icon| icons::icon(ui.nerd, icon);
+        let mark = |icon| icons::icon(nerd, icon);
         let skipped =
             if totals.skipped > 0 { format!("   {} {}", mark(Icon::Skip), totals.skipped) } else { String::new() };
         let errors = if totals.errors > 0 {
@@ -619,21 +629,23 @@ fn header(ui: &Ui, controller: &Controller, width: usize) -> Vec<Seg> {
             String::new()
         };
         let color = if totals.failed > 0 || totals.errors > 0 { C::Red } else { C::Green };
-        (
-            format!("{} {}   {} {}{skipped}{errors}", mark(Icon::Ok), totals.passed, mark(Icon::Fail), totals.failed),
-            color,
-        )
+        let (passed, failed) = rolled(ui, totals.passed, totals.failed, color);
+        vec![
+            seg(format!("{} ", mark(Icon::Ok)), color),
+            passed,
+            seg(format!("   {} ", mark(Icon::Fail)), color),
+            failed,
+            seg(format!("{skipped}{errors}"), color),
+        ]
     } else {
-        ("not run yet".to_string(), C::DarkGray)
+        vec![seg("not run yet", C::DarkGray)]
     };
-    let mut segs = vec![
-        seg(format!("  {count} suite{} · ", if count == 1 { "" } else { "s" }), C::DarkGray),
-        seg(summary, color),
-        seg("   ", C::Gray),
-    ];
+    let mut segs = vec![seg(format!("  {count} suite{} · ", if count == 1 { "" } else { "s" }), C::DarkGray)];
+    segs.extend(summary);
+    segs.push(seg("   ", C::Gray));
     for only in Only::EACH {
         let label = match only {
-            Only::Affected if ui.tests_only == only => super::suite_impact::chip(controller),
+            Only::Affected if ui.tests_only == only => super::suite_impact::chip(ui, controller),
             _ => only.label().to_string(),
         };
         let chip = format!(" {label} ");
@@ -1022,7 +1034,22 @@ fn details(ui: &mut Ui, controller: &Controller, suite: &Suite, width: usize) ->
                 [] => String::new(),
                 _ => " · failed tests only".to_string(),
             };
-            out.add(&format!("{spin} running · {} done · {}{only}", suite.done, elapsed(suite.started)), C::Yellow, 0);
+            let progress = match expected(suite) {
+                Some(expected) => {
+                    let share = suite.done as f64 / expected as f64;
+                    let animated = !out.ui.reduced_motion;
+                    let bar = bar(out.ui, share, &format!("suite:{}", suite.key), animated);
+                    format!("{bar}{}/{} done", suite.done, expected.max(suite.done))
+                }
+                None => format!("· {} done", suite.done),
+            };
+            let usual = controller
+                .durations
+                .usual(lazyrunner_core::run::history::Kind::Test, &suite.key)
+                .filter(|_| suite.rerun.is_empty())
+                .map_or(String::new(), |usual| format!(" · ~{} usual", format_duration(usual)));
+            let took = elapsed(suite.started);
+            out.add(&format!("{spin} running {progress} · {took}{usual}{only}"), C::Yellow, 0);
             out.blank();
             for line in tail(&suite.output) {
                 let bad = ["Failed ", "FAIL ", "error", "×"].iter().any(|word| line.contains(word));
@@ -1105,13 +1132,13 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
         out.lines.extend(why);
         out.blank();
     }
-    let glint = super::suite_runs::fresh(out.ui, suite);
+    let glint = super::suite_runs::glint(out.ui, suite);
     let mut failed: Vec<&TestResult> = suite.tests.iter().filter(|test| test.outcome == Outcome::Failed).collect();
     failed.sort_by_key(|test| !story(test).new);
     if !failed.is_empty() {
         let mut header = heading(out.ui.nerd, (Icon::Fail, C::Red), &format!("FAILURES {}", failed.len()), C::Red);
         if tally.new > 0 {
-            header.extend([seg("  ", C::Gray), on(format!(" NEW {} ", tally.new), C::Black, C::Red)]);
+            header.extend([seg("  ", C::Gray), on(format!(" NEW {} ", tally.new), C::Black, new_back(glint))]);
         }
         out.lines.push(header);
     }
@@ -1141,10 +1168,14 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
             continue;
         }
         out.lines.push(heading(out.ui.nerd, (icon, color), &format!("{title} ({}):", tests.len()), C::DarkCyan));
-        // A test fixed by the run just finished glints with it.
-        let color = if glint && color == C::Green { C::White } else { color };
         for test in tests {
-            out.lines.push(test_row(out.width, line(test), &story(test), test, color, glint));
+            let row = test_row(out.width, line(test), &story(test), test, color, glint);
+            // A test fixed by the run just finished has a green band sweep across it once.
+            let row = match glint.filter(|_| color == C::Green) {
+                Some(through) => seg::sweep(row, through, out.width, C::Black, C::Green),
+                None => row,
+            };
+            out.lines.push(row);
         }
         out.blank();
     }
@@ -1154,8 +1185,16 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
         out.lines.push(heading(out.ui.nerd, (Icon::Hourglass, C::Yellow), "Slowest:", C::DarkCyan));
         let mut slowest: Vec<&TestResult> = suite.tests.iter().collect();
         slowest.sort_by(|a, b| b.ms.total_cmp(&a.ms));
+        let top = slowest.first().map_or(0.0, |test| test.ms);
         for test in slowest.into_iter().take(SLOWEST) {
-            out.add(&format!("{:>7} ms  {}", test.ms.round(), test.name), C::DarkGray, 2);
+            let share = if top > 0.0 { test.ms / top } else { 0.0 };
+            let time = format!(" {:>7} ms  ", test.ms.round());
+            let room = out.width.saturating_sub(2 + SLOWEST_BAR + time.chars().count()).max(8);
+            out.lines.push(vec![
+                seg("  ", C::Gray),
+                seg(eighths(share, SLOWEST_BAR), C::DarkCyan),
+                seg(format!("{time}{}", end_of(&test.name, room)), C::DarkGray),
+            ]);
         }
     }
     let skipped: Vec<&TestResult> = suite.tests.iter().filter(|test| test.outcome == Outcome::Skipped).collect();
@@ -1170,8 +1209,15 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
 }
 
 /// A test's row in the details: its last runs (once its suite has a history), a badge when its failure is new, its
-/// mark and name.
-fn test_row(width: usize, runs: Option<&str>, story: &Story, test: &TestResult, color: C, glint: bool) -> Vec<Seg> {
+/// mark and name. `glint`: how far through glinting in the run just finished is.
+fn test_row(
+    width: usize,
+    runs: Option<&str>,
+    story: &Story,
+    test: &TestResult,
+    color: C,
+    glint: Option<f64>,
+) -> Vec<Seg> {
     let mark = match test.outcome {
         Outcome::Failed => "✗",
         Outcome::Passed if story.flaky.is_some() && !story.fixed => "↻",
@@ -1184,14 +1230,19 @@ fn test_row(width: usize, runs: Option<&str>, story: &Story, test: &TestResult, 
     let used = strip_cells + 2 + if new { 6 } else { 0 } + took.chars().count();
     let mut row = Vec::new();
     if let Some(runs) = runs {
-        row.extend(strip(runs, STRIP_CELLS, glint));
+        row.extend(strip(runs, STRIP_CELLS, glint.is_some()));
         row.push(seg(" ", C::Gray));
     }
     if new {
-        row.extend([on(" NEW ", C::Black, C::Red), seg(" ", C::Gray)]);
+        row.extend([on(" NEW ", C::Black, new_back(glint)), seg(" ", C::Gray)]);
     }
     row.push(seg(format!("{mark} {}{took}", end_of(&test.name, width.saturating_sub(used).max(8))), color));
     row
+}
+
+/// A new failure's badge's colour: white as the run that found it glints in, popping to red.
+fn new_back(glint: Option<f64>) -> C {
+    if glint.is_some_and(|through| through < super::suite_runs::POP) { C::White } else { C::Red }
 }
 
 /// A test's last runs (its history's line), `cells` wide: two runs a cell, the older's colour on the left half and
@@ -1287,11 +1338,12 @@ impl Details<'_> {
 }
 
 /// The tests on the panel's status line, once there are results or a run: "⚗ ✓438 ✗13 !1" (red when something
-/// failed or didn't run), or "⚗ ⠋ testing 6 +10 queued" while they run.
-pub fn badge(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
+/// failed or didn't run; the counts roll), or "⚗ ⠋ testing 6 +10 queued" while they run, with a lone suite's bar.
+pub fn badge(ui: &mut Ui, controller: &Controller) -> Option<Vec<Seg>> {
+    let flask = icons::icon(ui.nerd, Icon::Tests);
     if let Some(running) = status(controller) {
-        let flask = icons::icon(ui.nerd, Icon::Tests);
-        return Some((format!("{flask} {} {running}", icon(ui, Status::Running)), C::Yellow));
+        let progress = lone_bar(ui, controller);
+        return Some(vec![seg(format!("{flask} {} {running}{progress}", icon(ui, Status::Running)), C::Yellow)]);
     }
     let totals = controller.test_totals();
     if totals.ran == 0 {
@@ -1299,8 +1351,48 @@ pub fn badge(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
     }
     let errors = if totals.errors > 0 { format!(" !{}", totals.errors) } else { String::new() };
     let color = if totals.failed > 0 || totals.errors > 0 { C::Red } else { C::Green };
-    let flask = icons::icon(ui.nerd, Icon::Tests);
-    Some((format!("{flask} ✓{} ✗{}{errors}", totals.passed, totals.failed), color))
+    let (passed, failed) = rolled(ui, totals.passed, totals.failed, color);
+    Some(vec![seg(format!("{flask} ✓"), color), passed, seg(" ✗", color), failed, seg(errors, color)])
+}
+
+/// The tests passed and failed, rolling to their counts, each tinted a moment as it gets better or worse.
+fn rolled(ui: &mut Ui, passed: usize, failed: usize, color: C) -> (Seg, Seg) {
+    let (passed, passed_tint) = ui.roll(PASSED_ROLL, passed as f64, false, false);
+    let (failed, failed_tint) = ui.roll(FAILED_ROLL, failed as f64, false, true);
+    let figure = |value: f64, tint: Option<C>| seg((value.round() as usize).to_string(), tint.unwrap_or(color));
+    (figure(passed, passed_tint), figure(failed, failed_tint))
+}
+
+/// The tests a suite's run will have done: those it asked for when it runs some again, else as many as its last run
+/// had; none when it never ran.
+fn expected(suite: &Suite) -> Option<usize> {
+    match suite.rerun.len() {
+        0 if suite.tests.is_empty() => None,
+        0 => Some(suite.tests.len()),
+        asked => Some(asked),
+    }
+}
+
+/// A lone running suite's bar of its tests done, a space before it, for the header and the panel's badge (none while
+/// more than one runs or waits, or when it never ran).
+fn lone_bar(ui: &mut Ui, controller: &Controller) -> String {
+    let active: Vec<&Suite> = controller.suites.iter().flatten().filter(|suite| suite.is_active()).collect();
+    let [suite] = active.as_slice() else { return String::new() };
+    let Some(expected) = expected(suite).filter(|_| suite.status == Status::Running) else { return String::new() };
+    let animated = !ui.reduced_motion;
+    let bar = bar(ui, suite.done as f64 / expected as f64, &format!("suite:{}", suite.key), animated);
+    format!(" {}", bar.trim_end())
+}
+
+/// The spinner of something the tests view waits for ("●" with reduced motion).
+pub(super) fn waiting(ui: &Ui) -> String {
+    icon(ui, Status::Running)
+}
+
+/// Whether the tests view waits on something with a spinner: the suites being looked for, or what changes affect.
+pub fn spinning(ui: &Ui, controller: &Controller) -> bool {
+    matches!(ui.overlay, Some(Overlay::Tests { .. }))
+        && (controller.suites.is_none() || (ui.tests_only == Only::Affected && !controller.impacts_known()))
 }
 
 /// What the panel's status says while tests run: "testing 2 +3…" (running, and queued).

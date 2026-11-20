@@ -3,6 +3,26 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.104.0] - 2026-11-20
+
+### Added
+- A running suite has a bar of its tests done against how many its last run had (or the failed tests it runs again), and its usual time: `⠋ running ▕████▌     ▏ 12/40 done · 4s · ~9s usual`. While it's the only suite running, the tests view's header and the panel's badge have its bar too.
+- A whole run of a suite that goes all green after a red one is celebrated in the panel's banner, as "ready" is: `✦ Orders.Tests: all 438 tests green ✦`.
+
+### Changed
+- Spinners, glints and scrolling text are drawn every frame again: stepping them every 50 ms made spinners stutter.
+- What moves is drawn as often as the display shows frames: `frameRate` is `auto` - the fastest display's refresh rate, 60 at least, so 120, 144 or 240 on a display that shows them - or a number from 30 to 480.
+- The tests' counts roll to their new values instead of jumping, in the tests view's header and the panel's badge, green for a moment as more pass and red as more fail; a column's response time rolls the same way.
+- An error line, an alert or a crash lights a column's title red once, holding a moment then draining back to its state's colour, instead of strobing for a second and a half; another error while it's lit lights it again. With reduced motion it's red for the moment, as before.
+- A column's title fills yellow from the left as its app starts, as it fills green as it comes up, and every fill and drain moves an eighth of a cell at a time.
+- A test fixed by the run just finished has a green band sweep across its row once, instead of turning white; a new failure's `NEW` badge pops white to red as the panel's chips do. A migration context that reaches up to date and a branch change being fixed sweep the same way, and what changed for running has a bar of how many are fixed.
+- The slowest tests each have a bar, scaled to the slowest.
+- An empty column has its app's icon over what it says, its keys as keycaps, and how it exited in red with the exited icon.
+- "Looking for tests…", the affected list's "looking" and a column's "checking…" have a spinner; "not responding" has the exited icon.
+- A flipped setting flashes only its switch - green as it turns on, grey as it turns off - instead of the whole row green.
+- Folding a parsed entry wipes its lines up into the fold, as unfolding wipes them in, instead of snapping shut.
+- None of it moves with reduced motion.
+
 ## [1.103.0] - 2026-11-20
 
 ### Changed

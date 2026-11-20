@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
- ▸ ◆ Orders   ● check┳ ■ Billing   ○ starti┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
+ ▸ ◆ Orders   ⠋ check┳ ■ Billing   ○ starti┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
                      ┃                     │   dev server · dev  │   watch build · watc│   live · dev
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
@@ -12,11 +12,11 @@ expression: screen.frame()
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
                      ┃                     │                     │                     │
+                     ┃                     │          ■          │          ■          │          ■
                      ┃                     │                     │                     │
                      ┃                     │  not started yet    │   not started yet   │  not started yet
                      ┃                     │                     │                     │
-                     ┃                     │  port 47301 · free  │                     │  port 47303 · free
-info: Microsoft.     ┃                     │                     │                     │
+info: Microsoft.     ┃                     │  port 47301 · free  │                     │  port 47303 · free
 Hosting.Lifetime[14] ┃                     │                     │                     │
       Now listening  ┃                     │                     │                     │
 on: http://localhost:┃                     │                     │                     │

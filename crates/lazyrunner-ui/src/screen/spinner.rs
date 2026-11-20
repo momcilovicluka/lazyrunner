@@ -37,11 +37,6 @@ impl Default for Spinner {
 }
 
 impl Spinner {
-    /// How long a frame shows.
-    pub fn rate(&self) -> Duration {
-        self.rate
-    }
-
     /// The frame `elapsed` into the run.
     pub fn frame(&self, elapsed: Duration) -> &str {
         let at = elapsed.as_millis() / self.rate.as_millis().max(1);

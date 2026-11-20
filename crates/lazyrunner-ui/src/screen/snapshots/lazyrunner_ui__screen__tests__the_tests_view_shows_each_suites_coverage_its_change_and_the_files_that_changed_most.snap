@@ -18,7 +18,7 @@ expression: frame
      1 project without test files                           │ All 1 tests passed.
                                                             │
                                                             │ Slowest:
-                                                            │       230 ms  Billing.Tests.Invoices.Sums
+                                                            │   ████████     230 ms  Billing.Tests.Invoices.Sums
                                                             │
                                                             │
                                                             │

@@ -160,6 +160,35 @@ pub fn band(segs: Vec<Seg>, from: usize, to: usize, fg: C, bg: C) -> Vec<Seg> {
     out
 }
 
+/// The cells a sweep's band lights.
+pub const SWEEP_BAND: usize = 6;
+
+/// `segs` with a band `through` (0 to 1) of its way across `cells`, lit `fg` on `bg`: a sweep, once across a row.
+pub fn sweep(segs: Vec<Seg>, through: f64, cells: usize, fg: C, bg: C) -> Vec<Seg> {
+    let at = (through.clamp(0.0, 1.0) * (cells + SWEEP_BAND) as f64) as usize;
+    band(segs, at.saturating_sub(SWEEP_BAND), at, fg, bg)
+}
+
+/// `text` on `left`'s background for `share` (0 to 1) of it from the left and on `right`'s for the rest (each a
+/// foreground and a background), the edge between them an eighth block - `left`'s background drawn on `right`'s - so it
+/// moves an eighth of a cell at a time.
+pub fn fill(text: &str, share: f64, left: (C, C), right: (C, C)) -> Vec<Seg> {
+    let cells = text.width();
+    let eighths = (share.clamp(0.0, 1.0) * (cells * EIGHTHS.len()) as f64).round() as usize;
+    let (whole, part) = (eighths / EIGHTHS.len(), eighths % EIGHTHS.len());
+    let filled = take_cells(text, whole);
+    let rest = &text[filled.len()..];
+    let mut segs = vec![on(filled, left.0, left.1)];
+    match rest.graphemes(true).next().filter(|_| part > 0) {
+        Some(edge) => {
+            segs.push(on(eighth(part).repeat(edge.width().max(1)), left.1, right.1));
+            segs.push(on(&rest[edge.len()..], right.0, right.1));
+        }
+        None => segs.push(on(rest, right.0, right.1)),
+    }
+    segs.into_iter().filter(|part| !part.text.is_empty()).collect()
+}
+
 fn banded(seg: &Seg, text: String, lit: bool, fg: C, bg: C) -> Seg {
     if lit { Seg { text, fg, bg: Some(bg), style: None, ..seg.clone() } } else { Seg { text, ..seg.clone() } }
 }
@@ -359,6 +388,33 @@ mod tests {
         let lit = band(row, 2, 5, C::Black, C::Cyan);
         let parts: Vec<(&str, Option<C>)> = lit.iter().map(|part| (part.text.as_str(), part.bg)).collect();
         assert_eq!(parts, [("ab", None), ("c", Some(C::Cyan)), ("de", Some(C::Cyan)), ("fg", None)]);
+    }
+
+    #[test]
+    fn a_fill_moves_an_eighth_of_a_cell_at_a_time() {
+        let parts = |segs: Vec<Seg>| segs.into_iter().map(|part| (part.text, part.fg, part.bg)).collect::<Vec<_>>();
+        assert_eq!(
+            parts(fill("abcd", 0.5 + 1.0 / 32.0, (C::Black, C::Green), (C::White, C::Yellow))),
+            [
+                ("ab".to_string(), C::Black, Some(C::Green)),
+                ("▏".to_string(), C::Green, Some(C::Yellow)),
+                ("d".to_string(), C::White, Some(C::Yellow)),
+            ],
+            "two cells and an eighth: the third cell is the edge"
+        );
+        let (green, yellow) = ((C::Black, C::Green), (C::White, C::Yellow));
+        assert_eq!(parts(fill("ab", 1.0, green, yellow)), [("ab".into(), C::Black, Some(C::Green))]);
+        assert_eq!(parts(fill("ab", 0.0, green, yellow)), [("ab".into(), C::White, Some(C::Yellow))]);
+    }
+
+    #[test]
+    fn a_sweep_crosses_the_row_once() {
+        let row = || vec![seg("x".repeat(10), C::Gray)];
+        let lit =
+            |segs: Vec<Seg>| segs.iter().filter(|part| part.bg.is_some()).map(|part| part.text.len()).sum::<usize>();
+        assert_eq!(lit(sweep(row(), 0.0, 10, C::Black, C::Green)), 0, "not in yet");
+        assert_eq!(lit(sweep(row(), 0.5, 10, C::Black, C::Green)), SWEEP_BAND);
+        assert_eq!(lit(sweep(row(), 1.0, 10, C::Black, C::Green)), 0, "gone off its end");
     }
 
     #[test]

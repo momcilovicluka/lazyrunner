@@ -1,20 +1,23 @@
-//! A column's title as its app changes state (not with reduced motion): coming up fills its chip green from the left,
-//! stopping drains the colour it had from the right, and a crash pulses it twice - so a glance across the titles says
-//! what just happened where.
+//! A column's title as its app changes state (not with reduced motion): starting fills its chip yellow from the left
+//! and coming up green, stopping drains the colour it had from the right - each edge moving an eighth of a cell at a
+//! time - and a crash pulses it twice, so a glance across the titles says what just happened where. An error lights
+//! it red, draining back to its state's colour.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use lazyrunner_core::run::app::{AppState, Status};
-use unicode_width::UnicodeWidthStr;
 
 use super::Ui;
-use super::seg::{Seg, on, take_cells};
+use super::motion::Spot;
+use super::seg::{Seg, fill, on};
 use super::theme::C;
 
 /// How long a change shows: the fill and the drain, and the crash's two pulses.
 const CHANGE: Duration = Duration::from_millis(400);
 const PULSE_STEP: u128 = 100;
+/// The share of an error's light that holds red before it drains.
+const ERROR_HOLD: f64 = 0.5;
 
 /// Where an app is, as its title shows it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,10 +48,11 @@ impl Phase {
     }
 }
 
-/// Each app's phase, and its last change: from what, and when.
+/// Each app's phase, and its last change: from what, and when; and the end of the last error flash its title showed.
 #[derive(Debug, Default)]
 pub struct Phases {
     apps: HashMap<String, (Phase, Option<(Phase, Instant)>)>,
+    errors: HashMap<String, Instant>,
 }
 
 /// Notes app `key`'s phase this frame: a change from the last frame is kept, to show.
@@ -63,6 +67,15 @@ pub fn note(ui: &mut Ui, key: &str, phase: Phase) {
         None => {
             ui.phases.apps.insert(key.to_string(), (phase, None));
         }
+    }
+}
+
+/// Notes app `key`'s error flash this frame (`until`, column `index`): a new one - an error line, an alert, a crash -
+/// lights its title, again while it still is, so a burst is one flash.
+pub fn note_error(ui: &mut Ui, index: usize, key: &str, until: Option<Instant>) {
+    let Some(until) = until.filter(|until| ui.now < *until) else { return };
+    if ui.phases.errors.insert(key.to_string(), until) != Some(until) {
+        ui.motion.flash(Spot::Errored(index), ui.now);
     }
 }
 
@@ -82,28 +95,20 @@ pub fn animating(ui: &Ui) -> bool {
     ui.phases.apps.keys().any(|key| change(ui, key).is_some())
 }
 
-/// The first `cells` cells of `text`, and the rest.
-fn split(text: &str, cells: usize) -> (String, String) {
-    let first = take_cells(text, cells);
-    let rest = text[first.len()..].to_string();
-    (first, rest)
-}
-
-/// App `key`'s title chip, `text` in `fg` on `bg` as it is - or changing: filling green from the left as it comes up,
-/// the colour it had draining from the right as it stops, pulsing as it crashes.
+/// App `key`'s title chip, `text` in `fg` on `bg` as it is - or changing: filling yellow from the left as it starts
+/// and green as it comes up, the colour it had draining from the right as it stops, pulsing as it crashes.
 pub fn chip(ui: &Ui, key: &str, text: String, fg: C, bg: C) -> Vec<Seg> {
     let Some((was, now, progress, since)) = change(ui, key) else { return vec![on(text, fg, bg)] };
-    let cells = text.width();
     match now {
-        Phase::Up => {
-            let (filled, rest) = split(&text, (cells as f64 * progress).ceil() as usize);
-            vec![on(filled, C::Black, C::Green), on(rest, C::Black, was.color())]
-        }
-        Phase::Stopped => {
-            let (kept, rest) = split(&text, (cells as f64 * (1.0 - progress)).round() as usize);
-            vec![on(kept, C::Black, was.color()), on(rest, fg, bg)]
-        }
+        Phase::Up | Phase::Starting => fill(&text, progress, (C::Black, now.color()), (C::Black, was.color())),
+        Phase::Stopped => fill(&text, 1.0 - progress, (C::Black, was.color()), (fg, bg)),
         Phase::Crashed if (since.as_millis() / PULSE_STEP).is_multiple_of(2) => vec![on(text, C::Black, C::White)],
         _ => vec![on(text, fg, bg)],
     }
+}
+
+/// A title chip an error just lit (`lit`, 1 to 0): red, white text, holding a moment, then draining from the right back
+/// to `fg` on `bg`, its state's colours.
+pub fn errored(text: &str, lit: f64, fg: C, bg: C) -> Vec<Seg> {
+    fill(text, (lit / (1.0 - ERROR_HOLD)).min(1.0), (C::White, C::Red), (fg, bg))
 }

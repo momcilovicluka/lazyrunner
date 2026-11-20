@@ -514,6 +514,7 @@ impl Controller {
         let collected = std::mem::take(&mut suite.coverage.collecting);
         let file = if failed_only { suite.rerun_file(&dir) } else { suite.results_file(&dir) };
         let (name, seconds) = (suite.name.clone(), suite.seconds);
+        let red_before = suite.failed > 0 || suite.before == Status::Error;
         let tests = match suites::read_results(&suite.runner, &file) {
             Ok((tests, _)) => tests,
             Err(error) => {
@@ -577,6 +578,10 @@ impl Controller {
             self.add_log(text, Hue::Red);
         } else {
             self.add_log(format!("✓ {name}{again} - {passed} passed{skipped} ({took}){note}"), Hue::Green);
+        }
+        if red_before && !failed_only && failed == 0 {
+            // A whole run gone green after a red one: the panel's banner celebrates it.
+            self.celebrate = Some((format!("{name}: all {passed} tests green"), now + super::watch::CELEBRATE_FOR));
         }
     }
 
@@ -1071,6 +1076,58 @@ mod tests {
         run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
         sample.run_affected();
         assert!(!sample.tests_active(), "it ran on that change");
+    }
+
+    /// Every run of these passes: each is asked for its tests by name.
+    struct Green;
+
+    impl Commands for Green {
+        fn server(&self, root: &Path, app: &App, apps: &[App]) -> anyhow::Result<ServerCommand> {
+            Scripts.server(root, app, apps)
+        }
+
+        fn build(&self, root: &Path, key: &str) -> Spec {
+            Scripts.build(root, key)
+        }
+
+        fn npm_ci(&self, dir: &Path) -> anyhow::Result<Spec> {
+            Scripts.npm_ci(dir)
+        }
+
+        fn test(&self, runner: &Runner, results: &Path, _: &[String]) -> anyhow::Result<Spec> {
+            Scripts.test(runner, results, &["rounds".to_string()])
+        }
+
+        fn test_build(&self, project: &Path) -> Spec {
+            Scripts.test_build(project)
+        }
+
+        fn covered_test(&self, runner: &Runner, results: &Path, _: &Path) -> anyhow::Result<Spec> {
+            self.test(runner, results, &[])
+        }
+    }
+
+    #[tokio::test]
+    async fn a_whole_run_gone_green_after_a_red_one_is_celebrated() {
+        let temp = TempDir::new("suites-green");
+        let (mut sample, mut events) = controller(&temp);
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert!(sample.celebrate.is_none(), "red: nothing to celebrate");
+        sample.run_tests(&keys(&["cart"]), true);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert!(sample.celebrate.is_none(), "green again, but only the failed tests ran");
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        sample.commands = Arc::new(Green);
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        let said = sample.celebrate.as_ref().map(|(text, _)| text.as_str());
+        assert_eq!(said, Some("cart: all 2 tests green"));
+        sample.celebrate = None;
+        sample.run_tests(&keys(&["cart"]), false);
+        run_until(&mut sample, &mut events, |sample| !sample.tests_active()).await;
+        assert!(sample.celebrate.is_none(), "green after green: nothing new");
     }
 
     #[tokio::test]

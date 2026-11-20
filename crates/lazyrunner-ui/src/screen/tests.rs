@@ -2566,12 +2566,12 @@ async fn a_new_line_wakes_the_screen_only_when_its_colour_steps() {
 }
 
 #[tokio::test]
-async fn a_spinner_steps_instead_of_drawing_every_frame() {
-    let mut screen = screen("spinner-steps", json!({}));
+async fn a_spinner_is_drawn_every_frame_so_its_steps_land_evenly() {
+    let mut screen = screen("spinner-frames", json!({}));
     screen.running(); // Billing is starting: its spinner turns
     screen.ui.now += Duration::from_secs(5); // its first lines have settled
     let now = screen.ui.now;
-    assert_eq!(screen.ui.next_change(&screen.controller), Some(now + super::STEP));
+    assert_eq!(screen.ui.next_change(&screen.controller), Some(now));
 }
 
 #[tokio::test]
@@ -4084,18 +4084,18 @@ async fn an_empty_column_says_what_fills_it() {
     let mut screen = screen("empty-hints", json!({}));
     let frame = screen.frame();
     assert!(
-        frame.contains("u starts it") && frame.contains("b builds it") && frame.contains("U starts all"),
-        "{frame}"
+        frame.contains(" u  starts it") && frame.contains(" b  builds it") && frame.contains(" U  starts all"),
+        "the keys as keycaps: {frame}"
     );
     screen.press("3");
     let npm = screen.frame();
-    assert!(npm.contains("u starts it") && !npm.contains("b builds it"), "Shop's: npm builds as it starts: {npm}");
-    assert_eq!(npm.matches("u starts it").count(), 1, "the keys act on the focused app only");
+    assert!(npm.contains("u  starts it") && !npm.contains("builds it"), "Shop's: npm builds as it starts: {npm}");
+    assert_eq!(npm.matches("u  starts it").count(), 1, "the keys act on the focused app only");
 
     screen.press("1");
     let at = screen.ui.now - Duration::from_secs(5);
     screen.controller.states[0].add_line("Now listening on: http://localhost:47201", Hue::Gray, at);
-    assert!(!screen.frame().contains("u starts it"), "a column with output shows it");
+    assert!(!screen.frame().contains("u  starts it"), "a column with output shows it");
     screen.press("f");
     let errors = screen.frame();
     assert!(errors.contains("No errors") && errors.contains("f shows all"), "{errors}");
@@ -5676,4 +5676,182 @@ async fn get_logs_with_parsed_answers_entries() {
     assert_eq!(found["result"]["count"], 1, "grep looks in every line of an entry");
     let since = agent(&mut screen, "logs", json!({ "app": "orders", "parsed": true, "since": base + 26 }), None);
     assert_eq!(since["result"]["text"], format!("{} DBG Orders.Cache Cache warm", base + 27));
+}
+
+// ---------------------------------------------------------------- what moves (1.104.0)
+
+#[tokio::test]
+async fn a_running_suite_shows_a_bar_of_its_tests_done_against_its_last_run() {
+    use lazyrunner_core::run::suites::Status as SuiteStatus;
+    let mut screen = screen("suite-bar", json!({}));
+    with_suites(&mut screen);
+    let started = screen.ui.now - Duration::from_secs(4);
+    let orders = &mut screen.controller.suites.as_mut().unwrap()[0];
+    (orders.status, orders.done, orders.started) = (SuiteStatus::Running, 2, Some(started));
+    screen.press("T");
+    let frame = screen.frame();
+    assert!(frame.contains("running ▕") && frame.contains("▏ 2/3 done · 4s"), "against its last run's 3: {frame}");
+    assert!(frame.contains("testing 1 ▕"), "the header and the panel's badge have its bar too: {frame}");
+    screen.controller.suites.as_mut().unwrap()[0].rerun = vec!["Orders.Tests.CartTests.Totals(2, 3)".into()];
+    assert!(screen.frame().contains("2/2 done"), "running its failed tests: as many as it asked for");
+    let orders = &mut screen.controller.suites.as_mut().unwrap()[0];
+    (orders.rerun, orders.tests) = (Vec::new(), Vec::new());
+    let frame = screen.frame();
+    assert!(frame.contains("running · 2 done") && !frame.contains("testing 1 ▕"), "never ran: no bar: {frame}");
+}
+
+#[tokio::test]
+async fn the_tests_counts_roll_to_new_values_tinted_and_keep_the_screen_drawing_while_they_do() {
+    use lazyrunner_core::run::suites::{Outcome, TestResult};
+    let mut screen = screen("tests-roll", json!({}));
+    with_suites(&mut screen);
+    screen.ui.motion.enabled = true;
+    screen.press("T");
+    screen.frame();
+    screen.ui.now += Duration::from_secs(1); // the view has opened
+    assert!(screen.frame().contains("✓ 2   ✗ 1"), "{}", screen.frame());
+    let passing = |at: usize| TestResult {
+        name: format!("Billing.Tests.Invoices.Sums{at}"),
+        outcome: Outcome::Passed,
+        ms: 1.0,
+        message: String::new(),
+        stack: String::new(),
+    };
+    screen.controller.suites.as_mut().unwrap()[1].set_tests((0..11).map(passing).collect());
+    screen.frame();
+    screen.ui.now += Duration::from_millis(100);
+    let frame = screen.frame();
+    assert!(frame.contains("✓ 7   ✗ 1"), "half the way in a tick: {frame}");
+    assert_eq!(screen.ui.next_change(&screen.controller), Some(screen.ui.now), "it rolls on");
+    screen.ui.now += Duration::from_secs(2);
+    assert!(screen.frame().contains("✓ 12   ✗ 1"), "{}", screen.frame());
+    screen.ui.now += Duration::from_secs(1);
+    screen.frame();
+    assert!(!screen.ui.rolling("tests:"), "there and no longer tinted");
+}
+
+#[tokio::test]
+async fn an_error_lights_the_title_once_and_a_burst_lights_it_again_instead_of_strobing() {
+    use super::motion::Spot;
+    use super::theme::C;
+    let mut screen = screen("error-flash", json!({}));
+    screen.running();
+    screen.ui.motion.enabled = true;
+    screen.frame();
+    let now = screen.ui.now;
+    screen.controller.states[0].flash_until = Some(now + Duration::from_millis(1500));
+    screen.frame();
+    assert_eq!(screen.ui.motion.lit(&Spot::Errored(0), now), Some(1.0));
+    assert_eq!(super::columns::tone(&screen.ui, &screen.controller, 0), C::Green, "the chip drains to its state");
+    screen.ui.now = now + Duration::from_millis(800);
+    screen.frame();
+    assert!(screen.ui.motion.lit(&Spot::Errored(0), screen.ui.now).is_some_and(|lit| lit < 0.5), "draining");
+    screen.controller.states[0].flash_until = Some(screen.ui.now + Duration::from_millis(1500));
+    screen.frame();
+    assert_eq!(screen.ui.motion.lit(&Spot::Errored(0), screen.ui.now), Some(1.0), "another error: lit again");
+    screen.ui.now += super::motion::ERRORED;
+    screen.frame();
+    assert_eq!(screen.ui.motion.lit(&Spot::Errored(0), screen.ui.now), None, "one flash, over");
+
+    let mut calm = super::tests::screen("error-flash-calm", json!({ "reducedMotion": true }));
+    calm.running();
+    calm.ui.motion.enabled = true;
+    calm.controller.states[0].flash_until = Some(calm.ui.now + Duration::from_millis(1500));
+    calm.frame();
+    assert_eq!(super::columns::tone(&calm.ui, &calm.controller, 0), C::Red, "reduced motion: solid red");
+    assert_eq!(calm.ui.motion.lit(&Spot::Errored(0), calm.ui.now), None);
+}
+
+#[tokio::test]
+async fn a_starting_app_fills_its_title_yellow_with_an_eighth_block_edge() {
+    let mut screen = screen("starting-fill", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.frame();
+    screen.controller.states[0].status = AppStatus::Running;
+    screen.controller.states[0].started_at = Some(screen.ui.now);
+    screen.frame();
+    screen.ui.now += Duration::from_millis(190);
+    let (buffer, area) = screen.cells();
+    let edge = (0..area.width).find(|&x| super::seg::EIGHTHS[..7].contains(&buffer[(x, 0)].symbol()));
+    assert!(edge.is_some(), "the fill's edge moves an eighth of a cell at a time");
+    screen.ui.now += Duration::from_millis(400);
+    screen.frame();
+    assert!(!super::phases::animating(&screen.ui), "filled");
+}
+
+#[tokio::test]
+async fn an_empty_column_has_its_apps_icon_and_says_how_it_exited_in_red() {
+    let mut screen = screen("empty-exited", json!({}));
+    screen.controller.states[1].status = AppStatus::Exited(Some(1));
+    let frame = screen.frame();
+    assert!(frame.contains("✗ exited · code 1"), "{frame}");
+    assert!(frame.contains("◆") && frame.contains("■"), "each app's icon over its hint: {frame}");
+    let narrow = screen.render(70, 24);
+    assert!(narrow.contains("u starts it"), "a narrow column's keys are a cell each, so they fit: {narrow}");
+}
+
+#[tokio::test]
+async fn a_flipped_setting_flashes_only_its_switch_green_on_and_grey_off() {
+    use super::theme::C;
+    let mut screen = screen("settings-flash", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.press(", a");
+    let lit = |screen: &mut Screen, mark: &str| -> Vec<Option<C>> {
+        let rows = super::overlays::menu(&mut screen.ui, &screen.controller, 110, 40);
+        let flashed = rows.into_iter().flatten().filter(|part| part.bg.is_some_and(|bg| bg != C::FocusBack));
+        flashed.filter(|part| part.text.trim() == mark).map(|part| part.bg).collect()
+    };
+    assert_eq!(lit(&mut screen, "●"), [Some(C::Green)], "only the switch, not the row");
+    screen.ui.now += Duration::from_secs(1);
+    screen.press("a");
+    assert_eq!(lit(&mut screen, "○"), [Some(C::DarkGray)], "turned off: grey");
+}
+
+#[tokio::test]
+async fn folding_an_entry_wipes_its_lines_up_into_the_fold() {
+    let mut screen = screen("parsed-fold", json!({}));
+    orders_log(&mut screen);
+    screen.ui.motion.enabled = true;
+    screen.press("z v Enter");
+    screen.ui.now += Duration::from_secs(1);
+    assert!(screen.frame().contains("Checkout.Post()"), "unfolded");
+    screen.press("Enter");
+    assert!(screen.frame().contains("Checkout.Post()"), "folding: its lines still show as they wipe up");
+    screen.ui.now += super::motion::REVEAL;
+    let frame = screen.frame();
+    assert!(frame.contains("▸ +3 frames") && !frame.contains("Checkout.Post()"), "folded: {frame}");
+}
+
+#[tokio::test]
+async fn a_branch_change_being_fixed_sweeps_its_row_and_the_header_gauges_how_many_are() {
+    use lazyrunner_core::run::branch_changes::{Change, Fix, What};
+    let mut screen = screen("branch-sweep", json!({}));
+    let change = |text: &str| Change {
+        app: None,
+        what: What::Profile,
+        text: text.into(),
+        short: text.into(),
+        fix: Some(Fix::ReloadProfile),
+        keys: Vec::new(),
+    };
+    screen.controller.branch_changes = Some(("main".into(), "feature/x".into(), vec![change("a"), change("b")]));
+    screen.ui.motion.enabled = true;
+    screen.press("Alt+g");
+    screen.frame();
+    screen.ui.now += Duration::from_secs(1); // the box has opened
+    screen.frame();
+    screen.ui.branch_fixes.insert("a".into());
+    let frame = screen.frame();
+    assert!(frame.contains("✓ 1 of 2 fixed █████▱▱▱▱▱"), "{frame}");
+    assert!(screen.ui.motion.sweep("branch:a", screen.ui.now).is_some(), "fixed: it sweeps");
+    assert!(screen.ui.motion.sweep("branch:b", screen.ui.now).is_none());
+}
+
+#[tokio::test]
+async fn the_tests_view_spins_while_it_looks_for_suites() {
+    let mut screen = screen("tests-looking", json!({}));
+    screen.press("T");
+    screen.controller.suites = None;
+    assert!(screen.frame().contains("Looking for tests…"), "{}", screen.frame());
+    assert!(super::suites::spinning(&screen.ui, &screen.controller), "its spinner steps the screen");
 }

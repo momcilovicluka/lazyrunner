@@ -171,23 +171,23 @@ pub fn menu(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     };
     let bar = ui.motion.bar(index, ui.now);
     let row = |i: usize, item: &Action| {
-        let key = pad(&format!(" {}", item.key), keys);
         let hint = if item.hint.is_empty() { String::new() } else { format!("  {}", item.hint) };
         // A setting's [x] / [ ] is a switch: a green ● on, a dim ○ off.
         let switch = switch(&item.label);
-        let label =
-            switch.map_or_else(|| item.label.clone(), |(on, rest)| format!("{} {rest}", if on { "●" } else { "○" }));
+        // A switch just flipped flashes: green as it turns on, grey as it turns off.
         let flipped = matches!(&item.run, actions::Run::Setting { toggle, .. }
             if ui.motion.lit(&super::motion::Spot::Setting(*toggle), ui.now).is_some());
-        if flipped {
-            let line = pad(&format!("{key}{label}{hint}"), inner);
-            return aim(vec![on(line, C::Black, C::Green)], Target::Item(i));
-        }
+        let mark = |turned_on: bool| match (turned_on, flipped) {
+            (true, true) => on("●", C::Black, C::Green),
+            (false, true) => on("○", C::White, C::DarkGray),
+            (true, false) => seg("●", C::Green),
+            (false, false) => seg("○", C::DarkGray),
+        };
         let mut segs = key_caps(&item.key, i == bar, keys);
         let caps = segs.len();
         match switch {
-            Some((true, rest)) => segs.extend([seg("● ", C::Green), seg(rest.to_string(), C::White)]),
-            Some((false, rest)) => segs.extend([seg("○ ", C::DarkGray), seg(rest.to_string(), C::Gray)]),
+            Some((true, rest)) => segs.extend([mark(true), seg(" ", C::Gray), seg(rest.to_string(), C::White)]),
+            Some((false, rest)) => segs.extend([mark(false), seg(" ", C::Gray), seg(rest.to_string(), C::Gray)]),
             None => segs.push(seg(item.label.clone(), C::White)),
         }
         let named = segs.len();
