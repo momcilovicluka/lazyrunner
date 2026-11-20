@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.102.0] - 2026-11-20
+
+### Changed
+- Snappier while the apps log: lazyrunner drew 60 frames a second for over a second after any app's line, while anything spun or blinked, and for as long as any text scrolled sideways, though what changes then only steps. Now what flows (glides, wipes, sweeps, the reload show) is still drawn every frame; spinners, glints, a blinking cursor, a title's flash and scrolling text twenty times a second; and a new line's fade from white only when its colour steps. A column's rail map goes through its lines again at most ten times a second while they only keep coming (at once for a new error or warning), the start sheet reads launchSettings.json and the user secrets once a second instead of every frame, and `y` counts what it can copy only when the output changed. Fewer frames get in the way of your keys, and the CPU rests.
+- Switching from one screen to another (`K`, `H`, the stack map's views) only slides in; it no longer opens from its middle as well, which made the bar of screens blink.
+
 ## [1.101.0] - 2026-11-20
 
 ### Added

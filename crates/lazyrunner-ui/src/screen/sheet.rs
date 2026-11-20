@@ -14,6 +14,7 @@
 //! `y` copies the sheet, secrets masked. A running process's environment can't be read on Windows, so this is what
 //! lazyrunner passes it, not what it holds.
 
+use std::cell::RefCell;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
@@ -99,6 +100,7 @@ struct Var {
 }
 
 /// A line of the sheet.
+#[derive(Clone)]
 enum Row {
     Heading {
         title: String,
@@ -143,14 +145,51 @@ impl Typing {
 
 /// x then e: the focused app's sheet.
 pub fn open(ui: &mut Ui, controller: &Controller) {
+    ui.sheet_built.forget();
     if ui.focus < controller.apps.len() {
         let app = ui.focus;
         ui.overlay = Some(Overlay::Sheet { app, index: 0, shown: None, typing: None, only: false, saved: None });
     }
 }
 
+/// The sheet is built again this often while it's open, so a file edited beside it shows; a key builds it at once.
+const REBUILT: Duration = Duration::from_secs(1);
+
+/// The sheet's rows as last built, for which app and whether only the overrides: building them reads
+/// launchSettings.json and the user secrets, too slow for every frame of its wipe.
+#[derive(Default)]
+pub struct Built(RefCell<Option<Kept>>);
+
+struct Kept {
+    app: usize,
+    only: bool,
+    at: Instant,
+    rows: Vec<Row>,
+}
+
+impl Built {
+    /// The rows for `app`, built again when they're for another or older than `REBUILT`.
+    fn rows(&self, controller: &Controller, app: usize, only: bool, now: Instant) -> Vec<Row> {
+        let mut kept = self.0.borrow_mut();
+        if let Some(kept) = kept.as_ref()
+            && (kept.app, kept.only) == (app, only)
+            && now.saturating_duration_since(kept.at) < REBUILT
+        {
+            return kept.rows.clone();
+        }
+        let rows = build(controller, app, only);
+        *kept = Some(Kept { app, only, at: now, rows: rows.clone() });
+        rows
+    }
+
+    fn forget(&self) {
+        self.0.replace(None);
+    }
+}
+
 /// The sheet's keys (as the module says); while an override is typed, keys type it.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
+    ui.sheet_built.forget();
     let now = ui.now;
     let Some(Overlay::Sheet { app, index, shown, typing, only, saved }) = &mut ui.overlay else { return };
     let app = *app;
@@ -657,7 +696,7 @@ fn footer(input: Option<&Typing>, picked: Option<&Var>, only: bool, dotnet: bool
 pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some(Overlay::Sheet { app, index, shown, typing, only, saved }) = &ui.overlay else { return Vec::new() };
     let inner = cells.saturating_sub(8).clamp(20, INNER);
-    let built = build(controller, *app, *only);
+    let built = ui.sheet_built.rows(controller, *app, *only, ui.now);
     let count = built.iter().filter(|row| matches!(row, Row::Var(_))).count();
     let selected = (*index).min(count.saturating_sub(1));
     let reveal = revealed(ui, *shown);

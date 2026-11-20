@@ -50,6 +50,55 @@ pub const PICKS: [(Pick, &str, &str); 6] = [
     (Pick::Output, "o", "all of its output"),
 ];
 
+/// What the copy box's counts were gathered for: the app, its newest line's number and how many are kept (Ctrl+L
+/// clears them), its last build errors and the
+/// search's match. While these hold, the counts do: gathering clones the whole output.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Gathered {
+    focus: usize,
+    total: u64,
+    kept: usize,
+    build_errors: usize,
+    search: Option<usize>,
+}
+
+impl Gathered {
+    pub fn now(ui: &Ui, controller: &Controller) -> Self {
+        let state = controller.states.get(ui.focus);
+        let key = controller.apps.get(ui.focus).map(|app| app.key.as_str());
+        Self {
+            focus: ui.focus,
+            total: state.map_or(0, |state| state.output.total()),
+            kept: state.map_or(0, |state| state.output.len()),
+            build_errors: key.and_then(|key| controller.failed_build_errors.get(key)).map_or(0, Vec::len),
+            search: ui
+                .search
+                .as_ref()
+                .filter(|search| !search.typing && Some(search.key.as_str()) == key)
+                .and_then(|search| search.index),
+        }
+    }
+}
+
+/// How much each pick takes now (its non-empty lines, its entries), gathered again only when the output changed.
+pub fn counts(ui: &mut Ui, controller: &Controller) -> Vec<(usize, usize)> {
+    let gathered = Gathered::now(ui, controller);
+    if let Some((kept, counts)) = &ui.copy_counts
+        && *kept == gathered
+    {
+        return counts.clone();
+    }
+    let counts: Vec<(usize, usize)> = PICKS
+        .iter()
+        .map(|(pick, _, _)| {
+            let (lines, entries) = gather(ui, controller, *pick);
+            (lines.iter().filter(|line| !line.is_empty()).count(), entries)
+        })
+        .collect();
+    ui.copy_counts = Some((gathered, counts.clone()));
+    counts
+}
+
 /// What a pick takes from the focused app's output now: its lines, and how many entries they are (errors and
 /// warnings are separated by an empty line; the others are one entry).
 pub fn gather(ui: &Ui, controller: &Controller, pick: Pick) -> (Vec<String>, usize) {

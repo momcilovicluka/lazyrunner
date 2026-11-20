@@ -115,6 +115,8 @@ const MIN_SCROLLING_TAIL: usize = 12;
 /// The PowerShell version redrew every 100 ms; its frame-counted animations (spinners, glints, blinking cursors)
 /// keep that pace here at any frame rate.
 const ANIMATION_TICK: Duration = Duration::from_millis(100);
+/// What only steps is drawn this often: a bar's glint moves a cell, a spinner a frame (a quicker one sets its own).
+pub(crate) const STEP: Duration = Duration::from_millis(50);
 
 /// / in a column: the query, and the match it is on.
 #[derive(Clone, Debug, Default)]
@@ -433,6 +435,10 @@ pub struct Ui {
     pub held: held::Held,
     /// What spins while something runs: `"spinner"` in the settings, or lazyrunner's own.
     pub spinner: spinner::Spinner,
+    /// The start sheet's rows as last built.
+    pub sheet_built: sheet::Built,
+    /// The copy box's counts as last gathered, and for what output.
+    pub copy_counts: Option<(copy::Gathered, Vec<(usize, usize)>)>,
     /// Each column's rail map, drawn again only when its lines change.
     pub rails: rail::Maps,
     /// What moves on the rails: an ember to a new error, the shimmer back to live, a search's pulse.
@@ -604,6 +610,8 @@ impl Ui {
             user_key_at: None,
             held: held::Held::default(),
             spinner: spinner::Spinner::default(),
+            sheet_built: sheet::Built::default(),
+            copy_counts: None,
             rails: rail::Maps::default(),
             rail_motion: rail_motion::Effects::default(),
             diffs: std::collections::HashMap::new(),
@@ -824,9 +832,34 @@ impl Ui {
 
     /// Whether the next frame differs even if nothing happens.
     pub fn is_animating(&self, controller: &Controller) -> bool {
-        if self.reload.is_some()
+        self.next_change(controller).is_some()
+    }
+
+    /// When the screen next differs though nothing happens: now for what flows (drawn every frame), a step ahead for
+    /// what only steps (a spinner, a blinking cursor, a title's flash), a new line's next shade while it fades. A frame
+    /// sooner than that is one nobody sees.
+    pub fn next_change(&self, controller: &Controller) -> Option<Instant> {
+        if self.flowing(controller) {
+            return Some(self.now);
+        }
+        if self.reduced_motion {
+            // Nothing moves: keys, output and the tick redraw what changed (the busy frame still has to show).
+            return self.busy.is_some().then_some(self.now);
+        }
+        let step = self.stepping(controller).then(|| self.now + STEP.min(self.spinner.rate()));
+        let fade = controller
+            .states
+            .iter()
+            .filter(|state| state.scroll == 0)
+            .filter_map(|state| columns::next_shade(&state.output, self.now))
+            .min();
+        step.into_iter().chain(fade).min()
+    }
+
+    /// Whether something moves on every frame.
+    fn flowing(&self, controller: &Controller) -> bool {
+        self.reload.is_some()
             || self.theme_ripple.is_some()
-            || !self.marquees.borrow().is_empty()
             || self.motion.active(self.now)
             || sheet::animating(self)
             || !controller.auditing().is_empty()
@@ -862,22 +895,21 @@ impl Ui {
             || migrations_rail::animating(self, controller)
             || columns::animating(self, controller)
             || task_chips::animating(self, controller)
-        {
-            return true;
-        }
-        if self.reduced_motion {
-            // Nothing moves: keys, output and the tick redraw what changed (the busy frame still has to show).
-            return self.busy.is_some();
-        }
+            // The startup doctor's counts and countdown, the theme picker's preview, the about box's rainbow logo.
+            || (!self.reduced_motion
+                && matches!(self.overlay, Some(Overlay::Checklist(_) | Overlay::Themes { .. } | Overlay::About { .. })))
+    }
+
+    /// Whether something steps (a spinner, a glint, a blinking cursor, a title's flash, text scrolling sideways a cell
+    /// at a time) though nothing flows.
+    fn stepping(&self, controller: &Controller) -> bool {
         let typing = self.search.as_ref().is_some_and(|search| search.typing)
-            || matches!(
-                self.overlay,
-                Some(Overlay::Palette { .. } | Overlay::Checklist(_) | Overlay::Themes { .. } | Overlay::About { .. })
-            )
+            || matches!(self.overlay, Some(Overlay::Palette { .. }))
             || self.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
             || matches!(&self.overlay, Some(Overlay::Requests(view)) if view.typing)
             || (self.tests_typing && matches!(self.overlay, Some(Overlay::Tests { .. })));
         typing
+            || !self.marquees.borrow().is_empty()
             || self.busy.is_some()
             || controller.building.is_some()
             || controller.profiling.is_some()
@@ -887,13 +919,7 @@ impl Ui {
             || controller.celebrate.is_some()
             || controller.rebuild_pending()
             || controller.states.iter().any(|state| {
-                let fresh = state
-                    .output
-                    .last_line_at()
-                    .is_some_and(|at| self.now.saturating_duration_since(at) < Duration::from_millis(1200));
-                (state.is_running() && !state.is_up())
-                    || state.flash_until.is_some_and(|until| self.now < until)
-                    || (fresh && state.scroll == 0)
+                (state.is_running() && !state.is_up()) || state.flash_until.is_some_and(|until| self.now < until)
             })
     }
 }
@@ -936,7 +962,10 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     } else {
         let panel = panel::rows(ui, controller, width);
         let body_height = height.saturating_sub(panel.len());
-        let mut rows = reveal(body(ui, controller, width, body_height), opened);
+        let body = body(ui, controller, width, body_height);
+        // A screen switched to from another slides in; it doesn't open from its middle as well.
+        let opened = if screens::sliding(ui) { 1.0 } else { opened };
+        let mut rows = reveal(body, opened);
         // The palette Enter just closed wipes away over what's behind it.
         if ui.overlay.is_none()
             && ui.picker.is_none()

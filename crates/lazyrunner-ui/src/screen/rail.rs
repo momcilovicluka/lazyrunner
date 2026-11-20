@@ -8,6 +8,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use lazyrunner_core::output::{ColumnView, Level, LevelFilter};
 use lazyrunner_core::run::app::AppState;
@@ -40,10 +41,16 @@ enum Mark {
 /// A row of the rail: what it shows, and the line (in the column's list) a click brings into view.
 type Row = (Mark, usize);
 
+/// While lines only keep coming, a column's map is drawn again at most this often: every frame of a busy log would
+/// go through all its lines again, a search's matching and all.
+const REDRAWN_EVERY: Duration = Duration::from_millis(100);
+
 /// What a map was drawn from: it's drawn again only when one of these changes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Drawn {
     total: u64,
+    /// The app's errors and warnings: a new one is mapped at once (its ember sets off from it).
+    serious: (u64, u64),
     shown: usize,
     rows: usize,
     filter: LevelFilter,
@@ -52,6 +59,15 @@ struct Drawn {
     /// The first line of the run compared with the last one (`Alt+d`).
     diff: Option<u64>,
     view: ColumnView,
+}
+
+impl Drawn {
+    /// Whether `now` differs only by lines that came since (its rows' lines are all still there).
+    fn only_newer(&self, now: &Drawn) -> bool {
+        now.total > self.total
+            && now.shown >= self.shown
+            && *self == Drawn { total: self.total, shown: self.shown, ..now.clone() }
+    }
 }
 
 /// A column's map: its rows, and how fast each one's lines came.
@@ -63,7 +79,7 @@ struct Map {
 
 /// Each column's map, by its app's key.
 #[derive(Default)]
-pub struct Maps(RefCell<HashMap<String, (Drawn, Map)>>);
+pub struct Maps(RefCell<HashMap<String, (Drawn, Map, Instant)>>);
 
 /// The cells a `column` cells wide column's rail takes.
 pub fn width(column: usize) -> usize {
@@ -171,6 +187,7 @@ fn jump(line: usize, height: usize, total: usize) -> usize {
 fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, diff: Option<&View>, rows: usize) -> Map {
     let drawn = Drawn {
         total: state.output.total(),
+        serious: (state.errors, state.warnings),
         shown: list.len(),
         rows,
         filter: state.filter,
@@ -180,8 +197,8 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, diff:
         view: state.view,
     };
     let mut maps = ui.rails.0.borrow_mut();
-    if let Some((was, map)) = maps.get(&state.key)
-        && *was == drawn
+    if let Some((was, map, at)) = maps.get(&state.key)
+        && (*was == drawn || (was.only_newer(&drawn) && ui.now.saturating_duration_since(*at) < REDRAWN_EVERY))
     {
         return map.clone();
     }
@@ -194,7 +211,7 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, diff:
         }
     }
     let map = Map { rows: marks, density: rail_density::strip(list, rows) };
-    maps.insert(state.key.clone(), (drawn, map.clone()));
+    maps.insert(state.key.clone(), (drawn, map.clone(), ui.now));
     map
 }
 

@@ -1,7 +1,7 @@
 //! The columns: one per app (title, live numbers, output), side by side, with borders in the state colour of the
 //! column on their left, and heavy ones in the theme's focus colour beside the focused column.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use unicode_segmentation::UnicodeSegmentation;
 
 use lazyrunner_core::links;
@@ -42,7 +42,7 @@ const MIN_BAND: usize = 3;
 pub const LAYOUTS: [&str; 3] = ["auto", "columns", "stacked"];
 
 /// How fast the glint runs along a progress bar.
-const GLINT_CELLS_PER_SECOND: f64 = 16.0;
+const GLINT_CELLS_PER_SECOND: f64 = 1.0 / super::STEP.as_secs_f64();
 
 /// The spinner's frame now: `"spinner"` in the settings, or lazyrunner's own.
 pub fn spinner(ui: &Ui) -> &str {
@@ -358,6 +358,16 @@ fn recovery_chip(ui: &Ui, recovery: &lazyrunner_core::run::controller::Recovery)
         Some((left, _)) => seg(format!(" {icon} {} · {}s", recovery.restarts, left.as_secs_f64().ceil()), C::Yellow),
         None => seg(format!(" {icon} {}", recovery.restarts), C::DarkYellow),
     }
+}
+
+/// When a new line's colour next changes (white, then brighter than its own, then its own), while one still fades.
+pub fn next_shade(output: &lazyrunner_core::output::Output, now: Instant) -> Option<Instant> {
+    output
+        .newest_first(0)
+        .map(|line| (line.born, now.saturating_duration_since(line.born)))
+        .take_while(|(_, age)| *age < SETTLING)
+        .map(|(born, age)| born + if age < FRESH { FRESH } else { SETTLING })
+        .min()
 }
 
 /// A progress bar that glides towards its target and shimmers while it waits; `id` keeps its position.

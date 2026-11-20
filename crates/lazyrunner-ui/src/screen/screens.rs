@@ -219,10 +219,14 @@ pub fn slide(ui: &Ui, body: Vec<Vec<Seg>>, cells: usize) -> Vec<Vec<Seg>> {
         .collect()
 }
 
+/// Whether a screen switched to from another is sliding in.
+pub fn sliding(ui: &Ui) -> bool {
+    ui.screen_change.is_some_and(|(.., at)| moving(ui, at, SLIDE))
+}
+
 /// Whether a screen is sliding in or the hints shake.
 pub fn animating(ui: &Ui) -> bool {
-    ui.screen_change.is_some_and(|(.., at)| moving(ui, at, SLIDE))
-        || ui.shake_at.is_some_and(|at| moving(ui, at, SHAKE))
+    sliding(ui) || ui.shake_at.is_some_and(|at| moving(ui, at, SHAKE))
 }
 
 /// The hints shifted a cell back and forth while a key that did nothing shakes them.

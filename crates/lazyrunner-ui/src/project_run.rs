@@ -259,8 +259,8 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                     next_frame = Some(Instant::now() + MIN_GAP);
                     continue;
                 }
-                next_frame = if ui.is_animating(&controller) {
-                    Some((next_frame.unwrap_or(now) + FRAME).max(Instant::now() + MIN_GAP))
+                next_frame = if let Some(change) = ui.next_change(&controller) {
+                    Some(change.max(next_frame.unwrap_or(now) + FRAME).max(Instant::now() + MIN_GAP))
                 } else if options.frame_dump.is_some() && !dump_due {
                     Some(now + FRAME_DUMP_EVERY)
                 } else {
