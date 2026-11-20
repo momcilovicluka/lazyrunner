@@ -2481,6 +2481,43 @@ async fn with_reduced_motion_nothing_animates_and_new_lines_dont_flash() {
     }
 }
 
+#[tokio::test]
+async fn a_new_line_wakes_the_screen_only_when_its_colour_steps() {
+    let mut screen = screen("fade-steps", json!({}));
+    screen.render(240, 40); // wide: nothing has to scroll sideways
+    screen.ui.now += Duration::from_secs(5); // what opening it moved has stopped
+    let born = screen.ui.now;
+    screen.controller.states[0].output.push("a brand new line", born);
+    screen.render(240, 40);
+    assert_eq!(screen.ui.next_change(&screen.controller), Some(born + super::columns::FRESH), "white until then");
+    screen.ui.now = born + super::columns::FRESH;
+    assert_eq!(screen.ui.next_change(&screen.controller), Some(born + super::columns::SETTLING), "then brighter");
+    screen.ui.now = born + super::columns::SETTLING;
+    assert_eq!(screen.ui.next_change(&screen.controller), None, "settled: nothing to draw until something happens");
+}
+
+#[tokio::test]
+async fn a_spinner_steps_instead_of_drawing_every_frame() {
+    let mut screen = screen("spinner-steps", json!({}));
+    screen.running(); // Billing is starting: its spinner turns
+    screen.ui.now += Duration::from_secs(5); // its first lines have settled
+    let now = screen.ui.now;
+    assert_eq!(screen.ui.next_change(&screen.controller), Some(now + super::STEP));
+}
+
+#[tokio::test]
+async fn the_copy_box_counts_again_only_when_the_output_changes() {
+    let mut screen = screen("copy-counts", json!({}));
+    let at = screen.ui.now;
+    screen.controller.states[0].output.push("one", at);
+    screen.press("y");
+    assert!(screen.render(120, 30).contains("1 line"));
+    screen.controller.states[0].output.push("two", at);
+    assert!(screen.render(120, 30).contains("2 lines"), "a new line counts");
+    screen.controller.states[0].output.clear();
+    assert!(screen.render(120, 30).contains("none"), "cleared");
+}
+
 // ---------------------------------------------------------------- links
 
 #[tokio::test]

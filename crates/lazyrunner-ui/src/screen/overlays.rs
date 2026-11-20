@@ -255,7 +255,7 @@ pub fn install(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) 
 
 /// y: what to copy from the focused app's output, each with how much there is of it now.
 pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    use super::copy::{PICKS, Pick, gather};
+    use super::copy::{PICKS, Pick, counts};
     const INNER: usize = 72;
     let index = match &mut ui.overlay {
         Some(Overlay::Copy { index }) => {
@@ -264,16 +264,16 @@ pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         }
         _ => 0,
     };
+    let counts = counts(ui, controller);
     let lines: Vec<Vec<Seg>> = PICKS
         .iter()
+        .zip(counts)
         .enumerate()
-        .map(|(i, (pick, key, label))| {
-            let (lines, entries) = gather(ui, controller, *pick);
-            let count = lines.iter().filter(|line| !line.is_empty()).count();
+        .map(|(i, ((pick, key, label), (count, entries)))| {
             let plural =
                 |count: usize, one: &str, many: &str| format!("{count} {}", if count == 1 { one } else { many });
             let size = match pick {
-                _ if lines.is_empty() => "none".to_string(),
+                _ if count == 0 => "none".to_string(),
                 Pick::LastError => format!("with its stack trace, {}", plural(count, "line", "lines")),
                 Pick::Errors | Pick::Warnings | Pick::Both => {
                     format!("{entries} distinct {}", if entries == 1 { "entry" } else { "entries" })
@@ -285,7 +285,7 @@ pub fn copy(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             if i == index {
                 return aim(selected_parts(ui, &[&key, &label, &size], INNER), Target::Item(i));
             }
-            let color = if lines.is_empty() { C::DarkGray } else { C::White };
+            let color = if count == 0 { C::DarkGray } else { C::White };
             aim(vec![seg(key, C::Cyan), seg(label, color), seg(size, C::DarkGray)], Target::Item(i))
         })
         .collect();
