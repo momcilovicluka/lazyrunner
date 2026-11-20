@@ -24,7 +24,7 @@ use super::seg::{Seg, on, seg};
 use super::theme::C;
 
 /// An edge draws in this long, the next step out from the picked box this much later, at most this many steps.
-const REVEAL: Duration = Duration::from_millis(120);
+const EDGE_IN: Duration = Duration::from_millis(120);
 const OUTWARD: Duration = Duration::from_millis(90);
 const OUTWARD_MOST: usize = 6;
 /// A level's boxes grow (or shrink) this long, from this many cells wider on the way out.
@@ -357,7 +357,7 @@ fn edges(
     let pulse = moving(ui) && elapsed < PULSE && (elapsed.as_millis() / PULSE_STEP).is_multiple_of(2);
     let reveal = |from: usize, to: usize| {
         let step = far[&from].min(far[&to]).min(OUTWARD_MOST) as u32;
-        elapsed.saturating_sub(OUTWARD * step).as_secs_f64() / REVEAL.as_secs_f64()
+        elapsed.saturating_sub(OUTWARD * step).as_secs_f64() / EDGE_IN.as_secs_f64()
     };
     let touches = |from: usize, to: usize| Some(from) == shown.picked || Some(to) == shown.picked;
     let mut edges = Vec::new();

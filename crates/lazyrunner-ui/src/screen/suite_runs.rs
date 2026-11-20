@@ -13,8 +13,10 @@ use lazyrunner_core::run::suites::Suite;
 use lazyrunner_core::run::test_history::{RUNS_KEPT, SuiteHistory};
 
 use super::Ui;
+use super::icons::Icon;
 use super::seg::{Seg, on, pad, seg, take_cells};
 use super::theme::C;
+use super::viewbar::heading;
 
 /// How long a run just finished glints in.
 const GLINT: Duration = Duration::from_millis(600);
@@ -161,13 +163,13 @@ pub fn list_line(controller: &Controller, key: &str, cells: usize) -> Option<(Ve
 
 /// The project's last test runs, the newest first, at most `shown`, for under the list: when, how many passed and
 /// failed, how long.
-pub fn run_history(controller: &Controller, shown: usize) -> Vec<Vec<Seg>> {
+pub fn run_history(nerd: bool, controller: &Controller, shown: usize) -> Vec<Vec<Seg>> {
     let runs = &controller.test_runs.0;
     if runs.is_empty() || shown == 0 {
         return Vec::new();
     }
     let today = format!("{} ", jiff::ZonedDateTime::now().strftime(lazyrunner_core::time::DAY));
-    let mut rows = vec![Vec::new(), vec![seg(" RUN HISTORY", C::DarkCyan)]];
+    let mut rows = vec![Vec::new(), heading(nerd, (Icon::History, C::DarkCyan), " RUN HISTORY", C::DarkCyan)];
     for run in runs.iter().rev().take(shown) {
         let when = match run.at.strip_prefix(&today) {
             Some(time) => time.get(..5).unwrap_or(time).to_string(),

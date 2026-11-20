@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use super::Ui;
+use super::motion::ease;
 use super::seg::{Seg, on, seg};
 use super::theme::C;
 
@@ -241,11 +242,6 @@ pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
 /// How far through `length` `elapsed` is, 0 to 1.
 fn through(elapsed: Duration, length: Duration) -> f64 {
     (elapsed.as_secs_f64() / length.as_secs_f64()).clamp(0.0, 1.0)
-}
-
-/// `progress` eased out: quick at first, slowing into the end, as lazyrunner's glides do.
-fn ease(progress: f64) -> f64 {
-    1.0 - (1.0 - progress).powi(3)
 }
 
 /// The ember's rows `progress` into its flight, its head first.

@@ -19,8 +19,9 @@ use lazyrunner_core::run::test_history::{ABSENT, Story, Tally};
 use super::columns::{chunk, fit, linked, spinner};
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, aim, band, on, pad, seg, take_cells};
+use super::seg::{Seg, aim, band, focus_row, on, pad, seg, take_cells};
 use super::theme::C;
+use super::viewbar::heading;
 use super::{Overlay, Ui, copy};
 
 /// The marks before a suite's counts in the list (`✓12 ×13 ≈1`).
@@ -36,6 +37,9 @@ const LIST_LINE_CELLS: usize = 5;
 const NAME_KEPT: usize = 14;
 /// The project's runs listed under the list, at most.
 const HISTORY_SHOWN: usize = 6;
+/// The lists the selection bar takes turns on: the suites, and a picked suite's tests.
+const SUITES_BAR: &str = "suites";
+const TESTS_BAR: &str = "tests";
 
 /// The list's width: two fifths of the screen, within these.
 const LIST_WIDTH: (usize, usize) = (30, 60);
@@ -555,11 +559,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let detail_width = width.saturating_sub(list_width + 2);
     let hint = hint(width, picking.is_some());
     let height = rows.saturating_sub(1 + hint.len());
-    let mut list = list(ui, controller, &list_rows, selected, list_width);
+    // The selection bar is on the suites, or on the picked suite's tests while one is picked (its row stays lit).
+    let lit = if picking.is_none() { ui.motion.bar_of(SUITES_BAR, selected, ui.now) } else { selected };
+    let mut list = list(ui, controller, &list_rows, lit, list_width);
     // The project's last runs under the list, when there is room.
     let spare = height.saturating_sub(list.len() + 2);
     if spare > 0 {
-        list.extend(super::suite_runs::run_history(controller, spare.min(HISTORY_SHOWN)));
+        list.extend(super::suite_runs::run_history(ui.nerd, controller, spare.min(HISTORY_SHOWN)));
     }
     let list_top = selected.saturating_sub(height / 2).min(list.len().saturating_sub(height));
     let (detail, tail) = match (suite, picking) {
@@ -711,24 +717,17 @@ fn pick(ui: &mut Ui, controller: &Controller, suite: &Suite, at: usize, width: u
     let mut lines = vec![title];
     let room = (height.saturating_sub(2) * 11 / 20).max(3);
     let top = at.saturating_sub(room / 2).min(list.len().saturating_sub(room));
+    let bar = ui.motion.bar_of(TESTS_BAR, at, ui.now);
     for (index, test) in list.iter().enumerate().skip(top).take(room) {
         let (icon, color) = outcome_mark(ui.nerd, test.outcome);
         let ms = if test.ms > 0.0 { format!("{:>7} ms", test.ms.round()) } else { String::new() };
         let room = width.saturating_sub(ms.chars().count() + 4 + strip_cells).max(8);
         let name = ui.scrolling(&test.name, room);
         let marks = history.map_or_else(Vec::new, |history| strip(history.line(&test.name), PICK_STRIP_CELLS, false));
-        let row = if index == at {
-            let mut row = vec![on(format!(" {icon} "), C::FocusText, C::FocusBack)];
-            row.extend(marks);
-            let rest = width.saturating_sub(3 + strip_cells - gap.len());
-            row.push(on(pad(&format!("{gap}{name} {ms}"), rest), C::FocusText, C::FocusBack));
-            row
-        } else {
-            let mut row = vec![seg(format!(" {icon} "), color)];
-            row.extend(marks);
-            row.extend([seg(format!("{gap}{name} "), C::Gray), seg(ms, C::DarkGray)]);
-            row
-        };
+        let mut row = vec![seg(format!(" {icon} "), color)];
+        row.extend(marks);
+        row.extend([seg(format!("{gap}{name} "), C::Gray), seg(ms, C::DarkGray)]);
+        let row = if index == bar { focus_row(row, width) } else { row };
         lines.push(aim(row, Target::Test(index)));
     }
     lines.push(vec![seg("─".repeat(width), C::DarkGray)]);
@@ -776,12 +775,14 @@ fn end_of(text: &str, cells: usize) -> String {
     format!("…{rest}")
 }
 
-/// The list's rows: sides and apps (the pointer on one says a click runs it), and suites.
-fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: usize) -> Vec<Vec<Seg>> {
+/// The list's rows: sides and apps (the pointer on one says a click runs it), and suites; the one at `lit` under the
+/// selection bar.
+fn list(ui: &Ui, controller: &Controller, rows: &[Row], lit: usize, width: usize) -> Vec<Vec<Seg>> {
     let suites = controller.suites.as_deref().unwrap_or_default();
     let mut out = Vec::new();
     for (index, row) in rows.iter().enumerate() {
-        let hovered = ui.hover == Some(Target::Item(index)) && index != selected;
+        let on_bar = index == lit;
+        let hovered = ui.hover == Some(Target::Item(index)) && !on_bar;
         let line = match row {
             Row::Suite(at) => {
                 let Some(suite) = suites.get(*at) else { continue };
@@ -796,7 +797,7 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let width = if marked { width.saturating_sub(super::suite_impact::MARK_CELLS) } else { width };
                 let fixed = summary.chars().count() + beside + 9;
                 let spare = width.saturating_sub(fixed + suite.name.chars().count().min(NAME_KEPT));
-                let cover = super::coverage::row(ui, controller, suite, index == selected, spare);
+                let cover = super::coverage::row(ui, controller, suite, on_bar, spare);
                 // Its time and a line of its last times, as long as the name keeps some room.
                 let roomy = width.saturating_sub(fixed + super::seg::width(&cover));
                 let timed = super::suite_runs::list_line(controller, &suite.key, LIST_LINE_CELLS)
@@ -808,58 +809,46 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 let icon = icon(ui, suite.status);
                 let watched = if controller.test_watch.suites.contains(&suite.key) { WATCHED } else { " " };
                 let (line, last) = timed.unwrap_or_default();
-                let row = if index == selected {
-                    let mut row = vec![on(format!("  {watched}▸ {icon} {name} {summary}"), C::FocusText, C::FocusBack)];
-                    row.extend(cover);
-                    row.push(on(last, C::FocusText, C::FocusBack));
-                    if !line.is_empty() {
-                        row.push(on(" ", C::FocusText, C::FocusBack));
-                        row.extend(line);
-                    }
-                    let rest = width.saturating_sub(super::seg::width(&row));
-                    row.push(on(pad(&format!(" {badge}"), rest), C::FocusText, C::FocusBack));
-                    row
+                let color = tone(suite);
+                let name_color = if hovered { C::White } else { C::Gray };
+                let lead = if on_bar {
+                    seg(format!("  {watched}▸"), C::White)
                 } else {
-                    let color = tone(suite);
-                    let name_color = if hovered { C::White } else { C::Gray };
-                    let mut row = vec![
-                        seg(format!("   {watched}"), C::Cyan),
-                        seg(format!(" {icon} "), color),
-                        seg(format!("{name} "), name_color),
-                        seg(summary, color),
-                    ];
-                    row.extend(cover);
-                    row.push(seg(last, C::DarkGray));
-                    if !line.is_empty() {
-                        row.push(seg(" ", C::Gray));
-                        row.extend(line);
-                    }
-                    if !badge.is_empty() {
-                        row.extend([seg(" ", C::Gray), on(badge, C::Black, C::Red)]); // failures the run before didn't have
-                    }
-                    row
+                    seg(format!("   {watched}"), C::Cyan)
                 };
+                let mut row = vec![
+                    lead,
+                    seg(format!(" {icon} "), color),
+                    seg(format!("{name} "), name_color),
+                    seg(summary, color),
+                ];
+                row.extend(cover);
+                row.push(seg(last, C::DarkGray));
+                if !line.is_empty() {
+                    row.push(seg(" ", C::Gray));
+                    row.extend(line);
+                }
+                if !badge.is_empty() {
+                    row.extend([seg(" ", C::Gray), on(badge, C::Black, C::Red)]); // failures the run before didn't have
+                }
+                let row = if on_bar { focus_row(row, width) } else { row };
                 if !marked {
                     swept(ui, controller, &suite.key, row, width)
                 } else {
                     let affected = super::suite_impact::runs(controller, &suite.key);
                     let mut row = fit(row, width);
-                    if !affected && index != selected {
+                    if !affected && !on_bar {
                         row = super::suite_impact::dimmed(ui, row);
                     }
-                    row.extend(super::suite_impact::mark(ui, controller, &suite.key, index == selected));
+                    row.extend(super::suite_impact::mark(ui, controller, &suite.key, on_bar));
                     let full = width + super::suite_impact::MARK_CELLS;
                     let row = super::suite_impact::swept(ui, &suite.key, row, full);
                     swept(ui, controller, &suite.key, row, full)
                 }
             }
             Row::Untested { .. } => {
-                let text = format!("     {}", title(controller, row));
-                if index == selected {
-                    vec![on(pad(&text, width), C::FocusText, C::FocusBack)]
-                } else {
-                    vec![seg(text, C::DarkGray)]
-                }
+                let text = vec![seg(format!("     {}", title(controller, row)), C::DarkGray)];
+                if on_bar { focus_row(text, width) } else { text }
             }
             header => {
                 let keys = under(controller, rows, index);
@@ -874,8 +863,8 @@ fn list(ui: &Ui, controller: &Controller, rows: &[Row], selected: usize, width: 
                 };
                 let room = width.saturating_sub(summary.chars().count() + indent.len() + 2).max(4);
                 let name = pad(&cut(&title(controller, header), room), room);
-                if index == selected {
-                    vec![on(pad(&format!("{indent}{name} {summary}"), width), C::FocusText, C::FocusBack)]
+                if on_bar {
+                    focus_row(vec![seg(format!("{indent}{name} "), C::White), seg(summary, color)], width)
                 } else {
                     let tone = if matches!(header, Row::Side { .. }) { C::DarkCyan } else { C::Cyan };
                     let mut name = seg(format!("{indent}{name} "), if hovered { C::White } else { tone });
@@ -1120,7 +1109,7 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
     let mut failed: Vec<&TestResult> = suite.tests.iter().filter(|test| test.outcome == Outcome::Failed).collect();
     failed.sort_by_key(|test| !story(test).new);
     if !failed.is_empty() {
-        let mut header = vec![seg(format!("FAILURES {}", failed.len()), C::Red)];
+        let mut header = heading(out.ui.nerd, (Icon::Fail, C::Red), &format!("FAILURES {}", failed.len()), C::Red);
         if tally.new > 0 {
             header.extend([seg("  ", C::Gray), on(format!(" NEW {} ", tally.new), C::Black, C::Red)]);
         }
@@ -1144,14 +1133,14 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
     let passed = |wanted: fn(&Story) -> bool| -> Vec<&TestResult> {
         suite.tests.iter().filter(|test| test.outcome == Outcome::Passed && wanted(&story(test))).collect()
     };
-    for (title, tests, color) in [
-        ("Fixed since the run before", passed(|story| story.fixed), C::Green),
-        ("Flaky", passed(|story| story.flaky.is_some()), C::Yellow),
+    for (title, tests, color, icon) in [
+        ("Fixed since the run before", passed(|story| story.fixed), C::Green, Icon::Ok),
+        ("Flaky", passed(|story| story.flaky.is_some()), C::Yellow, Icon::Reload),
     ] {
         if tests.is_empty() {
             continue;
         }
-        out.add(&format!("{title} ({}):", tests.len()), C::DarkCyan, 0);
+        out.lines.push(heading(out.ui.nerd, (icon, color), &format!("{title} ({}):", tests.len()), C::DarkCyan));
         // A test fixed by the run just finished glints with it.
         let color = if glint && color == C::Green { C::White } else { color };
         for test in tests {
@@ -1162,7 +1151,7 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
     if suite.failed == 0 {
         out.add(&format!("All {} tests passed.", suite.passed), C::Green, 0);
         out.blank();
-        out.add("Slowest:", C::DarkCyan, 0);
+        out.lines.push(heading(out.ui.nerd, (Icon::Hourglass, C::Yellow), "Slowest:", C::DarkCyan));
         let mut slowest: Vec<&TestResult> = suite.tests.iter().collect();
         slowest.sort_by(|a, b| b.ms.total_cmp(&a.ms));
         for test in slowest.into_iter().take(SLOWEST) {
@@ -1172,7 +1161,8 @@ fn results(out: &mut Details, controller: &Controller, suite: &Suite, when: &str
     let skipped: Vec<&TestResult> = suite.tests.iter().filter(|test| test.outcome == Outcome::Skipped).collect();
     if !skipped.is_empty() {
         out.blank();
-        out.add(&format!("Skipped ({}):", skipped.len()), C::DarkCyan, 0);
+        let title = format!("Skipped ({}):", skipped.len());
+        out.lines.push(heading(out.ui.nerd, (Icon::Skip, C::DarkGray), &title, C::DarkCyan));
         for test in skipped.into_iter().take(SKIPPED_SHOWN) {
             out.add(&format!("– {}", test.name), C::DarkGray, 2);
         }

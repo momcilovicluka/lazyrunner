@@ -229,11 +229,12 @@ pub(super) fn go_to(ui: &mut Ui, controller: &mut Controller, app: usize, number
 }
 
 /// The marks box: each mark's app, how long ago its line came, and the line.
-/// A mark's row: its app, how long ago, its note and its line - the picked one lit (a note being typed yellow).
+/// A mark's row: its app, how long ago, its note and its line - the one under the selection bar (`bar`) lit, the
+/// picked one's note being typed yellow.
 fn mark_row(
     ui: &Ui,
     controller: &Controller,
-    (at, index): (usize, usize),
+    (at, index, bar): (usize, usize, usize),
     (app, number): (usize, u64),
     (inner, writing): (usize, Option<&str>),
 ) -> Vec<Seg> {
@@ -253,15 +254,13 @@ fn mark_row(
     {
         return vec![on(pad(&format!("{lead}note: {typing}{}", ui.cursor()), inner), C::Black, C::Yellow)];
     }
-    if at == index {
-        return vec![on(ui.scrolling_parts(&[&lead, &noted, &text], inner), C::Black, C::Cyan)];
-    }
-    vec![
+    let row = vec![
         seg(format!(" {name}"), C::Magenta),
         seg(format!(" {age:>9}  "), C::DarkGray),
         seg(noted, C::Yellow),
         seg(text, if line.is_some() { C::White } else { C::DarkGray }),
-    ]
+    ];
+    if at == bar { super::overlays::on_bar(ui, row, (2, 2), inner) } else { row }
 }
 
 /// The lines around the picked mark, dim, so it reads in its place without jumping there.
@@ -279,18 +278,23 @@ fn around(controller: &Controller, (app, number): (usize, u64), inner: usize) ->
     rows
 }
 
-pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let marks = all(controller);
-    let (index, writing) = match &ui.overlay {
-        Some(Overlay::Marks { index, note }) => ((*index).min(marks.len().saturating_sub(1)), note.as_deref()),
-        _ => (0, None),
+    let index = match &ui.overlay {
+        Some(Overlay::Marks { index, .. }) => (*index).min(marks.len().saturating_sub(1)),
+        _ => 0,
+    };
+    let bar = ui.motion.bar(index, ui.now);
+    let writing = match &ui.overlay {
+        Some(Overlay::Marks { note, .. }) => note.as_deref(),
+        _ => None,
     };
     let inner = cells.saturating_sub(8).clamp(20, INNER);
     let mut lines: Vec<Vec<Seg>> = marks
         .iter()
         .enumerate()
         .flat_map(|(at, &(app, number))| {
-            let mut rows = vec![mark_row(ui, controller, (at, index), (app, number), (inner, writing))];
+            let mut rows = vec![mark_row(ui, controller, (at, index, bar), (app, number), (inner, writing))];
             if at == index {
                 rows.extend(around(controller, (app, number), inner));
             }

@@ -10,12 +10,12 @@ expression: screen.frame()
 
 
                  ┌─ Copy from Orders ───────────────────────────────────────────────────────┐
-                 │  y   the last error        with its stack trace, 1 line                  │
-                 │  e   every error           2 distinct entries                            │
-                 │  w   every warning         1 distinct entry                              │
-                 │  a   errors and warnings   3 distinct entries                            │
-                 │  s   the search match      none                                          │
-                 │  o   all of its output     8 lines                                       │
+                 │   y  the last error        with its stack trace, 1 line                  │
+                 │   e  every error           2 distinct entries                            │
+                 │   w  every warning         1 distinct entry                              │
+                 │   a  errors and warnings   3 distinct entries                            │
+                 │   s  the search match      none                                          │
+                 │   o  all of its output     8 lines                                       │
                  │ press a key (y y: the last error), or j k + Enter · Esc close            │
                  └──────────────────────────────────────────────────────────────────────────┘
 

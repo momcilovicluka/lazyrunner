@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use super::editor::Place;
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, on, seg};
+use super::seg::{Seg, eighth, on, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -28,7 +28,6 @@ use super::{Overlay, Ui};
 /// eighths of a cell they fill.
 const BAR_CELLS: usize = 8;
 const LEAST_BAR_CELLS: usize = 4;
-const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
 /// How long the number and the bar take to ease to a run's new value; then the glint: when it starts sweeping across
 /// the change, how long it takes, and how wide it is.
 const EASE: Duration = Duration::from_millis(400);
@@ -206,13 +205,12 @@ pub fn bar(value: f64, before: f64, selected: bool, cells: usize) -> Vec<Seg> {
             let start = cell * 8;
             let kept = low.saturating_sub(start).min(8);
             let top = high.saturating_sub(start).min(8);
-            let block = |filled: usize| EIGHTHS[filled - 1];
             match (kept, top - kept) {
                 (0, 0) => paint(" ", base, back),
-                (kept, 0) => paint(block(kept), base, back),
-                (0, moved) => paint(block(moved), change, back),
-                (kept, _) if top == 8 => paint(block(kept), base, Some(change)),
-                (kept, moved) => paint(block(top), if moved >= kept { change } else { base }, back),
+                (kept, 0) => paint(eighth(kept), base, back),
+                (0, moved) => paint(eighth(moved), change, back),
+                (kept, _) if top == 8 => paint(eighth(kept), base, Some(change)),
+                (kept, moved) => paint(eighth(top), if moved >= kept { change } else { base }, back),
             }
         })
         .collect()

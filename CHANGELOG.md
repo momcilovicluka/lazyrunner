@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.103.0] - 2026-11-20
+
+### Changed
+- One selection bar everywhere: the `x` menu, the settings, `i`, `y` and a request's copy-as box, the About box's links, what changed for running, the start sheet, the launch picker, the repeat history, the marks, the database picker and the tests view (its suites, and a suite's tests while one is picked) now draw their chosen row in the theme's focus colours, on a bar that slides a row at a time as the palette's does, instead of black on cyan jumping from row to row. The menus show their keys as keycaps, as the palette does. Nothing slides with reduced motion.
+- The chosen row keeps what its colours say: a request's red 500 and slow time, an endpoint's errors, a database's answer, a migration's state, a timeline line's level and app, a suite's failures and its new-failures badge stay in their colours on the bar instead of all turning the bar's text colour on exactly the row being looked at.
+- Every bar of eighth blocks is drawn the same way, to an eighth of a cell: the startup doctor's checks done (gliding as they finish), a migration run's progress (moving with its bead), a breach building up in Health, the stack's memory and CPU in Health (gliding with the cards' figures beside them) and a running task's bar against its usual time fill smoothly instead of a whole cell at a time.
+- The tests view's sections have headings with icons, as COVERAGE and LIKELY CAUSE have: FAILURES, fixed since the run before, flaky, slowest, skipped, AFFECTED BECAUSE and RUN HISTORY.
+- One easing for everything that moves: the profile's zoom and the durations' charts ease out as the rest do.
+
 ## [1.102.0] - 2026-11-20
 
 ### Changed

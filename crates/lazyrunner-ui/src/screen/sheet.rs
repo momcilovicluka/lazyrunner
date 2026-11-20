@@ -33,7 +33,7 @@ use super::actions::Run;
 use super::icons::{self, Icon};
 use super::motion::FLASH;
 use super::overlays::boxed;
-use super::seg::{Seg, on, pad, seg};
+use super::seg::{Seg, focus_seg, on, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui, keys};
 
@@ -41,7 +41,7 @@ const INNER: usize = 100;
 const KEY_CELLS: usize = 28;
 /// How long `Space` shows a secret's value, and how long the value takes to wipe in, and out again.
 const SHOWN_FOR: Duration = Duration::from_secs(5);
-const WIPE: Duration = Duration::from_millis(80);
+const SECRET_WIPE: Duration = Duration::from_millis(80);
 const MASKED: &str = "••••";
 const BULLET: char = '•';
 /// Where a variable comes from, at the end of its line.
@@ -584,7 +584,7 @@ fn revealed(ui: &Ui, shown: Option<Instant>) -> Option<f64> {
         return Some(1.0);
     }
     let edge = since.min(SHOWN_FOR - since);
-    Some((edge.as_secs_f64() / WIPE.as_secs_f64()).min(1.0))
+    Some((edge.as_secs_f64() / SECRET_WIPE.as_secs_f64()).min(1.0))
 }
 
 /// `value` with its first `done` (0 to 1) shown and the rest masked, a character a cell.
@@ -614,9 +614,16 @@ fn shown_value(var: &Var, reveal: Option<f64>) -> (String, C) {
 }
 
 /// A variable's line - an override's amber edge, its icon, name, value and where it comes from - then what it wins
-/// over, dimmed. The picked one is lit - its value scrolling sideways when it's longer than its room - and one just
-/// saved flashes green.
-fn var_lines(ui: &Ui, var: &Var, picked: bool, reveal: Option<f64>, flash: bool, inner: usize) -> Vec<Vec<Seg>> {
+/// over, dimmed. The picked one's value scrolls sideways when it's longer than its room, the one under the selection
+/// bar is lit (`lit`), and one just saved flashes green.
+fn var_lines(
+    ui: &Ui,
+    var: &Var,
+    (picked, lit): (bool, bool),
+    reveal: Option<f64>,
+    flash: bool,
+    inner: usize,
+) -> Vec<Vec<Seg>> {
     let edge = if var.source == Source::Override { seg("▌", C::Yellow) } else { seg(" ", C::Gray) };
     let icon = match var.source {
         _ if var.secret => icons::icon(ui.nerd, Icon::Lock),
@@ -632,11 +639,12 @@ fn var_lines(ui: &Ui, var: &Var, picked: bool, reveal: Option<f64>, flash: bool,
         seg(format!(" {}", if picked { ui.scrolling(&value, room) } else { pad(&value, room) }), color),
         seg(format!("{:>PILL_CELLS$}", var.source.name()), var.source.color()),
     ];
-    if picked || flash {
-        let back = if flash { C::Green } else { C::Cyan };
+    if flash {
         for part in line.iter_mut().skip(1) {
-            (part.fg, part.bg) = (C::Black, Some(back));
+            (part.fg, part.bg) = (C::Black, Some(C::Green));
         }
+    } else if lit {
+        line = line.into_iter().enumerate().map(|(at, part)| if at == 0 { part } else { focus_seg(part) }).collect();
     }
     let mut lines = vec![line];
     for (source, value) in &var.hides {
@@ -693,12 +701,14 @@ fn footer(input: Option<&Typing>, picked: Option<&Var>, only: bool, dotnet: bool
     text
 }
 
-pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let Some(Overlay::Sheet { app, index, shown, typing, only, saved }) = &ui.overlay else { return Vec::new() };
+pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let Some(Overlay::Sheet { app, index, only, .. }) = ui.overlay else { return Vec::new() };
     let inner = cells.saturating_sub(8).clamp(20, INNER);
-    let built = ui.sheet_built.rows(controller, *app, *only, ui.now);
+    let built = ui.sheet_built.rows(controller, app, only, ui.now);
     let count = built.iter().filter(|row| matches!(row, Row::Var(_))).count();
-    let selected = (*index).min(count.saturating_sub(1));
+    let selected = index.min(count.saturating_sub(1));
+    let bar = ui.motion.bar(selected, ui.now);
+    let Some(Overlay::Sheet { shown, typing, saved, .. }) = &ui.overlay else { return Vec::new() };
     let reveal = revealed(ui, *shown);
     let lit = saved.as_ref().filter(|(_, at)| moving(ui) && ui.now.saturating_duration_since(*at) < FLASH);
     let (mut picked, mut var_at, mut at_selected) = (None, 0, 0);
@@ -727,13 +737,13 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
                 ]);
             }
             Row::Var(var) => {
-                let this = var_at == selected;
+                let (this, under_bar) = (var_at == selected, var_at == bar);
                 var_at += 1;
                 if this {
                     at_selected = lines.len();
                 }
                 let flash = lit.is_some_and(|(name, _)| *name == var.name);
-                lines.extend(var_lines(ui, &var, this, reveal.filter(|_| this), flash, inner));
+                lines.extend(var_lines(ui, &var, (this, under_bar), reveal.filter(|_| this), flash, inner));
                 if this {
                     picked = Some(var);
                 }
@@ -749,12 +759,12 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         let first = at_selected.saturating_sub(room / 2).min(lines.len() - room);
         lines = lines.into_iter().skip(first).take(room).collect();
     }
-    let app = controller.apps.get(*app);
+    let app = controller.apps.get(app);
     let name = app.map_or("", |app| app.name.as_str());
     let dotnet = app.is_some_and(|app| matches!(app.kind, AppKind::Dotnet { .. }));
-    let footer = footer(typing.as_ref(), picked.as_ref(), *only, dotnet, inner);
+    let footer = footer(typing.as_ref(), picked.as_ref(), only, dotnet, inner);
     let title =
-        if *only { format!("Start sheet · {name} · on this machine") } else { format!("Start sheet · {name}") };
+        if only { format!("Start sheet · {name} · on this machine") } else { format!("Start sheet · {name}") };
     boxed(&icons::titled(ui.nerd, Icon::Terminal, &title), lines, &footer, cells, rows, inner)
 }
 

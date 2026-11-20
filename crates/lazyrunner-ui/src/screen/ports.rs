@@ -42,12 +42,12 @@ const FIXED_CELLS: usize = 2 + PORT_CELLS + 2 + NAME_CELLS + 2 + 2 + STATE_CELLS
 /// A reserved range's hatched band.
 const BAND_CELLS: usize = 10;
 /// A change flashes this long; a new conflict slides in over `SLIDE` and pulses its edge twice in `PULSE`; a freed
-/// port's wipe takes `WIPE` (who held it out, then `freed` in), then it flashes green, and says `freed` for `FREED`.
-const FLASH: Duration = Duration::from_millis(150);
+/// port's wipe takes `FREED_WIPE` (who held it out, then `freed` in), then it flashes green, and says `freed` for `FREED`.
+const CHANGE_FLASH: Duration = Duration::from_millis(150);
 const SLIDE: Duration = Duration::from_millis(200);
 const PULSE: Duration = Duration::from_millis(400);
 const PULSE_STEP: u128 = 100;
-const WIPE: Duration = Duration::from_millis(300);
+const FREED_WIPE: Duration = Duration::from_millis(300);
 const FREED: Duration = Duration::from_millis(1500);
 /// As the view opens the strip's cells and the rows come in this far apart, all within `STAGGER_ALL`.
 const STAGGER: Duration = Duration::from_millis(25);
@@ -308,21 +308,23 @@ fn state(ui: &Ui, row: &Port, freeing: bool) -> Vec<Seg> {
     let freed = row.holding == Holding::Free
         && row.changed.is_some_and(|(was, at)| was == Holding::Other && ui.now.saturating_duration_since(at) < FREED);
     let now_said = vec![seg(format!("{mark} {}", if freed { "freed" } else { words }), color)];
-    let Some((was, since)) = row.changed.and_then(|(was, at)| Some((was, within(ui, Some(at), WIPE + FLASH)?))) else {
+    let Some((was, since)) =
+        row.changed.and_then(|(was, at)| Some((was, within(ui, Some(at), FREED_WIPE + CHANGE_FLASH)?)))
+    else {
         return now_said;
     };
-    let half = WIPE / 2;
-    if freed && since < WIPE + FLASH {
+    let half = FREED_WIPE / 2;
+    if freed && since < FREED_WIPE + CHANGE_FLASH {
         if since < half {
             let (mark, words, color) = look(was);
             return share(vec![seg(format!("{mark} {words}"), color)], 1.0 - since.as_secs_f64() / half.as_secs_f64());
         }
-        if since < WIPE {
+        if since < FREED_WIPE {
             return share(now_said, (since - half).as_secs_f64() / half.as_secs_f64());
         }
         return flashed(now_said, C::Green);
     }
-    if since < FLASH { flashed(now_said, color) } else { now_said }
+    if since < CHANGE_FLASH { flashed(now_said, color) } else { now_said }
 }
 
 /// What to do about a port: stop what took it (and since when), go to its own app, where the next start lands, the
@@ -356,7 +358,7 @@ fn edge(ui: &Ui, row: &Port, picked: bool, asking: bool) -> Seg {
 /// The last minute, a cell every two seconds, oldest first; the newest flashes as the port changes.
 fn history(ui: &Ui, row: &Port) -> Vec<Seg> {
     let mut out = vec![seg(" ".repeat(CELLS.saturating_sub(row.cells.len())), C::Gray)];
-    let flash = row.changed.and_then(|(_, at)| within(ui, Some(at), FLASH)).is_some();
+    let flash = row.changed.and_then(|(_, at)| within(ui, Some(at), CHANGE_FLASH)).is_some();
     let last = row.cells.len().saturating_sub(1);
     for (at, holding) in row.cells.iter().enumerate() {
         let (text, color) = cell(*holding);
@@ -501,7 +503,7 @@ fn overview(ui: &Ui, map: &Ports, opened: Instant) -> Vec<Vec<Seg>> {
     for row in rows.iter().take(arrived(ui, opened, rows.len())) {
         let color = look(row.holding).2;
         let text = if row.holding == Holding::Reserved { "░░" } else { "██" };
-        let flash = row.changed.and_then(|(_, at)| within(ui, Some(at), FLASH)).is_some();
+        let flash = row.changed.and_then(|(_, at)| within(ui, Some(at), CHANGE_FLASH)).is_some();
         strip.push(if flash { seg(text, C::White) } else { seg(text, color) });
         strip.push(seg(" ", C::Gray));
     }

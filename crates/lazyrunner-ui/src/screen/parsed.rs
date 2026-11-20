@@ -441,7 +441,7 @@ fn bar(ms: f64, slowest: f64) -> Vec<Seg> {
     (0..SQL_BAR)
         .map(|cell| match eighths.saturating_sub(cell * 8).min(8) {
             0 => seg("·", C::DarkGray),
-            filled => seg(super::request_waterfall::EIGHTHS[filled - 1], C::DarkCyan),
+            filled => seg(seg::eighth(filled), C::DarkCyan),
         })
         .collect()
 }

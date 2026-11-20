@@ -8,7 +8,7 @@ use lazyrunner_core::run::Controller;
 use super::icons::{self, Icon};
 use super::keys;
 use super::overlays::boxed;
-use super::seg::{Seg, on, pad, seg};
+use super::seg::{Seg, focus_row, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -47,11 +47,11 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     }
 }
 
-pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let Some(Overlay::Launch { app, index }) = &ui.overlay else { return Vec::new() };
-    let Some(found) = controller.apps.get(*app) else { return Vec::new() };
+pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let Some(Overlay::Launch { app, index }) = ui.overlay else { return Vec::new() };
+    let Some(found) = controller.apps.get(app) else { return Vec::new() };
     let choices = controller.launch_choices(&found.key);
-    let selected = (*index).min(choices.len().saturating_sub(1));
+    let bar = ui.motion.bar(index.min(choices.len().saturating_sub(1)), ui.now);
     let inner = cells.saturating_sub(8).clamp(20, INNER);
     let mut lines: Vec<Vec<Seg>> = choices
         .iter()
@@ -60,15 +60,12 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
             let mark = if choice.current { "●" } else { " " };
             let own = if choice.default { " (its own)" } else { "" };
             let name = pad(&format!("{}{own}", choice.name), NAME_CELLS);
-            if at == selected {
-                vec![on(pad(&format!(" {mark} {name} {}", choice.detail), inner), C::Black, C::Cyan)]
-            } else {
-                vec![
-                    seg(format!(" {mark} "), C::Green),
-                    seg(format!("{name} "), C::White),
-                    seg(&choice.detail, C::DarkGray),
-                ]
-            }
+            let row = vec![
+                seg(format!(" {mark} "), C::Green),
+                seg(format!("{name} "), C::White),
+                seg(&choice.detail, C::DarkGray),
+            ];
+            if at == bar { focus_row(row, inner) } else { row }
         })
         .collect();
     let branch = if controller.branch.is_empty() { "this checkout".to_string() } else { controller.branch.clone() };

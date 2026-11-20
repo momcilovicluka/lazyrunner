@@ -17,7 +17,7 @@ use lazyrunner_core::run::migrations::{Context, Migration, Run, Status};
 use super::columns::fit;
 use super::motion::ease;
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, seg};
+use super::seg::{Seg, aim, gauge, on, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -124,16 +124,16 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
             || context.run.as_ref().is_some_and(|run| settled(run).is_none_or(|settled| ui.now < settled)))
 }
 
-/// A run under way: the migrations the bead has reached, and how many it moves.
-pub fn progress(context: &Context, look: &Look) -> Option<(usize, usize)> {
+/// A run under way: how far the bead has travelled (gliding between migrations as it does), and how many it moves.
+pub fn progress(context: &Context, look: &Look) -> Option<(f64, usize)> {
     let run = context.run.as_ref().filter(|run| run.ended.is_none() && !run.planned.is_empty())?;
-    Some((travelled(&hops(&run.done()), look).floor() as usize, run.planned.len()))
+    Some((travelled(&hops(&run.done()), look), run.planned.len()))
 }
 
-/// `▰▰▱▱ 2/4`.
-pub fn bar(done: usize, total: usize) -> String {
-    let filled = (done * BAR_CELLS / total.max(1)).min(BAR_CELLS);
-    format!("{}{} {done}/{total}", "▰".repeat(filled), "▱".repeat(BAR_CELLS - filled))
+/// `██▌▱ 2/4`: the bead's travel in eighth blocks, and the migrations it has reached.
+pub fn bar(travelled: f64, total: usize) -> String {
+    let (filled, track) = gauge(travelled / total.max(1) as f64, BAR_CELLS);
+    format!("{filled}{track} {}/{total}", travelled.floor() as usize)
 }
 
 fn date(id: &str) -> Option<Date> {
@@ -540,7 +540,8 @@ mod tests {
         );
         assert_eq!((tick(jan, 1), tick(apr, 3)), (" Jan 2026".into(), " Apr 2026  · 3 months later".into()));
         assert!(risky(&items[1]) && !risky(&items[0]) && !risky(&migration("20260101000000_Address")));
-        assert_eq!(bar(1, 4), "▰▱▱▱ 1/4");
+        assert_eq!(bar(1.0, 4), "█▱▱▱ 1/4");
+        assert_eq!(bar(1.5, 4), "█▌▱▱ 1/4", "half way to the next, in eighths");
     }
 
     #[test]

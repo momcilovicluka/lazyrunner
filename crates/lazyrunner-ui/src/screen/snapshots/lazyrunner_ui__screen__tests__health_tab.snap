@@ -6,7 +6,7 @@ expression: frame
  Map  Code  Health    ● 0 healthy · △ 0 warning · ✗ 1 failing · 4 stopped   p95 565 ms · 0.3 req/s · 0.0% 5xx · ! 1 alert
  h j k l choose · v another chart · s sort · , its targets · a acknowledge its alerts · p profile it
  Enter its column, an endpoint's requests · Tab the map · Esc back
- memory ▕█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▏ 2.9 GB of 16.0 GB · 13.1 GB free
+ memory ▕█████████▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▏ 2.9 GB of 16.0 GB · 13.1 GB free
  cpu    ▕██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▏ 12% of the machine · 88% headroom
          ■ Orders  ■ Billing
 

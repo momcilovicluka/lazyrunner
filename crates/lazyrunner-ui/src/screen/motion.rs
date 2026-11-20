@@ -96,6 +96,9 @@ pub struct Motion {
     widths: Option<(Vec<usize>, Glide<Vec<f64>>)>,
     scrolls: HashMap<usize, Glide<f64>>,
     bar: Option<Glide<usize>>,
+    /// Which of a box's lists the bar is on (`bar_of`), and whether a frame drew it: one that didn't forgets it.
+    bar_list: &'static str,
+    bar_drawn: bool,
     /// The palette Enter closed: its search, the chosen item, and when.
     closing: Option<(String, usize, Instant)>,
 }
@@ -112,6 +115,8 @@ impl Default for Motion {
             widths: None,
             scrolls: HashMap::new(),
             bar: None,
+            bar_list: "",
+            bar_drawn: false,
             closing: None,
         }
     }
@@ -199,6 +204,9 @@ impl Motion {
             self.shown = shown;
             self.bar = None; // a list that opens starts with its bar where it is
         }
+        if !std::mem::take(&mut self.bar_drawn) {
+            self.bar = None; // a list drawn again (a menu over a view) starts where it is too
+        }
         if self.focus.is_some_and(|before| before != focus) {
             self.flash(Spot::Title(focus), now);
         }
@@ -268,6 +276,7 @@ impl Motion {
     /// than `BAR_ROWS` cut. A new target while it's still on its way (a held key repeats faster than it slides) has
     /// it go on from the row before the target, a row behind the key rather than stalling.
     pub fn bar(&mut self, target: usize, now: Instant) -> usize {
+        self.bar_drawn = true;
         if !self.on() {
             return target;
         }
@@ -287,6 +296,15 @@ impl Motion {
             None => self.bar = Some(Glide { from: target, to: target, at: now }),
         }
         self.bar_at(now)
+    }
+
+    /// `bar` on `list`, one of the lists a box takes turns showing it on (a suite's tests, then its suites again): a
+    /// list the bar wasn't on last starts with it where it is, rather than sliding over from the other's row.
+    pub fn bar_of(&mut self, list: &'static str, target: usize, now: Instant) -> usize {
+        if self.bar_list != list {
+            (self.bar, self.bar_list) = (None, list);
+        }
+        self.bar(target, now)
     }
 
     fn bar_at(&self, now: Instant) -> usize {
@@ -405,6 +423,22 @@ mod tests {
         let shown: Vec<usize> = (1..=8).map(|row| motion.bar(row, later(start, 33 * row as u64))).collect();
         assert_eq!(shown, [0, 1, 2, 3, 4, 5, 6, 7], "a repeat every 33 ms, faster than a row's 40: a row behind");
         assert_eq!(motion.bar(8, later(start, 33 * 8 + 41)), 8, "and onto the last row once it's let go");
+    }
+
+    #[test]
+    fn another_list_or_one_drawn_again_starts_with_its_bar_where_it_is() {
+        let (mut motion, start) = (Motion::default(), Instant::now());
+        motion.bar_of("suites", 3, start);
+        assert_eq!(motion.bar_of("tests", 0, later(start, 1)), 0, "a suite's tests: not from the suite's row");
+        assert_eq!(motion.bar_of("tests", 2, later(start, 2)), 0, "then it slides");
+        assert_eq!(motion.bar_of("suites", 3, later(start, 3)), 3, "back on the suites");
+        motion.frame(Some("requests"), 0, later(start, 4));
+        motion.bar(2, later(start, 4));
+        motion.frame(Some("requests"), 0, later(start, 5));
+        assert_eq!(motion.bar(0, later(start, 5)), 2, "drawn every frame, it slides");
+        motion.frame(Some("requests"), 0, later(start, 6));
+        motion.frame(Some("requests"), 0, later(start, 7));
+        assert_eq!(motion.bar(1, later(start, 8)), 1, "a frame without the list (a menu closed) forgot its bar");
     }
 
     #[test]

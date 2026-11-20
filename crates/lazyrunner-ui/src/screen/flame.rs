@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use lazyrunner_core::run::profile::{HOT, Profile, namespace, short};
 
 use super::icons::{self, Icon};
+use super::motion::{GLIDE, ease};
 use super::mouse::Target;
 use super::screens::Screen;
 use super::seg::{Seg, aim, on, seg};
@@ -32,8 +33,7 @@ const CHANGED: f64 = 0.05;
 const BLOOM_STEP: Duration = Duration::from_millis(40);
 const PULSE_FROM: Duration = Duration::from_millis(500);
 const PULSE: Duration = Duration::from_millis(200);
-/// Zooming glides the frame to the full width this long; the breadcrumb's new step stays lit this long.
-const GLIDE: Duration = Duration::from_millis(120);
+/// The breadcrumb's new step stays lit this long (zooming glides the frame to the full width in motion's `GLIDE`).
 const CRUMB: Duration = Duration::from_millis(400);
 /// What `+` and `-` change a capture's length by.
 const SECONDS_STEP: u64 = 5;
@@ -151,10 +151,7 @@ fn layout_from(profile: &Profile, zoom: usize, room: usize, at: (f64, f64)) -> V
 /// How far along `since` is in `length`, eased out; none once it's over or with motion off.
 fn progress(ui: &Ui, since: Instant, length: Duration) -> Option<f64> {
     let elapsed = ui.now.saturating_duration_since(since);
-    (super::stack::moving(ui) && elapsed < length).then(|| {
-        let t = elapsed.as_secs_f64() / length.as_secs_f64();
-        1.0 - (1.0 - t) * (1.0 - t)
-    })
+    (super::stack::moving(ui) && elapsed < length).then(|| ease(elapsed.as_secs_f64() / length.as_secs_f64()))
 }
 
 /// Whether the chart moves: blooming, a hot frame's pulse, a zoom's glide, the breadcrumb's lit step.

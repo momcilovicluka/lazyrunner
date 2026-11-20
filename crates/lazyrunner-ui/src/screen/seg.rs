@@ -164,6 +164,49 @@ fn banded(seg: &Seg, text: String, lit: bool, fg: C, bg: C) -> Seg {
     if lit { Seg { text, fg, bg: Some(bg), style: None, ..seg.clone() } } else { Seg { text, ..seg.clone() } }
 }
 
+/// A segment on the selection bar: on `C::FocusBack`, its plain text (grey, dim or white) in `C::FocusText`; one on
+/// a background of its own (a keycap, a tag) keeps it, and every other colour - a red status, a slow time - stays.
+pub fn focus_seg(part: Seg) -> Seg {
+    if part.bg.is_some() {
+        return part;
+    }
+    let fg = if matches!(part.fg, C::Gray | C::DarkGray | C::White) { C::FocusText } else { part.fg };
+    Seg { fg, bg: Some(C::FocusBack), ..part }
+}
+
+/// A row on the selection bar, padded to `cells`: every segment `focus_seg`ed, so it keeps what its colours mean.
+pub fn focus_row(segs: Vec<Seg>, cells: usize) -> Vec<Seg> {
+    let room = cells.saturating_sub(width(&segs));
+    let padding = (room > 0).then(|| seg(" ".repeat(room), C::Gray));
+    segs.into_iter().chain(padding).map(focus_seg).collect()
+}
+
+/// The blocks that fill a cell from its left an eighth at a time: `EIGHTHS[n - 1]` is `n` eighths.
+pub const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
+/// The cells a gauge leaves empty.
+const TRACK: &str = "▱";
+
+/// A cell `filled` eighths full: a space for none, a whole block from eight.
+pub fn eighth(filled: usize) -> &'static str {
+    match filled {
+        0 => " ",
+        filled => EIGHTHS[filled.min(EIGHTHS.len()) - 1],
+    }
+}
+
+/// `share` (0 to 1) of `cells` cells in eighth blocks, to the nearest eighth, padded with spaces to `cells`.
+pub fn eighths(share: f64, cells: usize) -> String {
+    let filled = (share.clamp(0.0, 1.0) * (cells * EIGHTHS.len()) as f64).round() as usize;
+    (0..cells).map(|cell| eighth(filled.saturating_sub(cell * EIGHTHS.len()))).collect()
+}
+
+/// `eighths` with the cells it leaves empty drawn as a dim track: the filled part, and the track after it.
+pub fn gauge(share: f64, cells: usize) -> (String, String) {
+    let filled = eighths(share, cells).trim_end().to_string();
+    let track = TRACK.repeat(cells.saturating_sub(filled.chars().count()));
+    (filled, track)
+}
+
 /// `text` padded with spaces (or cut) to exactly `cells` cells.
 pub fn pad(text: &str, cells: usize) -> String {
     let cut = take_cells(text, cells);
@@ -316,6 +359,38 @@ mod tests {
         let lit = band(row, 2, 5, C::Black, C::Cyan);
         let parts: Vec<(&str, Option<C>)> = lit.iter().map(|part| (part.text.as_str(), part.bg)).collect();
         assert_eq!(parts, [("ab", None), ("c", Some(C::Cyan)), ("de", Some(C::Cyan)), ("fg", None)]);
+    }
+
+    #[test]
+    fn a_bar_fills_its_cells_to_the_nearest_eighth() {
+        assert_eq!(eighths(0.0, 3), "   ");
+        assert_eq!(eighths(1.0, 3), "███");
+        assert_eq!(eighths(0.5, 3), "█▌ ", "12 of 24 eighths");
+        assert_eq!(eighths(1.0 / 24.0, 3), "▏  ", "one eighth");
+        assert_eq!(eighths(0.98, 2), "██", "15.7 eighths round up to a whole");
+        assert_eq!(eighths(2.0, 2), "██", "more than all of it is full");
+        assert_eq!(eighths(-1.0, 2), "  ");
+        assert_eq!(eighths(f64::NAN, 2), "  ");
+        assert_eq!(eighths(0.5, 0), "");
+        assert_eq!(gauge(0.5, 4), ("██".to_string(), "▱▱".to_string()));
+        assert_eq!(gauge(0.3, 4), ("█▎".to_string(), "▱▱".to_string()), "a part cell isn't track");
+        assert_eq!(gauge(0.0, 3), (String::new(), "▱▱▱".to_string()));
+    }
+
+    #[test]
+    fn a_selected_row_keeps_its_colours_on_the_bar() {
+        let row = vec![seg("GET ", C::DarkGray), seg("500", C::Red), on(" NEW ", C::Black, C::Red)];
+        let lit = focus_row(row, 14);
+        let parts: Vec<(&str, C, Option<C>)> = lit.iter().map(|part| (part.text.as_str(), part.fg, part.bg)).collect();
+        assert_eq!(
+            parts,
+            [
+                ("GET ", C::FocusText, Some(C::FocusBack)),
+                ("500", C::Red, Some(C::FocusBack)),
+                (" NEW ", C::Black, Some(C::Red)),
+                ("  ", C::FocusText, Some(C::FocusBack)),
+            ]
+        );
     }
 
     #[test]

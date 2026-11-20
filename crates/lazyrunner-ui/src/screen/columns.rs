@@ -24,7 +24,6 @@ use super::theme::C;
 
 const ORBIT: [char; 4] = ['◐', '◓', '◑', '◒'];
 pub const SPARKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-const BLOCKS: [char; 8] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 const DEFAULT_WIDTH: f64 = 33.0;
 const MIN_WIDTH: usize = 12;
 const SLOW_RESPONSE_MS: u64 = 1000;
@@ -375,16 +374,12 @@ pub fn bar(ui: &mut Ui, fraction: f64, id: &str, animated: bool) -> String {
     const WIDTH: usize = 10;
     let target = fraction.clamp(0.0, 1.0);
     let shown = if animated { ui.glide(id, target) } else { target };
-    let cells = shown * WIDTH as f64;
-    let full = cells.floor() as usize;
-    let partial =
-        if full < WIDTH { BLOCKS[((cells - full as f64) * 8.0) as usize % 8].to_string() } else { String::new() };
-    let mut filled: Vec<char> = vec!['█'; full];
+    let mut cells: Vec<char> = super::seg::eighths(shown, WIDTH).chars().collect();
+    let full = cells.iter().take_while(|cell| **cell == '█').count();
     if animated && full > 1 && shown < 1.0 {
-        filled[(ui.seconds() * GLINT_CELLS_PER_SECOND) as usize % full] = '▓'; // a light glint runs along the bar
+        cells[(ui.seconds() * GLINT_CELLS_PER_SECOND) as usize % full] = '▓'; // a light glint runs along the bar
     }
-    let rest = WIDTH.saturating_sub(full + partial.chars().count());
-    format!("▕{}{partial}{}▏ ", filled.into_iter().collect::<String>(), " ".repeat(rest))
+    format!("▕{}▏ ", cells.into_iter().collect::<String>())
 }
 
 fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {

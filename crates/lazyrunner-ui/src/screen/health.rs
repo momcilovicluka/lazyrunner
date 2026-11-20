@@ -15,7 +15,7 @@ use lazyrunner_core::run::requests::{Endpoint, endpoints};
 use super::health_draw::{self, Chart, Condition, NEAR};
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, aim, on, seg, width};
+use super::seg::{Seg, aim, gauge, on, seg, width};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -40,7 +40,6 @@ const PULSE: Duration = Duration::from_millis(300);
 const PULSES: u32 = 2;
 /// The sustained-time bar's cells.
 const SUSTAINED: usize = 10;
-const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
 
 /// The ways `s` orders the cards: the profile's order first (they don't move by themselves).
 pub const SORTS: [&str; 5] = ["the profile's order", "worst first", "cpu", "memory", "p95"];
@@ -331,7 +330,7 @@ fn probe(controller: &Controller, index: usize) -> Vec<Seg> {
 
 /// A card's readings in two lines: its CPU and memory; its p95, 5xx rate and requests a second.
 /// Each app's readings as they roll to their new values, and their tint a moment after one changed.
-type Rolled = std::collections::HashMap<(usize, Metric), (f64, Option<C>)>;
+pub(super) type Rolled = std::collections::HashMap<(usize, Metric), (f64, Option<C>)>;
 
 fn readings(controller: &Controller, index: usize, rolled: &Rolled) -> [Vec<Seg>; 2] {
     let mut first = reading(controller, index, Metric::Cpu, "cpu", rolled);
@@ -430,9 +429,8 @@ fn state_line(ui: &Ui, controller: &Controller, index: usize) -> Vec<Seg> {
             let text = format!("{} {what} for {lasted}{more}{hint}", icons::icon(ui.nerd, icon));
             return vec![seg(text, color)];
         }
-        let filled = (breach.progress(now) * SUSTAINED as f64).round() as usize;
-        let bar = format!("{}{}", "▰".repeat(filled), "▱".repeat(SUSTAINED.saturating_sub(filled)));
-        return vec![seg(bar, C::Yellow), seg(format!(" {what} for {lasted}{more}"), C::Yellow)];
+        let (filled, track) = gauge(breach.progress(now), SUSTAINED);
+        return vec![seg(format!("{filled}{track}"), C::Yellow), seg(format!(" {what} for {lasted}{more}"), C::Yellow)];
     }
     if Metric::ALL.iter().any(|&metric| controller.health.just_recovered(key, metric, now)) {
         return vec![seg(format!("{} back within its targets", icons::icon(ui.nerd, Icon::Ok)), C::Green)];
@@ -503,7 +501,7 @@ fn bar(p95: f64, target: f64, scale: f64) -> Vec<Seg> {
             match here {
                 0 if cell == tick => seg("┊", C::DarkGray),
                 0 => seg(" ", C::Gray),
-                full => seg(EIGHTHS[full - 1], if over { C::Red } else { C::DarkCyan }),
+                full => seg(super::seg::eighth(full), if over { C::Red } else { C::DarkCyan }),
             }
         })
         .collect()
@@ -595,13 +593,6 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     };
     let mut lines = vec![super::columns::fit(header(ui, controller), cells)];
     lines.extend(super::viewbar::keys(hint, cells));
-    lines.extend(health_draw::capacity(controller, (ui.machine_memory)(), cells));
-    lines.push(Vec::new());
-    let top = lines.len();
-    let side = cells > CARD + PANEL_GAP + PANEL;
-    let card_cells = if side { cells - PANEL_GAP - PANEL } else { cells };
-    let across = ((card_cells.saturating_sub(1) + GAP) / (CARD + GAP)).max(1);
-    ui.health_columns = across;
     let apps = controller.apps.len();
     let mut rolled = Rolled::new();
     for at in 0..apps {
@@ -612,6 +603,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             }
         }
     }
+    lines.extend(health_draw::capacity(controller, &rolled, (ui.machine_memory)(), cells));
+    lines.push(Vec::new());
+    let top = lines.len();
+    let side = cells > CARD + PANEL_GAP + PANEL;
+    let card_cells = if side { cells - PANEL_GAP - PANEL } else { cells };
+    let across = ((card_cells.saturating_sub(1) + GAP) / (CARD + GAP)).max(1);
+    ui.health_columns = across;
     let mut body: Vec<Vec<Seg>> = Vec::new();
     let mut picked_rows = 0..0;
     for (row, chunk) in order(controller, ui.health_sort).chunks(across).enumerate() {

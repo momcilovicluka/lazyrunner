@@ -119,8 +119,7 @@ fn grown(ui: &Ui, picked: Instant) -> f64 {
     if !ui.motion.enabled || ui.reduced_motion {
         return 1.0;
     }
-    let progress = ui.now.saturating_duration_since(picked).as_secs_f64() / GROW.as_secs_f64();
-    1.0 - (1.0 - progress.clamp(0.0, 1.0)).powi(3)
+    super::motion::ease(ui.now.saturating_duration_since(picked).as_secs_f64() / GROW.as_secs_f64())
 }
 
 /// The trend in words: slower or faster by how much (a failed run has none; a small change is "≈").

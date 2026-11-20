@@ -12,7 +12,7 @@ use super::actions::Run;
 use super::icons::{self, Icon};
 use super::keys;
 use super::overlays::boxed;
-use super::seg::{Seg, on, pad, seg};
+use super::seg::{Seg, focus_row, on, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -132,8 +132,9 @@ fn keys_of(change: &Change, inner: usize) -> Vec<Vec<Seg>> {
         .collect()
 }
 
-pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let Some(Overlay::BranchChanges { index, open }) = &ui.overlay else { return Vec::new() };
+pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let Some(Overlay::BranchChanges { index, open }) = ui.overlay else { return Vec::new() };
+    let bar = ui.motion.bar(index, ui.now);
     let inner = cells.saturating_sub(8).clamp(20, INNER);
     let mut lines = Vec::new();
     match &controller.branch_changes {
@@ -153,16 +154,20 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
                 let (icon, color) = if is_fixed { ("✓", C::Green) } else { kind_of(change.what) };
                 let fix = if is_fixed { "fixed" } else { fix_said(change.fix) };
                 let text = pad(&format!(" {}", change.text), inner.saturating_sub(fix.len() + 5));
-                lines.push(if at == *index {
-                    vec![on(format!(" {icon} {text}  {fix}"), C::Black, C::Cyan)]
-                } else {
-                    vec![
-                        seg(format!(" {icon} "), color),
-                        seg(text, if is_fixed { C::DarkGray } else { C::White }),
-                        seg(format!("  {fix}"), if is_fixed { C::Green } else { C::DarkCyan }),
-                    ]
-                });
-                if at == *index && *open {
+                let row = vec![
+                    seg(format!(" {icon} "), color),
+                    seg(text, if is_fixed { C::DarkGray } else { C::White }),
+                    seg(
+                        format!("  {fix}"),
+                        match is_fixed {
+                            true => C::Green,
+                            false if at == bar => C::Gray,
+                            false => C::DarkCyan,
+                        },
+                    ),
+                ];
+                lines.push(if at == bar { focus_row(row, inner) } else { row });
+                if at == index && open {
                     lines.extend(keys_of(change, inner));
                 }
             }
