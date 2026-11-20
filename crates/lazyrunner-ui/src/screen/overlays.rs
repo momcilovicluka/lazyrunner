@@ -14,9 +14,14 @@ use super::columns::{fit, hue_color, spinner};
 use super::icons::{self, Icon};
 use super::motion::{FLASH, Spot};
 use super::mouse::Target;
-use super::seg::{Seg, aim, eighths, focus_row, focus_seg, gauge, keycaps, limit, on, pad, seg, width};
+use super::seg::{Seg, aim, beads, eighths, focus_row, focus_seg, keycaps, limit, on, pad, seg, width};
 use super::theme::C;
 use super::{Overlay, Ui};
+
+/// The doctor's bar of checks done takes up to a third of the box's width, within these.
+const DOCTOR_BAR_SHARE: usize = 3;
+const MIN_DOCTOR_BAR: usize = 10;
+const MAX_DOCTOR_BAR: usize = 40;
 
 pub const LOGO: [&str; 3] = [
     "█   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄",
@@ -36,8 +41,6 @@ const TOOK_CELLS: usize = 10;
 const MENU_KEYS: usize = 8;
 const BOX_KEYS: usize = 5;
 const COPY_LABEL: usize = 22;
-/// Where the header's bar of the checks done keeps its glide.
-const DOCTOR_BAR: &str = "doctor:checked";
 pub const WHATS_NEW_MAX_LINES: usize = 12;
 const VERSION: &str = lazyrunner_core::changelog::VERSION;
 
@@ -542,8 +545,6 @@ pub fn checklist(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let news_rows = if news.is_empty() { 0 } else { news.len().min(WHATS_NEW_MAX_LINES) + 2 };
     let fold = 7 + groups(list).len() + list.items.len() + news_rows > rows.saturating_sub(4);
     let (mut left, picked) = checks_pane(ui, list, left_width, wide, fold);
-    let checked = list.tally(moving(ui).then_some(ui.now)).done as f64 / list.items.len().max(1) as f64;
-    let checked = if moving(ui) { ui.glide(DOCTOR_BAR, checked) } else { checked };
     let bar = ui.motion.bar(picked, ui.now);
     let bright = ui.motion.lit(&Spot::Wrapped, ui.now).is_some();
     if let Some(row) = left.get_mut(bar) {
@@ -568,7 +569,7 @@ pub fn checklist(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     }
     left.extend([Vec::new(), legend(ui)]);
     let right = if wide { details(ui, list, list.selected, right_width, false) } else { Vec::new() };
-    let mut lines = header(ui, list, inner, checked);
+    let mut lines = header(ui, list, inner);
     lines.push(Vec::new());
     for at in 0..left.len().max(right.len()) {
         let mut row = fit(left.get(at).cloned().unwrap_or_default(), left_width);
@@ -696,9 +697,9 @@ fn groups(list: &Checklist) -> Vec<(Group, Vec<usize>)> {
     groups
 }
 
-/// The header: the project, a bar of the checks done (`checked`, gliding as they finish), what they found, how long
+/// The header: the project, a bead for each check done (they tick up as they finish), what they found, how long
 /// they took and the slowest.
-fn header(ui: &Ui, list: &Checklist, inner: usize, checked: f64) -> Vec<Vec<Seg>> {
+fn header(ui: &Ui, list: &Checklist, inner: usize) -> Vec<Vec<Seg>> {
     let total = list.items.len();
     let tally = list.tally(moving(ui).then_some(ui.now));
     let done = tally.done;
@@ -707,8 +708,8 @@ fn header(ui: &Ui, list: &Checklist, inner: usize, checked: f64) -> Vec<Vec<Seg>
         first.push(seg(format!(" {}", list.project), C::White));
     }
     first.push(seg(" startup checks", C::DarkGray));
-    let cells = (inner / 4).clamp(10, 30);
-    let (filled, track) = gauge(checked, cells);
+    let cells = (inner / DOCTOR_BAR_SHARE).clamp(MIN_DOCTOR_BAR, MAX_DOCTOR_BAR);
+    let (filled, track) = beads(done, total, cells);
     let mut second =
         vec![seg(filled, C::Green), seg(track, C::DarkGray), seg(format!("  {done} / {total} checks   "), C::Gray)];
     let kinds =

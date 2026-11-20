@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.105.1] - 2026-11-20
+
+### Fixed
+- A bar of small rectangles that counts things has one for each: the startup doctor's `12 / 12 checks` is 12 of them, the apps up while they start, a migration run's migrations and the branch changes fixed are counted the same way. With room to spare each is wider, up to three cells, with a gap between them so they can still be counted (`▰▰ ▰▰ ▱▱`); with more things than room, the bar shows their share.
+
 ## [1.105.0] - 2026-11-20
 
 ### Changed
