@@ -151,6 +151,9 @@ fn press_key(ui: &mut Ui, controller: &mut Controller, key: KeyEvent) {
         return;
     }
     if ui.overlay.is_some() {
+        if name == "Enter" {
+            ui.motion.chose();
+        }
         overlay_key(ui, controller, &name, &key);
         return;
     }

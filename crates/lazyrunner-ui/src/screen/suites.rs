@@ -18,6 +18,7 @@ use lazyrunner_core::run::test_history::{ABSENT, Story, Tally};
 
 use super::columns::{bar, chunk, fit, linked, spinner};
 use super::icons::{self, Icon};
+use super::motion::{REVEAL, ease};
 use super::mouse::Target;
 use super::seg::{self, Seg, aim, band, eighths, focus_row, on, pad, seg, take_cells};
 use super::theme::C;
@@ -564,6 +565,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let detail_width = width.saturating_sub(list_width + 2);
     let hint = hint(width, picking.is_some());
     let height = rows.saturating_sub(1 + hint.len());
+    let wiped = wiped(ui, suite.map(|suite| suite.key.as_str()), height);
     // The selection bar is on the suites, or on the picked suite's tests while one is picked (its row stays lit).
     let lit = if picking.is_none() { ui.motion.bar_of(SUITES_BAR, selected, ui.now) } else { selected };
     let mut list = list(ui, controller, &list_rows, lit, list_width);
@@ -600,7 +602,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     out.extend(hint.into_iter().map(|row| aim(row, Target::Box)));
     for row in 0..height {
         let left = list.get(list_top + row).cloned().unwrap_or_default();
-        let right = detail.get(detail_top + row).cloned().unwrap_or_default();
+        let right = detail.get(detail_top + row).filter(|_| row < wiped).cloned().unwrap_or_default();
         let mut line = fit(left, list_width);
         line.push(seg("│ ", C::FocusBorder));
         line.extend(fit(right, detail_width));
@@ -699,6 +701,29 @@ fn swept(ui: &Ui, controller: &Controller, key: &str, row: Vec<Seg>, width: usiz
 /// Whether a watched suite's row is sweeping: frames keep coming until it's done.
 pub fn sweeping(ui: &Ui, controller: &Controller) -> bool {
     controller.test_watch.suites.iter().any(|key| sweep(ui, controller, key).is_some())
+}
+
+/// How many of the details' `rows` show: all, or - a moment after another suite was picked - more from the top as
+/// they wipe in downwards. Notes the suite the details are of (`key`).
+fn wiped(ui: &mut Ui, key: Option<&str>, rows: usize) -> usize {
+    let now = ui.now;
+    match &ui.tests_detail {
+        Some((shown, _)) if shown.as_deref() == key => {}
+        Some(_) => ui.tests_detail = Some((key.map(str::to_string), now)),
+        None => ui.tests_detail = Some((key.map(str::to_string), now.checked_sub(REVEAL).unwrap_or(now))),
+    }
+    let Some(at) = ui.tests_detail.as_ref().map(|(_, at)| *at).filter(|_| super::stack::moving(ui)) else {
+        return rows;
+    };
+    let progress = now.saturating_duration_since(at).as_secs_f64() / REVEAL.as_secs_f64();
+    (ease(progress) * rows as f64).ceil() as usize
+}
+
+/// Whether the details are wiping in.
+pub fn wiping(ui: &Ui) -> bool {
+    let tests = matches!(ui.overlay, Some(Overlay::Tests { .. }));
+    let since = ui.tests_detail.as_ref().map(|(_, at)| ui.now.saturating_duration_since(*at));
+    tests && super::stack::moving(ui) && since.is_some_and(|since| since < REVEAL)
 }
 
 fn hint(width: usize, picking: bool) -> Vec<Vec<Seg>> {

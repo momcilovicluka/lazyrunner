@@ -10,11 +10,14 @@ use super::columns::{self, hue_color};
 use super::icons::{self, Icon};
 use super::motion::Spot;
 use super::mouse::Target;
-use super::seg::{Seg, on, seg, width};
+use super::seg::{Seg, gauge, limit, on, seg, width};
 use super::theme::{C, no_color};
 use super::{Ui, bundle, status};
 
 const SPARKLE: [char; 2] = ['✦', '✧'];
+/// The cells of the header's bar of the apps up while they start, and its spinner with reduced motion.
+const STARTING_BAR: usize = 4;
+const STILL_SPINNER: &str = "●";
 const DEFAULT_LOG_LINES: usize = 5;
 /// "panelLogLines" beyond this is a typo, not a wish.
 const MAX_LOG_LINES: usize = 50;
@@ -23,7 +26,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>>
     let mut rows = Vec::new();
     let tag = if ui.theme.id != "default" || no_color() { format!(" {} ", ui.theme.name) } else { String::new() };
     rows.push(vec![seg("─".repeat(cells.saturating_sub(tag.chars().count())), C::DarkGray), seg(tag, C::DarkGray)]);
-    rows.push(header(ui, controller));
+    rows.push(header(ui, controller, cells));
     rows.push(if ui.follow.on {
         super::follow::ticker(ui, cells)
     } else {
@@ -75,23 +78,81 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>>
     rows
 }
 
-/// The lazyrunner chip shimmers while something builds; a sparkle banner celebrates "ready".
-fn header(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
+/// The lazyrunner chip shimmers while something builds; a sparkle banner celebrates "ready". It fits `cells`: the
+/// summary first, then the chips (cut with `…`), then the branch, the database and the folder - the folder going first.
+fn header(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
+    let lead = lead(ui, controller);
+    let chips = chips(ui, controller);
+    let mut branch = vec![
+        seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta).at(Target::Branch),
+    ];
+    if let Some(chip) = super::branch_changes::chip(ui, controller) {
+        branch.push(chip.at(Target::Branch)); // a click shows them (Alt+g)
+    }
+    let mut database = vec![
+        seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),
+        seg(controller.db_label.clone().unwrap_or_else(|| "n/a".into()), C::Yellow),
+    ];
+    if let Some(pending) = super::migrations_rail::pending(controller) {
+        database.push(seg(format!(" ○ {pending}"), C::Yellow)); // migrations pending on it
+    }
+    let folder = vec![seg(format!("   {}", controller.root.display()), C::DarkGray)];
+    fit_header(lead, chips, [branch, database, folder], cells)
+}
+
+/// The header's parts in `cells`, by priority: all of `lead`, the chips as far as they fit (cut with `…`), then each
+/// of `places` while the whole of it fits.
+fn fit_header(lead: Vec<Seg>, chips: Vec<Seg>, places: [Vec<Seg>; 3], cells: usize) -> Vec<Seg> {
+    let mut segs = limit(&lead, cells);
+    let mut room = cells.saturating_sub(width(&segs));
+    if width(&chips) > room {
+        segs.extend(limit(&chips, room));
+        return segs;
+    }
+    room -= width(&chips);
+    segs.extend(chips);
+    for place in places {
+        if width(&place) > room {
+            break;
+        }
+        room -= width(&place);
+        segs.extend(place);
+    }
+    segs
+}
+
+/// The lazyrunner chip and the summary: a spinner and a bar of the apps up while they start, a mark when it failed.
+fn lead(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let tick = ui.tick();
     let busy = controller.building.is_some() || controller.npm_ci.is_some();
     let reduced = ui.reduced_motion;
     let chip = if !reduced && busy && tick % 8 < 4 { C::Blue } else { C::Cyan };
-    let summary = match &controller.celebrate {
+    let mut segs = vec![on(" lazyrunner ", C::Black, chip)];
+    match &controller.celebrate {
         Some((text, _)) => {
             let spark = if reduced { SPARKLE[0] } else { SPARKLE[(tick / 2) as usize % 2] };
-            seg(format!("  {spark} {text} {spark}"), C::Green)
+            segs.push(seg(format!("  {spark} {text} {spark}"), C::Green));
         }
         None => {
             let summary = status::summary(controller);
-            seg(format!("  {}", summary.line(ui.nerd)), summary.color)
+            match summary.starting {
+                Some((up, of)) => {
+                    let spinner = if reduced { STILL_SPINNER } else { columns::spinner(ui) };
+                    segs.push(seg(format!("  {spinner} {}", summary.text), summary.color));
+                    let (filled, track) = gauge(up as f64 / of.max(1) as f64, STARTING_BAR);
+                    segs.extend([seg(" ", C::Gray), seg(filled, C::Green), seg(track, C::DarkGray)]);
+                }
+                None => segs.push(seg(format!("  {}", summary.line(ui.nerd)), summary.color)),
+            }
         }
-    };
-    let mut segs = vec![on(" lazyrunner ", C::Black, chip), summary];
+    }
+    segs
+}
+
+/// What's going on besides the apps: following an agent, the tasks, the jumps, the tests, what's new in each view,
+/// coverage, the diffs, ports, health and the last snapshot.
+fn chips(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
+    let mut segs = Vec::new();
     if ui.follow.on {
         let who = if ui.follow.client.is_empty() { "the agent" } else { ui.follow.client.as_str() };
         segs.push(seg(format!("   {} following {who}", icons::icon(ui.nerd, Icon::Watching)), C::Magenta));
@@ -145,20 +206,6 @@ fn header(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
     if let Some(chip) = super::snapshot::chip(ui) {
         segs.push(chip);
     }
-    segs.push(
-        seg(format!("   {} {}", icons::icon(ui.nerd, Icon::Branch), controller.branch), C::Magenta).at(Target::Branch),
-    );
-    if let Some(chip) = super::branch_changes::chip(ui, controller) {
-        segs.push(chip.at(Target::Branch)); // a click shows them (Alt+g)
-    }
-    segs.extend([
-        seg(format!("   {} ", icons::icon(ui.nerd, Icon::Database)), C::DarkGray),
-        seg(controller.db_label.clone().unwrap_or_else(|| "n/a".into()), C::Yellow),
-    ]);
-    if let Some(pending) = super::migrations_rail::pending(controller) {
-        segs.push(seg(format!(" ○ {pending}"), C::Yellow)); // migrations pending on it
-    }
-    segs.push(seg(format!("   {}", controller.root.display()), C::DarkGray));
     segs
 }
 
@@ -350,4 +397,24 @@ fn notice(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         ];
     }
     super::parsed::notice(ui, controller).unwrap_or_else(|| vec![seg("", C::Gray)])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_header_keeps_the_summary_and_chips_first_and_drops_the_folder_first() {
+        let text = |segs: Vec<Seg>| segs.iter().map(|part| part.text.as_str()).collect::<String>();
+        let places =
+            || [vec![seg("   main", C::Magenta)], vec![seg("   db", C::Yellow)], vec![seg("   /work", C::DarkGray)]];
+        let header = |cells: usize, chips: &str| {
+            text(fit_header(vec![seg(" up", C::Green)], vec![seg(chips.to_string(), C::Red)], places(), cells))
+        };
+        assert_eq!(header(40, " chip"), " up chip   main   db   /work");
+        assert_eq!(header(22, " chip"), " up chip   main   db", "the folder goes first");
+        assert_eq!(header(16, " chip"), " up chip   main");
+        assert_eq!(header(12, " a long failure"), " up a long …", "chips cut with …, the rest gone");
+        assert_eq!(header(2, " chip"), " …", "the summary cut last");
+    }
 }

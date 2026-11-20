@@ -13,8 +13,8 @@ use super::columns::{fit, spinner};
 use super::icons::{self, Icon};
 use super::migrations_rail::{self, Look};
 use super::mouse::Target;
-use super::overlays::boxed;
-use super::seg::{self, Seg, aim, focus_row, pad, seg, take_cells};
+use super::overlays::boxed_in;
+use super::seg::{self, Seg, aim, focus_row, keycaps, pad, seg, take_cells};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -26,11 +26,40 @@ const PAGE: usize = 10;
 const NAMED: usize = 6;
 /// The lines of dotnet ef's output shown while it works or after it failed.
 const TAIL: usize = 30;
+/// The y/n box's widest text.
+const CONFIRM_INNER: usize = 90;
 
-/// What the y/n box does on a yes: these contexts move (key, target migration, what the log says).
+/// What the y/n box does on a yes: these contexts move (key, target migration, what the log says); how much it risks.
 pub struct Confirm {
     pub lines: Vec<String>,
     pub jobs: Vec<(String, Option<String>, String)>,
+    pub risk: Risk,
+}
+
+/// What a yes risks: nothing much (applying), a revert through Down(), or a step that drops or deletes data.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Risk {
+    Apply,
+    Revert,
+    LosesData,
+}
+
+impl Risk {
+    /// The box's border: as calm or as loud as what a yes does.
+    fn border(self) -> C {
+        match self {
+            Self::Apply => C::Cyan,
+            Self::Revert => C::Yellow,
+            Self::LosesData => C::Red,
+        }
+    }
+}
+
+/// Whether one of `migrations`' steps drops or deletes data.
+fn loses_data<'a>(context: &Context, mut migrations: impl Iterator<Item = &'a Migration>) -> bool {
+    migrations.any(|migration| {
+        lazyrunner_core::run::migrations::steps(&context.project, &migration.id).iter().any(|step| step.destructive)
+    })
 }
 
 /// M.
@@ -148,6 +177,7 @@ pub(super) fn apply_pending(ui: &mut Ui, controller: &mut Controller, keys: &[St
     let mut lines = vec![format!("Apply the pending migrations to {}?", database(controller)), String::new()];
     let mut jobs = Vec::new();
     let mut why = None;
+    let mut risk = Risk::Apply;
     for context in keys.iter().filter_map(|key| controller.context(key)) {
         if let Some(reason) = not_ready(context) {
             why.get_or_insert(reason);
@@ -156,6 +186,9 @@ pub(super) fn apply_pending(ui: &mut Ui, controller: &mut Controller, keys: &[St
         let pending = context.pending();
         if pending.is_empty() {
             continue;
+        }
+        if loses_data(context, pending.iter().copied()) {
+            risk = Risk::LosesData;
         }
         let names: Vec<&str> = pending.iter().take(3).map(|migration| migration.name.as_str()).collect();
         let more = if pending.len() > 3 { ", …" } else { "" };
@@ -169,7 +202,7 @@ pub(super) fn apply_pending(ui: &mut Ui, controller: &mut Controller, keys: &[St
         controller.add_log(text, Hue::DarkGray);
         return;
     }
-    ask(ui, Confirm { lines, jobs });
+    ask(ui, Confirm { lines, jobs, risk });
 }
 
 /// m: moves a context to the chosen migration (`at`, oldest first) - forward applies up to it, back reverts the
@@ -219,7 +252,12 @@ fn migrate_to(ui: &mut Ui, controller: &mut Controller, context: &Context, at: u
         lines.push("…".into());
     }
     let what = if forward { format!("applied up to {to}") } else { format!("reverted to {to}") };
-    ask(ui, Confirm { lines, jobs: vec![(context.key(), Some(migration.id.clone()), what)] });
+    let risk = match forward {
+        _ if !risky.is_empty() || loses_data(context, moving.iter().copied()) => Risk::LosesData,
+        true => Risk::Apply,
+        false => Risk::Revert,
+    };
+    ask(ui, Confirm { lines, jobs: vec![(context.key(), Some(migration.id.clone()), what)], risk });
 }
 
 /// The y/n box: y / Enter does it, n / Esc doesn't.
@@ -484,15 +522,21 @@ fn steps(context: &Context, picking: Option<usize>, width: usize) -> Vec<Vec<Seg
     lines
 }
 
-/// The y/n box.
+/// The y/n box, its border as loud as what a yes risks, its keys as keycaps.
 pub fn confirm_rows(ui: &Ui, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some(Overlay::Confirm(confirm)) = &ui.overlay else { return Vec::new() };
-    let lines = confirm
+    let border = confirm.risk.border();
+    let mut lines: Vec<Vec<Seg>> = confirm
         .lines
         .iter()
         .map(|line| vec![seg(line.clone(), if line.contains("Down() runs") { C::Yellow } else { C::White })])
         .collect();
-    boxed(&icons::titled(ui.nerd, Icon::Help, "Confirm"), lines, "y / Enter: yes · n / Esc: no", width, rows, 90)
+    let mut keys = keycaps("y", C::Black, border);
+    keys.push(seg(" / Enter yes   ", C::DarkGray));
+    keys.extend(keycaps("n", C::White, C::DarkGray));
+    keys.push(seg(" / Esc no", C::DarkGray));
+    lines.extend([Vec::new(), keys]);
+    boxed_in(border, &icons::titled(ui.nerd, Icon::Help, "Confirm"), lines, "", width, rows, CONFIRM_INNER)
 }
 
 #[cfg(test)]

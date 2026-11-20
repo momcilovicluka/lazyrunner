@@ -718,6 +718,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         }
     }
     let reveal = super::request_waterfall::reveal(ui);
+    let moving = super::stack::moving(ui);
     let Some(Overlay::Requests(view)) = &ui.overlay else { return Vec::new() };
     let keys = super::viewbar::keys(&hint(view, controller), width);
     let Some(Overlay::Requests(view)) = &mut ui.overlay else { return Vec::new() };
@@ -729,7 +730,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         }
     }
     let running = if view.tab == Tab::Requests {
-        super::request_waterfall::running_rows(controller, ui.now, width)
+        ui.requests_running.rows(controller, ui.now, width, moving)
     } else {
         Vec::new()
     };

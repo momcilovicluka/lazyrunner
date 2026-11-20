@@ -31,6 +31,10 @@ const SLOW_RESPONSE_MS: u64 = 1000;
 pub(super) const FRESH: Duration = Duration::from_millis(400);
 pub(super) const SETTLING: Duration = Duration::from_millis(1000);
 const SPARK_WIDTH: usize = 10;
+/// A sparkline's braille: its left and right columns' dots from the bottom up.
+const SPARK_BRAILLE: u32 = 0x2800;
+const SPARK_LEFT: [u32; 4] = [0x40, 0x04, 0x02, 0x01];
+const SPARK_RIGHT: [u32; 4] = [0x80, 0x20, 0x10, 0x08];
 /// A stopped app's state breathes once in this many ticks.
 const IDLE_BREATH: u64 = 16;
 /// Narrower than this, `"layout": "auto"` stacks the apps top to bottom.
@@ -161,12 +165,25 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
         return vec![Vec::new(); rows];
     }
     ui.focus = ui.focus.min(count - 1);
-    let keys: Vec<usize> = if ui.zoom { vec![ui.focus] } else { (0..count).collect() };
-    if keys.len() > 1 && stacks(&controller.config, total) {
-        return stacked(ui, controller, &keys, total, rows);
+    let all: Vec<usize> = (0..count).collect();
+    if count > 1 && stacks(&controller.config, total) {
+        return stacked(ui, controller, &all, total, rows);
     }
-    let target = shares(controller, &keys, total.saturating_sub(keys.len() - 1), MIN_WIDTH, keys.len() - 1);
-    let widths = ui.motion.widths(&keys, target, ui.now);
+    // Zoomed, the others are 0 wide: the focused one glides to the whole width, and back.
+    let room = total.saturating_sub(count - 1);
+    let target = if ui.zoom {
+        all.iter().map(|&index| if index == ui.focus { room } else { 0 }).collect()
+    } else {
+        shares(controller, &all, room, MIN_WIDTH, count - 1)
+    };
+    let glided = ui.motion.widths(&all, target, ui.now);
+    let keys: Vec<usize> = all.iter().copied().filter(|&index| glided[index] > 0).collect();
+    let mut widths: Vec<usize> = keys.iter().map(|&index| glided[index]).collect();
+    // A column gone takes its border with it: the focused one (else the last) gets its cell.
+    let wide = keys.iter().position(|&index| index == ui.focus).unwrap_or(keys.len().saturating_sub(1));
+    if let Some(width) = widths.get_mut(wide) {
+        *width += count - keys.len();
+    }
     if let Some(cells) = keys.iter().position(|&index| index == ui.focus).map(|at| widths[at]) {
         ui.focus_cells = text_cells(controller, ui.focus, cells, rows);
     }
@@ -205,17 +222,23 @@ pub fn rows(ui: &mut Ui, controller: &Controller, total: usize, rows: usize) -> 
 }
 
 /// The apps one below the other, the full width, sharing the height as columns share the width (the focused one
-/// gets what's left over); when not all fit, the ones up to the focused one.
+/// gets what's left over); when not all fit, the ones up to the focused one. Zoomed, the others are 0 high: the
+/// focused one glides to the whole height, and back.
 fn stacked(ui: &mut Ui, controller: &Controller, keys: &[usize], total: usize, rows: usize) -> Vec<Vec<Seg>> {
     let fits = (rows / MIN_BAND).max(1);
     let at = keys.iter().position(|&index| index == ui.focus).unwrap_or(0);
     let first = (at + 1).saturating_sub(fits).min(keys.len().saturating_sub(fits));
     let shown = &keys[first..keys.len().min(first + fits)];
-    let heights = shares(controller, shown, rows, MIN_BAND, at - first); // the focused app gets the spare rows
+    let target = if ui.zoom {
+        shown.iter().map(|&index| if index == ui.focus { rows } else { 0 }).collect()
+    } else {
+        shares(controller, shown, rows, MIN_BAND, at - first) // the focused app gets the spare rows
+    };
+    let heights = ui.motion.heights(shown, target, ui.now);
     let base = ui.links.len();
     let mut found = Vec::new();
     let mut lines = Vec::with_capacity(rows);
-    for (&index, &band) in shown.iter().zip(&heights) {
+    for (&index, &band) in shown.iter().zip(&heights).filter(|(_, band)| **band > 0) {
         if index == ui.focus {
             ui.body_rows = band.saturating_sub(2);
             ui.focus_cells = text_cells(controller, index, total, band);
@@ -516,11 +539,26 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
     }
 }
 
-/// A sparkline of the newest values; `floor` keeps small values small (3% CPU is a low bar, not a full one).
+/// A sparkline of the newest values in braille, two to a cell, each a bar of one to four dots from the bottom; `floor`
+/// keeps small values small (3% CPU is a low bar, not a full one).
 pub fn sparkline<'a>(values: impl DoubleEndedIterator<Item = &'a f32> + ExactSizeIterator, floor: f32) -> String {
     let recent: Vec<f32> = values.rev().take(SPARK_WIDTH).copied().collect::<Vec<_>>().into_iter().rev().collect();
     let max = recent.iter().copied().fold(floor, f32::max);
-    recent.iter().map(|value| SPARKS[((value / max * 7.999).floor() as usize).min(7)]).collect()
+    let dots = |value: f32, column: &[u32; 4]| {
+        let height = 1 + ((value / max * 3.999).floor() as usize).min(column.len() - 1);
+        column[..height].iter().fold(0, |dots, dot| dots | dot)
+    };
+    // An odd number of values: the oldest cell has its right column only.
+    let padded: Vec<Option<f32>> =
+        std::iter::repeat_n(None, recent.len() % 2).chain(recent.iter().copied().map(Some)).collect();
+    padded
+        .chunks(2)
+        .map(|pair| {
+            let left = pair[0].map_or(0, |value| dots(value, &SPARK_LEFT));
+            let right = pair.get(1).copied().flatten().map_or(0, |value| dots(value, &SPARK_RIGHT));
+            char::from_u32(SPARK_BRAILLE + left + right).unwrap_or(' ')
+        })
+        .collect()
 }
 
 /// Its memory grew more than a fifth over the last minute (an alert of its own, #35).
@@ -1241,7 +1279,12 @@ mod tests {
 
     #[test]
     fn sparklines_and_chunks() {
-        assert_eq!(sparkline([0.0f32, 50.0, 100.0].iter(), 1.0), "▁▄█");
+        assert_eq!(sparkline([0.0f32, 50.0, 100.0].iter(), 1.0), "⢀⣼", "two to a cell, the oldest one alone");
+        assert_eq!(
+            sparkline([1.0f32; 12].iter(), 1.0).chars().count(),
+            SPARK_WIDTH / 2,
+            "the newest ten in five cells"
+        );
         assert_eq!(chunk("abcdefg", 3), ["abc", "def", "g"]);
         let line = "info: Microsoft.Hosting.Lifetime[14]";
         assert_eq!(chunk(line, 20), ["info: Microsoft.", "Hosting.Lifetime[14]"], "at a word, when one is near");

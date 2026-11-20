@@ -2,29 +2,29 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-
-
-
-
-
-
-
+ ▸ ◆ Orders   ○ stopp┳ ■ Billing   ○ stoppe┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
+                     ┃                     │   dev server · dev  │   watch build · wat…│   live · dev
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
                  ┌─ Copy from Orders ───────────────────────────────────────────────────────┐
                  │   y  the last error        with its stack trace, 1 line                  │
                  │   e  every error           2 distinct entries                            │
-                 │   w  every warning         1 distinct entry                              │
-                 │   a  errors and warnings   3 distinct entries                            │
-                 │   s  the search match      none                                          │
-                 │   o  all of its output     8 lines                                       │
-                 │ press a key (y y: the last error), or j k + Enter · Esc close            │
-                 └──────────────────────────────────────────────────────────────────────────┘
-
-
-
-
-
-
-
+warn: Shop.Cache[│   w  every warning         1 distinct entry                              │     ■
+      the cache i│   a  errors and warnings   3 distinct entries                            │
+cold             │   s  the search match      none                                          │ started yet
+fail: Shop.Orders│   o  all of its output     8 lines                                       │
+      boom       │ press a key (y y: the last error), or j k + Enter · Esc close            │t 47303 · free
+info: Shop.Orders└──────────────────────────────────────────────────────────────────────────┘
+fail: Shop.Orders[0] ┃                     │                     │                     │
+      boom           ┃                     │                     │                     │
+src/app.ts(3,1):     ┃                     │                     │                     │
+error TS2322: Type   ┃                     │                     │                     │
+'string' is not      ┃                     │                     │                     │
+assignable to type   ┃                     │                     │                     │
+'number'.            ┃                     │                     │                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   /  search   U  start all     :  commands   x  menu   ?  keys   ,  settings   q  quit

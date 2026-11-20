@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-  ┌─ Orders ───────────────────────────────────────────────────────────────────────────────────────────────┐
+ ▸┌─ Orders ───────────────────────────────────────────────────────────────────────────────────────────────┐ed
   │   Space  Start / stop the focused app  whichever it is not                                             │
   │   u      Start the focused app  builds it first if it changed                                          │
   │   s      Stop the focused app  or cancel its build / npm ci                                            │

@@ -160,6 +160,52 @@ pub fn band(segs: Vec<Seg>, from: usize, to: usize, fg: C, bg: C) -> Vec<Seg> {
     out
 }
 
+/// The part of a row from cell `from` up to cell `to` (a wide character across either edge left out).
+pub fn cells(segs: &[Seg], from: usize, to: usize) -> Vec<Seg> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    for part in segs {
+        let mut text = String::new();
+        for grapheme in part.text.graphemes(true) {
+            let cells = grapheme.width();
+            if at >= from && at + cells <= to {
+                text.push_str(grapheme);
+            }
+            at += cells;
+        }
+        if !text.is_empty() {
+            out.push(Seg { text, ..part.clone() });
+        }
+    }
+    out
+}
+
+/// `over` drawn on `under`: from its first cell that isn't a space - the spaces before it let `under` show - to its
+/// end, `under` on either side. An empty `over` leaves `under` as it is.
+pub fn splice(under: Vec<Seg>, over: Vec<Seg>) -> Vec<Seg> {
+    let text: String = over.iter().map(|part| part.text.as_str()).collect();
+    let end = text.width();
+    let margin = end - text.trim_start_matches(' ').width();
+    if margin == end {
+        return under;
+    }
+    let mut row = cells(&under, 0, margin);
+    let short = margin.saturating_sub(width(&row));
+    if short > 0 {
+        row.push(seg(" ".repeat(short), C::Gray));
+    }
+    row.extend(cells(&over, margin, end));
+    row.extend(cells(&under, end, usize::MAX));
+    row
+}
+
+/// A row behind a box: grey, without its backgrounds, nothing in it to click.
+pub fn dim(segs: Vec<Seg>) -> Vec<Seg> {
+    segs.into_iter()
+        .map(|part| Seg { fg: C::DarkGray, bg: None, style: None, target: None, underline: false, ..part })
+        .collect()
+}
+
 /// The cells a sweep's band lights.
 pub const SWEEP_BAND: usize = 6;
 
@@ -212,7 +258,8 @@ pub fn focus_row(segs: Vec<Seg>, cells: usize) -> Vec<Seg> {
 
 /// The blocks that fill a cell from its left an eighth at a time: `EIGHTHS[n - 1]` is `n` eighths.
 pub const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
-/// The cells a gauge leaves empty.
+/// A gauge's cell reached, and one it leaves empty.
+const BEAD: &str = "▰";
 const TRACK: &str = "▱";
 
 /// A cell `filled` eighths full: a space for none, a whole block from eight.
@@ -229,11 +276,12 @@ pub fn eighths(share: f64, cells: usize) -> String {
     (0..cells).map(|cell| eighth(filled.saturating_sub(cell * EIGHTHS.len()))).collect()
 }
 
-/// `eighths` with the cells it leaves empty drawn as a dim track: the filled part, and the track after it.
+/// `share` (0 to 1) of `cells` small rectangles, `▰▰▰▱▱`: the whole cells reached, and the track after them. Its
+/// cells are as small as the track's, so a gauge reads as one row of beads rather than a block beside them.
 pub fn gauge(share: f64, cells: usize) -> (String, String) {
-    let filled = eighths(share, cells).trim_end().to_string();
-    let track = TRACK.repeat(cells.saturating_sub(filled.chars().count()));
-    (filled, track)
+    let reached = if share.is_nan() { 0.0 } else { share.clamp(0.0, 1.0) * cells as f64 };
+    let filled = (reached.floor() as usize).min(cells);
+    (BEAD.repeat(filled), TRACK.repeat(cells - filled))
 }
 
 /// `text` padded with spaces (or cut) to exactly `cells` cells.
@@ -383,6 +431,20 @@ mod tests {
     }
 
     #[test]
+    fn a_box_row_is_drawn_over_what_is_behind_it() {
+        let text = |segs: &[Seg]| segs.iter().map(|part| part.text.as_str()).collect::<String>();
+        let under = vec![seg("0123456789", C::Gray).at(Target::Output(0))];
+        let over = vec![seg("   ", C::Gray), seg("│ab│", C::Cyan)];
+        let row = splice(dim(under.clone()), over);
+        assert_eq!(text(&row), "012│ab│789");
+        assert!(row.iter().all(|part| part.target.is_none()), "what's behind the box isn't clickable");
+        assert_eq!(row[0].fg, C::DarkGray);
+        assert_eq!(text(&splice(under.clone(), Vec::new())), "0123456789", "a row the box hasn't reached");
+        assert_eq!(text(&splice(Vec::new(), vec![seg("  ", C::Gray), seg("x", C::Gray)])), "  x");
+        assert_eq!(text(&cells(&[seg("ab", C::Gray), seg("cd", C::Red)], 1, 3)), "bc");
+    }
+
+    #[test]
     fn a_band_lights_its_cells_across_segments() {
         let row = vec![seg("abc", C::Gray), seg("defg", C::Red)];
         let lit = band(row, 2, 5, C::Black, C::Cyan);
@@ -428,9 +490,12 @@ mod tests {
         assert_eq!(eighths(-1.0, 2), "  ");
         assert_eq!(eighths(f64::NAN, 2), "  ");
         assert_eq!(eighths(0.5, 0), "");
-        assert_eq!(gauge(0.5, 4), ("██".to_string(), "▱▱".to_string()));
-        assert_eq!(gauge(0.3, 4), ("█▎".to_string(), "▱▱".to_string()), "a part cell isn't track");
+        assert_eq!(gauge(0.5, 4), ("▰▰".to_string(), "▱▱".to_string()));
+        assert_eq!(gauge(0.3, 4), ("▰".to_string(), "▱▱▱".to_string()), "a cell is filled once it's reached");
+        assert_eq!(gauge(11.0 / 12.0, 12), ("▰".repeat(11), "▱".to_string()));
+        assert_eq!(gauge(1.0, 3), ("▰▰▰".to_string(), String::new()));
         assert_eq!(gauge(0.0, 3), (String::new(), "▱▱▱".to_string()));
+        assert_eq!(gauge(f64::NAN, 2), (String::new(), "▱▱".to_string()));
     }
 
     #[test]
