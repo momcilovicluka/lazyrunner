@@ -26,6 +26,10 @@ pub const BAR_ROWS: usize = 3;
 /// After Enter the chosen keycap shows pressed for a frame, then the palette wipes closed.
 pub const PRESS: Duration = Duration::from_millis(16);
 pub const WIPE: Duration = Duration::from_millis(60);
+/// A column's title lit red by an error, holding then draining back to its state's colour.
+pub const ERRORED: Duration = Duration::from_millis(1200);
+/// A band sweeping once across a row that just reached a good state (a context up to date, a change fixed).
+pub const SWEEP: Duration = Duration::from_millis(300);
 
 /// The palette closing after Enter: shown pressed, then wiping (how much of it is left, 1 to 0).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -57,6 +61,12 @@ pub enum Spot {
     Switched(usize),
     /// An entry of a parsed view just unfolded (by its first line's number): its lines wipe in downwards.
     Unfolded { app: usize, line: u64 },
+    /// An entry of a parsed view just folded: its lines wipe up into its fold.
+    Folded { app: usize, line: u64 },
+    /// A column's title, an error line or an alert just came: lit red, it drains back to its state's colour.
+    Errored(usize),
+    /// A list's row (by an id of its own) that just reached a good state: a band sweeps across it once.
+    Reached(String),
     /// What was clicked.
     Clicked(Target),
     /// The startup doctor's selection bar going round the end of its list.
@@ -68,7 +78,9 @@ impl Spot {
         match self {
             Spot::Copied { .. } => COPY_FLASH,
             Spot::Looked { .. } | Spot::LookedRequests(_) => LOOK,
-            Spot::Switched(_) | Spot::Unfolded { .. } => REVEAL,
+            Spot::Switched(_) | Spot::Unfolded { .. } | Spot::Folded { .. } => REVEAL,
+            Spot::Errored(_) => ERRORED,
+            Spot::Reached(_) => SWEEP,
             _ => FLASH,
         }
     }
@@ -101,6 +113,8 @@ pub struct Motion {
     bar_drawn: bool,
     /// The palette Enter closed: its search, the chosen item, and when.
     closing: Option<(String, usize, Instant)>,
+    /// Whether each row `reach` was told about was in its good state last frame.
+    reached: HashMap<String, bool>,
 }
 
 impl Default for Motion {
@@ -118,6 +132,7 @@ impl Default for Motion {
             bar_list: "",
             bar_drawn: false,
             closing: None,
+            reached: HashMap::new(),
         }
     }
 }
@@ -159,6 +174,18 @@ impl Motion {
         let (spot, at) = self.flashes.iter().find(|(other, _)| other == spot)?;
         let done = progress(*at, now, spot.lasts());
         (done < 1.0).then_some(1.0 - done)
+    }
+
+    /// Notes whether row `id` is in its good state this frame: reaching it - not on first sight - sweeps it once.
+    pub fn reach(&mut self, id: &str, reached: bool, now: Instant) {
+        if self.reached.insert(id.to_string(), reached) == Some(false) && reached {
+            self.flash(Spot::Reached(id.to_string()), now);
+        }
+    }
+
+    /// How far across its row the sweep of row `id` is, 0 to 1, while it sweeps.
+    pub fn sweep(&self, id: &str, now: Instant) -> Option<f64> {
+        self.lit(&Spot::Reached(id.to_string()), now).map(|left| 1.0 - left)
     }
 
     /// The lines of app `app` that were just copied, while they're lit.
@@ -374,6 +401,25 @@ mod tests {
         assert!(motion.active(later(start, 300)));
         motion.frame(None, 0, later(start, 500));
         assert!(!motion.active(later(start, 500)), "over, and forgotten");
+    }
+
+    #[test]
+    fn a_row_reaching_its_good_state_sweeps_once_but_not_on_first_sight() {
+        let (mut motion, start) = (Motion::default(), Instant::now());
+        motion.reach("context", true, start);
+        assert_eq!(motion.sweep("context", start), None, "first seen up to date: nothing happened");
+        motion.reach("change", false, start);
+        motion.reach("change", true, later(start, 10));
+        assert_eq!(motion.sweep("change", later(start, 10)), Some(0.0));
+        let half = motion.sweep("change", later(start, 160)).unwrap();
+        assert!((half - 0.5).abs() < 0.01, "{half}");
+        motion.reach("change", true, later(start, 200));
+        assert!(motion.sweep("change", later(start, 200)).is_some_and(|through| through > 0.6), "once: not again");
+        assert_eq!(motion.sweep("change", later(start, 310)), None);
+        motion.reduced = true;
+        motion.reach("context", false, later(start, 320));
+        motion.reach("context", true, later(start, 330));
+        assert_eq!(motion.sweep("context", later(start, 330)), None, "reduced motion: none");
     }
 
     #[test]

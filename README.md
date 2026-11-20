@@ -1382,6 +1382,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `autoUpdate` | `true` | Install a newer lazyrunner when it opens |
 | `mouse` | `true` | Clicks and the wheel (off: the terminal selects text) |
 | `reducedMotion` | `false` | No blinking, spinners, glides or fades |
+| `frameRate` | `"auto"` | Frames a second for what moves: `auto` is the fastest display's refresh rate (60 at least - 120, 144, 240 on displays that show them), or a number from 30 to 480 |
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
 | `tunnelTool` | | What `Alt+s` shares an app through: `devtunnel` or `ngrok` (without it, the first of them installed) |

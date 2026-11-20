@@ -28,7 +28,7 @@ const METRICS_EVERY: Duration = Duration::from_secs(2);
 const BRANCH_SETTLE: Duration = Duration::from_secs(3);
 const CODE_SETTLE: Duration = Duration::from_secs(2);
 const TIMELINE_WIDTH: usize = 24;
-const CELEBRATE_FOR: Duration = Duration::from_secs(4);
+pub(super) const CELEBRATE_FOR: Duration = Duration::from_secs(4);
 /// A start that took this long gets a notification when it's ready.
 const NOTIFY_READY_AFTER: Duration = Duration::from_secs(20);
 

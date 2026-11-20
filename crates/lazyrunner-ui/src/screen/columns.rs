@@ -40,8 +40,8 @@ const MIN_BAND: usize = 3;
 /// The `"layout"` setting's values, in the order `|` goes through them.
 pub const LAYOUTS: [&str; 3] = ["auto", "columns", "stacked"];
 
-/// How fast the glint runs along a progress bar.
-const GLINT_CELLS_PER_SECOND: f64 = 1.0 / super::STEP.as_secs_f64();
+/// How fast the glint runs along a progress bar: a cell every 50 ms.
+const GLINT_CELLS_PER_SECOND: f64 = 20.0;
 
 /// The spinner's frame now: `"spinner"` in the settings, or lazyrunner's own.
 pub fn spinner(ui: &Ui) -> &str {
@@ -93,10 +93,12 @@ fn tool<'a>(
     Some((if job.what == "npm ci" { "npmci" } else { "npminstall" }, job))
 }
 
-/// The app's colour for its title chip; it flashes red for a moment when an error line arrives.
+/// The app's colour for its title chip. An error line, an alert or a crash holds it red for a moment when nothing
+/// moves; otherwise the title lights red and drains back to this (`Spot::Errored`).
 pub fn tone(ui: &Ui, controller: &Controller, index: usize) -> C {
     let state = &controller.states[index];
-    if state.flash_until.is_some_and(|until| ui.now < until) && (ui.reduced_motion || ui.tick() % 4 < 2) {
+    let still = ui.reduced_motion || !ui.motion.enabled;
+    if still && state.flash_until.is_some_and(|until| ui.now < until) {
         return C::Red;
     }
     if tool(controller, &state.key).is_some() {
@@ -281,15 +283,18 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         None => {}
     }
     super::phases::note(ui, &app.key, super::phases::Phase::of(&controller.states[index]));
+    super::phases::note_error(ui, index, &app.key, controller.states[index].flash_until);
     // Without Nerd Font icons a command app's language is a chip beside the plain icon: `■ py Pricing`.
     let chip = lazyrunner_core::apptypes::language(app)
         .filter(|_| !ui.nerd && app.icon.is_none())
         .map_or(String::new(), |language| format!("{} ", icons::language_chip(language)));
     let name = super::session::typed(ui, &app.key, name);
     let text = format!(" {marker}{icon} {chip}{name} ");
-    // An action's flash wins; else the chip moves as the app changes state.
+    // An action's flash wins, then an error's; else the chip moves as the app changes state.
     let mut segs = if ui.motion.title_lit(index, ui.now) {
         vec![on(text, chip_fg, chip_bg)]
+    } else if let Some(lit) = ui.motion.lit(&super::motion::Spot::Errored(index), ui.now) {
+        super::phases::errored(&text, lit, chip_fg, chip_bg)
     } else {
         super::phases::chip(ui, &app.key, text, chip_fg, chip_bg)
     };
@@ -453,16 +458,25 @@ fn status(ui: &mut Ui, controller: &Controller, index: usize) -> Vec<Seg> {
                     seg(up, C::DarkGray),
                 ];
             }
-            let mut segs = vec![seg(format!("{} ", icons::icon(ui.nerd, Icon::Up)), C::Green)];
-            segs.push(match controller.last_probe(&key) {
+            let probe = controller.last_probe(&key);
+            // Until its first answer the spinner stands where the up dot will.
+            let mark = match probe {
+                None if animated => spinner(ui).to_string(),
+                _ => icons::icon(ui.nerd, Icon::Up).to_string(),
+            };
+            let mut segs = vec![seg(format!("{mark} "), C::Green)];
+            segs.push(match probe {
                 None => seg("checking…", C::DarkGray),
-                Some(probe) if !probe.ok => seg("not responding", C::Red),
+                Some(probe) if !probe.ok => {
+                    seg(format!("{} not responding", icons::icon(ui.nerd, Icon::Exited)), C::Red)
+                }
                 Some(probe) => {
                     let code = if probe.code >= 400 { format!(" HTTP {}", probe.code) } else { String::new() };
+                    let (ms, tint) = ui.roll(&format!("response:{key}"), probe.ms as f64, false, true);
                     if probe.ms >= SLOW_RESPONSE_MS {
-                        seg(format!("slow {:.1}s{code}", probe.ms as f64 / 1000.0), C::Yellow)
+                        seg(format!("slow {:.1}s{code}", ms / 1000.0), tint.unwrap_or(C::Yellow))
                     } else {
-                        seg(format!("{} ms{code}", probe.ms), C::Green)
+                        seg(format!("{ms:.0} ms{code}"), tint.unwrap_or(C::Green))
                     }
                 }
             });
@@ -610,6 +624,13 @@ pub fn service_color(ui: &Ui, state: State) -> C {
     }
 }
 
+/// Whether an app that's up waits for its first answer: its title's spinner says it's checking.
+pub fn checking(controller: &Controller) -> bool {
+    controller.states.iter().any(|state| {
+        state.is_up() && controller.port(&state.key).is_some() && controller.last_probe(&state.key).is_none()
+    })
+}
+
 /// Whether a column moves: a compose service's dot breathing, a ready line's outline going.
 pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     let breathing = |key: &str| {
@@ -726,38 +747,50 @@ fn last_runs(controller: &Controller, index: usize) -> Vec<String> {
     lines
 }
 
-/// What an empty column says, centred: a stopped app's keys (in the focused column, where they act), or what hides
-/// every line and how to show them again.
-fn empty_hint(controller: &Controller, index: usize, focused: bool, search: Option<&super::Search>) -> Vec<String> {
+/// What an empty column says, centred: a stopped app's keys as keycaps (in the focused column, where they act), how
+/// it exited in red, or what hides every line and how to show them again.
+fn empty_hint(
+    ui: &Ui,
+    controller: &Controller,
+    index: usize,
+    cells: usize,
+    search: Option<&super::Search>,
+) -> Vec<Vec<Seg>> {
     let state = &controller.states[index];
+    let said = |text: String| vec![seg(text, C::DarkGray)];
     if state.output.is_empty() {
         // What the app is, in an empty column; the focused one's says what starts it too.
+        let exited = icons::icon(ui.nerd, Icon::Exited);
         let line = match &state.status {
-            Status::Stopped => match state.started_wall {
+            Status::Stopped => said(match state.started_wall {
                 None => "not started yet".to_string(),
                 Some(at) => {
                     let at = jiff::ZonedDateTime::try_from(at).map(|at| at.strftime("%H:%M").to_string());
                     format!("stopped · started {}", at.unwrap_or_default())
                 }
-            },
-            Status::Exited(code) => format!("exited · code {}", code.map_or("?".into(), |code| code.to_string())),
-            Status::Error(_) => "couldn't start".to_string(),
+            }),
+            Status::Exited(code) => {
+                let code = code.map_or("?".into(), |code| code.to_string());
+                vec![seg(format!("{exited} exited · code {code}"), C::Red)]
+            }
+            Status::Error(_) => vec![seg(format!("{exited} couldn't start"), C::Red)],
             Status::Running => return Vec::new(),
         };
         if !matches!(state.status, Status::Stopped) {
             return vec![line];
         }
-        let mut hint = vec![line, String::new()];
-        hint.extend(last_runs(controller, index));
-        if !focused {
+        let mut hint = vec![line, Vec::new()];
+        hint.extend(last_runs(controller, index).into_iter().map(said));
+        if ui.focus != index {
             return hint;
         }
-        hint.extend([String::new(), "u starts it".to_string()]);
+        let roomy = cells >= KEYCAP_ROOM;
+        hint.extend([Vec::new(), key_hint("u", "starts it", roomy)]);
         if controller.apps[index].traits().builds {
-            hint.push("b builds it".into());
+            hint.push(key_hint("b", "builds it", roomy));
         }
         if controller.apps.len() > 1 {
-            hint.push("U starts all".into());
+            hint.push(key_hint("U", "starts all", roomy));
         }
         return hint;
     }
@@ -767,14 +800,26 @@ fn empty_hint(controller: &Controller, index: usize, focused: bool, search: Opti
         LevelFilter::Warnings => "warnings or errors",
         LevelFilter::Info => "info, warnings or errors",
     };
-    match (noun.is_empty(), search) {
+    let lines = match (noun.is_empty(), search) {
         (false, Some(search)) => {
             vec![format!("No {noun}"), format!("match /{}", search.query), "f, Esc show all".into()]
         }
         (false, None) => vec![format!("No {noun}"), "f shows all".into()],
         (true, Some(search)) => vec!["Nothing matches".into(), format!("/{}", search.query), "Esc shows all".into()],
         (true, None) => Vec::new(),
-    }
+    };
+    lines.into_iter().map(said).collect()
+}
+
+/// The narrowest column whose keys get whole keycaps; a narrower one's are a cell each.
+const KEYCAP_ROOM: usize = 16;
+
+/// A key and what it does, as an empty column says it: the key a keycap, as the panel's hints have it (`roomy`), else
+/// only the key's cell lit, so the hint still fits.
+fn key_hint(key: &str, what: &str, roomy: bool) -> Vec<Seg> {
+    let mut segs = if roomy { super::seg::keycaps(key, C::Black, C::Gray) } else { vec![on(key, C::Black, C::Gray)] };
+    segs.push(seg(format!(" {what}"), C::DarkGray));
+    segs
 }
 
 /// Output rows, newest at the bottom, wrapped to the width. New lines fade in; search matches are highlighted
@@ -920,16 +965,25 @@ fn body(
         }
     }
     if shown == 0 {
-        let hint = empty_hint(controller, index, ui.focus == index, search.filter(|_| searching));
+        let mut hint = empty_hint(ui, controller, index, cells, search.filter(|_| searching));
         let blank = || vec![seg(" ".repeat(cells), C::Gray)];
+        // The lines start together, the block centred by its widest; an app's own empty column has its icon over it,
+        // when there's room.
+        let widest = hint.iter().map(|segs| width(segs)).max().unwrap_or(0);
+        let left = cells.saturating_sub(widest) / 2;
+        if state.output.is_empty() && !hint.is_empty() && hint.len() + 2 <= rows {
+            let app = &controller.apps[index];
+            let icon = icons::app(ui.nerd, app, controller.framework(&app.key)).to_string();
+            let centred = " ".repeat(widest.saturating_sub(icon.width()) / 2);
+            hint.splice(0..0, [vec![seg(format!("{centred}{icon}"), C::Gray)], Vec::new()]);
+        }
         let top = rows.saturating_sub(hint.len()) / 2;
-        // The lines start together, the block centred by its widest.
-        let widest = hint.iter().map(|text| text.width()).max().unwrap_or(0);
-        let left = " ".repeat(cells.saturating_sub(widest) / 2);
         let mut block: Vec<Vec<Seg>> = (0..top).map(|_| blank()).collect();
-        block.extend(
-            hint.iter().take(rows - top).map(|text| fit(vec![seg(format!("{left}{text}"), C::DarkGray)], cells)),
-        );
+        block.extend(hint.into_iter().take(rows - top).map(|segs| {
+            let mut row = vec![seg(" ".repeat(left), C::Gray)];
+            row.extend(segs);
+            fit(row, cells)
+        }));
         block.resize_with(rows, blank);
         result = block.into_iter().rev().collect();
     }

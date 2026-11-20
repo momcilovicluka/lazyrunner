@@ -19,7 +19,7 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::paths::Paths;
 use lazyrunner_core::profile::{self, ProfileDirs, Project};
 use lazyrunner_core::run::child::Guard;
-use lazyrunner_core::run::controller::{Passed, Setup, read_handover};
+use lazyrunner_core::run::controller::{MOST_FRAME_RATE, Passed, Setup, read_handover};
 use lazyrunner_core::run::{Command, Controller, Origin};
 use lazyrunner_core::update;
 use serde_json::{Value, json};
@@ -33,9 +33,9 @@ use crate::screen::{self, Exit, Overlay, Ui, status};
 use crate::terminal::{MouseCapture, Surface, TimerResolution};
 use crate::theme::{ColorMode, downsample};
 
-/// While something animates: 60 frames a second, so what flows (the logo's light, rainbows, a bar's glint and
-/// glide, the reload show) moves every frame.
-const FRAME: Duration = Duration::from_micros(16_667);
+/// While something moves, a frame at least this many times a second, so what flows (the logo's light, rainbows, a bar's
+/// glint and glide, spinners, the reload show) moves on every frame the display shows; a faster display gets more.
+const LEAST_AUTO_FRAME_RATE: u32 = 60;
 const MIN_GAP: Duration = Duration::from_millis(2);
 const TICK: Duration = Duration::from_millis(250);
 const FRAME_DUMP_EVERY: Duration = Duration::from_millis(100);
@@ -137,7 +137,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
 
     let mut dumps: Vec<oneshot::Sender<Value>> = Vec::new();
     let mut next_frame = Some(started);
-    // When the last frame was drawn: output, ticks and the like redraw at most once a FRAME.
+    // When the last frame was drawn: output, ticks and the like redraw at most once a frame.
     let mut last_frame = started;
     let mut last_dump: Option<Instant> = None;
     let mut tick = tokio::time::interval(TICK);
@@ -260,7 +260,7 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
                     continue;
                 }
                 next_frame = if let Some(change) = ui.next_change(&controller) {
-                    Some(change.max(next_frame.unwrap_or(now) + FRAME).max(Instant::now() + MIN_GAP))
+                    Some(change.max(next_frame.unwrap_or(now) + frame(&controller)).max(Instant::now() + MIN_GAP))
                 } else if options.frame_dump.is_some() && !dump_due {
                     Some(now + FRAME_DUMP_EVERY)
                 } else {
@@ -371,10 +371,23 @@ pub async fn run_project(surface: &mut dyn Surface, run: ProjectRun, options: Pr
         }
         if dirty {
             let soonest = Instant::now() + MIN_GAP;
-            let slot = if urgent { soonest } else { (last_frame + FRAME).max(soonest) };
+            let slot = if urgent { soonest } else { (last_frame + frame(&controller)).max(soonest) };
             next_frame = Some(next_frame.map_or(slot, |planned| planned.min(slot)));
         }
     }
+}
+
+/// How long a frame lasts: `"frameRate"`, or with `"auto"` the fastest display's refresh rate, 60 at least.
+fn frame(controller: &Controller) -> Duration {
+    static DISPLAY: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    let rate = controller.frame_rate().unwrap_or_else(|| {
+        *DISPLAY.get_or_init(|| {
+            crate::terminal::display_refresh_rate()
+                .unwrap_or(LEAST_AUTO_FRAME_RATE)
+                .clamp(LEAST_AUTO_FRAME_RATE, MOST_FRAME_RATE)
+        })
+    });
+    Duration::from_secs_f64(1.0 / f64::from(rate))
 }
 
 /// The terminal's keys, mouse and resizes (none headless). A new one after the git tool: dropping the old one stops

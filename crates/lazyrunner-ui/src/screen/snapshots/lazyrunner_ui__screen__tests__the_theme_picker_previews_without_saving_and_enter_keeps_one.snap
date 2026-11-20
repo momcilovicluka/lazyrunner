@@ -10,15 +10,15 @@ expression: screen.frame()
              ┃             │             │             │                 ┃ ▸  Ayu Mirage            ■■■■■■
              ┃             │             │             │                 ┃    Catppuccin Mocha      ■■■■■■
              ┃             │             │             │                 ┃    Dark                  ■■■■■■
-             ┃             │             │             │                 ┃    Dracula               ■■■■■■
-not started y┃             │             │             │                 ┃    Evangelion            ■■■■■■
-             ┃             │             │             │                 ┃    Everforest            ■■■■■■
-port 47201 · ┃not started y│not started y│not started y│not started yet  ┃    GitHub Dark           ■■■■■■
-             ┃             │             │             │                 ┃    Gruvbox               ■■■■■■
-u starts it  ┃port 47202 · │port 47301 · │             │port 47303 · free┃    Hatsune Miku          ■■■■■■
-b builds it  ┃             │             │             │                 ┃    High Contrast         ■■■■■■
-U starts all ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
-             ┃             │             │             │                 ┃    Monokai Pro           ■■■■■■
+        ◆    ┃             │             │             │                 ┃    Dracula               ■■■■■■
+             ┃             │             │             │                 ┃    Evangelion            ■■■■■■
+not started y┃        ■    │        ■    │       ■     │        ■        ┃    Everforest            ■■■■■■
+             ┃             │             │             │                 ┃    GitHub Dark           ■■■■■■
+port 47201 · ┃not started y│not started y│not started y│not started yet  ┃    Gruvbox               ■■■■■■
+             ┃             │             │             │                 ┃    Hatsune Miku          ■■■■■■
+u starts it  ┃port 47202 · │port 47301 · │             │port 47303 · free┃    High Contrast         ■■■■■■
+b builds it  ┃             │             │             │                 ┃    Kanagawa              ■■■■■■
+U starts all ┃             │             │             │                 ┃    Monokai Pro           ■■■■■■
              ┃             │             │             │                 ┃    Night Owl             ■■■■■■
              ┃             │             │             │                 ┃────────────────────────────────────
              ┃             │             │             │                 ┃ Ayu's medium-dark blue-grey; also

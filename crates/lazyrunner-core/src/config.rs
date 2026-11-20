@@ -119,6 +119,7 @@ pub fn defaults() -> Map<String, Value> {
         "editor": "auto",
         "terminal": "",
         "layout": "auto",
+        "frameRate": "auto",
         "updateRepoUrl": "",
         "updateBranch": "",
     }) else {

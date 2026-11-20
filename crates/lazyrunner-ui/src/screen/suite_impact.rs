@@ -87,10 +87,10 @@ pub fn runs(controller: &Controller, key: &str) -> bool {
     controller.impact(key).is_some_and(Impact::runs)
 }
 
-/// The affected list's chip: "affected 2 of 6", or that nothing changed.
-pub fn chip(controller: &Controller) -> String {
+/// The affected list's chip: "affected 2 of 6", that nothing changed, or a spinner while it's being found out.
+pub fn chip(ui: &Ui, controller: &Controller) -> String {
     if !controller.impacts_known() {
-        return "affected · looking".into();
+        return format!("{} affected · looking", super::suites::waiting(ui));
     }
     let total = controller.suites.iter().flatten().filter(|suite| !suite.untested).count();
     match controller.affected().len() {

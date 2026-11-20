@@ -12,7 +12,7 @@ use super::actions::Run;
 use super::icons::{self, Icon};
 use super::keys;
 use super::overlays::boxed;
-use super::seg::{Seg, focus_row, on, pad, seg};
+use super::seg::{self, Seg, focus_row, on, pad, seg};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -23,6 +23,8 @@ const MASKED: &str = "•••";
 /// The status line's chip slides in over this long, then glows amber this long.
 const SLIDE_IN: Duration = Duration::from_millis(300);
 const GLOW: Duration = Duration::from_secs(1);
+/// The bar beside how many of the changes are fixed.
+const FIXED_GAUGE: usize = 10;
 
 pub fn open(ui: &mut Ui) {
     ui.overlay = Some(Overlay::BranchChanges { index: 0, open: false });
@@ -143,7 +145,17 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             let done = changes.iter().filter(|change| fixed(ui, controller, change)).count();
             let mut head = vec![seg(format!(" {from} → {to}"), C::Magenta)];
             if done > 0 {
-                head.push(seg(format!("   ✓ {done} of {} fixed", changes.len()), C::Green));
+                let (filled, track) = seg::gauge(done as f64 / changes.len() as f64, FIXED_GAUGE);
+                head.extend([
+                    seg(format!("   ✓ {done} of {} fixed ", changes.len()), C::Green),
+                    seg(filled, C::Green),
+                    seg(track, C::DarkGray),
+                ]);
+            }
+            // A change being fixed has a green band sweep across its row once.
+            for change in changes {
+                let is_fixed = fixed(ui, controller, change);
+                ui.motion.reach(&format!("branch:{}", change.text), is_fixed, ui.now);
             }
             lines.extend([head, Vec::new()]);
             if changes.is_empty() {
@@ -166,7 +178,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
                         },
                     ),
                 ];
-                lines.push(if at == bar { focus_row(row, inner) } else { row });
+                let row = if at == bar { focus_row(row, inner) } else { row };
+                lines.push(match ui.motion.sweep(&format!("branch:{}", change.text), ui.now) {
+                    Some(through) => seg::sweep(row, through, inner, C::Black, C::Green),
+                    None => row,
+                });
                 if at == index && open {
                     lines.extend(keys_of(change, inner));
                 }

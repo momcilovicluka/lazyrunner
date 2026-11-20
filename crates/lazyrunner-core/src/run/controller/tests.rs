@@ -37,6 +37,20 @@ fn last_log(controller: &Controller) -> String {
 }
 
 #[tokio::test]
+async fn the_frame_rate_is_the_displays_unless_one_is_asked_for() {
+    for (asked, rate) in [
+        (json!("auto"), None),
+        (json!(144), Some(144)),
+        (json!(5), Some(super::LEAST_FRAME_RATE)),
+        (json!(100_000), Some(super::MOST_FRAME_RATE)),
+    ] {
+        let temp = TempDir::new("frame-rate");
+        let (controller, _rx) = controller(&temp, json!({ "frameRate": asked }));
+        assert_eq!(controller.frame_rate(), rate, "{asked}");
+    }
+}
+
+#[tokio::test]
 async fn a_hook_runs_when_its_event_happens_and_says_when_it_fails() {
     let temp = TempDir::new("hooks");
     let hooks = json!([{ "on": "tests.red", "run": "exit 4" }, { "on": "tests.blue", "run": "x" }]);

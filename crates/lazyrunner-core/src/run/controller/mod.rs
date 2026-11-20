@@ -74,6 +74,9 @@ pub use test_watch::TestWatch;
 
 /// Entries the panel's log keeps.
 const MAX_LOG_ENTRIES: usize = 200;
+/// The frames a second `"frameRate"` can ask for: fewer is a slideshow, more no display shows.
+pub const LEAST_FRAME_RATE: u32 = 30;
+pub const MOST_FRAME_RATE: u32 = 480;
 /// lazyrunner.log starts over at startup past this size (the old one becomes lazyrunner.prev.log).
 const LOG_FILE_CAP: u64 = 8 * 1024 * 1024;
 
@@ -1031,6 +1034,12 @@ impl Controller {
         }
         views[key] = json!(view.key());
         self.set_setting("columnViews", views);
+    }
+
+    /// The frames a second `"frameRate"` asks for (30 to 480), or `None` for `"auto"` (or none set): the display's.
+    pub fn frame_rate(&self) -> Option<u32> {
+        let rate = self.config["frameRate"].as_u64()?;
+        Some(u32::try_from(rate).unwrap_or(MOST_FRAME_RATE).clamp(LEAST_FRAME_RATE, MOST_FRAME_RATE))
     }
 
     /// An on/off setting.

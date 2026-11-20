@@ -93,6 +93,8 @@ struct Roll {
 const ROLL_SIGNIFICANT: f64 = 0.1;
 /// How long a changed figure stays tinted.
 const ROLL_TINT: std::time::Duration = std::time::Duration::from_millis(700);
+/// The figures whose rolling steps the screen on (by their ids' start): the tests' counts, a column's response time.
+const ROLLED: [&str; 2] = ["tests:", "response:"];
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -115,8 +117,6 @@ const MIN_SCROLLING_TAIL: usize = 12;
 /// The PowerShell version redrew every 100 ms; its frame-counted animations (spinners, glints, blinking cursors)
 /// keep that pace here at any frame rate.
 const ANIMATION_TICK: Duration = Duration::from_millis(100);
-/// What only steps is drawn this often: a bar's glint moves a cell, a spinner a frame (a quicker one sets its own).
-pub(crate) const STEP: Duration = Duration::from_millis(50);
 
 /// / in a column: the query, and the match it is on.
 #[derive(Clone, Debug, Default)]
@@ -757,6 +757,16 @@ impl Ui {
         (roll.shown, tint)
     }
 
+    /// Whether a figure whose id starts with `prefix` still rolls to its value, or is still tinted for its change
+    /// (one not drawn a moment ago doesn't).
+    pub(crate) fn rolling(&self, prefix: &str) -> bool {
+        let recent = |at: Instant| self.now.saturating_duration_since(at) < ROLL_TINT;
+        self.rolls.iter().filter(|(id, _)| id.starts_with(prefix)).any(|(_, roll)| {
+            ((roll.target - roll.shown).abs() > f64::EPSILON && recent(roll.at))
+                || roll.changed.is_some_and(|(at, _)| recent(at))
+        })
+    }
+
     /// Glides a progress bar towards `target` (half the way per 100 ms, never backwards); `id` keeps its place.
     pub fn glide(&mut self, id: &str, target: f64) -> f64 {
         let now = self.now;
@@ -835,9 +845,9 @@ impl Ui {
         self.next_change(controller).is_some()
     }
 
-    /// When the screen next differs though nothing happens: now for what flows (drawn every frame), a step ahead for
-    /// what only steps (a spinner, a blinking cursor, a title's flash), a new line's next shade while it fades. A frame
-    /// sooner than that is one nobody sees.
+    /// When the screen next differs though nothing happens: now for what moves - what flows, and what steps (a
+    /// spinner, a glint, a blinking cursor, scrolling text), drawn every frame too so its steps land evenly - and a new
+    /// line's next shade while it fades. A frame sooner than that is one nobody sees.
     pub fn next_change(&self, controller: &Controller) -> Option<Instant> {
         if self.flowing(controller) {
             return Some(self.now);
@@ -846,14 +856,15 @@ impl Ui {
             // Nothing moves: keys, output and the tick redraw what changed (the busy frame still has to show).
             return self.busy.is_some().then_some(self.now);
         }
-        let step = self.stepping(controller).then(|| self.now + STEP.min(self.spinner.rate()));
-        let fade = controller
+        if self.stepping(controller) {
+            return Some(self.now);
+        }
+        controller
             .states
             .iter()
             .filter(|state| state.scroll == 0)
             .filter_map(|state| columns::next_shade(&state.output, self.now))
-            .min();
-        step.into_iter().chain(fade).min()
+            .min()
     }
 
     /// Whether something moves on every frame.
@@ -918,9 +929,10 @@ impl Ui {
             || controller.migrations_active()
             || controller.celebrate.is_some()
             || controller.rebuild_pending()
-            || controller.states.iter().any(|state| {
-                (state.is_running() && !state.is_up()) || state.flash_until.is_some_and(|until| self.now < until)
-            })
+            || columns::checking(controller)
+            || suites::spinning(self, controller)
+            || ROLLED.iter().any(|prefix| self.rolling(prefix))
+            || controller.states.iter().any(|state| state.is_running() && !state.is_up())
     }
 }
 

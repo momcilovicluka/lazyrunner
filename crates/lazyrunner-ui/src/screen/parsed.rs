@@ -178,9 +178,17 @@ impl Drawing<'_, '_> {
         let color = level_color(entry.level);
         let details = if entry.folds() { detail_lines(self.state, entry) } else { Vec::new() };
         let mut rows = vec![self.head(item, entry, before, open)];
-        if open {
-            let wiping = self.ui.motion.lit(&Spot::Unfolded { app: self.index, line: entry.first }, self.ui.now);
-            let revealed = wiping.map_or(details.len(), |left| ((1.0 - left) * details.len() as f64).ceil() as usize);
+        // Just folded, its lines still wipe up into the fold.
+        let (app, now) = (self.index, self.ui.now);
+        let folding = (entry.folds() && !open)
+            .then(|| self.ui.motion.lit(&Spot::Folded { app, line: entry.first }, now))
+            .flatten();
+        if open || folding.is_some() {
+            let wiping = self.ui.motion.lit(&Spot::Unfolded { app, line: entry.first }, now);
+            let revealed = match folding {
+                Some(left) => (left * details.len() as f64).ceil() as usize,
+                None => wiping.map_or(details.len(), |left| ((1.0 - left) * details.len() as f64).ceil() as usize),
+            };
             let revealed = revealed.min(details.len());
             rows.extend(details.iter().take(revealed).map(|line| self.detail(line, entry, "│")));
             let left = details.len() - revealed;
@@ -567,7 +575,9 @@ pub fn fold(ui: &mut Ui, controller: &mut Controller, index: usize, line: u64) {
         return;
     }
     let spot = (state.key.clone(), line);
-    if !ui.unfolded.remove(&spot) {
+    if ui.unfolded.remove(&spot) {
+        ui.motion.flash(Spot::Folded { app: index, line }, ui.now);
+    } else {
         ui.unfolded.insert(spot);
         ui.motion.flash(Spot::Unfolded { app: index, line }, ui.now);
     }

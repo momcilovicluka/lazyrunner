@@ -31,6 +31,16 @@ const LEFT: [u32; 4] = [0x40, 0x04, 0x02, 0x01];
 const RIGHT: [u32; 4] = [0x80, 0x20, 0x10, 0x08];
 const BRAILLE: u32 = 0x2800;
 
+/// The share of a run's glint a new failure's badge pops white for, as the panel's chips pop.
+pub const POP: f64 = super::motion::FLASH.as_secs_f64() / GLINT.as_secs_f64();
+
+/// How far through its glint `suite`'s newest run is, 0 to 1, a moment after it finished (never with reduced
+/// motion).
+pub fn glint(ui: &Ui, suite: &Suite) -> Option<f64> {
+    let since = ui.now.saturating_duration_since(suite.finished?);
+    fresh(ui, suite).then(|| since.as_secs_f64() / GLINT.as_secs_f64())
+}
+
 /// Whether `suite` finished a run a moment ago: its newest run glints in.
 pub fn fresh(ui: &Ui, suite: &Suite) -> bool {
     !ui.reduced_motion && suite.finished.is_some_and(|at| ui.now.saturating_duration_since(at) < GLINT)

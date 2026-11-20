@@ -14,7 +14,7 @@ use super::icons::{self, Icon};
 use super::migrations_rail::{self, Look};
 use super::mouse::Target;
 use super::overlays::boxed;
-use super::seg::{Seg, aim, focus_row, pad, seg, take_cells};
+use super::seg::{self, Seg, aim, focus_row, pad, seg, take_cells};
 use super::theme::C;
 use super::{Overlay, Ui};
 
@@ -279,6 +279,10 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
     let Some(Overlay::Migrations { index, picking }) = &mut ui.overlay else { return Vec::new() };
     *index = (*index).min(all.len().saturating_sub(1));
     let (selected, picking) = (*index, *picking);
+    // A context that reaches up to date (not just checked again) has a green band sweep across its row once.
+    for context in all.iter().filter(|context| !matches!(context.status, Status::Loading | Status::Queued)) {
+        ui.motion.reach(&swept_id(context), up_to_date(context), now);
+    }
     let list_width = (width / 3).clamp(LIST_WIDTH.0, LIST_WIDTH.1).min(width.saturating_sub(20));
     let detail_width = width.saturating_sub(list_width + 2);
     let hint = if picking.is_some() {
@@ -346,6 +350,10 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
                     })
                     .collect(),
             };
+            let row = match ui.motion.sweep(&swept_id(context), now) {
+                Some(through) => seg::sweep(row, through, list_width, C::Black, C::Green),
+                None => row,
+            };
             aim(row, Target::Item(at))
         })
         .collect();
@@ -359,6 +367,16 @@ pub fn rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> 
         out.push(line);
     }
     out.into_iter().map(|row| aim(row, Target::Box)).collect()
+}
+
+/// What a context's row is known by to its sweep.
+fn swept_id(context: &Context) -> String {
+    format!("migrations:{}:{}", context.app, context.name)
+}
+
+/// Whether a context has every migration applied.
+fn up_to_date(context: &Context) -> bool {
+    context.status == Status::Ok && context.known() && context.pending().is_empty()
 }
 
 fn cut(text: &str, cells: usize) -> String {

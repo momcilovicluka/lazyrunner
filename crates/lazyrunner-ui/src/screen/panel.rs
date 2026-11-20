@@ -76,7 +76,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>>
 }
 
 /// The lazyrunner chip shimmers while something builds; a sparkle banner celebrates "ready".
-fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
+fn header(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
     let tick = ui.tick();
     let busy = controller.building.is_some() || controller.npm_ci.is_some();
     let reduced = ui.reduced_motion;
@@ -100,9 +100,9 @@ fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     if let Some((at, of)) = ui.jumps.count() {
         segs.push(seg(format!("   {} {at}/{of}", icons::icon(ui.nerd, Icon::Back)), C::DarkCyan));
     }
-    if let Some((text, color)) = super::suites::badge(ui, controller) {
+    if let Some(badge) = super::suites::badge(ui, controller) {
         segs.push(seg("   ", C::Gray));
-        segs.push(seg(text, color).at(Target::Tests)); // a click opens T
+        segs.extend(super::seg::aim(badge, Target::Tests)); // a click opens T
     }
     if let Some(watching) = super::suites::watching(ui, controller) {
         segs.push(watching.at(Target::Tests));
