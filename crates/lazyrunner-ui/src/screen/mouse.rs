@@ -28,6 +28,9 @@ pub enum Target {
     Title(usize),
     /// A column's output.
     Output(usize),
+    /// An entry of a column's parsed view - its category, or its fold - by the column and its first line's number:
+    /// the pointer on it says its category in full, a click unfolds it.
+    Entry { column: usize, line: u64 },
     /// An item of the open list (menu, palette, database or theme picker), by its index in that list.
     Item(usize),
     /// A check's `FIX` tag in the startup doctor, by the check's index: a click runs its fix.
@@ -226,6 +229,10 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
             }
         }
         Some(Target::Output(index)) => ui.focus = index,
+        Some(Target::Entry { column, line }) => {
+            ui.focus = column;
+            super::parsed::fold(ui, controller, column, line);
+        }
         Some(Target::Rail { column, scroll, .. }) => to_rail(ui, controller, column, scroll),
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
@@ -291,6 +298,7 @@ fn wheel(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, direc
     }
     if let Some(
         Target::Output(index)
+        | Target::Entry { column: index, .. }
         | Target::Title(index)
         | Target::Link { column: index, .. }
         | Target::Rail { column: index, .. },

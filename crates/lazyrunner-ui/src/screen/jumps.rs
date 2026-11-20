@@ -183,7 +183,8 @@ pub(super) fn go(ui: &mut Ui, controller: &mut Controller, place: &Place) -> boo
         None => (0, None),
         Some(number) => {
             let shown = columns::shown_lines(state, ui.search.as_ref());
-            let Some(at) = shown.iter().rposition(|item| state.output.number_at(item.position) == number) else {
+            let held = |item: &columns::Shown| state.output.position_of(number).is_some_and(|at| item.holds(state, at));
+            let Some(at) = shown.iter().rposition(held) else {
                 return false;
             };
             (shown.len() - 1 - at, Some(shown[at].position))

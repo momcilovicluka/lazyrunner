@@ -123,6 +123,10 @@ pub enum Icon {
     Camera,
     /// A suite's code coverage (#33): none in the plain set, where the `%` says it.
     Coverage,
+    /// A parsed view's entry with more lines than it shows, folded or open (#27).
+    Fold {
+        open: bool,
+    },
 }
 
 /// The icon, plain or (`nerd`) the Nerd Font's.
@@ -292,6 +296,10 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Camera, true) => "\u{f030}", // camera
         (Icon::Coverage, false) => "",
         (Icon::Coverage, true) => "\u{f132}", // shield
+        (Icon::Fold { open: false }, false) => "▸",
+        (Icon::Fold { open: false }, true) => "\u{f054}", // chevron right
+        (Icon::Fold { open: true }, false) => "▾",
+        (Icon::Fold { open: true }, true) => "\u{f078}", // chevron down
     }
 }
 
@@ -464,6 +472,8 @@ mod tests {
             Icon::Spec,
             Icon::Camera,
             Icon::Coverage,
+            Icon::Fold { open: false },
+            Icon::Fold { open: true },
         ];
         for each in all {
             assert_eq!(icon(true, each).width(), 1, "{each:?}");

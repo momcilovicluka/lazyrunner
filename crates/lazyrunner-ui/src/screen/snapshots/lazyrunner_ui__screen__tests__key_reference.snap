@@ -26,9 +26,9 @@ expression: screen.frame()
   │   o           Open the focused app's log file                                   Ctrl+O      Jump back… │
   │   O           Open the focused app's last error in your editor                  Alt+→       Jump forw… │
   │   e           Start sheet: what the focused app is started with                 f           Filter th… │
-  │   p           Run the focused app on another launch profile or npm variant      m           Mark a li… │
-  │   Alt+l       Log levels of the focused app                                     [           Older mark │
-  │   Alt+g       What changed for running on the last branch switch                ]           Newer mark │
-  │   Alt+s       Share the focused app through a tunnel (again: stop)              '           Marks: ev… │
+  │   p           Run the focused app on another launch profile or npm variant      v           Raw / par… │
+  │   Alt+l       Log levels of the focused app                                     m           Mark a li… │
+  │   Alt+g       What changed for running on the last branch switch                [           Older mark │
+  │   Alt+s       Share the focused app through a tunnel (again: stop)              ]           Newer mark │
   │ / filters · any key closes · : searches every command · lowercase = focused app, uppercase = all apps  │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘

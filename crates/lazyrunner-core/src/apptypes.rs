@@ -172,6 +172,14 @@ pub fn level_filter(config: &Value, key: &str) -> crate::output::LevelFilter {
     crate::output::LevelFilter::from_key(app_setting(config, key, "filter").as_str().unwrap_or_default())
 }
 
+/// How the column shows its output (`v`): `"columnViews": { "<key>": "parsed" }`, else `"columnView"` - the view a
+/// column starts with until `v` picks one for it - else raw.
+pub fn column_view(config: &Value, key: &str) -> crate::output::ColumnView {
+    let read = |value: &Value| value.as_str().and_then(crate::output::ColumnView::from_key);
+    let own = field_ci(field(config, "columnViews"), key).and_then(read);
+    own.or_else(|| read(field(config, "columnView"))).unwrap_or_default()
+}
+
 /// Whether the app runs on this machine: `"apps": { "<key>": { "enabled": false } }` turns one off, and
 /// `"frontend": false` every frontend.
 pub fn is_enabled(config: &Value, app: &App) -> bool {
@@ -522,6 +530,17 @@ pub fn missing_path(command: &Command, folders: &[PathBuf]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_columns_view_is_its_own_else_the_default_else_raw() {
+        use crate::output::ColumnView;
+        let config =
+            serde_json::json!({ "columnView": "parsed", "columnViews": { "Orders": "raw", "web": "nonsense" } });
+        assert_eq!(column_view(&config, "orders"), ColumnView::Raw, "its own, whatever its case");
+        assert_eq!(column_view(&config, "billing"), ColumnView::Parsed, "the default for a new column");
+        assert_eq!(column_view(&serde_json::json!({}), "orders"), ColumnView::Raw);
+        assert_eq!(column_view(&config, "web"), ColumnView::Parsed, "one that doesn't read: the default");
+    }
 
     #[test]
     fn a_command_apps_language_is_its_presets_else_its_programs() {

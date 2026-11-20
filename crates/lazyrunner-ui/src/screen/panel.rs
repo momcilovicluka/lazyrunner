@@ -285,7 +285,7 @@ fn notice(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         if search.typing {
             let name = controller.app(&search.key).map_or("", |app| app.name.as_str());
             let count = controller.state(&search.key).map_or(0, |state| {
-                columns::shown_lines(state, None).iter().filter(|item| search.matches(&item.line.text)).count()
+                columns::shown_lines(state, None).iter().filter(|item| item.matches(state, search)).count()
             });
             let matches = if count == 1 { "match" } else { "matches" };
             let switch = |on: bool, text: &str| seg(text.to_string(), if on { C::Cyan } else { C::DarkGray });
@@ -349,5 +349,5 @@ fn notice(ui: &Ui, controller: &Controller) -> Vec<Seg> {
             seg(" reinstalls the packages", C::Yellow),
         ];
     }
-    vec![seg("", C::Gray)]
+    super::parsed::notice(ui, controller).unwrap_or_else(|| vec![seg("", C::Gray)])
 }

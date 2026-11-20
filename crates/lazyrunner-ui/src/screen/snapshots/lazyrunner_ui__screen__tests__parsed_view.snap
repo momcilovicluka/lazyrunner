@@ -1,0 +1,31 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ▸ ◆ Orders  parsed · 28 lines → 8 entries :47201  ○ stopped ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+
+
+
+
+
+
+
+
+ ▐INF▌ hh:mm:ss Using launch settings from Properties/launchSettings.json...
+ ▐INF▌ hh:mm:ss Hosting.Lifetime   Now listening on: http://localhost:5001
+ ▐INF▌ hh:mm:ss EFCore.Command     SQL 12 ms █··· SELECT [o].[Id], [o].[Total] FROM [Orders] AS [o] ▸ +2
+ ▐INF▌ hh:mm:ss │                  SQL 48 ms ████ SELECT [l].[Id] FROM [Lines] AS [l] ▸ +1
+ ▐INF▌ hh:mm:ss Orders.Worker      Polled the queue: 1 messages ×3
+ ▐WRN▌ hh:mm:ss Orders.Api.Checko… Card declined for order 42 ▸ +1
+ ▐ERR▌ hh:mm:ss AspNetCore.Develo… An unhandled exception has occurred while executing the request.
+       System.InvalidOperationException: the basket is empty
+       at Orders.Api.Checkout.Pay() in C:\src\Orders\Checkout.cs:line 42
+       ▸ +3 frames
+ ▐DBG▌ hh:mm:ss Orders.Cache       Cache warm
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   /  search   U  start all     :  commands   x  menu   ?  keys   ,  settings   q  quit
+ ERR Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware · 7 lines · Enter unfolds it

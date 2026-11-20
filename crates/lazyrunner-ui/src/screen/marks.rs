@@ -62,12 +62,8 @@ pub fn jump(ui: &mut Ui, controller: &mut Controller, older: bool) {
     let focus = ui.focus;
     let Some(state) = controller.states.get(focus) else { return };
     let shown = columns::shown_lines(state, ui.search.as_ref());
-    let marked: Vec<usize> = shown
-        .iter()
-        .enumerate()
-        .filter(|(_, item)| state.marks.binary_search(&state.output.number_at(item.position)).is_ok())
-        .map(|(at, _)| at)
-        .collect();
+    let marked: Vec<usize> =
+        shown.iter().enumerate().filter(|(_, item)| item.marked(state)).map(|(at, _)| at).collect();
     let (Some(&first), Some(&last)) = (marked.first(), marked.last()) else {
         let why = if state.marks.is_empty() {
             "No marks in this column - m marks the line at its bottom."
@@ -81,7 +77,7 @@ pub fn jump(ui: &mut Ui, controller: &mut Controller, older: bool) {
     let from = ui
         .mark_at
         .filter(|(app, _)| *app == focus)
-        .and_then(|(_, position)| shown.iter().position(|item| item.position == position))
+        .and_then(|(_, position)| shown.iter().position(|item| item.holds(state, position)))
         .map_or(bottom, |at| at as isize);
     let next = if older {
         marked.iter().rev().find(|&&at| (at as isize) < from)
@@ -217,7 +213,7 @@ pub(super) fn go_to(ui: &mut Ui, controller: &mut Controller, app: usize, number
     let Some(state) = controller.states.get(app) else { return };
     let shown = columns::shown_lines(state, ui.search.as_ref());
     let kept = state.output.position_of(number);
-    let Some(found) = kept.and_then(|position| shown.iter().position(|item| item.position == position)) else {
+    let Some(found) = kept.and_then(|position| shown.iter().position(|item| item.holds(state, position))) else {
         let why = if kept.is_none() {
             "That line has left the column's buffer."
         } else {

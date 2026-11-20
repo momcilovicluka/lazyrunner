@@ -105,8 +105,11 @@ mod tests {
                 shape: 0,
             })
             .collect();
-        let list: Vec<Shown> =
-            lines.iter().enumerate().map(|(position, line)| Shown { position, line, context: false }).collect();
+        let list: Vec<Shown> = lines
+            .iter()
+            .enumerate()
+            .map(|(position, line)| Shown { position, line, context: false, entry: None })
+            .collect();
         strip(&list, rows)
     }
 

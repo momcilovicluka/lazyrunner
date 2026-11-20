@@ -245,9 +245,13 @@ fn app_index(controller: &Controller, args: &Value) -> Result<usize, Refusal> {
 /// `grep` (ignoring case), errors only when asked. Not an object per line: an agent pays for every character, and
 /// `{"seq":…,"text":…}` made a log half again as long. `next` is the number to pass as `since` for what comes
 /// after; `truncated` says older matching lines after `since` didn't fit. A `since` past the newest line (lazyrunner
-/// opened again since) starts over (`reset`).
+/// opened again since) starts over (`reset`). With `parsed`, the output's log entries instead (#27), each after its
+/// first line's number on a line of its own: its level, time, category and message, its frames and repeats.
 fn logs(controller: &Controller, args: &Value) -> Answer {
     let index = app_index(controller, args)?;
+    if args["parsed"].as_bool().unwrap_or(false) {
+        return parsed_logs(controller, index, args);
+    }
     let output = &controller.states[index].output;
     let total = output.total();
     let oldest = total + 1 - output.len() as u64;
@@ -273,6 +277,49 @@ fn logs(controller: &Controller, args: &Value) -> Answer {
         "app": controller.apps[index].key,
         "count": lines.len(),
         "text": lines.join("\n"),
+        "next": total,
+        "truncated": truncated,
+        "older_lines_dropped": since.saturating_add(1) < oldest,
+        "reset": reset,
+    }))
+}
+
+/// `get_logs` with `parsed`: the newest `limit` entries that end after `since`, those whose lines contain `grep`
+/// (ignoring case), errors only when asked.
+fn parsed_logs(controller: &Controller, index: usize, args: &Value) -> Answer {
+    let output = &controller.states[index].output;
+    let total = output.total();
+    let oldest = total + 1 - output.len() as u64;
+    let asked = args["since"].as_u64().unwrap_or(0);
+    let reset = asked > total;
+    let since = if reset { 0 } else { asked };
+    let limit = args["limit"].as_u64().map_or(LOG_LINES, |limit| (limit as usize).clamp(1, MAX_LOG_LINES));
+    let grep = args["grep"].as_str().map(str::to_lowercase);
+    let errors_only = args["errors_only"].as_bool().unwrap_or(false);
+    let found = |entry: &&lazyrunner_core::run::entries::Entry| {
+        grep.as_ref().is_none_or(|grep| {
+            (entry.first..=entry.last)
+                .filter_map(|number| output.position_of(number).and_then(|at| output.at(at)))
+                .any(|line| line.text.to_lowercase().contains(grep))
+        })
+    };
+    let mut entries: Vec<String> = output
+        .entries()
+        .iter()
+        .rev()
+        .take_while(|entry| entry.last > since)
+        .filter(|entry| !errors_only || entry.level == lazyrunner_core::output::Level::Error)
+        .filter(found)
+        .take(limit + 1)
+        .map(|entry| format!("{} {}", entry.first, entry.said()))
+        .collect();
+    let truncated = entries.len() > limit;
+    entries.truncate(limit);
+    entries.reverse();
+    Ok(json!({
+        "app": controller.apps[index].key,
+        "count": entries.len(),
+        "text": entries.join("\n"),
         "next": total,
         "truncated": truncated,
         "older_lines_dropped": since.saturating_add(1) < oldest,

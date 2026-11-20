@@ -296,6 +296,7 @@ at once while the palette wipes away.
 | `,` `A` then `z` | **Diagnostics zip**, in the About box under Report a bug: what to attach to a bug report - lazyrunner's and the tools' versions, the apps and their states, the settings and the profile with their secrets masked, each app's last 1000 lines and lazyrunner's log (passwords in connection strings, URL credentials and bearer tokens masked), and the screen as a picture. In the project's state folder (`diagnostics`); the log says where, and Alt+click on its path there (a click with `l` off) shows it in its folder. Look over its logs before you share it |
 | `m`, `[` / `]`, `'` | Mark the line at the bottom of the focused column (or the search match it is on; `m` again unmarks), jump to its older / newer mark, list every column's marks, oldest first (`Enter` jumps, `a` writes a note, `y` copies them all as a timeline - time, app, note, line - `d` unmarks). Marked lines show a `▌`, and the list shows the picked mark's lines around it; marks and their notes go when the app starts again |
 | `f` | Filter the focused column by level: errors only → warnings and errors → info and up → all lines again. Its top row says how many lines it hides; kept for the app between runs |
+| `v` | The focused column raw (what the app printed) or parsed: a row per log entry, by level (below, "What it shows"). `Enter` unfolds the selected entry - the search's match, else the newest one on screen that folds - and folds it again; a click on an entry's fold or category does too. Kept for the app between runs (`columnViews`); `columnView` picks the view a new column starts with |
 | `Alt+p` | Profile the focused .NET or npm app's CPU for 10 s, then its flame chart (below, "Profiling"); `Alt+p` again stops it. On an app that isn't running, its last captures |
 | `Alt+b` | The build as a map: the Code tab's projects with the running build, else the last one, over them - each project's state and own time, the critical path in the accent colour; `w` follows what's compiling, `B` shows the build's projects alone (below, "The build map") |
 | `Alt+d` | What's new since the app's last run, in the focused column: the lines the last run printed too dim (times, durations, ports and ids don't count as a change), new ones keep their colour - `▲` before a new error or warning, `●` before any other new line - and the top row counts them: `+2 new errors · 3 fixed · 41 new lines` (`fixed?` until the app is up). `n` / `N` step through the new errors and warnings (the new lines when there are none); the rail marks only what's new and sends its ember only for a new error. The last run is kept when lazyrunner quits, so the first run after it compares too. `Enter` lists what was fixed: the last run's errors and warnings that didn't come back. A run with new errors puts a chip in the panel's header - `1 Orders +2 new errors` - whose number (or a click) opens that column this way, on the first of them. A good build says how its warnings changed since the last good one - `12 warnings (+3)` - and lists the new ones under it. `Alt+d` again shows all |
@@ -401,6 +402,21 @@ focused app's build or take it out of the queue, and `q`.
   instead of flooding the column.
 - **Log lines** are coloured by level, and every app's full output is saved to `<project>/logs/<app>.log` in the
   state folder (below), so `o` lets you search all of it.
+- **The parsed view** (`v`, per column): a row per log entry instead of a line per line - ASP.NET's console entries
+  (`info: Category[id]` and the indented lines under it), Serilog's `[10:00:00 INF] …` and plain lines each become one.
+  A row is the level in a filled capsule (`▐INF▌`, `▐WRN▌`, `▐ERR▌`, `DBG` dimmed), the time it came (the one the line
+  says, for Serilog), its category trimmed to its last parts (`EFCore.Command`, `Hosting.Lifetime` - a thin `│` under
+  the same one; the pointer on it, or the panel's notice line for the selected entry, says it in full) and its message,
+  the whole row in its level's colour. An exception folds to its message, the exception's line and its first frame in
+  the app's own code (a link), with `▸ +18 frames` under it; `Enter` unfolds it downwards, the count running down as its
+  lines wipe in, a `╭ │ ╰` bracket beside it in its level's colour. An EF Core command is one row - `SQL 12 ms`, a
+  small bar against the slowest command of the endpoint that ran it, and its SQL. A line that comes again and again -
+  `npm verbose …`, `webpack compiled` - is one row with its count, `×12`, lit for a moment as the count rises. Angular
+  and Vite print no levels: their errors and warnings are by the colours the raw view gives them, the rest `INF`.
+  Search, `f`, marks, `y`, links, `O` and the rail work on the entries - the rail counts them, its ember lands on the
+  entry. `v` keeps the entry at the bottom where it was, the column opening from its middle, and its title says what
+  it did for a moment: `parsed · 1,204 lines → 312 entries`. The entries are built as the lines arrive and kept with
+  them; the raw lines are still all there (`v`, `o`).
 - **Links** in output are underlined: URLs, and places in files - a build error's `Orders.cs(12,5)`, a .NET stack
   frame's `in …\Checkout.cs:line 42`, a node or jest frame's `src/cart.ts:12:5`. A click opens a URL in the browser
   and a file at its line in your editor (`"editor"`); a bare file name is looked for in the project, outside build
@@ -1080,7 +1096,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | Tool | What it does |
 |------|--------------|
 | `get_status` | Each app's state, port, url and error count, and its environment overrides (secrets masked); what's busy; the test totals; the settings; what's on screen |
-| `get_logs` | An app's output as one text, each line after its number: `since` (only what's new), `limit`, `grep`, `errors_only` |
+| `get_logs` | An app's output as one text, each line after its number: `since` (only what's new), `limit`, `grep`, `errors_only`; `parsed` gives its log entries instead of its lines, one a line after its first line's number - level, time, category, message, an EF Core command's time and SQL, an exception's frame count, a repeat's `×12` |
 | `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
 | `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path, one endpoint - or summed up per endpoint (p50, p95, max); N+1s marked |
 | `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1), and its waterfall - each command and call where it ran, the exception's moment, the time in the app itself, from its OpenTelemetry trace when its app sends one (nested, the critical path marked); with `baseline`, another request's id, the two compared row against row |
@@ -1307,7 +1323,7 @@ checklist's marks too, and an icon for each check). A column says up, watching, 
 and a crossed circle, its warnings, level filter and search with a warning, a funnel and a magnifier; every box has
 an icon in its title, the theme picker a sun and a moon on its groups and a pin on the project's own theme, and the
 requests view's copy menu a terminal, a globe, JavaScript's logo or a link on each way to copy, and a suite's code
-coverage a shield. An app's `"icon"` is the one it has without them; `"nerdIcon"` in its profile gives it one with
+coverage a shield. A parsed column's title has an eye, its folds chevrons and its EF Core commands a database. An app's `"icon"` is the one it has without them; `"nerdIcon"` in its profile gives it one with
 them, as PowerShell's lazybms had - `"\uf0ac"` a globe, `"\uf085"` cogs, any icon on
 [the Nerd Fonts cheat sheet](https://www.nerdfonts.com/cheat-sheet). Text written into the columns and the log stays as
 it is.
@@ -1374,6 +1390,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `linksOnAltClick` | `true` | Links in the output open on Alt+click (Ctrl+click too, where the terminal allows); off, on a plain click |
 | `followAgent` | `true` | An agent's call over MCP starts follow mode (`F`): the screen shows what it reads, your keys rest until `F`; while the terminal is in the background a notification says an agent is at work |
 | `spinner` | lazyrunner's | What spins while something runs, as lazygit's `gui.spinner`: `{ "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` - texts of up to 8 cells, and milliseconds a frame (16 to 2000; 100 left out) |
+| `columnView` | `"raw"` | The view a column starts with: `raw` (the lines as the app printed them) or `parsed` (a row per log entry) - until `v` picks one for it |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |
 | `testParallelism` | half the cores | How many test suites `T` runs at once |
 | `auditParallelism` | `2` | How many apps the audit view (`A`) scans at once, 1 to 8 (`+` / `-` there) |
@@ -1385,6 +1402,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `projects.<id>.theme` | | This project's own theme, instead of `theme` (`t`, then `Tab`) |
 | `projects.<id>.spinner` | | This project's own spinner, instead of `spinner` |
 | `projects.<id>.columnWidths` | equal | Relative width per app key, or height when stacked (`>` / `<` / `=`) |
+| `projects.<id>.columnViews` | `columnView` | `raw` or `parsed` per app key (`v`) |
 | `projects.<id>.apps.<key>.enabled` | `true` | `false` leaves that app out on this machine |
 | `projects.<id>.apps.<key>.includeInAll` | | `false` keeps that app running on Stop all / Restart all |
 | `projects.<id>.frontend` | `true` | `false` leaves out every npm app |

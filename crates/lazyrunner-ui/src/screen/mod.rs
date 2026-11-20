@@ -42,6 +42,7 @@ pub mod mouse;
 pub mod overlays;
 pub mod palette;
 pub mod panel;
+pub mod parsed;
 pub mod phases;
 pub mod ports;
 pub mod problems;
@@ -509,6 +510,10 @@ pub struct Ui {
     pub git_tool_wanted: bool,
     /// The mark `[` / `]` jumped to last: its column and line, where the next jump goes on from.
     pub mark_at: Option<(usize, usize)>,
+    /// The entries unfolded in the parsed views (`Enter`): their app's key and their first line's number.
+    pub unfolded: std::collections::HashSet<(String, u64)>,
+    /// What `v` did to a column, by its app's key, and when: its title says it a moment.
+    pub views_said: HashMap<String, (String, Instant)>,
     /// The git tool has the terminal (its name): nothing is drawn, and quitting or switching versions waits.
     pub away: Option<String>,
     pub pending_g: Option<Instant>,
@@ -642,6 +647,8 @@ impl Ui {
             replays: Vec::new(),
             git_tool_wanted: false,
             mark_at: None,
+            unfolded: std::collections::HashSet::new(),
+            views_said: HashMap::new(),
             away: None,
             pending_g: None,
             hits: Vec::new(),

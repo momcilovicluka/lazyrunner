@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.101.0] - 2026-11-20
+
+### Added
+- A parsed view of each app's output: `v` switches the focused column between raw - exactly what the app printed - and parsed, a row per log entry. ASP.NET's console entries with their indented lines, Serilog's `[10:00:00 INF]` lines and plain lines each become one row: the level in a filled capsule (`▐INF▌`, `▐ERR▌`, `DBG` dimmed), the time it came, its category trimmed to its last parts (`EFCore.Command`; in full on the pointer, or in the panel's notice line for the selected entry) and its message, in its level's colour. An exception folds to its first lines and its first frame in the app's own code, a link, over `▸ +18 frames`, and `Enter` unfolds it inside a `╭ │ ╰` bracket; an EF Core command is `SQL 12 ms`, a bar against its endpoint's slowest, and its SQL on one row; a line repeated - npm's chatter, a dev server's rebuilds - is one row `×12`. Search, the level filter, marks, `y`, links, `O` and the rail work on the entries. Each column keeps its view between runs (`columnViews`), and `columnView` picks the one a new column starts with; the MCP's `get_logs` takes `parsed: true` for entries instead of lines (#27).
+- `v` keeps the entry at the bottom in place while the column opens from its middle, and the title says for a moment what it did: `parsed · 1,204 lines → 312 entries`. Unfolding wipes the lines in downwards, the `+18 frames` counting down; a repeat's count flashes as it rises. None of it moves with reduced motion. With Nerd Font icons a parsed column's title has an eye, its folds chevrons and its EF Core commands a database.
+
 ## [1.100.0] - 2026-11-19
 
 ### Added

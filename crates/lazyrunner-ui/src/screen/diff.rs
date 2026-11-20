@@ -342,7 +342,7 @@ pub fn step(ui: &mut Ui, controller: &mut Controller, older: bool) {
         targets.iter().find(|&&number| number > from).copied().unwrap_or(first)
     };
     let Some(position) = state.output.position_of(next) else { return };
-    let Some(found) = shown.iter().position(|item| item.position == position) else { return };
+    let Some(found) = shown.iter().position(|item| item.holds(state, position)) else { return };
     let scroll = columns::middle(&shown, found, ui.focus_cells, ui.body_rows);
     let key = state.key.clone();
     if let Some(diff) = ui.diffs.get_mut(&key) {

@@ -346,7 +346,9 @@ fn look_at(ui: &mut Ui, controller: &mut Controller, app: usize, lines: HashSet<
     close_view(ui);
     ui.focus = app;
     let shown = columns::shown_lines(&controller.states[app], ui.search.as_ref());
-    let scroll = shown.iter().rposition(|item| lines.contains(&item.line.text)).map_or(0, |at| shown.len() - 1 - at);
+    let state = &controller.states[app];
+    let read = |item: &columns::Shown| item.any_line(state, |line| lines.contains(&line.text));
+    let scroll = shown.iter().rposition(read).map_or(0, |at| shown.len() - 1 - at);
     controller.states[app].scroll = scroll;
     ui.motion.look(Spot::Looked { app, lines }, ui.now);
 }

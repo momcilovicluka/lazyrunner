@@ -20,6 +20,7 @@ pub mod controller;
 pub mod coverage;
 pub mod coverage_needs;
 pub mod diff;
+pub mod entries;
 pub mod faults;
 pub mod health;
 pub mod history;

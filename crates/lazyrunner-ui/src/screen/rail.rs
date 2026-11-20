@@ -9,7 +9,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use lazyrunner_core::output::{Level, LevelFilter};
+use lazyrunner_core::output::{ColumnView, Level, LevelFilter};
 use lazyrunner_core::run::app::AppState;
 
 use super::columns::{self, Shown};
@@ -51,6 +51,7 @@ struct Drawn {
     marks: usize,
     /// The first line of the run compared with the last one (`Alt+d`).
     diff: Option<u64>,
+    view: ColumnView,
 }
 
 /// A column's map: its rows, and how fast each one's lines came.
@@ -97,7 +98,7 @@ pub fn add(
     let bracket = if scroll > 0 { C::Cyan } else { C::DarkGray };
     let stepped = diff.and_then(|diff| diff.at).and_then(|number| state.output.position_of(number));
     let matched = search.and_then(|search| search.index).or(stepped);
-    let match_at = matched.and_then(|position| list.iter().position(|item| item.position == position));
+    let match_at = matched.and_then(|position| list.iter().position(|item| item.holds(state, position)));
     let now = Now {
         live_top: height.saturating_sub(thumb),
         narrow: cells == 1,
@@ -154,7 +155,8 @@ pub fn preview(ui: &Ui, state: &AppState, index: usize, rows: &mut [Vec<Seg>], c
     let back = state.output.len().saturating_sub(line + 1);
     let Some(shown) = state.output.newest_first(back).next() else { return };
     let edge = found.split_off(found.len().saturating_sub(rail));
-    let text = seg::ellipsis(&format!(" {} ", shown.text.trim()), cells);
+    let said = super::parsed::preview(state, line).unwrap_or_else(|| shown.text.trim().to_string());
+    let text = seg::ellipsis(&format!(" {said} "), cells);
     *found = vec![on(text, C::Black, columns::line_color(shown))];
     found.extend(edge);
 }
@@ -175,6 +177,7 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, diff:
         search: search.map(|search| (search.query.clone(), search.regex, search.case)),
         marks: state.marks.len(),
         diff: diff.map(|_| state.run_from),
+        view: state.view,
     };
     let mut maps = ui.rails.0.borrow_mut();
     if let Some((was, map)) = maps.get(&state.key)
@@ -200,11 +203,11 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, diff:
 fn mark(state: &AppState, item: &Shown, search: Option<&Search>, diff: Option<&View>) -> Mark {
     let number = state.output.number_at(item.position);
     let kind = diff.and_then(|diff| diff.kind(number));
-    match (kind, item.line.severity()) {
+    match (kind, item.severity()) {
         (Some(Kind::Problem { level: Level::Error, .. }) | None, Level::Error) => Mark::Error,
         (Some(Kind::Problem { .. }) | None, Level::Warn | Level::Error) => Mark::Warning,
-        _ if search.is_some_and(|search| search.matches(&item.line.text)) => Mark::Match,
-        _ if state.marks.binary_search(&number).is_ok() => Mark::Marked,
+        _ if search.is_some_and(|search| item.matches(state, search)) => Mark::Match,
+        _ if item.marked(state) => Mark::Marked,
         (Some(Kind::New | Kind::Problem { .. }), _) => Mark::New,
         _ => Mark::Normal,
     }
