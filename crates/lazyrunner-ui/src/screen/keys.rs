@@ -339,6 +339,7 @@ fn navigation(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         }
         "n" | "N" if super::diff::steps(ui, controller) => super::diff::step(ui, controller, name == "n"),
         "Enter" if super::diff::focused_on(ui, controller) => super::diff::toggle_fixed(ui, controller),
+        "Enter" if super::parsed::focused(ui, controller) => super::parsed::fold_selected(ui, controller),
         "n" => find_match(ui, controller, true),
         "N" => find_match(ui, controller, false),
         "Escape" => ui.search = None,
@@ -432,7 +433,7 @@ fn find_match(ui: &mut Ui, controller: &mut Controller, older: bool) {
     let hits: Vec<usize> = shown
         .iter()
         .enumerate()
-        .filter(|(_, item)| !item.context && search.matches(&item.line.text))
+        .filter(|(_, item)| !item.context && item.matches(state, search))
         .map(|(at, _)| at)
         .collect();
     let (Some(&first), Some(&last)) = (hits.first(), hits.last()) else {
@@ -440,7 +441,7 @@ fn find_match(ui: &mut Ui, controller: &mut Controller, older: bool) {
         search.total = 0;
         return;
     };
-    let current = search.index.and_then(|index| shown.iter().position(|item| item.position == index));
+    let current = search.index.and_then(|index| shown.iter().position(|item| item.holds(state, index)));
     let start = current.map_or(if older { shown.len() as isize - state.scroll as isize } else { -1 }, |at| at as isize);
     let next = if older {
         hits.iter().rev().find(|&&at| (at as isize) < start)
@@ -851,6 +852,7 @@ fn perform(ui: &mut Ui, controller: &mut Controller, action: &Run) {
                 None => controller.add_log(super::code::NO_BUILD, Hue::DarkGray),
             }
         }
+        Run::ParsedView => super::parsed::switch(ui, controller),
         Run::LevelFilter => {
             let Some(state) = controller.states.get(ui.focus) else { return };
             let (key, filter) = (state.key.clone(), state.filter.next());

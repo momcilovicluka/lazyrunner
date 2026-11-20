@@ -5384,3 +5384,190 @@ async fn the_doctor_checks_what_coverage_needs_only_with_the_setting_on_and_f_ad
     let ok = vec![Item { name: CHECK.into(), status: Status::Ok, detail: "all 3 suites can collect it".into() }];
     assert_eq!(Checklist::fixed(ok, Vec::new(), "").fix_of(0), None, "both present: nothing to fix");
 }
+
+// ---------------------------------------------------------------- the parsed view (v, #27)
+
+/// An Orders run as ASP.NET's console logger prints it: its host's entries, two EF Core commands, a worker polling
+/// again and again, a warning, an exception with its stack, a debug entry.
+fn orders_log(screen: &mut Screen) {
+    let at = screen.ui.now - Duration::from_secs(5);
+    let lines = [
+        ("Using launch settings from Properties/launchSettings.json...", Hue::Gray),
+        ("info: Microsoft.Hosting.Lifetime[14]", Hue::Cyan),
+        ("      Now listening on: http://localhost:5001", Hue::Green),
+        ("info: Microsoft.EntityFrameworkCore.Database.Command[20101]", Hue::Cyan),
+        (
+            "      Executed DbCommand (12ms) [Parameters=[@__id_0='5'], CommandType='Text', CommandTimeout='30']",
+            Hue::Gray,
+        ),
+        ("      SELECT [o].[Id], [o].[Total]", Hue::Gray),
+        ("      FROM [Orders] AS [o]", Hue::Gray),
+        ("info: Microsoft.EntityFrameworkCore.Database.Command[20101]", Hue::Cyan),
+        ("      Executed DbCommand (48ms) [Parameters=[], CommandType='Text', CommandTimeout='30']", Hue::Gray),
+        ("      SELECT [l].[Id] FROM [Lines] AS [l]", Hue::Gray),
+        ("info: Orders.Worker[1]", Hue::Cyan),
+        ("      Polled the queue: 0 messages", Hue::Gray),
+        ("info: Orders.Worker[1]", Hue::Cyan),
+        ("      Polled the queue: 2 messages", Hue::Gray),
+        ("info: Orders.Worker[1]", Hue::Cyan),
+        ("      Polled the queue: 1 messages", Hue::Gray),
+        ("warn: Orders.Api.Checkout[3]", Hue::Yellow),
+        ("      Card declined for order 42", Hue::DarkYellow),
+        ("      retrying once", Hue::DarkYellow),
+        ("fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]", Hue::Red),
+        ("      An unhandled exception has occurred while executing the request.", Hue::Red),
+        ("      System.InvalidOperationException: the basket is empty", Hue::Red),
+        ("         at Microsoft.AspNetCore.Routing.EndpointMiddleware.Invoke(HttpContext context)", Hue::Red),
+        (r"         at Orders.Api.Checkout.Pay() in C:\src\Orders\Checkout.cs:line 42", Hue::Red),
+        (r"         at Orders.Api.Checkout.Post() in C:\src\Orders\Checkout.cs:line 17", Hue::Red),
+        (
+            "         at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext c)",
+            Hue::Red,
+        ),
+        ("dbug: Orders.Cache[7]", Hue::DarkGray),
+        ("      Cache warm", Hue::DarkGray),
+    ];
+    for (line, hue) in lines {
+        screen.controller.states[0].add_line(line, hue, at);
+    }
+}
+
+/// The wall clock's times in a frame: they change from run to run.
+fn clock_masked(frame: String) -> String {
+    let times = regex::Regex::new(r"\d\d:\d\d:\d\d").unwrap();
+    times.replace_all(&frame, "hh:mm:ss").into_owned()
+}
+
+#[tokio::test]
+async fn v_shows_a_column_as_log_entries_and_enter_unfolds_a_stack() {
+    let mut screen = screen("parsed-view", json!({}));
+    orders_log(&mut screen);
+    screen.press("z");
+    let raw = screen.frame();
+    screen.press("v");
+    let frame = clock_masked(screen.frame());
+    insta::assert_snapshot!("parsed_view", frame);
+    assert!(frame.contains("parsed · 28 lines → 8 entries"), "the title says what v did: {frame}");
+    assert!(frame.contains("▐ERR▌") && frame.contains("▐WRN▌") && frame.contains("▐DBG▌"), "{frame}");
+    assert!(frame.contains("EFCore.Command") && frame.contains("SQL 12 ms"), "{frame}");
+    assert!(frame.contains("Polled the queue: 1 messages ×3"), "the newest of the repeats, counted: {frame}");
+    assert!(frame.contains(r"at Orders.Api.Checkout.Pay() in C:\src\Orders\Checkout.cs:line 42"), "{frame}");
+    assert!(frame.contains("▸ +3 frames") && !frame.contains("Checkout.Post()"), "the rest folded: {frame}");
+    assert!(frame.contains("Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware"), "notice: {frame}");
+    assert_eq!(screen.controller.config["columnViews"]["orders"], "parsed", "kept for the app");
+
+    screen.press("Enter");
+    let frame = clock_masked(screen.frame());
+    insta::assert_snapshot!("parsed_view_unfolded", frame);
+    assert!(frame.contains("╭▐ERR▌") && frame.contains("Checkout.Post()") && frame.contains("╰"), "{frame}");
+    screen.press("Enter");
+    assert!(screen.frame().contains("▸ +3 frames"), "Enter folds it again");
+
+    screen.press("v");
+    assert_eq!(screen.controller.states[0].view, lazyrunner_core::output::ColumnView::Raw);
+    assert_eq!(screen.controller.config["columnViews"]["orders"], "raw");
+    assert!(screen.frame().contains("raw · 8 entries → 28 lines"));
+    screen.ui.now += Duration::from_secs(3);
+    assert_eq!(screen.frame(), raw, "back to exactly what the app printed");
+}
+
+#[tokio::test]
+async fn each_column_keeps_its_view_and_a_setting_picks_the_one_new_columns_start_with() {
+    use lazyrunner_core::output::ColumnView;
+    let mut screen = screen("parsed-kept", json!({ "columnView": "parsed" }));
+    let views = |screen: &Screen| screen.controller.states.iter().map(|state| state.view).collect::<Vec<_>>();
+    assert!(views(&screen).iter().all(|view| *view == ColumnView::Parsed), "the default for every column");
+    screen.press("v");
+    assert_eq!(views(&screen)[0], ColumnView::Raw);
+    let saved: Value =
+        serde_json::from_str(&std::fs::read_to_string(screen.temp.join("config.json")).unwrap()).unwrap();
+    let project = screen.controller.project.id.clone();
+    assert_eq!(saved["projects"][&project]["columnViews"]["orders"], "raw", "in the project's section");
+    screen.controller.states[0].view = ColumnView::Parsed;
+    screen.controller.reload_settings();
+    assert_eq!(views(&screen)[0], ColumnView::Raw, "read back");
+    assert_eq!(views(&screen)[1], ColumnView::Parsed);
+}
+
+#[tokio::test]
+async fn search_marks_copy_and_the_level_filter_go_by_entries_in_the_parsed_view() {
+    let mut screen = screen("parsed-search", json!({}));
+    orders_log(&mut screen);
+    screen.press("z v / b a s k e t Enter");
+    let state = &screen.controller.states[0];
+    let index = screen.ui.search.as_ref().and_then(|search| search.index).expect("a match");
+    let entry = state.output.entries().of(state.output.number_at(index)).unwrap().clone();
+    assert_eq!(entry.level, lazyrunner_core::output::Level::Error, "the match is the exception's entry");
+    assert!(screen.frame().contains("match 1 of 1"), "an entry matches once: {}", screen.frame());
+    screen.press("m");
+    let marked = screen.controller.states[0].marks.clone();
+    assert_eq!(marked.len(), 1);
+    assert!(entry.holds(marked[0]));
+    screen.press("y s");
+    let copied = copied();
+    let text = copied.last().expect("copied");
+    assert!(text.contains("the basket is empty") && text.contains("Checkout.cs:line 42"), "{text}");
+    screen.press("Esc");
+
+    let shown = super::columns::shown_lines(&screen.controller.states[0], None);
+    assert_eq!(shown.len(), 8, "the rail and scrolling count entries");
+    screen.press("f");
+    let shown = super::columns::shown_lines(&screen.controller.states[0], None);
+    assert_eq!(shown.len(), 1, "errors only: the exception's entry");
+}
+
+#[tokio::test]
+async fn v_keeps_the_entry_at_the_bottom_where_it_was() {
+    let mut screen = screen("parsed-keep", json!({}));
+    orders_log(&mut screen);
+    screen.press("z");
+    screen.controller.states[0].scroll = 9; // the warning's last line at the bottom
+    screen.press("v");
+    let state = &screen.controller.states[0];
+    let shown = super::columns::shown_lines(state, None);
+    let bottom = shown[shown.len() - 1 - state.scroll].entry.unwrap();
+    assert_eq!(bottom.category.as_deref(), Some("Orders.Api.Checkout"), "its entry");
+    screen.press("v");
+    let state = &screen.controller.states[0];
+    let shown = super::columns::shown_lines(state, None);
+    assert_eq!(shown[shown.len() - 1 - state.scroll].line.text, "      retrying once", "its last line");
+}
+
+#[tokio::test]
+async fn v_opens_the_column_from_its_middle_and_reduced_motion_switches_at_once() {
+    let mut screen = screen("parsed-motion", json!({}));
+    orders_log(&mut screen);
+    screen.ui.motion.enabled = true;
+    screen.press("v");
+    assert!(screen.ui.motion.lit(&super::motion::Spot::Switched(0), screen.ui.now).is_some());
+    let mut calm = super::tests::screen("parsed-calm", json!({ "reducedMotion": true }));
+    orders_log(&mut calm);
+    calm.ui.motion.enabled = true;
+    calm.frame();
+    calm.press("v Enter");
+    assert!(calm.ui.motion.lit(&super::motion::Spot::Switched(0), calm.ui.now).is_none(), "no reveal");
+    let first = calm.controller.states[0].output.entries().iter().find(|entry| entry.frames > 0).unwrap().first;
+    assert!(calm.ui.motion.lit(&super::motion::Spot::Unfolded { app: 0, line: first }, calm.ui.now).is_none());
+    assert!(calm.ui.unfolded.contains(&("orders".to_string(), first)), "unfolded at once");
+}
+
+#[tokio::test]
+async fn get_logs_with_parsed_answers_entries() {
+    let mut screen = screen("parsed-logs", json!({}));
+    orders_log(&mut screen);
+    let base = screen.controller.states[0].output.total() - 28;
+    let answer = agent(&mut screen, "logs", json!({ "app": "orders", "parsed": true }), None);
+    let text = answer["result"]["text"].as_str().unwrap().to_string();
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(answer["result"]["count"], 8, "{text}");
+    let sql = "SQL 12 ms · SELECT [o].[Id], [o].[Total] FROM [Orders] AS [o]";
+    assert_eq!(lines[2], format!("{} INF Microsoft.EntityFrameworkCore.Database.Command {sql}", base + 4));
+    assert_eq!(lines[4], format!("{} INF Orders.Worker Polled the queue: 1 messages ×3", base + 11));
+    assert!(lines[6].starts_with(&format!("{} ERR ", base + 20)) && lines[6].ends_with("(+4 frames)"), "{text}");
+    let errors = agent(&mut screen, "logs", json!({ "app": "orders", "parsed": true, "errors_only": true }), None);
+    assert_eq!(errors["result"]["count"], 1);
+    let found = agent(&mut screen, "logs", json!({ "app": "orders", "parsed": true, "grep": "checkout.cs" }), None);
+    assert_eq!(found["result"]["count"], 1, "grep looks in every line of an entry");
+    let since = agent(&mut screen, "logs", json!({ "app": "orders", "parsed": true, "since": base + 26 }), None);
+    assert_eq!(since["result"]["text"], format!("{} DBG Orders.Cache Cache warm", base + 27));
+}

@@ -60,6 +60,8 @@ pub enum Run {
     /// `, A v`: a read-only snapshot of this run to hand on (#106).
     Snapshot,
     LevelFilter,
+    /// v: the focused column raw or parsed (#27).
+    ParsedView,
     Mark,
     PrevMark,
     NextMark,
@@ -360,6 +362,15 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             "Filter the focused column by level",
             "errors, warnings and errors, info and up, all",
             Run::LevelFilter,
+        )
+        .safe()
+        .focused(),
+        action(
+            "View",
+            "v",
+            "Raw / parsed view of the focused column",
+            "a row per log entry by level, stacks folded (Enter unfolds) - kept per app",
+            Run::ParsedView,
         )
         .safe()
         .focused(),

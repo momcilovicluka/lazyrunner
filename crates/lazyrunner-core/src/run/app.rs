@@ -12,7 +12,7 @@ use regex::Regex;
 
 use super::child::Child;
 use super::{diff, requests};
-use crate::output::{Hue, LevelFilter, Output};
+use crate::output::{ColumnView, Hue, LevelFilter, Output};
 use crate::profile::{App, Command, Ready};
 
 /// Lines each column keeps.
@@ -67,6 +67,8 @@ pub struct AppState {
     pub scroll: usize,
     /// Which of its lines the column shows (`f`), kept for the app between runs.
     pub filter: LevelFilter,
+    /// Its lines as the app printed them, or one row per log entry (`v`), kept for the app between runs.
+    pub view: ColumnView,
     /// The lines marked (`m`), by number, oldest first; they go when the app starts again.
     pub marks: Vec<u64>,
     /// The marks' notes, by line number; they go with their marks.
@@ -167,6 +169,7 @@ impl AppState {
             output: Output::new(MAX_PANE_LINES),
             scroll: 0,
             filter: LevelFilter::All,
+            view: ColumnView::Raw,
             marks: Vec::new(),
             notes: std::collections::BTreeMap::new(),
             errors: 0,
@@ -275,8 +278,17 @@ impl AppState {
 
     /// A line in the column (and its log file).
     pub fn add_line(&mut self, text: &str, hue: Hue, now: Instant) {
+        let entries = self.output.entries().counted();
         self.output.push_hued(text, Some(hue), now);
-        let shown = self.output.newest_first(0).next().is_some_and(|line| self.filter.admits(line));
+        let shown = match self.view {
+            // A parsed view moves by an entry its filter shows, not by a line that goes on one or repeats it.
+            ColumnView::Parsed => {
+                let newest = self.output.entries().iter().next_back();
+                self.output.entries().counted() > entries
+                    && newest.is_some_and(|entry| self.filter.admits_level(entry.level))
+            }
+            ColumnView::Raw => self.output.newest_first(0).next().is_some_and(|line| self.filter.admits(line)),
+        };
         if self.scroll > 0 && shown {
             self.scroll = (self.scroll + 1).min(self.output.len().saturating_sub(1)); // a scrolled-back view stays put
         }
@@ -603,6 +615,28 @@ mod tests {
         );
         assert_eq!(hues, [Hue::DarkGray, Hue::Red, Hue::Yellow, Hue::Green]);
         assert_eq!((state.errors, state.warnings), (1, 1));
+    }
+
+    #[test]
+    fn a_scrolled_back_parsed_view_moves_by_entries_not_lines() {
+        let mut state = AppState::new("a");
+        state.view = ColumnView::Parsed;
+        let now = Instant::now();
+        for (line, hue) in
+            [("info: Orders.Api[0]", Hue::Cyan), ("      Listing orders", Hue::Gray), ("ready", Hue::Gray)]
+        {
+            state.add_line(line, hue, now);
+        }
+        state.scroll = 1;
+        state.add_line("ready", Hue::Gray, now);
+        assert_eq!(state.scroll, 1, "a repeat is the same row");
+        state.add_line("fail: Orders.Api[1]", Hue::Red, now);
+        assert_eq!(state.scroll, 2, "a new entry");
+        state.add_line("      it broke", Hue::Red, now);
+        assert_eq!(state.scroll, 2, "a line of the newest entry");
+        state.filter = LevelFilter::Errors;
+        state.add_line("info: Orders.Api[2]", Hue::Cyan, now);
+        assert_eq!(state.scroll, 2, "an entry the filter hides");
     }
 
     #[test]

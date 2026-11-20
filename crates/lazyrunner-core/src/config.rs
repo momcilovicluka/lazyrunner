@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 use crate::json;
 
 /// The settings kept per project.
-pub const PROJECT_KEYS: [&str; 4] = ["columnWidths", "apps", "frontend", "stopFrontendOnStop"];
+pub const PROJECT_KEYS: [&str; 5] = ["columnWidths", "columnViews", "apps", "frontend", "stopFrontendOnStop"];
 const WRITE_ATTEMPTS: usize = 10;
 const WRITE_RETRY: Duration = Duration::from_millis(40);
 

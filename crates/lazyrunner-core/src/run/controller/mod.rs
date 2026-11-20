@@ -354,6 +354,7 @@ impl Controller {
         let kept_levels = log_levels::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
+            state.view = apptypes::column_view(&config, &state.key);
             state.previous = runs.remove(&state.key);
             if let Err(error) = state.open_log(&state_dir.join("logs")) {
                 log_problems.push(format!("! {}'s output isn't saved to a log file ({error})", state.key));
@@ -995,6 +996,7 @@ impl Controller {
         self.config = self.config_file.load(Some(&self.project.id));
         for state in &mut self.states {
             state.filter = apptypes::level_filter(&self.config, &state.key);
+            state.view = apptypes::column_view(&self.config, &state.key);
         }
     }
 
@@ -1015,6 +1017,20 @@ impl Controller {
             apps[key]["filter"] = json!(filter.key());
         }
         self.set_setting("apps", apps);
+    }
+
+    /// v: how an app's column shows its output, from now on and next time (saved with the project's settings, as
+    /// its width is).
+    pub fn set_column_view(&mut self, key: &str, view: crate::output::ColumnView) {
+        if let Some(state) = self.states.iter_mut().find(|state| state.key == key) {
+            state.view = view;
+        }
+        let mut views = self.config["columnViews"].clone();
+        if !views.is_object() {
+            views = json!({});
+        }
+        views[key] = json!(view.key());
+        self.set_setting("columnViews", views);
     }
 
     /// An on/off setting.

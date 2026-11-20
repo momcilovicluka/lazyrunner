@@ -12,7 +12,7 @@ use super::icons::{self, Icon};
 use super::seg::{Seg, seg};
 use super::theme::C;
 
-const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
+pub(super) const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
 /// The spans listed at most; the rest are counted.
 const MOST_SPANS: usize = 8;
 /// A row's label, and its time's cells.

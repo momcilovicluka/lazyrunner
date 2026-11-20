@@ -25,13 +25,17 @@ pub fn list(apps: &str) -> Vec<Value> {
             "get_logs",
             "An app's output as one text, each line after its number: the newest `limit` (100, at most 500) \
              after `since` (pass the last answer's `next` to get only what's new; `truncated` says older matching \
-             lines didn't fit), those containing `grep` (ignoring case), or only the error lines.",
+             lines didn't fit), those containing `grep` (ignoring case), or only the error lines. With `parsed`, \
+             the log entries instead of lines, as the column's parsed view (v) shows them: each after its first \
+             line's number, its level, time, category and message on one line - an EF Core command's time and SQL, \
+             an exception's frame count, a repeated line's count (×12).",
             json!({
                 "app": app,
                 "since": { "type": "integer", "minimum": 0 },
                 "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
                 "grep": { "type": "string" },
                 "errors_only": { "type": "boolean" },
+                "parsed": { "type": "boolean" },
             }),
             &["app"],
             true,

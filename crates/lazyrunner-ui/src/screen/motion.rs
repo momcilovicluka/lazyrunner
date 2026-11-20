@@ -53,6 +53,10 @@ pub enum Spot {
     LookedRequests(HashSet<u64>),
     /// The search match just jumped to (the line's index, 0 = the oldest kept).
     Match { app: usize, line: usize },
+    /// A column `v` just switched between raw and parsed: it opens from its middle.
+    Switched(usize),
+    /// An entry of a parsed view just unfolded (by its first line's number): its lines wipe in downwards.
+    Unfolded { app: usize, line: u64 },
     /// What was clicked.
     Clicked(Target),
     /// The startup doctor's selection bar going round the end of its list.
@@ -64,6 +68,7 @@ impl Spot {
         match self {
             Spot::Copied { .. } => COPY_FLASH,
             Spot::Looked { .. } | Spot::LookedRequests(_) => LOOK,
+            Spot::Switched(_) | Spot::Unfolded { .. } => REVEAL,
             _ => FLASH,
         }
     }
@@ -252,6 +257,11 @@ impl Motion {
             *glide = Glide { from: shown(glide), to: target, at: now };
         }
         shown(glide).round().max(0.0) as usize
+    }
+
+    /// Column `app`'s scroll is in other units now (`v`): it goes there at once rather than gliding.
+    pub fn jump_scroll(&mut self, app: usize) {
+        self.scrolls.remove(&app);
     }
 
     /// The row to draw the palette's selection bar on, on its way to `target`: a row every `BAR_STEP`, a jump of more

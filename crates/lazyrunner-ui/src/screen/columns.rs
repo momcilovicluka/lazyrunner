@@ -5,12 +5,13 @@ use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
 use lazyrunner_core::links;
-use lazyrunner_core::output::{Hue, Level, LevelFilter, OutputLine};
+use lazyrunner_core::output::{ColumnView, Hue, Level, LevelFilter, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
 use lazyrunner_core::run::audit::Severity;
 use lazyrunner_core::run::compose::{self as services_of, State};
 use lazyrunner_core::run::controller::compose;
+use lazyrunner_core::run::entries::Entry;
 use lazyrunner_core::run::{format_age, format_duration};
 use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
@@ -28,8 +29,8 @@ const DEFAULT_WIDTH: f64 = 33.0;
 const MIN_WIDTH: usize = 12;
 const SLOW_RESPONSE_MS: u64 = 1000;
 /// Fresh output is white this long, then a brighter shade of its colour until this.
-const FRESH: Duration = Duration::from_millis(400);
-const SETTLING: Duration = Duration::from_millis(1000);
+pub(super) const FRESH: Duration = Duration::from_millis(400);
+pub(super) const SETTLING: Duration = Duration::from_millis(1000);
 const SPARK_WIDTH: usize = 10;
 /// A stopped app's state breathes once in this many ticks.
 const IDLE_BREATH: u64 = 16;
@@ -294,6 +295,7 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
         super::phases::chip(ui, &app.key, text, chip_fg, chip_bg)
     };
     let chip_parts = segs.len();
+    segs.extend(super::parsed::title(ui, &controller.states[index]));
     if super::diff::is_on(ui, &app.key) {
         segs.push(seg(format!(" {}", icons::icon(ui.nerd, Icon::Diff)), C::Cyan));
     }
@@ -589,7 +591,7 @@ const RUNNING: &str = "running";
 /// How slowly a starting service's dot breathes.
 const BREATH: Duration = Duration::from_millis(1600);
 /// How long the line that made a command app up stays outlined.
-const READY_OUTLINE: Duration = Duration::from_secs(3);
+pub(super) const READY_OUTLINE: Duration = Duration::from_secs(3);
 /// The colours a compose app's services' lines are told apart by, in the order of its services.
 const SERVICE_COLORS: [C; 8] =
     [C::Cyan, C::Magenta, C::Blue, C::Green, C::DarkCyan, C::DarkMagenta, C::DarkBlue, C::DarkGreen];
@@ -611,6 +613,7 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     let outlined =
         |state: &AppState| state.ready_at.is_some_and(|(_, at)| ui.now.saturating_duration_since(at) < READY_OUTLINE);
     controller.states.iter().any(outlined)
+        || super::parsed::animating(ui)
         || controller.restarting()
         || (!ui.reduced_motion && controller.apps.iter().any(|app| breathing(&app.key)))
 }
@@ -667,7 +670,7 @@ pub fn hue_color(hue: Hue) -> C {
 }
 
 /// The brighter shade a fresh line settles through.
-fn bright(color: C) -> C {
+pub(super) fn bright(color: C) -> C {
     match color {
         C::Gray => C::White,
         C::DarkGray => C::Gray,
@@ -801,7 +804,15 @@ fn body(
     let looked = ui.motion.looked(index, ui.now);
     let composed = controller.apps[index].command().is_some_and(|command| command.compose.is_some());
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
-    for (at, item) in list.iter().enumerate().rev().skip(scroll) {
+    // A parsed column draws its entries; the loop below draws a raw one's lines.
+    let raw: &[Shown] = if state.view == ColumnView::Parsed {
+        let frame = super::parsed::Frame { cells, rows, scroll, search, diff: diff.as_ref() };
+        result = super::parsed::rows(ui, controller, index, &list, &frame, found, base);
+        &[]
+    } else {
+        &list
+    };
+    for (at, item) in raw.iter().enumerate().rev().skip(scroll) {
         if result.len() >= rows {
             break;
         }
@@ -921,6 +932,7 @@ fn body(
         result.push(vec![seg(" ".repeat(cells), C::Gray)]);
     }
     result.reverse();
+    super::parsed::reveal(ui, index, &mut result);
     if rail > 0 {
         super::rail::add(ui, state, index, &list, search, diff.as_ref(), &mut result, scroll, rail);
         super::rail::preview(ui, state, index, &mut result, cells, rail);
@@ -988,7 +1000,7 @@ pub fn middle(shown: &[Shown], found: usize, cells: usize, rows: usize) -> usize
     let mut rows_below = 0;
     let mut scroll = shown.len() - 1 - found;
     for item in shown[found + 1..].iter().rev() {
-        let wrapped = chunk(&item.line.text, cells).len();
+        let wrapped = if item.entry.is_some() { 1 } else { chunk(&item.line.text, cells).len() };
         if rows_below + wrapped > rows / 2 {
             break;
         }
@@ -999,16 +1011,57 @@ pub fn middle(shown: &[Shown], found: usize, cells: usize, rows: usize) -> usize
 }
 
 /// A line a column shows: where it is among the lines kept (0 = the oldest), and whether it's only there as context
-/// around a match (a search that filters).
+/// around a match (a search that filters). In a parsed view it stands for an entry, and `line` is its first.
 pub struct Shown<'a> {
     pub position: usize,
     pub line: &'a OutputLine,
     pub context: bool,
+    pub entry: Option<&'a Entry>,
+}
+
+impl Shown<'_> {
+    /// Whether the line at `position` (0 = the oldest kept) is this one, or one of its entry's.
+    pub fn holds(&self, state: &AppState, position: usize) -> bool {
+        match self.entry {
+            Some(entry) => entry.holds(state.output.number_at(position)),
+            None => self.position == position,
+        }
+    }
+
+    /// How serious it is: its entry's level, else the line's.
+    pub fn severity(&self) -> Level {
+        self.entry.map_or_else(|| self.line.severity(), |entry| entry.level)
+    }
+
+    /// Whether `test` holds for the line, or for any of its entry's.
+    pub fn any_line(&self, state: &AppState, test: impl Fn(&OutputLine) -> bool) -> bool {
+        match self.entry {
+            Some(entry) => super::parsed::lines(state, entry).any(test),
+            None => test(self.line),
+        }
+    }
+
+    /// Whether a search matches it.
+    pub fn matches(&self, state: &AppState, search: &super::Search) -> bool {
+        self.any_line(state, |line| search.matches(&line.text))
+    }
+
+    /// Whether it's marked (`m`): the line, or one of its entry's.
+    pub fn marked(&self, state: &AppState) -> bool {
+        let Some(entry) = self.entry else {
+            return state.marks.binary_search(&state.output.number_at(self.position)).is_ok();
+        };
+        let from = state.marks.partition_point(|number| *number < entry.first);
+        state.marks.get(from).is_some_and(|number| *number <= entry.last)
+    }
 }
 
 /// The lines a column shows, oldest first: those its level filter (f) lets through, and while its search filters
 /// (Tab), only the matches among them, with a line either side.
 pub fn shown_lines<'a>(state: &'a AppState, search: Option<&super::Search>) -> Vec<Shown<'a>> {
+    if state.view == ColumnView::Parsed {
+        return super::parsed::shown(state, search);
+    }
     let total = state.output.len();
     let mut kept: Vec<(usize, &OutputLine)> = state
         .output
@@ -1020,14 +1073,17 @@ pub fn shown_lines<'a>(state: &'a AppState, search: Option<&super::Search>) -> V
     kept.reverse();
     let filtering = search.filter(|search| search.filter && !search.query.is_empty() && search.key == state.key);
     let Some(search) = filtering else {
-        return kept.into_iter().map(|(position, line)| Shown { position, line, context: false }).collect();
+        return kept
+            .into_iter()
+            .map(|(position, line)| Shown { position, line, context: false, entry: None })
+            .collect();
     };
     let hits: Vec<bool> = kept.iter().map(|(_, line)| search.matches(&line.text)).collect();
     kept.into_iter()
         .enumerate()
         .filter_map(|(at, (position, line))| {
             let near = (at > 0 && hits[at - 1]) || hits.get(at + 1).copied().unwrap_or(false);
-            (hits[at] || near).then_some(Shown { position, line, context: !hits[at] })
+            (hits[at] || near).then_some(Shown { position, line, context: !hits[at], entry: None })
         })
         .collect()
 }

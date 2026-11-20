@@ -3,6 +3,8 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
+use crate::run::entries::Entries;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
     Debug,
@@ -75,13 +77,18 @@ impl LevelFilter {
 
     /// Whether the column shows `line`.
     pub fn admits(self, line: &OutputLine) -> bool {
+        self.admits_level(line.severity())
+    }
+
+    /// Whether the column shows what is this serious (a parsed view's entry).
+    pub fn admits_level(self, level: Level) -> bool {
         let least = match self {
             Self::All => return true,
             Self::Errors => Level::Error,
             Self::Warnings => Level::Warn,
             Self::Info => Level::Info,
         };
-        line.severity() >= least
+        level >= least
     }
 
     /// Its name in the settings file (`"apps": { "<key>": { "filter": … } }`); all lines have none.
@@ -114,6 +121,40 @@ impl LevelFilter {
     }
 }
 
+/// How a column shows its app's output (`v`): the lines as the app printed them, or one row per log entry (#27).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ColumnView {
+    #[default]
+    Raw,
+    Parsed,
+}
+
+impl ColumnView {
+    /// Its name in the settings file (`"columnViews": { "<key>": … }`, `"columnView"`).
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Raw => "raw",
+            Self::Parsed => "parsed",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "raw" => Some(Self::Raw),
+            "parsed" => Some(Self::Parsed),
+            _ => None,
+        }
+    }
+
+    /// The other one (`v`).
+    pub fn other(self) -> Self {
+        match self {
+            Self::Raw => Self::Parsed,
+            Self::Parsed => Self::Raw,
+        }
+    }
+}
+
 /// The colours lazyrunner gives lines, named as the themes name them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Hue {
@@ -138,6 +179,8 @@ pub struct Output {
     errors: u64,
     warnings: u64,
     last_line_at: Option<Instant>,
+    /// The lines as log entries, for a parsed view.
+    entries: Entries,
 }
 
 impl Output {
@@ -149,6 +192,7 @@ impl Output {
             errors: 0,
             warnings: 0,
             last_line_at: None,
+            entries: Entries::default(),
         }
     }
 
@@ -172,14 +216,23 @@ impl Output {
         if self.lines.len() == self.capacity {
             self.lines.pop_front();
         }
-        self.lines.push_back(OutputLine { text, level, born: now, hue, shape });
+        let line = OutputLine { text, level, born: now, hue, shape };
         self.total += 1;
+        self.entries.push(self.total, &line);
+        self.lines.push_back(line);
+        self.entries.trim(self.total + 1 - self.lines.len() as u64);
         self.last_line_at = Some(now);
     }
 
     /// Forgets the lines (Ctrl+L); the counters stay.
     pub fn clear(&mut self) {
         self.lines.clear();
+        self.entries.clear();
+    }
+
+    /// The lines kept, as log entries.
+    pub fn entries(&self) -> &Entries {
+        &self.entries
     }
 
     pub fn len(&self) -> usize {
@@ -197,6 +250,11 @@ impl Output {
 
     pub fn total(&self) -> u64 {
         self.total
+    }
+
+    /// The line at `position` among those kept (0 = the oldest).
+    pub fn at(&self, position: usize) -> Option<&OutputLine> {
+        self.lines.get(position)
     }
 
     /// The number of the line at `position` among those kept (0 = the oldest); the first line ever pushed is 1.
