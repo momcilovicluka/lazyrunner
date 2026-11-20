@@ -9,11 +9,15 @@ use lazyrunner_core::run::{Controller, format_duration};
 use super::Ui;
 use super::icons::{self, Icon};
 use super::mouse::Target;
-use super::seg::{Seg, gauge, seg};
+use super::seg::{EIGHTHS, Seg, eighth, ellipsis, gauge, seg, take_cells};
 use super::theme::C;
+use unicode_width::UnicodeWidthStr;
 
-/// How long a passed task's chip shows, glinting.
+/// How long a passed task's chip shows, glinting, and then drains from the right so the header closes up.
 const PASSED: Duration = Duration::from_millis(1500);
+const CLOSE: Duration = Duration::from_millis(300);
+/// A failed task's error is cut to this many cells: the header keeps room for the rest.
+const ERROR_CELLS: usize = 40;
 /// How long the glint runs over it.
 const GLINT: Duration = Duration::from_millis(400);
 /// A failed task's chip pulses this long, a pulse each two steps.
@@ -53,11 +57,13 @@ pub fn chips(ui: &Ui, controller: &Controller) -> Vec<Seg> {
             continue;
         };
         let since = ui.now.saturating_duration_since(result.at);
-        if result.ok && since < PASSED {
+        let closing = !ui.reduced_motion && ui.motion.enabled;
+        if result.ok && (since < PASSED || (closing && since < PASSED + CLOSE)) {
             let glint = !ui.reduced_motion && since < GLINT;
             let text =
                 format!("{GAP}{} {} {}", icons::icon(ui.nerd, Icon::Ok), task.name, format_duration(result.seconds));
-            segs.push(seg(text, if glint { C::White } else { C::Green }));
+            let left = 1.0 - since.saturating_sub(PASSED).as_secs_f64() / CLOSE.as_secs_f64();
+            segs.push(seg(drained(&text, left), if glint { C::White } else { C::Green }));
         }
     }
     for (at, (task, result)) in controller.task_failures().into_iter().enumerate() {
@@ -65,18 +71,31 @@ pub fn chips(ui: &Ui, controller: &Controller) -> Vec<Seg> {
         let since = ui.now.saturating_duration_since(result.at);
         let pulse = !ui.reduced_motion && since < PULSE && (since.as_millis() / PULSE_STEP).is_multiple_of(2);
         let why = result.error.clone().unwrap_or_default();
+        let why = ellipsis(&why, why.width().min(ERROR_CELLS));
         let text = format!("{GAP}{} {}: {why}", icons::icon(ui.nerd, Icon::Fail), task.name);
         segs.push(seg(text, if pulse { C::White } else { C::Red }).at(Target::TaskResult(index)));
     }
     segs
 }
 
-/// Whether the chips move: a task running, a glint, a pulse.
+/// `text` with `left` (1 to 0) of its cells left, the last an eighth block as it goes: a chip draining from the right.
+fn drained(text: &str, left: f64) -> String {
+    if left >= 1.0 {
+        return text.to_string();
+    }
+    let cells = text.width();
+    let eighths = (left.max(0.0) * (cells * EIGHTHS.len()) as f64).round() as usize;
+    let whole = take_cells(text, eighths / EIGHTHS.len());
+    format!("{whole}{}", eighth(eighths % EIGHTHS.len()).trim())
+}
+
+/// Whether the chips move: a task running, a glint, a pulse, a passed one draining away.
 pub fn animating(ui: &Ui, controller: &Controller) -> bool {
+    let close = if ui.reduced_motion || !ui.motion.enabled { Duration::ZERO } else { CLOSE };
     let moving = |task: &lazyrunner_core::profile::Task| {
         controller.task_result(&task.key).is_some_and(|result| {
             let since = ui.now.saturating_duration_since(result.at);
-            if result.ok { since < PASSED } else { !ui.reduced_motion && since < PULSE }
+            if result.ok { since < PASSED + close } else { !ui.reduced_motion && since < PULSE }
         })
     };
     !controller.tasks_running().is_empty() || controller.tasks().iter().any(moving)
@@ -89,9 +108,17 @@ mod tests {
     #[test]
     fn the_bar_fills_against_the_usual_time_and_says_when_its_past_it() {
         assert_eq!(bar(0.0, 12.0), ("▱▱▱▱".to_string(), false));
-        assert_eq!(bar(6.0, 12.0), ("██▱▱".to_string(), false));
-        assert_eq!(bar(6.75, 12.0), ("██▎▱".to_string(), false), "to an eighth");
-        assert_eq!(bar(13.0, 12.0), ("████".to_string(), true));
+        assert_eq!(bar(6.0, 12.0), ("▰▰▱▱".to_string(), false));
+        assert_eq!(bar(6.75, 12.0), ("▰▰▱▱".to_string(), false), "a bead fills once it's reached");
+        assert_eq!(bar(13.0, 12.0), ("▰▰▰▰".to_string(), true));
+    }
+
+    #[test]
+    fn a_passed_chip_drains_from_the_right_an_eighth_at_a_time() {
+        assert_eq!(drained("abcd", 1.0), "abcd");
+        assert_eq!(drained("abcd", 0.5), "ab");
+        assert_eq!(drained("abcd", 0.5 + 1.0 / 32.0), "ab▏", "an eighth into the third cell");
+        assert_eq!(drained("abcd", 0.0), "");
     }
 
     #[test]

@@ -42,6 +42,8 @@ const MOST_GAP: usize = 6;
 const LABEL_LEAST: usize = 24;
 const MARK_CELLS: usize = 3;
 const CUT: &str = "…";
+/// The answer of a server that doesn't answer: the widest the answers column holds, so it's never narrower.
+const NO_ANSWER: &str = "✗ no answer";
 /// Each row comes in this long after the one above it, dim at first for this long; an answer flashes this long.
 const ROW_STAGGER: Duration = Duration::from_millis(35);
 const ROW_DIM: Duration = Duration::from_millis(120);
@@ -135,7 +137,7 @@ fn note_answers(ui: &mut Ui) {
 fn answer(ui: &Ui, server: &str) -> Seg {
     match reach_of(ui, server) {
         Some(Reach::Up(ms)) => seg(format!("● {ms} ms"), C::Green),
-        Some(Reach::Down) => seg("✗ no answer", C::Red),
+        Some(Reach::Down) => seg(NO_ANSWER, C::Red),
         Some(Reach::Checking) => {
             let lit = ui.reduced_motion || ui.tick() % 4 < 2;
             seg("◌ checking", if lit { C::Yellow } else { C::DarkYellow })
@@ -171,11 +173,13 @@ fn parts(ui: &Ui, controller: &Controller, entry: &Entry) -> [Seg; 5] {
     [label, answer(ui, &entry.server), seg(apps, C::Gray), pending, seg(last, C::DarkGray)]
 }
 
-/// Each column's width and the gap between them for `cells`: each as wide as the most it holds (its title at least);
-/// the database and server get what the others leave, down to [`LABEL_LEAST`]; what's still left widens the gaps.
+/// Each column's width and the gap between them for `cells`: each as wide as the most it holds (its title at least,
+/// the answers as wide as [`NO_ANSWER`] so an answer coming in doesn't shift the columns after it); the database and
+/// server get what the others leave, down to [`LABEL_LEAST`]; what's still left widens the gaps.
 fn widths(all: &[[Seg; 5]], cells: usize) -> ([usize; 5], usize) {
     let most = |at: usize| all.iter().map(|parts| parts[at].text.width()).chain([TITLES[at].width()]).max();
     let mut widths: [usize; 5] = std::array::from_fn(|at| most(at).unwrap_or_default());
+    widths[1] = widths[1].max(NO_ANSWER.width());
     let others = MARK_CELLS + widths[1..].iter().sum::<usize>() + GAP * (TITLES.len() - 1);
     widths[0] = widths[0].min(cells.saturating_sub(others)).max(LABEL_LEAST);
     let left = cells.saturating_sub(others + widths[0]);
@@ -319,6 +323,15 @@ mod tests {
         assert_eq!(widths(&all, 40).0[0], LABEL_LEAST, "never narrower than that");
         assert_eq!(cell(long, 10), "shop-orde…");
         assert_eq!(cell("so", 4), "so  ");
+    }
+
+    #[test]
+    fn the_answers_column_keeps_its_width_as_answers_come_in() {
+        let answered = [entry("shop")];
+        let mut checking = [entry("shop")];
+        checking[0][1] = seg("◌ checking", C::Yellow);
+        assert_eq!(widths(&checking, 120), widths(&answered, 120), "◌ checking → ● 1 ms: nothing after it moves");
+        assert_eq!(widths(&answered, 120).0[1], NO_ANSWER.width());
     }
 
     #[test]

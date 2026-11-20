@@ -7,8 +7,11 @@ use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::requests::{Request, endpoints};
 use lazyrunner_core::run::waterfall::{self, Kind, Span, Waterfall};
 
+use std::time::{Duration, Instant};
+
 use super::Ui;
 use super::icons::{self, Icon};
+use super::motion::FLASH;
 use super::seg::{EIGHTHS, Seg, seg};
 use super::theme::C;
 
@@ -39,6 +42,12 @@ const PULSE_SHARE: f64 = 0.2;
 /// The running requests shown at most, and their bars' cells.
 const MOST_RUNNING: usize = 3;
 const RUNNING_BAR: usize = 30;
+/// A finished request's row stays this long, its bar flashing for `FLASH` of it; the running slot gives back room it
+/// hasn't needed for `SLOT_IDLE`.
+const LINGER: Duration = Duration::from_millis(300);
+const SLOT_IDLE: Duration = Duration::from_secs(1);
+/// A request answered with this status or above went wrong.
+const FAILED_STATUS: u16 = 400;
 
 /// A bar's cells: how many eighths of each it fills (none: empty).
 type Cells = Vec<Option<usize>>;
@@ -291,41 +300,135 @@ pub(super) fn reveal(ui: &Ui) -> Option<f64> {
 
 /// Whether a request's timeline is being swept in.
 pub fn animating(ui: &Ui) -> bool {
-    matches!(&ui.overlay, Some(super::Overlay::Requests(view)) if view.details) && reveal(ui).is_some()
+    let requests = matches!(&ui.overlay, Some(super::Overlay::Requests(_)));
+    (requests && super::stack::moving(ui) && ui.requests_running.moving())
+        || matches!(&ui.overlay, Some(super::Overlay::Requests(view)) if view.details) && reveal(ui).is_some()
 }
 
-/// The requests running now, each with its timeline so far growing at the right edge: what's served while you look.
-pub(super) fn running_rows(controller: &Controller, now: std::time::Instant, width: usize) -> Vec<Vec<Seg>> {
-    let mut lines = Vec::new();
+/// A row of the running slot: its request (its app, and the app's line count at its start), its label and its bar,
+/// and - once it finished - whether it went well, and when.
+#[derive(Debug)]
+struct Slot {
+    key: (String, u64),
+    label: Vec<Seg>,
+    bar: Vec<Seg>,
+    finished: Option<(bool, Instant)>,
+}
+
+/// The requests view's running slot: steady in height - growing when more run, shrinking only after it has had room
+/// to spare a moment - each finished request's row staying a moment, its bar flashing green or red, before it frees
+/// its place.
+#[derive(Debug, Default)]
+pub struct Running {
+    slots: Vec<Slot>,
+    height: usize,
+    spare_since: Option<Instant>,
+    drawn: Option<Instant>,
+}
+
+impl Running {
+    /// The slot's rows for this frame, `width` wide; `moving` off (reduced motion): a finished row goes at once.
+    pub(super) fn rows(&mut self, controller: &Controller, now: Instant, width: usize, moving: bool) -> Vec<Vec<Seg>> {
+        if self.drawn.is_none_or(|drawn| now.saturating_duration_since(drawn) > SLOT_IDLE) {
+            *self = Self::default(); // the view wasn't open: what ran meanwhile isn't news
+        }
+        self.drawn = Some(now);
+        let live = live(controller, now);
+        for slot in &mut self.slots {
+            match live.iter().find(|now| now.key == slot.key) {
+                Some(now) => (slot.label, slot.bar) = (now.label.clone(), now.bar.clone()),
+                None if slot.finished.is_none() => slot.finished = Some((went_well(controller, &slot.key), now)),
+                None => {}
+            }
+        }
+        let staying = |at: Instant| moving && now.saturating_duration_since(at) < LINGER;
+        self.slots.retain(|slot| slot.finished.is_none_or(|(_, at)| staying(at)));
+        for slot in live {
+            if !self.slots.iter().any(|shown| shown.key == slot.key) {
+                self.slots.push(slot);
+            }
+        }
+        let mut lines: Vec<Vec<Seg>> = self.slots.iter().map(|slot| slot_row(slot, now, width)).collect();
+        if lines.len() > MOST_RUNNING {
+            let more = lines.len() - MOST_RUNNING;
+            lines.truncate(MOST_RUNNING);
+            lines.push(vec![seg(format!(" ⋯ {more} more running"), C::DarkGray)]);
+        }
+        let spare = now.saturating_duration_since(*self.spare_since.get_or_insert(now));
+        if lines.len() >= self.height || spare >= SLOT_IDLE {
+            (self.height, self.spare_since) = (lines.len(), None);
+        }
+        lines.resize(self.height, Vec::new());
+        lines
+    }
+
+    /// Whether the slot moves: a finished row flashing, or room to spare it gives back in a moment.
+    pub fn moving(&self) -> bool {
+        self.spare_since.is_some() || self.slots.iter().any(|slot| slot.finished.is_some())
+    }
+}
+
+/// The requests running now, each with its label and its timeline so far, to an eighth of a cell.
+fn live(controller: &Controller, now: Instant) -> Vec<Slot> {
+    let mut found = Vec::new();
     for (app, state) in controller.apps.iter().zip(&controller.states) {
         for (started, from, at) in state.in_flight().running() {
             let fall = waterfall::running(&state.output, from, at, now);
             let scale = Scale { ms: fall.ms.max(1.0), cells: RUNNING_BAR };
-            let mut cells = vec![seg("░", C::DarkGray); RUNNING_BAR];
+            let mut cells: Vec<Option<(usize, C)>> = vec![None; RUNNING_BAR];
             for span in fall.spans.iter().filter(|span| span.kind != Kind::Exception) {
                 let color = if span.kind == Kind::Db { C::DarkCyan } else { C::Blue };
                 for (cell, filled) in scale.bar(span.start, span.end()).into_iter().enumerate() {
-                    if filled.is_some() {
-                        cells[cell] = seg("█", color);
+                    if let Some(filled) = filled.filter(|filled| cells[cell].is_none_or(|(had, _)| *filled > had)) {
+                        cells[cell] = Some((filled, color));
                     }
                 }
             }
+            let cell = |cell: Option<(usize, C)>| match cell {
+                Some((filled, color)) => seg(EIGHTHS[filled - 1], color),
+                None => seg(HATCH, C::DarkGray),
+            };
+            let mut bar: Vec<Seg> = cells.into_iter().map(cell).collect();
             if fall.spans.iter().any(|span| span.kind == Kind::Exception) {
-                cells[RUNNING_BAR - 1] = seg("✗", C::Red);
+                bar[RUNNING_BAR - 1] = seg("✗", C::Red);
             }
-            let mut line = vec![seg(format!(" ⋯ {} {} {} ", app.name, started.method, started.path), C::Yellow)];
-            line.push(seg(format!("running {:.1} s ▕", fall.ms / 1000.0), C::DarkGray));
-            line.extend(cells);
-            line.push(seg("▏", C::DarkGray));
-            lines.push(super::columns::fit(line, width));
+            let label = vec![
+                seg(format!(" ⋯ {} {} {} ", app.name, started.method, started.path), C::Yellow),
+                seg(format!("running {:.1} s ▕", fall.ms / 1000.0), C::DarkGray),
+            ];
+            found.push(Slot { key: (app.key.clone(), from), label, bar, finished: None });
         }
     }
-    if lines.len() > MOST_RUNNING {
-        let more = lines.len() - MOST_RUNNING;
-        lines.truncate(MOST_RUNNING);
-        lines.push(vec![seg(format!(" ⋯ {more} more running"), C::DarkGray)]);
+    found
+}
+
+/// Whether the request `key` names went well, once it's among the requests served (a status under 400).
+fn went_well(controller: &Controller, (app, from): &(String, u64)) -> bool {
+    let request = controller
+        .requests
+        .items
+        .iter()
+        .rev()
+        .find(|request| request.app == *app && request.logs.is_some_and(|(first, _)| first == from + 1));
+    request.is_none_or(|request| request.status < FAILED_STATUS)
+}
+
+/// A slot's row: its bar flashing green or red for a moment once its request finished, dim after.
+fn slot_row(slot: &Slot, now: Instant, width: usize) -> Vec<Seg> {
+    let mut line = slot.label.clone();
+    match slot.finished {
+        Some((well, at)) => {
+            let color = match (now.saturating_duration_since(at) < FLASH, well) {
+                (false, _) => C::DarkGray,
+                (true, true) => C::Green,
+                (true, false) => C::Red,
+            };
+            line.extend(slot.bar.iter().map(|cell| Seg { fg: color, ..cell.clone() }));
+        }
+        None => line.extend(slot.bar.iter().cloned()),
     }
-    lines
+    line.push(seg("▏", C::DarkGray));
+    super::columns::fit(line, width)
 }
 
 /// The milliseconds under the bars: round ticks as far apart as they fit.
@@ -370,4 +473,41 @@ pub(super) fn compare(request: &Request, baseline: &Request, width: usize) -> Ve
         ]);
     }
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn later(start: Instant, ms: u64) -> Instant {
+        start + Duration::from_millis(ms)
+    }
+
+    #[test]
+    fn a_finished_request_stays_a_moment_flashing_and_the_slot_keeps_its_height_until_idle() {
+        let (_temp, controller) = super::super::tests::controller("running-slot");
+        let start = Instant::now();
+        let mut running = Running::default();
+        assert!(running.rows(&controller, start, 60, true).is_empty(), "nothing running: no slot");
+        let slot = |at: u64| Slot {
+            key: ("orders".into(), at),
+            label: vec![seg(" ⋯ GET /orders ", C::Yellow)],
+            bar: vec![seg("█", C::Blue)],
+            finished: None,
+        };
+        running.slots = vec![slot(1), slot(2)];
+        let finished = running.rows(&controller, later(start, 10), 60, true);
+        assert_eq!(finished.len(), 2, "both finished: their rows stay a moment");
+        assert!(finished.iter().all(|row| row.iter().any(|part| part.text == "█" && part.fg == C::Green)), "flashing");
+        assert!(running.moving());
+        let gone = running.rows(&controller, later(start, 10 + 400), 60, true);
+        assert_eq!(gone.len(), 2, "freed, but the slot keeps its height a moment");
+        assert!(gone.iter().all(Vec::is_empty));
+        let idle = running.rows(&controller, later(start, 10 + 400 + 1000), 60, true);
+        assert!(idle.is_empty(), "idle a while: it gives the room back");
+        assert!(!running.moving());
+        running.slots = vec![slot(3)];
+        running.rows(&controller, later(start, 1500), 60, false);
+        assert!(running.slots.is_empty(), "reduced motion: a finished row goes at once");
+    }
 }

@@ -2,7 +2,7 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-        ┌─ lazyrunner v<version> · changelog ──────────────────────────────────────────────────────────┐
+ ▸ ◆ Ord┌─ lazyrunner v<version> · changelog ──────────────────────────────────────────────────────────┐ stopped
         │ │   • change 3                                                                             │
         │ │   • change 4                                                                             │
         │ │   • change 5                                                                             │
@@ -12,19 +12,19 @@ expression: screen.frame()
         │ │   • change 9                                                                             │
         │ │   • change 10                                                                            │
         │ │   • change 11                                                                            │
-        │ │   • change 12                                                                            │
+  not st│ │   • change 12                                                                            │
         │ │   • change 13                                                                            │
-        │ │   • change 14                                                                            │
+  port 4│ │   • change 14                                                                            │yet
         │ │   • change 15                                                                            │
-        │ │   • change 16                                                                            │
-        │ │   • change 17                                                                            │
-        │ │   • change 18                                                                            │
+   u  st│ │   • change 16                                                                            │ free
+   b  bu│ │   • change 17                                                                            │
+   U  st│ │   • change 18                                                                            │
         │ │   • change 19                                                                            │
         │ │   • change 20                                                                            │
         │ │   • change 21                                                                            │
         │ 3-21 of 40 · j k scroll · Esc closes                                                       │
         └────────────────────────────────────────────────────────────────────────────────────────────┘
-
+                     ┃                     │                     │                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

@@ -3,6 +3,21 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.105.0] - 2026-11-20
+
+### Changed
+- Every box closes as it opens: the `x` menu, the settings, `y`, `i`, the About box, the y/n box and the others wipe closed towards their middle instead of vanishing in a frame, showing the chosen row pressed for a frame first when Enter chose it. A box that opens another (the `x` menu's `y`) doesn't close first.
+- A box is drawn over what it was opened from - the columns, or the view behind it - dimmed instead of a blank screen, so the migrations' y/n box shows the rail it asks about. What's dimmed behind a box can't be clicked.
+- The y/n box looks as risky as what it does: a yellow border for a revert, red when a step drops or deletes data, and `y` and `n` as keycaps.
+- `z` glides: the focused column grows to the whole width as the others narrow away, and back, side by side and stacked.
+- Zooming out of a flame chart frame (Backspace) glides, the frame shrinking back to its place in its caller, as zooming in does.
+- The panel's header fits its width: the summary first, then the chips (cut with `…`), then the branch, the database and the folder - the folder going first - instead of being cut mid-word. A failed task's error is cut short, "starting (1/3 up)…" has a spinner and a bar of the apps up, "something failed" the exited icon, and a passed task's chip drains away from the right so the header closes up instead of jumping.
+- The requests view's running requests keep a slot of steady height instead of pushing the list down and up for every short request: a finished one stays a moment, its bar flashing green or red, and the slot shrinks only after it has been idle a moment. Their bars fill to an eighth of a cell.
+- The database screen's columns no longer shift as the servers' answers come in.
+- The tests view's details wipe in from the top as another suite is picked; the snapshot's shutter closes from the top and bottom edges and opens again; a column's sparklines are braille, two samples a cell, in half the width.
+- The startup doctor's bar of checks done, a task's bar, a migration run's bar, a breach building up in Health and the fixed changes' count are rows of small rectangles again, `▰▰▰▱▱`: 1.103.0 drew their filled part as full-height blocks beside the small empty ones.
+- None of it moves with reduced motion.
+
 ## [1.104.0] - 2026-11-20
 
 ### Added

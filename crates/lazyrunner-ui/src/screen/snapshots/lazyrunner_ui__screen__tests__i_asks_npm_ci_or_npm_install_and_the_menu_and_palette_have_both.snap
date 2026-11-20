@@ -2,29 +2,29 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-
-
-
-
-
-
-
-
-
+ ◆ Orders   ○ stopped┬ ■ Billing   ○ stoppe┳ ▸ ■ Shop   ○ stopped┳ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
+                     │                     ┃   dev server · dev  ┃   watch build · wat…│   live · dev
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃          ■          ┃                     │
        ┌─ Install Shop's packages ────────────────────────────────────────────────────────────────────┐
        │   c  npm ci  a clean install of exactly what package-lock.json says                          │
        │   n  npm install  adds and updates packages to match package.json (the lock file may change) │
-       │ c or n, or j k + Enter · Esc / i close                                                       │
+  not s│ c or n, or j k + Enter · Esc / i close                                                       │et
        └──────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-
-
-
-
-
-
-
+  port 47201 · free  │  port 47202 · free  ┃   u  starts it      ┃                     │  port 47303 · free
+                     │                     ┃   U  starts all     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
+                     │                     ┃                     ┃                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   U  start all                            :  commands   x  menu   ?  keys   ,  settings   q  quit

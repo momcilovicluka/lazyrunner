@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use lazyrunner_core::config::Toggle;
 
 use super::mouse::Target;
+use super::seg::Seg;
 
 /// A flash where something happened: long enough to be seen, short enough to never be waited for.
 pub const FLASH: Duration = Duration::from_millis(220);
@@ -86,6 +87,9 @@ impl Spot {
     }
 }
 
+/// Sizes along one direction - column widths, stacked heights - by the keys they're for, and the glide they're on.
+type Sizes = Option<(Vec<usize>, Glide<Vec<f64>>)>;
+
 /// Where a glide started, where it goes, and when it set off.
 #[derive(Clone, Debug)]
 struct Glide<T> {
@@ -105,7 +109,8 @@ pub struct Motion {
     opened: Option<Instant>,
     /// The column focused last frame: a new one pulses.
     focus: Option<usize>,
-    widths: Option<(Vec<usize>, Glide<Vec<f64>>)>,
+    widths: Sizes,
+    heights: Sizes,
     scrolls: HashMap<usize, Glide<f64>>,
     bar: Option<Glide<usize>>,
     /// Which of a box's lists the bar is on (`bar_of`), and whether a frame drew it: one that didn't forgets it.
@@ -113,6 +118,10 @@ pub struct Motion {
     bar_drawn: bool,
     /// The palette Enter closed: its search, the chosen item, and when.
     closing: Option<(String, usize, Instant)>,
+    /// Enter was pressed in a box since the last frame; the box that closed last: its rows, whether Enter chose
+    /// something in it, and when.
+    chose: bool,
+    box_closing: Option<(Vec<Vec<Seg>>, bool, Instant)>,
     /// Whether each row `reach` was told about was in its good state last frame.
     reached: HashMap<String, bool>,
 }
@@ -127,11 +136,14 @@ impl Default for Motion {
             opened: None,
             focus: None,
             widths: None,
+            heights: None,
             scrolls: HashMap::new(),
             bar: None,
             bar_list: "",
             bar_drawn: false,
             closing: None,
+            chose: false,
+            box_closing: None,
             reached: HashMap::new(),
         }
     }
@@ -250,34 +262,17 @@ impl Motion {
     }
 
     /// The column widths to draw for these columns (`keys`) going to `target`: from where they were towards it when
-    /// it changed, the same total each frame. Another set of columns (zoom, more or fewer apps) starts where it is.
+    /// it changed, the same total each frame. A column going to 0 (zoom) reaches it; another set of columns (more or
+    /// fewer apps) starts where it is.
     pub fn widths(&mut self, keys: &[usize], target: Vec<usize>, now: Instant) -> Vec<usize> {
-        let as_floats = |widths: &[usize]| widths.iter().map(|width| *width as f64).collect::<Vec<_>>();
-        let same_columns = self.widths.as_ref().is_some_and(|(shown_for, _)| shown_for == keys);
-        let moved = self.widths.as_ref().is_some_and(|(_, glide)| glide.to != as_floats(&target));
-        if !self.on() || !same_columns {
-            self.widths = Some((keys.to_vec(), Glide { from: as_floats(&target), to: as_floats(&target), at: now }));
-            return target;
-        }
-        if moved {
-            let current = self.width_floats(now);
-            self.widths = Some((keys.to_vec(), Glide { from: current, to: as_floats(&target), at: now }));
-        }
-        let shown = self.width_floats(now);
-        let mut widths: Vec<usize> = shown.iter().map(|width| (width.round() as usize).max(1)).collect();
-        // Rounding mustn't change the total: the last column takes the difference.
-        let total: usize = target.iter().sum();
-        let others: usize = widths.iter().rev().skip(1).sum();
-        if let Some(last) = widths.last_mut() {
-            *last = total.saturating_sub(others).max(1);
-        }
-        widths
+        let on = self.on();
+        glide_sizes(&mut self.widths, on, keys, target, now)
     }
 
-    fn width_floats(&self, now: Instant) -> Vec<f64> {
-        let Some((_, glide)) = &self.widths else { return Vec::new() };
-        let done = ease(progress(glide.at, now, GLIDE));
-        glide.from.iter().zip(&glide.to).map(|(from, to)| from + (to - from) * done).collect()
+    /// `widths` for the stacked layout's heights.
+    pub fn heights(&mut self, keys: &[usize], target: Vec<usize>, now: Instant) -> Vec<usize> {
+        let on = self.on();
+        glide_sizes(&mut self.heights, on, keys, target, now)
     }
 
     /// The scroll to draw for column `app` going to `target` (lines back from the newest).
@@ -365,6 +360,52 @@ impl Motion {
         Some((query.clone(), *index, phase))
     }
 
+    /// Enter was pressed in a box: if that closes it, it shows pressed first.
+    pub fn chose(&mut self) {
+        self.chose = true;
+    }
+
+    /// Whether Enter was pressed in a box since the last frame (asked once a frame).
+    pub fn take_chose(&mut self) -> bool {
+        std::mem::take(&mut self.chose)
+    }
+
+    /// A box closed (its last frame's `rows`): it wipes closed towards its middle - shown pressed first when Enter
+    /// `chose` something in it.
+    pub fn close_box(&mut self, rows: Vec<Vec<Seg>>, chose: bool, now: Instant) {
+        if self.on() {
+            let rows = rows.into_iter().map(|row| row.into_iter().map(|part| Seg { target: None, ..part }).collect());
+            self.box_closing = Some((rows.collect(), chose, now));
+        }
+    }
+
+    /// The box closing, while it does: its rows, and how far along.
+    pub fn box_closing(&self, now: Instant) -> Option<(&Vec<Vec<Seg>>, Closing)> {
+        let (rows, chose, at) = self.box_closing.as_ref().filter(|_| self.on())?;
+        let elapsed = now.saturating_duration_since(*at);
+        let pressed = if *chose { PRESS } else { Duration::ZERO };
+        let phase = if elapsed < pressed {
+            Closing::Pressed
+        } else if elapsed < pressed + WIPE {
+            Closing::Wiping(1.0 - (elapsed - pressed).as_secs_f64() / WIPE.as_secs_f64())
+        } else {
+            return None;
+        };
+        Some((rows, phase))
+    }
+
+    /// The selection bar as it is, to put back after drawing what's behind a box (which has a list of its own).
+    pub fn kept_bar(&self) -> (Option<(usize, usize, Instant)>, &'static str, bool) {
+        let bar = self.bar.as_ref().map(|glide| (glide.from, glide.to, glide.at));
+        (bar, self.bar_list, self.bar_drawn)
+    }
+
+    /// Puts back the selection bar `kept_bar` kept.
+    pub fn restore_bar(&mut self, (bar, list, drawn): (Option<(usize, usize, Instant)>, &'static str, bool)) {
+        self.bar = bar.map(|(from, to, at)| Glide { from, to, at });
+        (self.bar_list, self.bar_drawn) = (list, drawn);
+    }
+
     /// Whether something is still moving (the next frame differs).
     pub fn active(&self, now: Instant) -> bool {
         if !self.on() {
@@ -373,11 +414,44 @@ impl Motion {
         let gliding = |at: Instant| progress(at, now, GLIDE) < 1.0;
         !self.flashes.is_empty()
             || self.revealed(now) < 1.0
-            || self.widths.as_ref().is_some_and(|(_, glide)| gliding(glide.at))
+            || [&self.widths, &self.heights].into_iter().flatten().any(|(_, glide)| gliding(glide.at))
             || self.scrolls.values().any(|glide| gliding(glide.at))
             || self.bar.as_ref().is_some_and(|glide| self.bar_at(now) != glide.to)
             || self.palette_closing(now).is_some()
+            || self.box_closing(now).is_some()
     }
+}
+
+/// Sizes for `keys` going to `target` on the glide in `slot`; at once when `on` is off or the keys changed.
+fn glide_sizes(slot: &mut Sizes, on: bool, keys: &[usize], target: Vec<usize>, now: Instant) -> Vec<usize> {
+    let as_floats = |sizes: &[usize]| sizes.iter().map(|size| *size as f64).collect::<Vec<_>>();
+    let same_keys = slot.as_ref().is_some_and(|(shown_for, _)| shown_for == keys);
+    let moved = slot.as_ref().is_some_and(|(_, glide)| glide.to != as_floats(&target));
+    if !on || !same_keys {
+        *slot = Some((keys.to_vec(), Glide { from: as_floats(&target), to: as_floats(&target), at: now }));
+        return target;
+    }
+    if moved {
+        let current = size_floats(slot, now);
+        *slot = Some((keys.to_vec(), Glide { from: current, to: as_floats(&target), at: now }));
+    }
+    let least = |at: usize| usize::from(target[at] > 0);
+    let shown = size_floats(slot, now);
+    let mut sizes: Vec<usize> =
+        shown.iter().enumerate().map(|(at, size)| (size.round() as usize).max(least(at))).collect();
+    // Rounding mustn't change the total: the last takes the difference.
+    let total: usize = target.iter().sum();
+    let others: usize = sizes.iter().rev().skip(1).sum();
+    if let Some(last) = sizes.last_mut() {
+        *last = total.saturating_sub(others).max(least(target.len() - 1));
+    }
+    sizes
+}
+
+fn size_floats(slot: &Sizes, now: Instant) -> Vec<f64> {
+    let Some((_, glide)) = slot else { return Vec::new() };
+    let done = ease(progress(glide.at, now, GLIDE));
+    glide.from.iter().zip(&glide.to).map(|(from, to)| from + (to - from) * done).collect()
 }
 
 #[cfg(test)]
@@ -444,9 +518,23 @@ mod tests {
         let middle = motion.widths(&[0, 1], vec![70, 30], later(start, 40));
         assert!(middle[0] > 50 && middle[0] < 70 && middle.iter().sum::<usize>() == 100, "{middle:?}");
         assert_eq!(motion.widths(&[0, 1], vec![70, 30], later(start, 200)), [70, 30]);
-        assert_eq!(motion.widths(&[1], vec![100], later(start, 210)), [100], "zoomed: no glide");
+        assert_eq!(motion.widths(&[1], vec![100], later(start, 210)), [100], "fewer columns: no glide");
         motion.enabled = false;
         assert_eq!(motion.widths(&[0, 1], vec![10, 90], later(start, 220)), [10, 90]);
+    }
+
+    #[test]
+    fn zooming_glides_the_others_to_nothing_and_back() {
+        let (mut motion, start) = (Motion::default(), Instant::now());
+        motion.heights(&[0, 1, 2], vec![30, 30, 40], start);
+        assert_eq!(motion.heights(&[0, 1, 2], vec![0, 100, 0], later(start, 1)), [30, 30, 40]);
+        let middle = motion.heights(&[0, 1, 2], vec![0, 100, 0], later(start, 40));
+        assert!(middle[1] > 30 && middle[1] < 100 && middle.iter().sum::<usize>() == 100, "{middle:?}");
+        assert_eq!(motion.heights(&[0, 1, 2], vec![0, 100, 0], later(start, 200)), [0, 100, 0], "zoomed: none left");
+        let back = motion.heights(&[0, 1, 2], vec![30, 30, 40], later(start, 210));
+        assert!(back[0] >= 1 && back[2] >= 1, "unzooming: they grow back from a cell {back:?}");
+        motion.reduced = true;
+        assert_eq!(motion.heights(&[0, 1, 2], vec![0, 100, 0], later(start, 220)), [0, 100, 0], "reduced: at once");
     }
 
     #[test]
@@ -496,6 +584,28 @@ mod tests {
         assert!((left - 0.5).abs() < 0.01, "{left}");
         assert_eq!(motion.palette_closing(later(start, 80)), None);
         assert!(!motion.active(later(start, 80)));
+    }
+
+    #[test]
+    fn a_box_closes_pressed_when_enter_chose_something_then_wipes() {
+        let (mut motion, start) = (Motion::default(), Instant::now());
+        motion.close_box(
+            vec![vec![crate::screen::seg::seg("x", crate::screen::theme::C::Gray).at(Target::Box)]],
+            true,
+            start,
+        );
+        let Some((rows, Closing::Pressed)) = motion.box_closing(start) else { panic!() };
+        assert!(rows[0][0].target.is_none(), "a closing box isn't clickable");
+        assert!(matches!(motion.box_closing(later(start, 16 + 30)), Some((_, Closing::Wiping(_)))));
+        assert!(motion.active(later(start, 40)));
+        assert!(motion.box_closing(later(start, 16 + 60)).is_none());
+        motion.close_box(Vec::new(), false, start);
+        assert!(matches!(motion.box_closing(start), Some((_, Closing::Wiping(left))) if left == 1.0), "Esc: no press");
+        motion.reduced = true;
+        assert!(motion.box_closing(start).is_none(), "reduced motion: gone at once");
+        motion.close_box(Vec::new(), false, start);
+        motion.reduced = false;
+        assert!(motion.box_closing(later(start, 100)).is_none());
     }
 
     #[test]

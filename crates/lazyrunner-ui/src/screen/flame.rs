@@ -148,6 +148,14 @@ fn layout_from(profile: &Profile, zoom: usize, room: usize, at: (f64, f64)) -> V
     bars
 }
 
+/// Where to draw `parent` so its callee `child` - the frame zoomed out of - fills the full width: the chart glides from
+/// there to `parent` at the full width, `child` shrinking back to its place.
+fn zoomed_out(profile: &Profile, parent: usize, child: usize, (cells, room): (usize, usize)) -> Option<(f64, f64)> {
+    let slot = layout(profile, parent, (cells, room)).into_iter().find(|bar| bar.node == child && bar.depth == 1)?;
+    let scale = cells as f64 / slot.width.max(1) as f64;
+    Some((-(slot.x as f64) * scale, cells as f64 * scale))
+}
+
 /// How far along `since` is in `length`, eased out; none once it's over or with motion off.
 fn progress(ui: &Ui, since: Instant, length: Duration) -> Option<f64> {
     let elapsed = ui.now.saturating_duration_since(since);
@@ -253,7 +261,10 @@ fn chart(ui: &Ui, controller: &Controller, view: &View, profile: &Profile, size:
         usize::MAX
     };
     let mut bars = layout_from(profile, view.zoom, room, at);
-    bars.retain(|bar| bar.depth < bloomed);
+    bars.retain(|bar| bar.depth < bloomed && bar.x < cells);
+    for bar in &mut bars {
+        bar.width = bar.width.min(cells - bar.x); // zooming out, the frames start wider than the chart
+    }
     let changes = changes(controller, view);
     let depth = bars.iter().map(|bar| bar.depth + 1).max().unwrap_or(0);
     (0..depth)
@@ -531,7 +542,11 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &crossterm
         }
         "Backspace" => {
             next.zoom = profile.nodes[current.zoom].parent.unwrap_or(0);
-            (next.zoomed, next.crumb) = (None, Some(ui.now));
+            next.zoomed = (next.zoom != current.zoom)
+                .then(|| zoomed_out(&profile, next.zoom, current.zoom, current.size))
+                .flatten()
+                .map(|(x, width)| (ui.now, x, width));
+            next.crumb = Some(ui.now);
         }
         "g" => (next.zoom, next.picked, next.crumb) = (0, 0, Some(ui.now)),
         "/" => (next.typing, next.query) = (true, String::new()),
@@ -617,5 +632,12 @@ mod tests {
             (Some(40), Some(40), Some(30), Some(10))
         );
         assert_eq!(colour("Shop.Pricing"), colour("Shop.Pricing"));
+        let main = bars.iter().find(|bar| profile.name(bar.node).contains("Main")).unwrap().node;
+        let tax = bars.iter().find(|bar| profile.name(bar.node).contains("Tax")).unwrap().node;
+        let (x, wide) = zoomed_out(&profile, main, tax, (40, 10)).unwrap();
+        assert_eq!((x, wide), (-120.0, 160.0), "Tax is the last 10 of 40: Main 4 times as wide, Tax at the left edge");
+        let first = layout_from(&profile, main, 10, (x, wide));
+        let tax_at = first.iter().find(|bar| bar.node == tax).map(|bar| (bar.x, bar.width));
+        assert_eq!(tax_at, Some((0, 40)), "zooming out starts with Tax filling the chart");
     }
 }

@@ -452,6 +452,8 @@ pub struct Ui {
     /// The tests view's filter by name (`/`), and whether it's being typed.
     pub tests_query: String,
     pub tests_typing: bool,
+    /// The suite the tests view's details were last of, and when it was picked (the details wipe in).
+    pub tests_detail: Option<(Option<String>, Instant)>,
     /// What the tests view saw of what changes affect (#78).
     pub tests_impact: suite_impact::Seen,
     /// Where the stack map's dots are along their edges (K, #51).
@@ -464,6 +466,10 @@ pub struct Ui {
     pub health_chart: usize,
     /// How the Health tab orders its cards (`s`), by its place in `health::SORTS`; the target `,` edits.
     pub health_sort: usize,
+    /// The rows of the box the last frame drew over its context (it wipes closed from them).
+    pub last_box: Option<Vec<Vec<Seg>>>,
+    /// The requests view's slot of requests running now (steady in height, finished ones staying a moment).
+    pub requests_running: request_waterfall::Running,
     /// The request whose timeline last opened, and when (its playhead sweeps from then, #97).
     pub waterfall_seen: Option<(u64, Instant)>,
     /// The screen shown last frame, and the last switch: from which to which, when (the new one slides in).
@@ -619,12 +625,15 @@ impl Ui {
             tests_run: None,
             tests_query: String::new(),
             tests_typing: false,
+            tests_detail: None,
             tests_impact: suite_impact::Seen::default(),
             stack_dots: stack::Dots::default(),
             stack_tab: stack::Tab::default(),
             health_columns: 1,
             health_chart: 0,
             health_sort: 0,
+            last_box: None,
+            requests_running: request_waterfall::Running::default(),
             waterfall_seen: None,
             last_screen: None,
             screen_change: None,
@@ -898,6 +907,7 @@ impl Ui {
             || panel::sliding(self)
             || controller.test_watch.runs_in(self.now).is_some()
             || suites::sweeping(self, controller)
+            || suites::wiping(self)
             || suite_impact::animating(self)
             || rail_motion::animating(self)
             || diff::animating(self)
@@ -944,9 +954,15 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
     ui.marquees.borrow_mut().values_mut().for_each(|(_, seen)| *seen = false);
     seen::update(ui, controller);
     let typing = ui.search.as_ref().is_some_and(|search| search.typing);
-    if ui.overlay.is_none() && ui.picker.is_none() && !typing {
+    let (shown_box, chose) = (ui.last_box.take(), ui.motion.take_chose());
+    let closed = ui.overlay.is_none() && ui.picker.is_none() && !typing;
+    if closed {
         editor::settle(ui);
         ui.overlay = ui.behind.take(); // what was opened from a view closed: the view again
+    }
+    // A box that closed - not one another box or a screen took the place of - wipes closed over what's back.
+    if let Some(rows) = shown_box.filter(|_| closed && !ui.overlay.as_ref().is_some_and(boxed_over)) {
+        ui.motion.close_box(rows, chose, ui.now);
     }
     // A box that just appeared opens from its middle; the checklist and the theme picker have their own motion.
     let revealing = match &ui.overlay {
@@ -975,9 +991,26 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
         let panel = panel::rows(ui, controller, width);
         let body_height = height.saturating_sub(panel.len());
         let body = body(ui, controller, width, body_height);
-        // A screen switched to from another slides in; it doesn't open from its middle as well.
-        let opened = if screens::sliding(ui) { 1.0 } else { opened };
+        // A screen switched to from another slides in; it doesn't open from its middle as well; a box over its context
+        // opens over it (`under_bar`).
+        let over_context = ui.picker.is_none() && ui.overlay.as_ref().is_some_and(boxed_over);
+        let opened = if screens::sliding(ui) || over_context { 1.0 } else { opened };
         let mut rows = reveal(body, opened);
+        // A box that just closed wipes closed over what's back.
+        if !over_context
+            && ui.picker.is_none()
+            && let Some((ghost, phase)) = ui.motion.box_closing(ui.now)
+        {
+            let ghost = match phase {
+                motion::Closing::Pressed => pressed(ghost.clone()),
+                motion::Closing::Wiping(left) => reveal(ghost.clone(), left),
+            };
+            rows = rows
+                .into_iter()
+                .zip(ghost.into_iter().chain(std::iter::repeat(Vec::new())))
+                .map(|(row, line)| seg::splice(row, line))
+                .collect();
+        }
         // The palette Enter just closed wipes away over what's behind it.
         if ui.overlay.is_none()
             && ui.picker.is_none()
@@ -1023,6 +1056,47 @@ pub(super) fn reveal(rows: Vec<Vec<Seg>>, opened: f64) -> Vec<Vec<Seg>> {
         .collect()
 }
 
+/// A box's rows with its selection bar shown pressed: its colours swapped.
+fn pressed(rows: Vec<Vec<Seg>>) -> Vec<Vec<Seg>> {
+    let on_bar = |row: &Vec<Seg>| row.iter().any(|part| part.bg == Some(C::FocusBack));
+    rows.into_iter()
+        .map(|row| {
+            if !on_bar(&row) {
+                return row;
+            }
+            let swap = |part: Seg| match part.bg {
+                Some(bg) => Seg { fg: bg, bg: Some(part.fg), ..part },
+                None => part,
+            };
+            row.into_iter().map(swap).collect()
+        })
+        .collect()
+}
+
+/// Whether `overlay` is a box drawn over its context - the view it was opened from, else the columns - rather than a
+/// screen of its own (or the palette, the startup doctor, the theme picker: their own motion).
+fn boxed_over(overlay: &Overlay) -> bool {
+    matches!(
+        overlay,
+        Overlay::Menu { .. }
+            | Overlay::Settings { .. }
+            | Overlay::Copy { .. }
+            | Overlay::Install { .. }
+            | Overlay::About { .. }
+            | Overlay::BranchChanges { .. }
+            | Overlay::Confirm(_)
+            | Overlay::Changelog { .. }
+            | Overlay::Marks { .. }
+            | Overlay::Sheet { .. }
+            | Overlay::Launch { .. }
+            | Overlay::LogLevels { .. }
+            | Overlay::Repeats { .. }
+            | Overlay::ShareQr { .. }
+            | Overlay::Crashes { .. }
+            | Overlay::Places { .. }
+    )
+}
+
 /// The body: a full screen under the bar of screens, else what's open over the columns, else the columns.
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     flame::open_fresh(ui, controller);
@@ -1040,7 +1114,49 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
     lines
 }
 
+/// What's open over the columns, else the columns; a box opening from its middle over its context, dimmed.
 fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let over_context = ui.picker.is_none() && ui.overlay.as_ref().is_some_and(boxed_over);
+    let shown = overlay_rows(ui, controller, width, rows);
+    if !over_context {
+        return shown;
+    }
+    let behind = context(ui, controller, width, rows);
+    ui.last_box = Some(shown.clone());
+    let opened = reveal(shown, ui.motion.revealed(ui.now));
+    let blank = std::iter::repeat(Vec::new());
+    behind
+        .into_iter()
+        .chain(blank.clone())
+        .zip(opened.into_iter().chain(blank))
+        .take(rows)
+        .map(|(row, line)| seg::splice(row, line))
+        .collect()
+}
+
+/// What a box is drawn over: the view it was opened from (its screen's bar on top), else the columns - dimmed and
+/// still (nothing scrolls sideways or spins behind the box), nothing in it to click. The view's own selection bar is
+/// drawn without moving the box's.
+fn context(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
+    let kept = ui.motion.kept_bar();
+    let reduced = std::mem::replace(&mut ui.reduced_motion, true);
+    let shown = ui.overlay.take();
+    ui.overlay = ui.behind.take();
+    let lines = match screens::current(ui) {
+        Some(screen) => {
+            let mut lines = vec![screens::bar(ui, screen, width)];
+            lines.extend(under_bar(ui, controller, width, rows.saturating_sub(1)));
+            lines
+        }
+        None => under_bar(ui, controller, width, rows),
+    };
+    ui.behind = std::mem::replace(&mut ui.overlay, shown);
+    ui.motion.restore_bar(kept);
+    ui.reduced_motion = reduced;
+    lines.into_iter().map(seg::dim).collect()
+}
+
+fn overlay_rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     match &ui.overlay {
         Some(Overlay::Checklist(_)) => return overlays::checklist(ui, width, rows),
         _ if ui.picker.is_some() => return database::rows(ui, controller, width, rows),

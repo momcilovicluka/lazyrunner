@@ -19,6 +19,8 @@ pub struct Summary {
     pub color: C,
     /// OSC 9;4 state;progress: "1;100" green, "2;100" red, "4;100" yellow, "0;0" none.
     pub progress: &'static str,
+    /// While the apps start: how many are up of how many run (the header spins and fills a bar of them).
+    pub starting: Option<(usize, usize)>,
 }
 
 pub fn summary(controller: &Controller) -> Summary {
@@ -58,7 +60,7 @@ pub fn summary(controller: &Controller) -> Summary {
     let (progress, mark, text, color) = if !tools.is_empty() {
         ("4;100", None, tools.join(" + "), C::Yellow)
     } else if failed {
-        ("2;100", None, "something failed - see the log".into(), C::Red)
+        ("2;100", Some(Icon::Exited), "something failed - see the log".into(), C::Red)
     } else if !running.is_empty() && up < running.len() {
         ("4;100", None, format!("starting ({up}/{} up)…", running.len()), C::Yellow)
     } else if slow > 0 {
@@ -68,7 +70,8 @@ pub fn summary(controller: &Controller) -> Summary {
     } else {
         ("0;0", Some(Icon::Stopped), "stopped".into(), C::DarkGray)
     };
-    Summary { mark, text, color, progress }
+    let starting = (tools.is_empty() && !failed && up < running.len()).then_some((up, running.len()));
+    Summary { mark, text, color, progress, starting }
 }
 
 impl Summary {

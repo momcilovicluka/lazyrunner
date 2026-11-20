@@ -149,12 +149,18 @@ pub fn animating(ui: &Ui) -> bool {
     !ui.reduced_motion && ui.snapshot.is_some_and(|at| ui.now.saturating_duration_since(at) < SHUTTER)
 }
 
-/// The shutter: the screen dimmed for a moment as the snapshot is taken.
+/// How far the shutter has closed, 0 to 1, `progress` (0 to 1) through it: closing from the edges, then opening again.
+fn closed(progress: f64) -> f64 {
+    if progress < 0.5 { super::motion::ease(progress * 2.0) } else { 1.0 - super::motion::ease((progress - 0.5) * 2.0) }
+}
+
+/// The shutter as the snapshot is taken: rows dimmed from the top and bottom edges inwards, then opening again.
 pub fn paint(buf: &mut Buffer, area: Rect, ui: &Ui) {
-    if !animating(ui) {
-        return;
-    }
-    for y in area.top()..area.bottom() {
+    let Some(at) = ui.snapshot.filter(|_| animating(ui)) else { return };
+    let progress = ui.now.saturating_duration_since(at).as_secs_f64() / SHUTTER.as_secs_f64();
+    let reach = (closed(progress) * f64::from(area.height) / 2.0).ceil() as u16;
+    let shut = |y: u16| y - area.top() < reach || area.bottom() - 1 - y < reach;
+    for y in (area.top()..area.bottom()).filter(|y| shut(*y)) {
         for x in area.left()..area.right() {
             if let Some(cell) = buf.cell_mut((x, y)) {
                 cell.modifier.insert(Modifier::DIM);
@@ -340,6 +346,15 @@ fn stack(edges: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_shutter_closes_from_the_edges_and_opens_again() {
+        assert_eq!(closed(0.0), 0.0);
+        assert!(closed(0.25) > 0.5, "fast at first: {}", closed(0.25));
+        assert_eq!(closed(0.5), 1.0, "shut halfway through");
+        assert!(closed(0.75) < 0.5, "{}", closed(0.75));
+        assert_eq!(closed(1.0), 0.0, "open again");
+    }
 
     #[test]
     fn only_the_last_few_snapshots_are_kept() {

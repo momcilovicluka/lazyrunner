@@ -687,7 +687,8 @@ async fn a_long_changelog_line_wraps_beside_the_rail_and_none_is_cut_off() {
     screen.ui.overlay = Some(Overlay::Changelog { lines, top: 0, seen: None });
     for width in [60, 100, 140] {
         let frame = screen.render(width, 30);
-        assert!(!frame.contains('…'), "{width} columns: {frame}");
+        let changes = frame.lines().filter(|line| line.contains("│ │"));
+        assert!(changes.clone().count() > 0 && changes.into_iter().all(|line| !line.contains('…')), "{width}: {frame}");
         assert!(frame.contains("answer"), "{frame}");
     }
 }
@@ -1336,7 +1337,7 @@ async fn a_run_moves_the_bead_a_node_a_hop_and_says_where_it_failed() {
     let invoices = line_with(&frame, "Invoices");
     assert!(invoices.contains('●') && invoices.contains("Invoices  ◂ applying Refunds…"), "{frame}");
     assert!(line_with(&frame, "  Refunds").contains('○'), "not there yet: {frame}");
-    assert!(frame.contains("██▱▱ 1/2"), "the list's bar: {frame}");
+    assert!(frame.contains("▰▰▱▱ 1/2"), "the list's bar: {frame}");
     run.ended = Some((now - Duration::from_secs(1), Some("Invalid column name 'Total'.".into())));
     set(&mut screen, &run, Ef::Ok);
     let frame = screen.frame();
@@ -1757,6 +1758,28 @@ async fn the_tests_view_lists_the_suites_and_shows_the_failures() {
     with_suites(&mut screen);
     screen.press("T");
     insta::assert_snapshot!(screen.frame());
+}
+
+#[tokio::test]
+async fn another_suites_details_wipe_in_downwards() {
+    let mut screen = screen("tests-wipe", json!({}));
+    with_suites(&mut screen);
+    screen.ui.motion.enabled = true;
+    screen.press("T");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(200);
+    let filled = |frame: &str| {
+        frame.lines().filter(|line| line.split("│ ").nth(1).is_some_and(|right| !right.trim().is_empty())).count()
+    };
+    let open = filled(&screen.frame());
+    assert!(!super::suites::wiping(&screen.ui), "the first suite's details don't wipe in: the view opens");
+    screen.press("j");
+    screen.ui.now += Duration::from_millis(20);
+    let wiping = filled(&screen.frame());
+    assert!(super::suites::wiping(&screen.ui) && wiping < open, "{wiping} of {open}");
+    screen.ui.now += Duration::from_millis(200);
+    screen.frame();
+    assert!(!super::suites::wiping(&screen.ui));
 }
 
 #[tokio::test]
@@ -3251,7 +3274,7 @@ async fn a_box_opens_from_its_middle_without_holding_up_its_keys() {
     screen.ui.motion.enabled = true;
     screen.frame();
     screen.press(",");
-    let box_rows = |frame: &str| frame.lines().filter(|line| line.contains('│')).count();
+    let box_rows = |frame: &str| frame.lines().filter(|line| line.contains('●') || line.contains('○')).count();
     let opening = screen.frame();
     screen.press("Down");
     assert_eq!(screen.ui.overlay.as_ref().map(Overlay::kind), Some("settings"), "keys act while it opens");
@@ -3260,6 +3283,95 @@ async fn a_box_opens_from_its_middle_without_holding_up_its_keys() {
     screen.ui.now += Duration::from_millis(200);
     let open = screen.frame();
     assert!(box_rows(&opening) < box_rows(&partly) && box_rows(&partly) < box_rows(&open), "{partly}");
+}
+
+#[tokio::test]
+async fn a_box_wipes_closed_over_what_is_back_and_one_another_box_replaced_does_not() {
+    let mut screen = screen("box-close", json!({}));
+    screen.ui.motion.enabled = true;
+    screen.frame();
+    screen.press(",");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(200);
+    let box_rows = |frame: &str| frame.lines().filter(|line| line.contains('●') || line.contains('○')).count();
+    let open = box_rows(&screen.frame());
+    screen.press("Esc");
+    assert!(screen.ui.overlay.is_none(), "closed at once: keys act on the columns");
+    let closing = screen.frame();
+    assert!(closing.contains("─ Settings"), "it wipes closed from its last frame: {closing}");
+    screen.ui.now += Duration::from_millis(30);
+    let wiping = box_rows(&screen.frame());
+    assert!(wiping < open, "{wiping} rows of {open}");
+    screen.ui.now += Duration::from_millis(100);
+    assert!(!screen.frame().contains("─ Settings"), "and is gone");
+    screen.press("x");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(200);
+    screen.frame();
+    screen.press("y");
+    assert_eq!(screen.ui.overlay.as_ref().map(Overlay::kind), Some("copy"));
+    screen.frame();
+    assert!(screen.ui.motion.box_closing(screen.ui.now).is_none(), "the menu's action opened a box: no close");
+    screen.press("Esc");
+    screen.press("x");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(200);
+    screen.frame();
+    screen.press("Enter");
+    screen.frame();
+    let phase = screen.ui.motion.box_closing(screen.ui.now).map(|(_, phase)| phase);
+    assert_eq!(phase, Some(super::motion::Closing::Pressed), "Enter chose something: it shows pressed first");
+}
+
+#[tokio::test]
+async fn a_box_is_drawn_over_its_context_dimmed_and_the_context_isnt_clickable() {
+    let mut screen = screen("box-context", json!({}));
+    screen.press(",");
+    let frame = screen.frame();
+    assert!(frame.contains("─ Settings") && frame.contains("Orders"), "the columns behind the box: {frame}");
+    let behind =
+        |screen: &Screen| screen.ui.hits.iter().any(|hit| matches!(hit.target, Target::Title(_) | Target::Output(_)));
+    assert!(!behind(&screen), "what's behind the box can't be clicked");
+    screen.ui.behind = Some(Overlay::Migrations { index: 0, picking: None });
+    let lines = vec!["Revert 1 migration of Shop?".to_string()];
+    let risk = super::migrations::Risk::LosesData;
+    screen.ui.overlay = Some(Overlay::Confirm(Box::new(super::migrations::Confirm { lines, jobs: Vec::new(), risk })));
+    let confirm = screen.frame();
+    assert!(
+        confirm.contains("MIGRATIONS") && confirm.contains("Revert 1 migration"),
+        "over the view it asks about: {confirm}"
+    );
+    assert!(!behind(&screen));
+    let rows = super::migrations::confirm_rows(&screen.ui, 100, 20);
+    let top = rows.iter().find(|row| row.iter().any(|part| part.text.contains('┌'))).unwrap();
+    assert_eq!(
+        top.iter().find(|part| part.text.contains('┌')).map(|part| part.fg),
+        Some(super::theme::C::Red),
+        "it loses data"
+    );
+    let keys = rows.iter().flatten().filter(|part| part.text == " y " || part.text == " n ");
+    assert_eq!(keys.map(|part| part.bg.is_some()).collect::<Vec<_>>(), [true, true], "y and n as keycaps");
+}
+
+#[tokio::test]
+async fn zooming_glides_the_focused_column_to_the_whole_width_and_back() {
+    let mut screen = screen("zoom-glide", json!({}));
+    screen.ui.motion.enabled = true;
+    let borders = |frame: &str| frame.lines().next().unwrap_or_default().matches(['┬', '┳']).count();
+    assert_eq!(borders(&screen.frame()), 4);
+    screen.press("z");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(40);
+    assert_eq!(borders(&screen.frame()), 4, "the others narrow, still there");
+    screen.ui.now += Duration::from_millis(200);
+    assert_eq!(borders(&screen.frame()), 0, "then only the focused one");
+    screen.press("z");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(40);
+    assert_eq!(borders(&screen.frame()), 4, "unzooming, they come back growing");
+    screen.ui.now += Duration::from_millis(200);
+    screen.frame();
+    assert!(!screen.ui.motion.active(screen.ui.now), "settled");
 }
 
 #[tokio::test]
@@ -5842,7 +5954,7 @@ async fn a_branch_change_being_fixed_sweeps_its_row_and_the_header_gauges_how_ma
     screen.frame();
     screen.ui.branch_fixes.insert("a".into());
     let frame = screen.frame();
-    assert!(frame.contains("✓ 1 of 2 fixed █████▱▱▱▱▱"), "{frame}");
+    assert!(frame.contains("✓ 1 of 2 fixed ▰▰▰▰▰▱▱▱▱▱"), "{frame}");
     assert!(screen.ui.motion.sweep("branch:a", screen.ui.now).is_some(), "fixed: it sweeps");
     assert!(screen.ui.motion.sweep("branch:b", screen.ui.now).is_none());
 }

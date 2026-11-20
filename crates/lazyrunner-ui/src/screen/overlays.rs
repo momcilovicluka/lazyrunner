@@ -50,15 +50,29 @@ pub fn boxed(
     rows: usize,
     max_inner: usize,
 ) -> Vec<Vec<Seg>> {
-    draining_box(title, lines, footer, cells, rows, max_inner, None)
+    draining_box(title, lines, footer, cells, rows, max_inner, (C::Cyan, None))
 }
 
-/// A box whose bottom edge drains from the right as `drain` goes from 1 to 0: the time until it closes by itself.
+/// `boxed` with a border of its own colour: a box that asks about something that can't be undone looks it.
+pub fn boxed_in(
+    border: C,
+    title: &str,
+    lines: Vec<Vec<Seg>>,
+    footer: &str,
+    cells: usize,
+    rows: usize,
+    max_inner: usize,
+) -> Vec<Vec<Seg>> {
+    draining_box(title, lines, footer, cells, rows, max_inner, (border, None))
+}
+
 /// How wide a box's text is in a terminal `cells` wide, `max_inner` at most.
 pub fn box_inner(cells: usize, max_inner: usize) -> usize {
     cells.saturating_sub(8).min(max_inner).max(20)
 }
 
+/// A box in a `border` colour whose bottom edge drains from the right as `drain` goes from 1 to 0: the time until it
+/// closes by itself.
 fn draining_box(
     title: &str,
     lines: Vec<Vec<Seg>>,
@@ -66,14 +80,14 @@ fn draining_box(
     cells: usize,
     rows: usize,
     max_inner: usize,
-    drain: Option<f64>,
+    (border, drain): (C, Option<f64>),
 ) -> Vec<Vec<Seg>> {
     let inner = box_inner(cells, max_inner);
     let left = " ".repeat(cells.saturating_sub(inner + 4) / 2);
     let mut boxed = vec![vec![
-        seg("┌─", C::Cyan),
+        seg("┌─", border),
         seg(format!(" {title} "), C::White),
-        seg(format!("{}┐", "─".repeat(inner.saturating_sub(title.width() + 1))), C::Cyan),
+        seg(format!("{}┐", "─".repeat(inner.saturating_sub(title.width() + 1))), border),
     ]];
     for line in lines {
         let segs = limit(&line, inner); // never push the right border out
@@ -83,21 +97,21 @@ fn draining_box(
             .last()
             .and_then(|last| last.target)
             .map_or_else(|| seg(" ".repeat(room), C::Gray), |target| seg(" ".repeat(room), C::Gray).at(target));
-        let mut row = vec![seg("│ ", C::Cyan)];
+        let mut row = vec![seg("│ ", border)];
         row.extend(segs);
         row.push(padding);
-        row.push(seg(" │", C::Cyan));
+        row.push(seg(" │", border));
         boxed.push(row);
     }
     if !footer.is_empty() {
-        boxed.push(vec![seg("│ ", C::Cyan), seg(pad(footer, inner), C::DarkGray), seg(" │", C::Cyan)]);
+        boxed.push(vec![seg("│ ", border), seg(pad(footer, inner), C::DarkGray), seg(" │", border)]);
     }
     let edge = inner + 2;
     let lit = drain.map_or(edge, |drain| (drain.clamp(0.0, 1.0) * edge as f64).round() as usize);
     boxed.push(if lit == edge {
-        vec![seg(format!("└{}┘", "─".repeat(edge)), C::Cyan)]
+        vec![seg(format!("└{}┘", "─".repeat(edge)), border)]
     } else {
-        vec![seg(format!("└{}", "─".repeat(lit)), C::Cyan), seg(format!("{}┘", "─".repeat(edge - lit)), C::DarkGray)]
+        vec![seg(format!("└{}", "─".repeat(lit)), border), seg(format!("{}┘", "─".repeat(edge - lit)), C::DarkGray)]
     });
     // Inside the box a click keeps it open (an item's click picks it); the margin around it is outside.
     let boxed: Vec<Vec<Seg>> = boxed
@@ -571,7 +585,7 @@ pub fn checklist(ui: &mut Ui, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     lines.extend([countdown(ui, list, inner), vec![seg(keys_line(ui), C::DarkGray)]]);
     let sparkle = if animated { SPARKLE[(ui.tick() / 3) as usize % 2] } else { SPARKLE[0] };
     let title = format!("{sparkle} lazyrunner v{VERSION} · startup doctor");
-    draining_box(&title, lines, &list.footer, cells, rows, DOCTOR_INNER, list.draining(ui.now))
+    draining_box(&title, lines, &list.footer, cells, rows, DOCTOR_INNER, (C::Cyan, list.draining(ui.now)))
 }
 
 /// The startup checklist, while it's open.

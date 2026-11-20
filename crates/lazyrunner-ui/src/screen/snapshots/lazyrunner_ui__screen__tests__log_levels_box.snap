@@ -2,12 +2,12 @@
 source: crates/lazyrunner-ui/src/screen/tests.rs
 expression: screen.frame()
 ---
-
-
-
-
-
-
+ ▸ ◆ Orders   ○ stopp┳ ■ Billing   ○ stoppe┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
+                     ┃                     │   dev server · dev  │   watch build · wat…│   live · dev
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
   ┌─ Orders log levels ────────────────────────────────────────────────────────────────────────────────────┐
   │  ▸ Default                                         Trace━ Debug━●Information─ Warning       ·  its own │
   │    Microsoft.EntityFrameworkCore.Database.Command  Trace─ Debug─ Information─ Warning       ·  its own │
@@ -18,13 +18,13 @@ expression: screen.frame()
   │  After lazyrunner's own --Logging arguments, so they win; this session only, unless kept (s).          │
   │ j k category · h l level · Enter sets it (restarts it) · x its own · r all · s keeps · Esc             │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-
-
-
-
-
+   U  starts all     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
