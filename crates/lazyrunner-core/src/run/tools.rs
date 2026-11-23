@@ -427,6 +427,12 @@ pub fn git(dir: &Path, args: &[&str]) -> Option<String> {
     output.status.success().then(|| String::from_utf8_lossy(&output.stdout).trim_end().to_string())
 }
 
+/// Whether `dir` is a checkout of its own (a worktree, a nested repo or submodule) under the one being run: its
+/// projects aren't this one's.
+pub fn another_checkout(dir: &Path) -> bool {
+    dir.join(".git").exists()
+}
+
 /// The repo's git folder (a worktree's own one).
 pub fn git_dir(root: &Path) -> Option<PathBuf> {
     git(root, &["rev-parse", "--absolute-git-dir"]).map(|dir| PathBuf::from(crate::profile::native(&dir)))

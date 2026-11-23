@@ -481,7 +481,8 @@ fn nx_suites(workspace: &Path) -> Vec<Suite> {
     suites
 }
 
-/// Every file under `root`, breadth first, not into links, build output or packages, and only so far.
+/// Every file under `root`, breadth first, not into links, build output, packages or other checkouts, and only so
+/// far.
 fn walk(root: &Path, mut visit: impl FnMut(&Path)) {
     let mut budget = SEARCH_BUDGET;
     let mut folders = VecDeque::from([root.to_path_buf()]);
@@ -494,7 +495,8 @@ fn walk(root: &Path, mut visit: impl FnMut(&Path)) {
             budget -= 1;
             let Ok(kind) = entry.file_type() else { continue };
             if kind.is_dir() {
-                if !SKIPPED.iter().any(|skipped| entry.file_name().eq_ignore_ascii_case(skipped)) {
+                let skipped = SKIPPED.iter().any(|skipped| entry.file_name().eq_ignore_ascii_case(skipped));
+                if !skipped && !super::tools::another_checkout(&entry.path()) {
                     folders.push_back(entry.path());
                 }
             } else if kind.is_file() {
@@ -786,6 +788,20 @@ mod tests {
         let names = ["Shop.Cart.Adds", "Shop.Cart.Totals(2, 3)", "Shop.Cart.Totals(1, 1)"].map(String::from);
         assert_eq!(dotnet_filter(&names), "FullyQualifiedName=Shop.Cart.Adds|FullyQualifiedName~Shop.Cart.Totals");
         assert_eq!(name_pattern(&["cart totals (2)".to_string()]), r"^(?:cart totals \(2\))$");
+    }
+
+    #[test]
+    fn a_worktree_inside_the_repo_adds_no_second_copy_of_its_suites() {
+        let temp = TempDir::new("suites-worktree");
+        let root = temp.path();
+        let sdk = r#"<Project><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /></ItemGroup></Project>"#;
+        write(root.join(".git/HEAD"), "ref: refs/heads/main");
+        write(root.join("tests/Shop.Tests/Shop.Tests.csproj"), sdk);
+        let worktree = root.join(".claude/worktrees/fix");
+        write(worktree.join(".git"), "gitdir: ../../../.git/worktrees/fix");
+        write(worktree.join("tests/Shop.Tests/Shop.Tests.csproj"), sdk);
+        let keys: Vec<String> = discover(root, &[]).into_iter().map(|suite| suite.key).collect();
+        assert_eq!(keys, ["dotnet:tests/Shop.Tests/Shop.Tests.csproj"]);
     }
 
     #[test]

@@ -204,7 +204,7 @@ pub fn resolve(root: &Path, path: &str) -> Option<PathBuf> {
 }
 
 /// The first file under `root` whose path ends with `wanted`: breadth first, not into links (junctions, symlinks),
-/// build output or packages, and only so far.
+/// build output, packages or other checkouts, and only so far.
 fn search(root: &Path, wanted: &[Component<'_>]) -> Option<PathBuf> {
     let mut budget = SEARCH_BUDGET;
     let mut folders = VecDeque::from([root.to_path_buf()]);
@@ -218,7 +218,8 @@ fn search(root: &Path, wanted: &[Component<'_>]) -> Option<PathBuf> {
             let Ok(kind) = entry.file_type() else { continue };
             let path = entry.path();
             if kind.is_dir() {
-                if !SKIPPED.iter().any(|skipped| entry.file_name().eq_ignore_ascii_case(skipped)) {
+                let skipped = SKIPPED.iter().any(|skipped| entry.file_name().eq_ignore_ascii_case(skipped));
+                if !skipped && !crate::run::tools::another_checkout(&path) {
                     folders.push_back(path);
                 }
             } else if kind.is_file()

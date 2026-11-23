@@ -283,7 +283,7 @@ pub fn solutions(root: &Path) -> Vec<PathBuf> {
             let (path, name) = (entry.path(), entry.file_name());
             let Ok(kind) = entry.file_type() else { continue };
             let skipped = NOT_SEARCHED.iter().any(|skip| name.eq_ignore_ascii_case(skip));
-            if kind.is_dir() && depth < SOLUTION_DEPTH && !skipped {
+            if kind.is_dir() && depth < SOLUTION_DEPTH && !skipped && !super::tools::another_checkout(&path) {
                 folders.push_back((path, depth + 1));
             } else if kind.is_file()
                 && path.extension().is_some_and(|ext| SOLUTION_KINDS.iter().any(|kind| ext.eq_ignore_ascii_case(kind)))
