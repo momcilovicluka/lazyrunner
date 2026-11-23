@@ -566,6 +566,47 @@ command line, and never shows in the log or to an agent. The save points are kep
 (`save-points.json`); the snapshots and backups are the server's. SQL Server only: snapshots need 2016 SP1 or later
 (Express and LocalDB included).
 
+### Copies, backups, exports and imports
+
+Each row says how big its database is - `2.4 GB` and a bar beside it, as a share of the biggest one listed - and the
+keys there make files of it, or a new database from one:
+
+| Key | Does |
+|-----|------|
+| `c` | Copies the highlighted database to a new one on the same server: its name is asked for (`Shop_copy`, then `Shop_copy2`... while those are taken), then a `COPY_ONLY` backup is restored `WITH MOVE` to new files (`<data folder>\Shop_copy_<logical name>.mdf`, `.ldf`), and the backup on the way is deleted (`xp_delete_file`) - or left in the backup folder, and the log says so |
+| `b` | Backs it up to `Shop_20261123_1042.bak` in the server's own backup folder (`COPY_ONLY, INIT, STATS = 5`) |
+| `e` | Exports it to `Shop_20261123_1042.bacpac` with SqlPackage, into lazyrunner's folder for the project - portable across SQL Server versions and to Azure |
+| `i` | Imports the picked file as a new database: a `.bak` restored `WITH MOVE`, a `.bacpac` through SqlPackage |
+| `Del` | Drops the highlighted database, after a yes that names it and its size: its save point snapshots go first, everyone still connected is cut off, and its connection string leaves `secrets.json` (the file before is kept as `secrets.json.lazyrunner-backup`). Never the one in use, nor one a running app is on |
+
+A copy or an import never goes over a database that's there: the name is checked first, and the SQL stops itself
+when the database has turned up meanwhile (`IF DB_ID(...) IS NOT NULL THROW`). Once it's made, its connection string
+is added beside the others, as `n` adds one, and the screen offers to switch to it.
+
+Under the save points, the **files**: the `.bak` files lazyrunner made in servers' backup folders and the `.bak` and
+`.bacpac` files in its own folder for the project - `%LOCALAPPDATA%\lazyrunner\<project>\databases` on Windows, the
+state folder's `<project>/databases` elsewhere, outside the repo so nothing backed up or exported can be committed. Put
+a file there to import it. Each shows its size as a bar and its age, older ones dimmer; `Tab` (after the save points'
+rail) gives them the keys: `j` `k` pick one, `i` imports it, `Del` deletes it after a yes (one in a server's backup
+folder is deleted by the server, with `xp_delete_file` - never `xp_cmdshell`).
+
+The server reads a `.bak` itself, so a `.bak` can only be imported on a server that can open it: one in its own
+backup folder always can; one in lazyrunner's folder only on a server on this machine whose service account may read
+that folder - else it says so. A `.bacpac` is read by SqlPackage here, so it can go to any server.
+
+Exports and `.bacpac` imports need SqlPackage (`dotnet tool install -g microsoft.sqlpackage`; lazyrunner finds it on
+PATH, among the .NET global tools, or where the DacFx installer puts it). When it's missing, `e` and `i` offer to
+install it - never without a yes. Its connection string, password and all, goes to it in a response file in
+lazyrunner's state folder, deleted as soon as SqlPackage has read it - never on its command line.
+
+The startup checklist checks both, for a project whose APIs keep their connection strings in user secrets: `sqlcmd`
+and `SqlPackage` with their versions, or a skip saying what needs them. `f` on SqlPackage's line installs it; on
+sqlcmd's it copies `winget install Microsoft.Sqlcmd`, for a terminal of your own (winget may ask for admin rights).
+
+A job washes across its database's row as it runs, saying how far it is - `backing up · 64% · 1.5 GB of 2.4 GB ·
+about 20s left` from the server's `STATS`, or an export's `table 112 of 214` - and folds into a file icon when it's
+done; a new database is a ghost row filling as it's restored.
+
 ## lazygit (`L`)
 
 `L` opens [lazygit](https://github.com/jesseduffield/lazygit) in the project's folder without leaving lazyrunner. It
@@ -1173,9 +1214,10 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `open_in_editor` | A file of the repo at a line in your editor, as `O` does - to show you the code it's talking about; after `"confirm": true` |
 | `add_database` | A connection string added to secrets.json as `n` on the database screen does: a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet - or, with `switch` (and `confirm`), the one in use |
 | `save_point`, `rewind`, `database_changes` | A save point of a database (a snapshot, or a backup); a rewind to one (with `confirm`); what changed since one, table by table - rows then and now, and the small tables changed in place |
+| `copy_database`, `backup_database`, `export_database`, `import_database`, `drop_database`, `database_files` | A database copied to a new one beside it, backed up to a `.bak`, exported to a `.bacpac`; a file imported as a new database; a database dropped (with `confirm`; never the one in use); the files, the databases' sizes and the job running - no connection string, ever |
 
 What can't be undone or takes something away from you - quitting, killing a port's holder, reverting a migration,
-rewinding the database, switching the database, clearing the output, reopening lazyrunner, the git tool over the screen, opening a file in your
+rewinding or dropping a database, switching the database, clearing the output, reopening lazyrunner, the git tool over the screen, opening a file in your
 editor - needs
 `"confirm": true`, and the agent is told to ask you first.
 

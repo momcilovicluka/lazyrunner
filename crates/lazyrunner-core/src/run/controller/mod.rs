@@ -19,6 +19,8 @@ mod tunnels;
 pub use crashes::{Crash, LOOP_CRASHES, Recovery};
 pub use log_levels::{CATEGORIES, DEFAULT, LEVELS, LogLevel};
 pub use tunnels::Tunnel;
+pub mod database_files;
+mod database_jobs;
 mod hooks;
 mod impact;
 mod launch;
@@ -310,6 +312,8 @@ pub struct Controller {
     pub installing_trace: bool,
     /// What collecting coverage needs being added (the startup checklist's fix, #33).
     pub installing_coverage: bool,
+    /// SqlPackage's install (the doctor's fix, or the database screen's y/n) is running.
+    pub installing_sqlpackage: bool,
     /// What happened this session, by the hooks' event names (the About box counts them), and when it began.
     pub session: HashMap<&'static str, usize>,
     pub session_started: Instant,
@@ -339,6 +343,13 @@ pub struct Controller {
     pub db_work: Option<DbWork>,
     pub db_done: Option<DbDone>,
     pub db_counts: HashMap<String, Counts>,
+    /// The files section's files, the `.bak` files lazyrunner made on servers, and each server's databases and their
+    /// sizes, by server (#110).
+    pub db_files: Vec<super::database_files::DbFile>,
+    made_files: Vec<super::database_files::Made>,
+    pub db_sizes: HashMap<String, database_files::Sizes>,
+    /// What runs SqlPackage (tests put a script in its place).
+    pub(crate) package: Arc<dyn super::sqlpackage::Package>,
     /// What runs SQL (sqlcmd; tests put a script in its place), and the secrets.json the tests use instead of the
     /// apps' own.
     pub(crate) sql: Arc<dyn super::sql::Sql>,
@@ -368,6 +379,7 @@ impl Controller {
         let audits = crate::run::audit::load(&state_dir);
         let kept_levels = log_levels::load(&state_dir);
         let save_points = super::save_points::load(&state_dir);
+        let made_files = super::database_files::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
             state.view = apptypes::column_view(&config, &state.key);
@@ -504,6 +516,7 @@ impl Controller {
             last_profiled: None,
             installing_trace: false,
             installing_coverage: false,
+            installing_sqlpackage: false,
             session: HashMap::new(),
             session_started: Instant::now(),
             resume: None,
@@ -522,6 +535,10 @@ impl Controller {
             db_work: None,
             db_done: None,
             db_counts: HashMap::new(),
+            db_files: Vec::new(),
+            made_files,
+            db_sizes: HashMap::new(),
+            package: Arc::new(super::sqlpackage::SqlPackage),
             sql: Arc::new(super::sql::Sqlcmd),
             secrets_at: None,
             commands: Arc::new(super::tools::Tools),
@@ -787,6 +804,7 @@ impl Controller {
             Event::ComposeServices { key, generation, services } => self.compose_arrived(key, generation, services),
             Event::ComposePorts { key, ports } => self.compose_ports_arrived(key, ports),
             Event::Sql { job, news } => self.sql_news(job, news),
+            Event::DatabaseFiles { job, news } => self.files_news(job, news),
         }
     }
 

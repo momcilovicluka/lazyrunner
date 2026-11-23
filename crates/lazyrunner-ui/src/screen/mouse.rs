@@ -179,7 +179,8 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         }
         _ => {}
     }
-    let typing_in_picker = ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
+    let typing_in_picker = ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
+        || super::database_files::typing(ui);
     if typing_in_picker {
         // Typing a filter or a new database's name: a click there doesn't pick (or add) anything; outside, it closes.
         if !matches!(target, Some(Target::Item(_) | Target::Box)) {

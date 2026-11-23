@@ -3,6 +3,17 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.107.0] - 2026-11-23
+
+### Added
+- Copies, backups, exports and imports of a database (#110), on the database screen (`d`): `c` copies the highlighted database to a new one on the same server - named `Shop_copy` (then `Shop_copy2`...) until you type another - by restoring a `COPY_ONLY` backup to new files, never over a database that's there, and deletes the backup on the way (or says where it was left). `b` backs it up to `Shop_20261123_1042.bak` in the server's own backup folder, `e` exports a `.bacpac` with SqlPackage into lazyrunner's folder for the project (outside the repo), and `i` imports a `.bak` or `.bacpac` as a new database. A new database gets a connection string beside the others, and the screen offers to switch to it.
+- `Del` on a database drops it, after a yes that names it and its size: its save point snapshots first, everyone still connected cut off, then its connection string out of `secrets.json` (the file before kept). Never the one in use, nor one a running app is on.
+- Each database's size, `2.4 GB` with a bar as a share of the biggest one listed. Under the save points, the files: the backups lazyrunner made and the files in its folder, each with its size as a bar and its age, older ones dimmer. `Tab` gives them the keys: `i` imports the picked one, `Del` deletes it after a yes.
+- Exports and `.bacpac` imports need SqlPackage (`dotnet tool install -g microsoft.sqlpackage`); when it's missing, lazyrunner offers to install it. Its connection string goes to it in a response file that's deleted as soon as it's read, never on its command line.
+- It moves: a backup, export or copy washes across its database's row as it runs, its edge an eighth of a cell at a time with a shimmer along it, saying `backing up · 64% · 1.5 GB of 2.4 GB · about 20s left`; done, the wash folds into a file icon and the file slides into the files. A new database is a ghost row that fills solid as it's restored and glints once it's there; a database dropped or a file deleted dims and closes up. None of it moves with reduced motion.
+- MCP: `copy_database`, `backup_database`, `export_database`, `import_database`, `drop_database` (with `"confirm": true`) and `database_files`, which lists the files, the databases' sizes and the job running - never a connection string (#110).
+- The startup checklist checks sqlcmd and SqlPackage, which the database screen runs through: their versions, or what needs them when they're missing. `f` installs SqlPackage, and copies sqlcmd's install (`winget install Microsoft.Sqlcmd`) for a terminal of your own (#110).
+
 ## [1.106.0] - 2026-11-23
 
 ### Added

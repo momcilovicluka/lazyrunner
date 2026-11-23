@@ -140,10 +140,6 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, typed: Option<c
                 controller.add_log(format!("✗ {why}"), Hue::Red);
             }
         }
-        "Tab" if all.is_empty() => {
-            controller.add_log(format!("No save points of {} yet - s makes one.", entry.database), Hue::Gray);
-        }
-        "Tab" => ui.save_view.on_rail = !ui.save_view.on_rail,
         "j" | "DownArrow" if ui.save_view.on_rail => {
             ui.save_view.picked = (ui.save_view.picked + 1).min(all.len().saturating_sub(1));
         }
@@ -299,6 +295,7 @@ pub fn yes(controller: &mut Controller, yes: SavePointYes) {
     let result = match yes {
         SavePointYes::Rewind(id) => controller.rewind_to(&id, None),
         SavePointYes::Forget(id) => controller.forget_save_point(&id),
+        _ => return,
     };
     if let Err(why) = result {
         controller.add_log(format!("✗ {why}"), Hue::Red);
@@ -430,6 +427,7 @@ fn note(ui: &Ui, controller: &Controller, entry: &Entry) -> Option<(String, C)> 
         Doing::Making(Kind::Backup) => "backing up".to_string(),
         Doing::Rewinding(_) => "rewinding".to_string(),
         Doing::Dropping(_) => "dropping a snapshot".to_string(),
+        Doing::Database(_) => return None,
     };
     Some((format!("{spin} {what}{}…", share.unwrap_or_default()), C::Yellow))
 }
@@ -660,7 +658,7 @@ pub fn hint(ui: &Ui) -> Option<&'static str> {
     }
     ui.save_view.on_rail.then_some(
         " j k pick a save point · r rewind to it · R pin · F2 rename · Del drop · u count again · s S save point · \
-         Tab databases · Esc back",
+         Tab on · Esc back",
     )
 }
 

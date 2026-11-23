@@ -289,6 +289,30 @@ pub fn add(path: &Path, entry: &Entry, database: &str) -> Result<()> {
     write(path, &lines.join(newline), bom, "with the new line")
 }
 
+/// Removes the connection strings to `database` on `server` (ignoring case) - commented-out ones only: refused while
+/// one is in use. How many went.
+pub fn remove(path: &Path, server: &str, database: &str) -> Result<usize> {
+    let (text, bom, newline) = read(path)?;
+    let gone: Vec<Entry> = connections(&text)
+        .into_iter()
+        .filter(|entry| entry.server.eq_ignore_ascii_case(server) && entry.database.eq_ignore_ascii_case(database))
+        .collect();
+    if gone.iter().any(|entry| entry.active) {
+        bail!("{database} @ {server} is in use - switch to another database first");
+    }
+    if gone.is_empty() {
+        return Ok(0);
+    }
+    let kept: Vec<String> = lines(&text)
+        .into_iter()
+        .enumerate()
+        .filter(|(at, _)| !gone.iter().any(|entry| entry.line == *at))
+        .map(|(_, line)| line)
+        .collect();
+    write(path, &kept.join(newline), bom, "without its connection strings")?;
+    Ok(gone.len())
+}
+
 /// Sets `key` (flat, `Section:Key`) to `value` in secrets.json: its active line rewritten, else a new line at the top
 /// of the object; the file made when there is none.
 pub fn set(path: &Path, key: &str, value: &str) -> Result<()> {
@@ -432,6 +456,13 @@ mod tests {
         let added = connections(&text).into_iter().find(|entry| entry.database == "ShopTest").unwrap();
         assert!(!added.active, "added inactive");
         assert!(add(&path, &local, "bad;name").is_err());
+
+        assert_eq!(remove(&path, "LOCALHOST", "shoptest").unwrap(), 1);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("ShopTest") && text.contains("ShopLocal"), "{text}");
+        serde_json::from_str::<serde_json::Value>(&strip_jsonc(&text)).unwrap();
+        assert!(remove(&path, "dev-sql", "Shop").is_err(), "the one in use stays");
+        assert_eq!(remove(&path, "localhost", "Nowhere").unwrap(), 0);
     }
 
     #[test]

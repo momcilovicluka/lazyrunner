@@ -1,11 +1,14 @@
 //! Save points over MCP (#110): `save_point` makes one of a database, `rewind` takes it back to one (after
 //! `"confirm": true` - what changed since is lost), `database_changes` says what changed since one, table by table;
-//! get_status lists them. A database is named by its label (`Shop @ localhost`) or its name, the one in use when left
-//! out; a save point by its label or id, the database's newest when left out. Passwords never leave lazyrunner.
+//! get_status lists them. And copies, backups, exports and imports: `copy_database`, `backup_database`,
+//! `export_database`, `import_database`, `drop_database` (after `"confirm": true`) and `database_files`. A database is
+//! named by its label (`Shop @ localhost`) or its name, the one in use when left out; a save point by its label or id,
+//! the database's newest when left out; a file by its name or path. Passwords never leave lazyrunner.
 
 use std::time::Duration;
 
 use lazyrunner_core::run::Controller;
+use lazyrunner_core::run::database_files::{self as files, DbFile, Kind as FileKind};
 use lazyrunner_core::run::save_points::{self as points, Kind, SavePoint};
 use lazyrunner_core::run::secrets::{self, Entry};
 use serde_json::{Value, json};
@@ -157,4 +160,127 @@ pub fn changes(controller: &mut Controller, args: &Value) -> Result<Value, Refus
         "error": counts.and_then(|counts| counts.error.clone()),
         "note": counted.is_none().then_some("the rows are being counted - call again in a moment"),
     }))
+}
+
+/// Copies a database to a new one on its server: `"name"`, else `<database>_copy`.
+pub fn copy(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let (server, name) = database(controller, args)?;
+    let to = args["name"]
+        .as_str()
+        .map(|to| clean(to, CLIENT_CHARS))
+        .unwrap_or_else(|| controller.copy_default(&server, &name));
+    let doing = controller.copy_database(&server, &name, &to).map_err(|why| ("refused", why))?;
+    Ok(format!(
+        "{doing} - its connection string is added once it's made; database_files and busy.database say how it goes"
+    ))
+}
+
+/// Backs a database up to a `.bak` in its server's backup folder.
+pub fn backup(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let (server, name) = database(controller, args)?;
+    let doing = controller.backup_database(&server, &name).map_err(|why| ("refused", why))?;
+    Ok(format!("{doing} - database_files lists the file once it's written"))
+}
+
+/// Exports a database to a `.bacpac` in lazyrunner's folder.
+pub fn export(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let (server, name) = database(controller, args)?;
+    let doing = controller.export_database(&server, &name).map_err(|why| ("refused", why))?;
+    Ok(format!("{doing} - database_files lists the file once it's written"))
+}
+
+/// The file `args["file"]` names, by its name or path.
+fn file(controller: &Controller, args: &Value) -> Result<DbFile, Refusal> {
+    let wanted =
+        args["file"].as_str().ok_or_else(|| ("bad_args", "\"file\" names a file of database_files".to_string()))?;
+    let found = controller
+        .db_files
+        .iter()
+        .find(|file| file.name.eq_ignore_ascii_case(wanted) || file.path.eq_ignore_ascii_case(wanted));
+    found.cloned().ok_or_else(|| {
+        let known: Vec<&str> = controller.db_files.iter().map(|file| file.name.as_str()).collect();
+        let there = if known.is_empty() { "none yet".to_string() } else { known.join(", ") };
+        ("not_found", format!("no file '{}' (there: {there})", clean(wanted, CLIENT_CHARS)))
+    })
+}
+
+/// Imports a `.bak` or `.bacpac` as a new database: `"name"`, else the file's name.
+pub fn import(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    controller.refresh_files();
+    let file = file(controller, args)?;
+    let server = match &file.server {
+        Some(server) => server.clone(),
+        None => database(controller, args)?.0,
+    };
+    let to = args["name"]
+        .as_str()
+        .map(|to| clean(to, CLIENT_CHARS))
+        .unwrap_or_else(|| controller.import_default(&server, &file));
+    let doing = controller.import_file(&file.path, &server, &to).map_err(|why| ("refused", why))?;
+    Ok(format!("{doing} - its connection string is added once it's made"))
+}
+
+/// Drops a database - never the one in use - after `"confirm": true`.
+pub fn drop_database(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    if args["database"].as_str().is_none() {
+        return Err(("bad_args", "\"database\" names the database to drop".into()));
+    }
+    let (server, name) = database(controller, args)?;
+    controller.can_drop(&server, &name).map_err(|why| ("refused", why))?;
+    if !confirmed(args) {
+        let size =
+            controller.size_of(&server, &name).map_or_else(String::new, |bytes| format!(" ({})", files::size(bytes)));
+        let points = controller.save_points_of(&server, &name).len();
+        let also = if points == 0 { String::new() } else { format!(", its {points} save points") };
+        return Err(confirm_first(&format!(
+            "dropping {name} @ {server}{size} loses its data for good{also} and its connection string, and cuts off \
+             other connections to it -"
+        )));
+    }
+    controller.drop_database(&server, &name).map_err(|why| ("refused", why))
+}
+
+/// The files section's files, each database's size as last measured, and the job running on one - read-only.
+pub fn files(controller: &mut Controller) -> Value {
+    controller.refresh_files();
+    let now = jiff::Timestamp::now();
+    let listed: Vec<Value> = controller
+        .db_files
+        .iter()
+        .map(|file| {
+            json!({
+                "name": file.name,
+                "path": file.path,
+                "kind": match file.kind { FileKind::Bak => "bak", FileKind::Bacpac => "bacpac" },
+                "bytes": file.bytes,
+                "size": file.bytes.map(files::size),
+                "age_seconds": file.age(now).map(|age| age.as_secs()),
+                "in_backup_folder_of": file.server,
+            })
+        })
+        .collect();
+    let mut sizes: Vec<Value> = Vec::new();
+    for (server, measured) in &controller.db_sizes {
+        for (name, bytes) in &measured.databases {
+            sizes.push(
+                json!({ "database": format!("{name} @ {server}"), "bytes": bytes, "size": bytes.map(files::size) }),
+            );
+        }
+    }
+    let job = controller.db_work.as_ref().map(|work| {
+        json!({
+            "doing": controller.database_busy(),
+            "share": work.share.map(|(_, newest, _)| newest),
+            "tables": work.progress.tables,
+            "step": work.progress.step,
+            "seconds": work.started.elapsed().as_secs(),
+        })
+    });
+    json!({
+        "folder": controller.files_folder().display().to_string(),
+        "files": listed,
+        "databases": sizes,
+        "running": job,
+        "sqlpackage": controller.sqlpackage_ready().err(),
+    })
 }

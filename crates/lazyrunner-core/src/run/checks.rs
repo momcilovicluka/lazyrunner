@@ -12,6 +12,7 @@ use super::Controller;
 use super::net::Listening;
 use super::secrets;
 use super::tools;
+use super::{sql, sqlpackage};
 use crate::profile::{App, AppKind, Source};
 use crate::update;
 
@@ -20,8 +21,15 @@ const SQL_PORT: u16 = 1433;
 /// A tool that hasn't printed its version by then is hung (a broken install, a prompt nobody sees).
 const TOOL_TIMEOUT: Duration = Duration::from_secs(10);
 const TOOL_POLL: Duration = Duration::from_millis(20);
+/// What a found tool says when it doesn't print its version.
+const INSTALLED: &str = "installed";
+/// What asks sqlcmd and SqlPackage for their versions.
+const SQLCMD_VERSION: [&str; 1] = ["-?"];
+const SQLPACKAGE_VERSION: [&str; 1] = ["/version"];
 /// The session's row (#85).
 pub const SESSION_CHECK: &str = "Session";
+/// SqlPackage's row.
+pub const SQLPACKAGE_CHECK: &str = "SqlPackage";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -238,6 +246,8 @@ pub fn checks(controller: &Controller) -> Vec<Check> {
     checks.push(ports_check(controller));
     if controller.apps.iter().any(|app| app.traits().uses_secrets) {
         checks.push(database_check(controller));
+        checks.push(sqlcmd_check());
+        checks.push(sqlpackage_check());
     }
     let installs = |app: &&App| app.command().is_some_and(|command| !command.install.is_empty());
     for app in controller.apps.iter().filter(|app| matches!(app.kind, AppKind::Npm { .. }) || installs(app)) {
@@ -362,6 +372,36 @@ fn database_check(controller: &Controller) -> Check {
         } else {
             (Status::Warn, format!("{} · nothing answers on port {port}", active.label))
         }
+    })
+}
+
+/// sqlcmd, which the database screen's save points, copies and backups run their SQL through.
+fn sqlcmd_check() -> Check {
+    check(Kind::Tool, sql::PROGRAM, || match tools::find_on_path(sql::PROGRAM) {
+        Some(path) => {
+            (Status::Ok, tool_version(&path, &SQLCMD_VERSION).map_or(INSTALLED.into(), |line| sql::version_of(&line)))
+        }
+        None => (
+            Status::Skip,
+            format!(
+                "not installed - save points, copies and backups (D) run SQL through it; f copies `{}`",
+                sql::INSTALL
+            ),
+        ),
+    })
+}
+
+/// SqlPackage, which the database screen's `.bacpac` exports and imports run through.
+fn sqlpackage_check() -> Check {
+    check(Kind::Tool, SQLPACKAGE_CHECK, || match sqlpackage::find() {
+        Some(path) => (Status::Ok, tool_version(&path, &SQLPACKAGE_VERSION).unwrap_or_else(|| INSTALLED.into())),
+        None => (
+            Status::Skip,
+            format!(
+                "not installed - .bacpac exports and imports (D) run through it; f installs it ({})",
+                sqlpackage::INSTALL_TEXT
+            ),
+        ),
     })
 }
 

@@ -4,11 +4,12 @@ expression: screen.frame()
 ---
   K  E  H  M  A  T  P  D  ~ DB DATABASE
  DefaultConnection · secrets.json · 1 connection strings · the active one ●
- j k choose · Enter switch + restart the APIs · s snapshot · S backup · r rewind · R pin · u changes
- Tab save points · n new (a copy) · / filter · y copy row · Esc back
+ j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin
+ u changes · c copy · b back up · e export · i import · Del drop · Tab save points, files
+ n new connection string · / filter · y copy row · Esc back
 
-   DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SWITCHED TO
- ● Shop @ localhost              – local          -               -               -
+   DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SIZE      SWITCHED TO
+ ● Shop @ localhost              – local          -               -               -         -
 
  SAVE POINTS · Shop                               SINCE "before approval" · 10:42            3 tables changed
   ⡗ ◉  now  ◂ you are here                                      removed │ added
@@ -17,9 +18,8 @@ expression: screen.frame()
   ⡇                                                Approvals            ◆            ~ changed        412
   ⡇ ◇  after import  09:15  backup
 
-
-
-
+ FILES · …\sample\databases
+ none yet - b backs a database up to the server's backup folder, e exports a .bacpac here
 
 
 

@@ -273,6 +273,76 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
+            "copy_database",
+            "Copies a database to a new one on the same server (as c on the database screen does): a COPY_ONLY \
+             backup restored WITH MOVE to new files, never over a database that's there; then a connection string \
+             to it is added beside the source's (inactive - switch_database makes it the one in use). `name` is \
+             the new database's (`<database>_copy` when left out). It runs in the background: busy.database and \
+             database_files say how far it is.",
+            json!({
+                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
+                "name": { "type": "string", "description": "The new database's name" },
+            }),
+            &[],
+            false,
+        ),
+        tool(
+            "backup_database",
+            "Backs a database up to `<database>_<yyyyMMdd_HHmm>.bak` in its server's own backup folder (as b on \
+             the database screen does): COPY_ONLY, so it changes no backup chain. In the background; \
+             database_files lists the file once it's written.",
+            json!({ "database": { "type": "string", "description": "The database's name or label (database @ server)" } }),
+            &[],
+            false,
+        ),
+        tool(
+            "export_database",
+            "Exports a database to a .bacpac with SqlPackage (as e on the database screen does), into lazyrunner's \
+             folder for the project (database_files' folder): portable across SQL Server versions and to Azure. \
+             Refused when SqlPackage isn't installed - the answer says how to install it; ask the user first. In \
+             the background, table by table.",
+            json!({ "database": { "type": "string", "description": "The database's name or label (database @ server)" } }),
+            &[],
+            false,
+        ),
+        tool(
+            "import_database",
+            "Imports a .bak or .bacpac from database_files as a new database (as i on the database screen does) - \
+             never over one that's there - then adds a connection string to it (inactive). A .bak in a server's \
+             backup folder goes to that server; one of lazyrunner's files to `database`'s server (the one in use \
+             when left out). `name` is the new database's (the file's name when left out).",
+            json!({
+                "file": { "type": "string", "description": "A file's name or path, as database_files lists it" },
+                "name": { "type": "string", "description": "The new database's name" },
+                "database": { "type": "string", "description": "A database on the server to import into (name or label)" },
+            }),
+            &["file"],
+            false,
+        ),
+        destructive(tool(
+            "drop_database",
+            "Drops a database (as Del on the database screen does): its lazyrunner save point snapshots first, \
+             everyone connected cut off, then its connection strings removed from secrets.json (the file before is \
+             kept). Never the one in use or one a running app is on. Its data is gone for good - needs confirm: \
+             true; ask the user first.",
+            json!({
+                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
+                "confirm": { "type": "boolean" },
+            }),
+            &["database"],
+            false,
+        )),
+        tool(
+            "database_files",
+            "The database screen's files: the .bak backups lazyrunner made in servers' backup folders and the \
+             .bak / .bacpac files in its own folder for the project (name, path, size, age), each database's size \
+             as last measured, the copy, backup, export or import running (its share done, tables, step), and \
+             whether SqlPackage is missing. Never a connection string.",
+            json!({}),
+            &[],
+            true,
+        ),
+        tool(
             "run_task",
             "Runs one of the profile's tasks (get_status lists them: key, name, running, last) in the background - \
              a one-off command such as seeding the database. Its output goes to the panel's log. Then wait for \

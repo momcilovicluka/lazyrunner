@@ -14,6 +14,10 @@ pub const PROGRAM: &str = "sqlcmd";
 /// What lazyrunner says when it isn't there.
 pub const MISSING: &str = "sqlcmd isn't installed (or isn't on PATH) - save points run SQL through it: winget install \
                            Microsoft.Sqlcmd";
+/// What installs it (the doctor's `f` copies it: winget may ask for admin rights).
+pub const INSTALL: &str = "winget install Microsoft.Sqlcmd";
+/// What `-?` starts its version with.
+const VERSION_PREFIX: &str = "Version ";
 /// Where sqlcmd reads the password of a SQL login from.
 pub const PASSWORD_VARIABLE: &str = "SQLCMDPASSWORD";
 /// Between a row's columns: put the column that can hold anything last.
@@ -35,6 +39,11 @@ const PASSWORD_KEYS: [&str; 2] = ["password", "pwd"];
 const TRUST_KEYS: [&str; 1] = ["trustservercertificate"];
 const ENCRYPT_KEYS: [&str; 1] = ["encrypt"];
 const YES: [&str; 5] = ["true", "yes", "sspi", "mandatory", "strict"];
+
+/// sqlcmd's version, from the line `-?` prints it on.
+pub fn version_of(line: &str) -> String {
+    line.trim_start_matches(VERSION_PREFIX).to_string()
+}
 
 /// Where a connection string connects, and as whom.
 #[derive(Clone, PartialEq, Eq)]

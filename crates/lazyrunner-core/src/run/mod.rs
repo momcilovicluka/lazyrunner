@@ -19,6 +19,7 @@ pub mod compose;
 pub mod controller;
 pub mod coverage;
 pub mod coverage_needs;
+pub mod database_files;
 pub mod diff;
 pub mod entries;
 pub mod faults;
@@ -37,6 +38,7 @@ pub mod save_points;
 pub mod secrets;
 pub mod session;
 pub mod sql;
+pub mod sqlpackage;
 pub mod suites;
 pub mod test_history;
 pub mod tools;
@@ -181,6 +183,11 @@ pub enum Event {
     Sql {
         job: u64,
         news: save_points::News,
+    },
+    /// A copy's, backup's, export's, import's or drop's news, and the sizes and files around them (#110).
+    DatabaseFiles {
+        job: u64,
+        news: database_files::News,
     },
 }
 

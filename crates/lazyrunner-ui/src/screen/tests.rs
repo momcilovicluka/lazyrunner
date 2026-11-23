@@ -601,6 +601,97 @@ async fn database_save_points() {
     assert!(!screen.ui.save_view.on_rail && screen.ui.picker.is_some(), "Esc leaves the rail first");
 }
 
+/// SQL and SqlPackage that answer nothing: the database screen's keys, without a server.
+struct Silent;
+
+impl lazyrunner_core::run::sql::Sql for Silent {
+    fn run(&self, _: &str, _: Option<&str>, _: &str, _: &mut dyn FnMut(&str)) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn ready(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl lazyrunner_core::run::sqlpackage::Package for Silent {
+    fn run(
+        &self,
+        _: lazyrunner_core::run::sqlpackage::Action,
+        _: &str,
+        _: &str,
+        _: &std::path::Path,
+        _: &mut dyn FnMut(&str),
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn ready(&self) -> Result<(), String> {
+        Err(lazyrunner_core::run::sqlpackage::MISSING.into())
+    }
+}
+
+#[tokio::test]
+async fn database_files() {
+    use lazyrunner_core::run::controller::database_files::Sizes;
+    use lazyrunner_core::run::database_files::{Chore, Progress};
+
+    let mut screen = screen("snap-database-files", json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{
+  \"DefaultConnection\": \"Server=localhost;Database=Shop;Trusted_Connection=True\",
+  //\"DefaultConnection\": \"Server=localhost;Database=Shop_copy;Trusted_Connection=True\",
+}
+";
+    std::fs::write(&path, secrets).unwrap();
+    screen.controller.use_sql(std::sync::Arc::new(Silent), std::sync::Arc::new(Silent), path.clone());
+    let groups = lazyrunner_core::run::secrets::groups(secrets);
+    let picker =
+        Picker { path, groups, group: 0, index: 0, top: 0, filter: String::new(), filtering: false, new_name: None };
+    screen.ui.picker = Some(picker);
+    let gb = 1024 * 1024 * 1024;
+    let databases = vec![("Shop".to_string(), Some(gb * 12 / 5)), ("Shop_copy".to_string(), Some(gb * 6 / 5))];
+    let sizes = Sizes { databases, at: Some(screen.ui.now), error: None, reading: None };
+    screen.controller.db_sizes.insert("localhost".into(), sizes);
+    let folder = screen.controller.files_folder();
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("Shop_qa_20261120.bacpac"), vec![0u8; 4096]).unwrap();
+    screen.controller.refresh_files();
+    let progress = Progress { share: Some(0.64), bytes: Some(gb * 3 / 2), ..Progress::default() };
+    let started = screen.ui.now - Duration::from_secs(36);
+    screen.controller.pretend_chore(Chore::Backup, ("localhost", "Shop"), started, progress);
+    insta::assert_snapshot!(screen.frame());
+
+    let restoring = Progress { share: Some(0.4), bytes: Some(gb), restoring: true, ..Progress::default() };
+    let copy = Chore::Copy { to: "Shop_copy2".into() };
+    screen.controller.db_work = None;
+    screen.controller.pretend_chore(copy, ("localhost", "Shop"), started, restoring);
+    let frame = screen.frame();
+    let row =
+        |text: &str| frame.lines().position(|line| line.contains(text)).unwrap_or_else(|| panic!("{text}: {frame}"));
+    assert_eq!(
+        row("Shop_copy2 @ localhost"),
+        row("● Shop @ localhost") + 1,
+        "the ghost row is under its source: {frame}"
+    );
+    assert!(frame.contains("restoring · 40% · 1.0 GB of 2.4 GB"), "{frame}");
+    screen.controller.db_work = None;
+
+    screen.press("c");
+    assert!(screen.frame().contains("+ copy Shop @ localhost as: Shop_copy2"), "a free name: {}", screen.frame());
+    screen.press("Esc Delete");
+    assert!(screen.last_log().contains("is the one in use"), "{}", screen.last_log());
+    screen.press("Tab");
+    assert!(screen.ui.files_view.on_files, "no save points: Tab goes to the files");
+    assert!(screen.frame().contains("j k pick a file"), "{}", screen.frame());
+    screen.press("i");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Confirm(_))), "SqlPackage missing: it offers to install it");
+    screen.press("n Delete");
+    assert!(screen.frame().contains("Delete Shop_qa_20261120.bacpac (4.0 KB)?"), "{}", screen.frame());
+    screen.press("y");
+    assert!(screen.controller.db_files.is_empty() && screen.last_log() == "Deleted Shop_qa_20261120.bacpac");
+}
+
 #[tokio::test]
 async fn startup_checklist() {
     let mut screen = screen("snap-checklist", json!({}));

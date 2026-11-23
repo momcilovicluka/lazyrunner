@@ -59,6 +59,7 @@ pub fn prompt(ui: &Ui) -> bool {
     ui.search.as_ref().is_some_and(|search| search.typing)
         || ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
         || super::save_points::typing(ui)
+        || super::database_files::typing(ui)
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Sheet { typing: Some(_), .. }))
@@ -253,6 +254,7 @@ pub(super) fn fix_check(
             *replay = Some(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)); // the picker, once closed
         }
         Some(Fix::Winnat) => list.copied(index, clipboard(WINNAT)),
+        Some(Fix::Sqlcmd) => list.copied(index, clipboard(lazyrunner_core::run::sql::INSTALL)),
         Some(Fix::Audit) => {
             list.skip = true;
             *replay = Some(KeyEvent::new(KeyCode::Char('A'), KeyModifiers::NONE)); // the audit view, once closed
@@ -1053,6 +1055,7 @@ fn open_picker(ui: &mut Ui, controller: &mut Controller) {
     ui.db_motion = super::database::Motion::opened(ui.now);
     ui.picker = Some(picker);
     super::save_points::opened(ui, controller);
+    super::database_files::opened(ui, controller);
 }
 
 fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
@@ -1065,6 +1068,9 @@ fn picker_keys(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         return;
     }
     let typing = ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
+    if !typing && super::database_files::key(ui, controller, name, typed(key)) {
+        return;
+    }
     if !typing && super::save_points::key(ui, controller, name, typed(key)) {
         return;
     }

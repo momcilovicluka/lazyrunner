@@ -61,6 +61,11 @@ pub enum Fix {
     Audit,
     /// Install dotnet-trace, for Alt+p's profiles (#83).
     DotnetTrace,
+    /// Install SqlPackage, for the database screen's `.bacpac` exports and imports (#110).
+    SqlPackage,
+    /// Copy what installs sqlcmd, which the database screen runs its SQL through (#110): winget may ask for admin
+    /// rights, so it's for a terminal of your own.
+    Sqlcmd,
     /// Start the apps that were running when lazyrunner closed (#85), with auto-start off.
     Resume,
     /// Add what collecting code coverage needs (#33): coverlet's collector, vitest's coverage provider.
@@ -83,6 +88,8 @@ impl Fix {
             Self::Winnat => format!("`{WINNAT}` in an elevated terminal"),
             Self::Audit => "see them and fix them in the audit view (`A`)".into(),
             Self::DotnetTrace => format!("`{}`", lazyrunner_core::run::profile::INSTALL),
+            Self::SqlPackage => format!("`{}`", lazyrunner_core::run::sqlpackage::INSTALL_TEXT),
+            Self::Sqlcmd => format!("`{}`", lazyrunner_core::run::sql::INSTALL),
             Self::Resume => "start the apps that were running (`f`)".into(),
             Self::Coverage => "add the packages coverage needs (the commands in its details)".into(),
         }
@@ -97,7 +104,8 @@ impl Fix {
             Self::Database => "f picks a database",
             Self::Winnat => "f copies the fix",
             Self::Audit => "f opens the audit",
-            Self::DotnetTrace => "f installs it",
+            Self::DotnetTrace | Self::SqlPackage => "f installs it",
+            Self::Sqlcmd => "f copies the install",
             Self::Resume => "f starts them",
             Self::Coverage => "f adds them",
         }
@@ -439,6 +447,10 @@ impl Checklist {
             (Kind::Tool, Status::Skip) if item.detail.contains(lazyrunner_core::run::profile::INSTALL) => {
                 Some(Fix::DotnetTrace)
             }
+            (Kind::Tool, Status::Skip) if item.detail.contains(lazyrunner_core::run::sqlpackage::INSTALL_TEXT) => {
+                Some(Fix::SqlPackage)
+            }
+            (Kind::Tool, Status::Skip) if item.detail.contains(lazyrunner_core::run::sql::INSTALL) => Some(Fix::Sqlcmd),
             (Kind::Session(_), Status::Ok) if self.session.offered && !self.session.done && !self.starts() => {
                 Some(Fix::Resume)
             }
@@ -472,6 +484,11 @@ impl Checklist {
                 self.items[index].detail = "installing…".into();
                 self.rows[index].fixing = Some(fix);
             }
+            Fix::SqlPackage => {
+                controller.install_sqlpackage();
+                self.items[index].detail = "installing…".into();
+                self.rows[index].fixing = Some(fix);
+            }
             Fix::Coverage => {
                 controller.install_coverage();
                 self.items[index].detail = "adding…".into();
@@ -483,7 +500,7 @@ impl Checklist {
                     self.items[index].detail.push_str(" · resumed");
                 }
             }
-            Fix::Database | Fix::Winnat | Fix::Audit => {}
+            Fix::Database | Fix::Winnat | Fix::Sqlcmd | Fix::Audit => {}
         }
     }
 
@@ -691,6 +708,7 @@ impl Checklist {
     fn follow_install(&mut self, controller: &Controller) {
         let installing = |fix: &Fix| match fix {
             Fix::DotnetTrace => Some(controller.installing_trace),
+            Fix::SqlPackage => Some(controller.installing_sqlpackage),
             Fix::Coverage => Some(controller.installing_coverage),
             _ => None,
         };
@@ -1357,6 +1375,26 @@ mod tests {
         assert_eq!(safe, [true, false, false, true], "a kills nothing and asks for no pick");
         let reserved = problem("Ports", Status::Fail, "47211 reserved by Windows (47200-47299) - net stop winnat");
         assert_eq!(Checklist::fixed(vec![reserved], Vec::new(), "").fix_of(0), Some(Fix::Winnat));
+    }
+
+    #[test]
+    fn a_missing_sqlpackage_is_installed_by_f_and_a_missing_sqlcmd_has_its_install_copied() {
+        let problem = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
+        let package = problem(
+            "SqlPackage",
+            Status::Skip,
+            "not installed - .bacpac exports and imports (D) run through it; f installs it (dotnet tool install -g \
+             microsoft.sqlpackage)",
+        );
+        let sqlcmd = problem(
+            "sqlcmd",
+            Status::Skip,
+            "not installed - save points, copies and backups (D) run SQL through it; f copies `winget install \
+             Microsoft.Sqlcmd`",
+        );
+        let list = Checklist::fixed(vec![package, sqlcmd], Vec::new(), "");
+        assert_eq!([list.fix_of(0), list.fix_of(1)], [Some(Fix::SqlPackage), Some(Fix::Sqlcmd)]);
+        assert!(!Fix::SqlPackage.safe() && !Fix::Sqlcmd.safe(), "an install is f's, never a's");
     }
 
     #[test]
