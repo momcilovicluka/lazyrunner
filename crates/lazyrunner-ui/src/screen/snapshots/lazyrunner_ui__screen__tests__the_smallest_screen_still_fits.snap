@@ -9,7 +9,7 @@ info: Applic┃ng.cs(3,1): │            │            │
 ation starte┃ something  │port 47301 ·│not started │port 473
 d.          ┃is off      │            │            │
 ────────────────────────────────────────────────────────────
- lazyrunner   ⠋ starting (1/2 up)… ▰▰▰ ▱▱▱   ⎇ main
+ lazyrunner   ⠋ starting (1/2 up)… ▰▱   ⎇ main
   r  restart   s  stop   w  open               :  commands
 
  12:00:00   Starting Orders + Billing

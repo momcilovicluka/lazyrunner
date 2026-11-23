@@ -9,6 +9,10 @@ use super::icons::{self, Icon};
 use super::theme::C;
 
 const SLOW_RESPONSE_MS: u64 = 1000;
+/// What the tab's title marks a failure with (the plain mark: the tab isn't in the terminal's font).
+const FAILED: &str = "✗";
+/// The longest console title read back.
+const TITLE_CHARS: usize = 1024;
 
 /// The summary: what the header and the tab say, its colour, and the progress state for the tab.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -93,9 +97,36 @@ pub fn task_progress(seconds: f64, usual: Option<f64>) -> String {
     }
 }
 
-/// The escape sequences for the tab: its progress and its title ("lazyrunner · ShopLocal · ● all up (5)"). While a
-/// task runs and nothing else is going on, the progress is the task's.
-pub fn tab_sequence(controller: &Controller, summary: &Summary) -> String {
+/// The tab's title: what's going on first, then the project, so a narrow tab still says it - "● all up (5) · Shop",
+/// "building Orders 40% · Shop", "✗ Orders exited · Shop", "doctor 7/12 · Shop", with "✗ 3 tests" while tests fail
+/// and "testing" while they run. `doctor`: the startup doctor's checks done and all of them, while it checks.
+pub fn tab_title(controller: &Controller, summary: &Summary, doctor: Option<(usize, usize)>) -> String {
+    let exited = controller
+        .apps
+        .iter()
+        .zip(&controller.states)
+        .find(|(_, state)| matches!(state.status, Status::Exited(_) | Status::Error(_)))
+        .map(|(app, _)| app.name.as_str());
+    let state = match (doctor, summary.mark) {
+        (Some((done, total)), _) if done < total => format!("doctor {done}/{total}"),
+        (_, Some(Icon::Exited)) => match exited {
+            Some(app) => format!("{FAILED} {app} exited"),
+            None => format!("{FAILED} build failed"),
+        },
+        _ => summary.line(false),
+    };
+    let totals = controller.test_totals();
+    let tests = match () {
+        _ if controller.tests_active() => " · testing".to_string(),
+        _ if totals.failed > 0 => format!(" · {FAILED} {} tests", totals.failed),
+        _ => String::new(),
+    };
+    format!("{state}{tests} · {}", controller.project.name)
+}
+
+/// The escape sequences for the tab: its progress and its title (`tab_title`). While a task runs and nothing else is
+/// going on, the progress is the task's.
+pub fn tab_sequence(controller: &Controller, summary: &Summary, title: &str) -> String {
     let quiet = matches!(summary.progress, "0;0" | "1;100");
     let task = controller
         .tasks_running()
@@ -104,11 +135,23 @@ pub fn tab_sequence(controller: &Controller, summary: &Summary) -> String {
         .filter(|_| quiet)
         .map(|(task, started)| task_progress(started.elapsed().as_secs_f64(), controller.task_usual(&task.key)));
     let progress = task.unwrap_or_else(|| summary.progress.to_string());
-    let database = controller
-        .db_label
-        .as_ref()
-        .map_or(String::new(), |label| format!("{} · ", label.split(" @ ").next().unwrap_or(label)));
-    format!("\x1b]9;4;{progress}\x1b\\\x1b]0;lazyrunner · {database}{}\x07", summary.line(false))
+    format!("\x1b]9;4;{progress}\x1b\\\x1b]0;{title}\x07")
+}
+
+/// The title the console has now (Windows): a tool that shares it can change it under lazyrunner.
+#[cfg(windows)]
+pub fn console_title() -> Option<String> {
+    use windows_sys::Win32::System::Console::GetConsoleTitleW;
+    let mut buffer = vec![0u16; TITLE_CHARS];
+    // SAFETY: the buffer is valid for its length, which is what the call is told.
+    let length = unsafe { GetConsoleTitleW(buffer.as_mut_ptr(), buffer.len() as u32) } as usize;
+    (length > 0 && length < buffer.len()).then(|| String::from_utf16_lossy(&buffer[..length]))
+}
+
+/// Elsewhere a tool's output goes through lazyrunner, which drops what would retitle the terminal.
+#[cfg(not(windows))]
+pub fn console_title() -> Option<String> {
+    None
 }
 
 /// Puts the tab back as it was: no progress.
@@ -169,7 +212,7 @@ impl Title {
     #[cfg(windows)]
     pub fn save() -> Self {
         use windows_sys::Win32::System::Console::GetConsoleTitleW;
-        let mut buffer = vec![0u16; 1024];
+        let mut buffer = vec![0u16; TITLE_CHARS];
         // SAFETY: the buffer is valid for its length, which is what the call is told.
         let length = unsafe { GetConsoleTitleW(buffer.as_mut_ptr(), buffer.len() as u32) } as usize;
         Self((length > 0 && length < buffer.len()).then(|| {

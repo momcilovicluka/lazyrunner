@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.105.2] - 2026-11-23
+
+### Changed
+- The terminal tab's title says what's going on first, then the project, so even a narrow tab tells it: `● all up (5) · Shop`, `building Orders 40% · Shop`, `✗ Orders exited · Shop`, `doctor 7/12 · Shop`, with `· testing` while tests run and `· ✗ 3 tests` while some fail. It keeps up as things change.
+
+### Fixed
+- The tab no longer says `npm`: the startup doctor's version checks, the audit, coverage's installs and stopping Nx's daemon ran in lazyrunner's own console, where npm renames the window. They each get a hidden console of their own now, and if anything still retitles the tab, lazyrunner puts its title back within half a second.
+- The startup doctor's bar is a small rectangle for each check, side by side as before 1.105.1: `12 / 12 checks` is 12 of them, without gaps. The other bars that count things - the apps up while they start, a migration run's, the branch changes fixed - are drawn the same way.
+
 ## [1.105.1] - 2026-11-20
 
 ### Fixed

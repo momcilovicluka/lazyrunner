@@ -18,10 +18,10 @@ use super::seg::{Seg, aim, beads, eighths, focus_row, focus_seg, keycaps, limit,
 use super::theme::C;
 use super::{Overlay, Ui};
 
-/// The doctor's bar of checks done takes up to a third of the box's width, within these.
-const DOCTOR_BAR_SHARE: usize = 3;
+/// The doctor's bar has a bead a check, up to a quarter of the box's width (within these) - more checks share them.
+const DOCTOR_BAR_SHARE: usize = 4;
 const MIN_DOCTOR_BAR: usize = 10;
-const MAX_DOCTOR_BAR: usize = 40;
+const MAX_DOCTOR_BAR: usize = 30;
 
 pub const LOGO: [&str; 3] = [
     "█   ▄▀▄ ▀▀█ █ █ █▀▄ █ █ █▀▄ █▀▄ █▀▀ █▀▄",

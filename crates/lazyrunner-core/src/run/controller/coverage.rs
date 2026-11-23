@@ -42,11 +42,10 @@ impl Controller {
 /// Runs what adds one missing package; its last line when it fails.
 fn add(missing: &coverage_needs::Missing) -> Result<(), String> {
     let spec = missing.spec().map_err(|error| error.to_string())?;
-    let output = Command::new(&spec.program)
-        .args(&spec.args)
-        .current_dir(&spec.dir)
-        .output()
-        .map_err(|error| format!("{}: {error}", missing.suite))?;
+    let mut command = Command::new(&spec.program);
+    command.args(&spec.args).current_dir(&spec.dir);
+    let output =
+        crate::run::tools::own_console(&mut command).output().map_err(|error| format!("{}: {error}", missing.suite))?;
     if output.status.success() {
         return Ok(());
     }

@@ -540,9 +540,9 @@ mod tests {
         );
         assert_eq!((tick(jan, 1), tick(apr, 3)), (" Jan 2026".into(), " Apr 2026  · 3 months later".into()));
         assert!(risky(&items[1]) && !risky(&items[0]) && !risky(&migration("20260101000000_Address")));
-        assert_eq!(bar(1.0, 4), "▰▰ ▱▱ ▱▱ ▱▱ 1/4", "a bead a migration");
-        assert_eq!(bar(1.5, 4), "▰▰ ▱▱ ▱▱ ▱▱ 1/4", "half way to the next: a bead fills once it's reached");
-        assert_eq!(bar(2.0, 3), "▰▰▰ ▰▰▰ ▱▱▱ 2/3");
+        assert_eq!(bar(1.0, 4), "▰▱▱▱ 1/4", "a bead a migration");
+        assert_eq!(bar(1.5, 4), "▰▱▱▱ 1/4", "half way to the next: a bead fills once it's reached");
+        assert_eq!(bar(2.0, 3), "▰▰▱ 2/3");
     }
 
     #[test]

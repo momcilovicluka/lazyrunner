@@ -7,7 +7,7 @@ expression: frame
 
   ┌─ ✧ lazyrunner v<version> · startup doctor ───────────────────────────────────────────────────────────────┐
   │  DOCTOR  startup checks                                                                                │
-  │ ▰▰▰ ▰▰▰ ▰▰▰ ▰▰▰  4 / 4 checks   ✓ 3   ! 0   ✗ 1   – 0    · slowest .NET SDK 0.4 s                      │
+  │ ▰▰▰▰  4 / 4 checks   ✓ 3   ! 0   ✗ 1   – 0    · slowest .NET SDK 0.4 s                                 │
   │                                                                                                        │
   │  ENVIRONMENT ───────────────────────────────────────────────────────────────────────────────── ✓ 0.5 s │
   │   ✓ git                2.50                                                             0.1 s ▋        │

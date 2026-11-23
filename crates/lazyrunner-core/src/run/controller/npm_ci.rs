@@ -314,7 +314,7 @@ fn stop_nx_daemon(dir: &Path) {
     let Some(nx) = tools::nx_script(dir) else { return };
     let Some(node) = tools::find_on_path("node") else { return };
     let mut command = std::process::Command::new(node);
-    command.arg(nx).args(["daemon", "--stop"]).current_dir(dir);
+    tools::own_console(command.arg(nx).args(["daemon", "--stop"]).current_dir(dir));
     command.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
     let Ok(mut process) = command.spawn() else {
         return;

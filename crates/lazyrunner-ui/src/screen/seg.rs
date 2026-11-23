@@ -258,8 +258,6 @@ pub fn focus_row(segs: Vec<Seg>, cells: usize) -> Vec<Seg> {
 
 /// The blocks that fill a cell from its left an eighth at a time: `EIGHTHS[n - 1]` is `n` eighths.
 pub const EIGHTHS: [&str; 8] = ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
-/// The widest a bead gets with room to spare.
-const WIDEST_BEAD: usize = 3;
 /// A gauge's cell reached, and one it leaves empty.
 const BEAD: &str = "▰";
 const TRACK: &str = "▱";
@@ -286,21 +284,14 @@ pub fn gauge(share: f64, cells: usize) -> (String, String) {
     (BEAD.repeat(filled), TRACK.repeat(cells - filled))
 }
 
-/// A bead for each of `total` things, the `done` ones filled, in `room` cells at most: `▰▰▰▱` is 3 of 4. With room to
-/// spare each bead is wider, up to `WIDEST_BEAD` cells, and a gap parts them so they still count: `▰▰ ▰▰ ▱▱`. With more
-/// things than `room`, the share of `room` beads (`gauge`).
+/// A bead for each of `total` things, the `done` ones filled, packed together: `▰▰▰▱` is 3 of 4. With more things than
+/// `room`, the share of `room` beads (`gauge`), so a bar never runs wider than its place.
 pub fn beads(done: usize, total: usize, room: usize) -> (String, String) {
     if total > room {
         return gauge(done as f64 / total as f64, room);
     }
     let done = done.min(total);
-    let wide = ((room + 1) / total.max(1)).saturating_sub(1).min(WIDEST_BEAD);
-    if wide < 2 {
-        return (BEAD.repeat(done), TRACK.repeat(total - done));
-    }
-    let row = |glyph: &str, count: usize| vec![glyph.repeat(wide); count].join(" ");
-    let gap = if done > 0 && done < total { " " } else { "" };
-    (row(BEAD, done), format!("{gap}{}", row(TRACK, total - done)))
+    (BEAD.repeat(done), TRACK.repeat(total - done))
 }
 
 /// `text` padded with spaces (or cut) to exactly `cells` cells.
@@ -515,10 +506,9 @@ mod tests {
         assert_eq!(gauge(1.0, 3), ("▰▰▰".to_string(), String::new()));
         assert_eq!(gauge(0.0, 3), (String::new(), "▱▱▱".to_string()));
         assert_eq!(gauge(f64::NAN, 2), (String::new(), "▱▱".to_string()));
-        assert_eq!(beads(12, 12, 20), ("▰".repeat(12), String::new()), "a bead a thing");
-        assert_eq!(beads(3, 12, 40), (["▰▰"; 3].join(" "), format!(" {}", ["▱▱"; 9].join(" "))), "wider");
-        assert_eq!(beads(1, 2, 30), ("▰▰▰".to_string(), " ▱▱▱".to_string()), "no wider than three cells");
-        assert_eq!(beads(2, 2, 30), ("▰▰▰ ▰▰▰".to_string(), String::new()));
+        assert_eq!(beads(12, 12, 30), ("▰".repeat(12), String::new()), "a bead a thing");
+        assert_eq!(beads(11, 12, 30), ("▰".repeat(11), "▱".to_string()), "packed, however much room");
+        assert_eq!(beads(1, 2, 30), ("▰".to_string(), "▱".to_string()));
         assert_eq!(beads(5, 40, 10), ("▰".to_string(), "▱".repeat(9)), "more than there's room for: a share");
         assert_eq!(beads(0, 0, 10), (String::new(), String::new()));
     }

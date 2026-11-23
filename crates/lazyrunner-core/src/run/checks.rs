@@ -131,13 +131,9 @@ pub fn version_line(output: &str) -> Option<String> {
 }
 
 fn tool_version(program: &PathBuf, args: &[&str]) -> Option<String> {
-    let mut child = Command::new(program)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .ok()?;
+    let mut command = Command::new(program);
+    command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = tools::own_console(&mut command).spawn().ok()?;
     let started = Instant::now();
     let status = loop {
         match child.try_wait() {
