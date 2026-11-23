@@ -159,6 +159,9 @@ fn chips(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(seg(format!("   {} following {who}", icons::icon(ui.nerd, Icon::Watching)), C::Magenta));
     }
     segs.extend(super::task_chips::chips(ui, controller));
+    if let Some(pinned) = super::save_points::chip(ui, controller) {
+        segs.push(pinned.at(Target::Screen(super::screens::Screen::Database))); // a click opens d
+    }
     if let Some((at, of)) = ui.jumps.count() {
         segs.push(seg(format!("   {} {at}/{of}", icons::icon(ui.nerd, Icon::Back)), C::DarkCyan));
     }

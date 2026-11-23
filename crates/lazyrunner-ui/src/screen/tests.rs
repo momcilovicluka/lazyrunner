@@ -538,6 +538,70 @@ async fn database_picker() {
 }
 
 #[tokio::test]
+async fn database_save_points() {
+    use lazyrunner_core::run::controller::Counts;
+    use lazyrunner_core::run::controller::save_points::db_key;
+    use lazyrunner_core::run::save_points::{Kind as PointKind, SavePoint, Table};
+
+    let mut screen = screen("snap-save-points", json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{
+  \"DefaultConnection\": \"Server=localhost;Database=Shop;Trusted_Connection=True\"
+}
+";
+    std::fs::write(&path, secrets).unwrap();
+    let groups = lazyrunner_core::run::secrets::groups(secrets);
+    let picker =
+        Picker { path, groups, group: 0, index: 0, top: 0, filter: String::new(), filtering: false, new_name: None };
+    screen.ui.picker = Some(picker);
+    let table = |name: &str, rows: u64, checksum: Option<i64>| Table {
+        schema: "dbo".into(),
+        name: name.into(),
+        rows,
+        checksum,
+    };
+    let local = |hour: i8, minute: i8| {
+        let at = jiff::civil::Date::new(2026, 11, 23).unwrap().at(hour, minute, 0, 0);
+        lazyrunner_core::time::rfc3339(&at.to_zoned_datetime(jiff::tz::TimeZone::system()).unwrap())
+    };
+    let then = vec![table("AuditLog", 88_020, None), table("Drafts", 47, Some(1)), table("Approvals", 412, Some(5))];
+    let point = |id: &str, label: &str, created: String, kind| SavePoint {
+        id: id.into(),
+        label: label.into(),
+        kind,
+        database: "Shop".into(),
+        server: "localhost".into(),
+        created,
+        snapshot: (kind == PointKind::Snapshot).then(|| id.to_string()),
+        backup: None,
+        pinned: false,
+        tables: then.clone(),
+        gone: false,
+    };
+    screen.controller.save_points = vec![
+        point("Shop_lr_20261123091500", "after import", local(9, 15), PointKind::Backup),
+        point("Shop_lr_20261123104200", "before approval", local(10, 42), PointKind::Snapshot),
+    ];
+    let now = vec![table("AuditLog", 88_032, None), table("Drafts", 45, Some(1)), table("Approvals", 412, Some(6))];
+    let counts = Counts { tables: now, at: Some(screen.ui.now), error: None, reading: None };
+    screen.controller.db_counts.insert(db_key("localhost", "Shop"), counts);
+    insta::assert_snapshot!(screen.frame());
+
+    screen.press("R");
+    let pinned: Vec<&str> =
+        screen.controller.save_points.iter().filter(|point| point.pinned).map(|point| point.label.as_str()).collect();
+    assert_eq!(pinned, ["before approval"], "the newest is picked");
+    assert!(screen.frame().contains("⟲ before approval"), "the status bar says it's pinned: {}", screen.frame());
+    screen.press("Tab j");
+    assert!(screen.ui.save_view.on_rail && screen.ui.save_view.picked == 1);
+    assert!(screen.frame().contains("j k pick a save point"), "{}", screen.frame());
+    screen.press("F2 ! Enter");
+    assert!(screen.controller.save_points.iter().any(|point| point.label == "after import!"));
+    screen.press("Esc");
+    assert!(!screen.ui.save_view.on_rail && screen.ui.picker.is_some(), "Esc leaves the rail first");
+}
+
+#[tokio::test]
 async fn startup_checklist() {
     let mut screen = screen("snap-checklist", json!({}));
     let item = |name: &str, status, detail: &str| Item { name: name.into(), status, detail: detail.into() };
@@ -3349,7 +3413,12 @@ async fn a_box_is_drawn_over_its_context_dimmed_and_the_context_isnt_clickable()
     screen.ui.behind = Some(Overlay::Migrations { index: 0, picking: None });
     let lines = vec!["Revert 1 migration of Shop?".to_string()];
     let risk = super::migrations::Risk::LosesData;
-    screen.ui.overlay = Some(Overlay::Confirm(Box::new(super::migrations::Confirm { lines, jobs: Vec::new(), risk })));
+    screen.ui.overlay = Some(Overlay::Confirm(Box::new(super::migrations::Confirm {
+        lines,
+        jobs: Vec::new(),
+        risk,
+        save_point: None,
+    })));
     let confirm = screen.frame();
     assert!(
         confirm.contains("MIGRATIONS") && confirm.contains("Revert 1 migration"),

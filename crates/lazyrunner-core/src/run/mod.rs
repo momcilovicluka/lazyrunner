@@ -33,8 +33,10 @@ pub mod otlp;
 pub mod ports;
 pub mod profile;
 pub mod requests;
+pub mod save_points;
 pub mod secrets;
 pub mod session;
+pub mod sql;
 pub mod suites;
 pub mod test_history;
 pub mod tools;
@@ -174,6 +176,11 @@ pub enum Event {
     /// What coverage needs is added (the startup checklist's fix, #33): what didn't add, if something didn't.
     CoverageInstalled {
         result: Result<(), String>,
+    },
+    /// A database job's news (#110): its share done, a save point made, a rewind done, the tables counted.
+    Sql {
+        job: u64,
+        news: save_points::News,
     },
 }
 

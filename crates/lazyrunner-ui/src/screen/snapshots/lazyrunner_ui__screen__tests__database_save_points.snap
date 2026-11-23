@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
+ DefaultConnection · secrets.json · 1 connection strings · the active one ●
+ j k choose · Enter switch + restart the APIs · s snapshot · S backup · r rewind · R pin · u changes
+ Tab save points · n new (a copy) · / filter · y copy row · Esc back
+
+   DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SWITCHED TO
+ ● Shop @ localhost              – local          -               -               -
+
+ SAVE POINTS · Shop                               SINCE "before approval" · 10:42            3 tables changed
+  ⡗ ◉  now  ◂ you are here                                      removed │ added
+  ⡇    +12 −2 rows in 2 tables, ~1 changed         AuditLog             │▰▰▰▰▰▰▰▰▰▰   +12     88 020 → 88 032
+  ⡇ ◆  before approval  10:42  snapshot            Drafts             ▰▰│              −2         47 → 45
+  ⡇                                                Approvals            ◆            ~ changed        412
+  ⡇ ◇  after import  09:15  backup
+
+
+
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

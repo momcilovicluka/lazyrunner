@@ -2,7 +2,7 @@
 //! checked as the screen opens, the dots breathing meanwhile - the apps that use it, its pending migrations and when
 //! you last switched to it. `Enter` switches and restarts the APIs; `n` adds one (a copy), `/` filters, `y` copies a
 //! row, `h` `l` another key, `Esc` goes back. Its rows come in one after another as it opens, and each answer flashes
-//! as it arrives.
+//! as it arrives. Under them, the highlighted database's save points and what changed since ([`super::save_points`]).
 
 use std::collections::HashMap;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -170,7 +170,8 @@ fn parts(ui: &Ui, controller: &Controller, entry: &Entry) -> [Seg; 5] {
     let pending = if pending > 0 { seg(format!("{pending} pending"), C::Yellow) } else { seg("-", C::DarkGray) };
     let last = controller.config[SWITCHED][&entry.label].as_str().and_then(ago).unwrap_or_else(|| "-".to_string());
     let label = seg(entry.label.clone(), if entry.active { C::Green } else { C::Gray });
-    [label, answer(ui, &entry.server), seg(apps, C::Gray), pending, seg(last, C::DarkGray)]
+    let apps = super::save_points::apps_back(ui, controller, entry).unwrap_or_else(|| seg(apps, C::Gray));
+    [label, answer(ui, &entry.server), apps, pending, seg(last, C::DarkGray)]
 }
 
 /// Each column's width and the gap between them for `cells`: each as wide as the most it holds (its title at least,
@@ -242,8 +243,12 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         " type to filter · Enter keeps it · Esc clears it".to_string()
     } else if picker.new_name.is_some() {
         " type the database name · Enter adds it (inactive) · Esc cancels".to_string()
+    } else if let Some(hint) = super::save_points::hint(ui) {
+        hint.to_string()
     } else {
-        " j k choose · Enter switch + restart the APIs · n new (a copy) · / filter · y copy row · Esc back".to_string()
+        " j k choose · Enter switch + restart the APIs · s snapshot · S backup · r rewind · R pin · u changes · Tab \
+         save points · n new (a copy) · / filter · y copy row · Esc back"
+            .to_string()
     };
     lines.extend(super::viewbar::keys(&hint, cells));
     if picker.filtering || !picker.filter.is_empty() {
@@ -264,7 +269,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     if entries.is_empty() {
         lines.push(vec![seg("   nothing matches", C::DarkGray)]);
     }
-    let room = rows.saturating_sub(lines.len() + 2).max(1);
+    let lower = if entries.is_empty() { 0 } else { super::save_points::LOWER_LEAST };
+    let room = rows.saturating_sub(lines.len() + 2 + lower).max(1).min(entries.len().max(1));
     let (index, mut top) = (picker.index, picker.top);
     if index < top {
         top = index;
@@ -277,6 +283,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         let comes = ROW_STAGGER * shown as u32;
         let picked = (at == bar).then_some(cells);
         let mut line = super::columns::fit(row(entry, parts, (widths, gap), picked, flashing(ui, entry)), cells);
+        if let Some(through) = super::save_points::glint(ui, entry) {
+            line = super::seg::sweep(line, through, cells, C::Black, C::Cyan);
+        }
         match opened {
             Some(since) if since < comes => line = Vec::new(),
             Some(since) if since < comes + ROW_DIM && at != index => {
@@ -292,6 +301,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     }
     if let Some(picker) = ui.picker.as_mut() {
         picker.top = top;
+    }
+    let left = rows.saturating_sub(lines.len() + 1);
+    if left > 0 && !entries.is_empty() {
+        lines.push(Vec::new());
+        lines.extend(super::save_points::rows(ui, controller, cells, left));
     }
     lines.truncate(rows);
     lines.resize(rows, Vec::new());

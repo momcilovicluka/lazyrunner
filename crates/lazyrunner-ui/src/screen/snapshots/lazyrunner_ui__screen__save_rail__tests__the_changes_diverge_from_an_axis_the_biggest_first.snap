@@ -1,0 +1,11 @@
+---
+source: crates/lazyrunner-ui/src/screen/save_rail.rs
+expression: "text(&panel(&changes, 100, 12))"
+---
+ SINCE "before approval" · 10:42                                  4 tables changed · u counts again
+                      removed │ added
+  AuditLog                    │▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰   +12     88 020 → 88 032
+  OrderLines                  │▰▰▰▰                +3      5 310 → 5 313
+  Drafts                   ▰▰▰│                    −2         47 → 45
+  Orders                      │▰▰                  +1      1 204 → 1 205
+  Approvals                   ◆                  ~ changed        412

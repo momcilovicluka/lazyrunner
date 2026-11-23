@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.106.0] - 2026-11-23
+
+### Added
+- Save points of a database, to check the same case again (#110): on the database screen (`d`), `s` makes a save point of the highlighted database - a SQL Server snapshot, made in a moment whatever its size - and `S` one that's a `COPY_ONLY` backup in the server's own backup folder, slower but as many as you like. Each is named `before 10:42` (`F2` renames it) and keeps every table's row count, and a checksum of the small ones, as they were. `r` rewinds the database to the picked one: after a yes that says what's lost - what changed since, who else is connected and gets cut off, and the other snapshot save points of the database, which SQL Server needs dropped first - the .NET apps on it stop, it's restored, and they start again. `Del` drops a save point's snapshot (a backup's file stays). SQL runs through `sqlcmd`, which reads the password from its environment, never from its command line.
+- `R` pins a save point: a restart you ask for (`r`, `R`, `restart_apps`) then rewinds to it first, so trying the same action after each fix needs no reset by hand - `"rewindPinned": "everyRestart"` makes the restarts after a code change rewind too. A start meanwhile waits for the rewind. The status bar says so, `⟲ before 10:42`, breathing while a rewind holds a restart.
+- What changed since: under the databases, the highlighted one's save points are a rail - `◉ now`, you are here, on top, `◆` snapshots and `◇` backups below, the stretch down to the picked one saying `+16 −2 rows in 5 tables` - and beside it its tables' changes as bars from an axis, added growing right in green, removed left in red, a table whose rows changed though their count didn't an amber `◆`, the biggest change first. They're counted as the screen opens and with `u`; `Tab` gives the rail the keys, to pick another save point. A snapshot dropped outside lazyrunner shows as gone.
+- It moves: a new save point drops onto the rail with a ripple while its database's row glints; a rewind glides "you are here" down to the save point as the server restores (a backup's own percentages), draining the stretch it crosses, the bars shrinking to their axis and their numbers rolling back, the apps' dots lighting again as each answers. The bars grow from the axis row after row as the screen opens and tween to new counts. None of it moves with reduced motion.
+- MCP: `save_point` makes one, `rewind` goes back to one (with `"confirm": true`), and `database_changes` says what changed since one, table by table - so an agent can rewind between its attempts and read what each one touched. `get_status` lists the save points (#110).
+
 ## [1.105.3] - 2026-11-23
 
 ### Fixed

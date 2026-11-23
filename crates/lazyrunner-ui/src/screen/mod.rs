@@ -53,6 +53,8 @@ pub mod reload;
 pub mod repeat;
 pub mod request_waterfall;
 pub mod requests;
+pub mod save_points;
+pub mod save_rail;
 pub mod screens;
 pub mod seen;
 pub mod seg;
@@ -483,6 +485,8 @@ pub struct Ui {
     pub db_reach: Option<database::Reachability>,
     /// The database screen's rows coming in and answers flashing.
     pub db_motion: database::Motion,
+    /// The database screen's save points: the rail's keys, the picked one, their motion (#110).
+    pub save_view: save_points::View,
     /// The resumed apps whose columns fade in once they run, and the fades under way, by app (#85).
     pub restoring: Vec<String>,
     pub fades: HashMap<String, Instant>,
@@ -641,6 +645,7 @@ impl Ui {
             help_filter: String::new(),
             db_reach: None,
             db_motion: database::Motion::default(),
+            save_view: save_points::View::default(),
             restoring: Vec::new(),
             fades: HashMap::new(),
             help_typing: false,
@@ -893,6 +898,7 @@ impl Ui {
             || request_waterfall::animating(self)
             || screens::animating(self)
             || database::animating(self)
+            || save_points::animating(self, controller)
             || session::animating(self)
             || durations::animating(self)
             || problems::animating(self)
@@ -993,7 +999,7 @@ pub fn draw(frame: &mut Frame, ui: &mut Ui, controller: &Controller) {
         let body = body(ui, controller, width, body_height);
         // A screen switched to from another slides in; it doesn't open from its middle as well; a box over its context
         // opens over it (`under_bar`).
-        let over_context = ui.picker.is_none() && ui.overlay.as_ref().is_some_and(boxed_over);
+        let over_context = over_its_context(ui);
         let opened = if screens::sliding(ui) || over_context { 1.0 } else { opened };
         let mut rows = reveal(body, opened);
         // A box that just closed wipes closed over what's back.
@@ -1097,9 +1103,16 @@ fn boxed_over(overlay: &Overlay) -> bool {
     )
 }
 
+/// Whether a box is open over its context: not over the database screen - but its y/n box is (#110).
+fn over_its_context(ui: &Ui) -> bool {
+    let over_picker = ui.picker.is_none() || matches!(ui.overlay, Some(Overlay::Confirm(_)));
+    over_picker && ui.overlay.as_ref().is_some_and(boxed_over)
+}
+
 /// The body: a full screen under the bar of screens, else what's open over the columns, else the columns.
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     flame::open_fresh(ui, controller);
+    save_points::poll(ui, controller);
     let screen = screens::current(ui);
     if screen != ui.last_screen {
         if let (Some(from), Some(to)) = (ui.last_screen, screen) {
@@ -1116,7 +1129,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
 
 /// What's open over the columns, else the columns; a box opening from its middle over its context, dimmed.
 fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
-    let over_context = ui.picker.is_none() && ui.overlay.as_ref().is_some_and(boxed_over);
+    let over_context = over_its_context(ui);
     let shown = overlay_rows(ui, controller, width, rows);
     if !over_context {
         return shown;
@@ -1159,6 +1172,7 @@ fn context(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> V
 fn overlay_rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     match &ui.overlay {
         Some(Overlay::Checklist(_)) => return overlays::checklist(ui, width, rows),
+        Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         _ if ui.picker.is_some() => return database::rows(ui, controller, width, rows),
         Some(Overlay::Palette { .. }) => return palette::rows(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),
@@ -1186,7 +1200,6 @@ fn overlay_rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize)
         Some(Overlay::Health { .. }) => return health::rows(ui, controller, width, rows),
         Some(Overlay::Flame(_)) => return flame::rows(ui, controller, width, rows),
         Some(Overlay::Code(_)) => return code::rows(ui, controller, width, rows),
-        Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
         Some(Overlay::Menu { .. } | Overlay::Settings { .. }) => return overlays::menu(ui, controller, width, rows),
         Some(Overlay::Themes { .. }) => return with_theme_picker(ui, controller, width, rows),
         Some(Overlay::About { .. }) => return about::rows(ui, controller, width, rows),

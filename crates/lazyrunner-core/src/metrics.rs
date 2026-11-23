@@ -14,6 +14,26 @@ pub fn machine_memory_mb() -> f32 {
     })
 }
 
+/// The processes of the trees under `roots`, the roots too: who is lazyrunner's own among a database's sessions.
+pub fn tree_pids(roots: &[u32]) -> std::collections::HashSet<u32> {
+    let mut system = System::new();
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+    let mut children: HashMap<Pid, Vec<Pid>> = HashMap::new();
+    for (pid, process) in system.processes() {
+        if let Some(parent) = process.parent() {
+            children.entry(parent).or_default().push(*pid);
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut pending: Vec<Pid> = roots.iter().map(|root| Pid::from_u32(*root)).collect();
+    while let Some(pid) = pending.pop() {
+        if seen.insert(pid.as_u32()) {
+            pending.extend(children.get(&pid).into_iter().flatten().copied());
+        }
+    }
+    seen
+}
+
 /// CPU and memory of whole process trees (dotnet run and its API, npm and node): what an app costs.
 pub struct TreeSampler {
     system: System,
@@ -70,6 +90,11 @@ impl TreeSampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tree_holds_its_root() {
+        assert!(tree_pids(&[std::process::id()]).contains(&std::process::id()));
+    }
 
     #[test]
     fn a_tree_sums_its_processes() {

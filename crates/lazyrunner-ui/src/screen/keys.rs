@@ -58,6 +58,7 @@ pub fn key_name(key: &KeyEvent) -> String {
 pub fn prompt(ui: &Ui) -> bool {
     ui.search.as_ref().is_some_and(|search| search.typing)
         || ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
+        || super::save_points::typing(ui)
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Sheet { typing: Some(_), .. }))
@@ -1051,10 +1052,20 @@ fn open_picker(ui: &mut Ui, controller: &mut Controller) {
     ui.db_reach = Some(super::database::check(&entries));
     ui.db_motion = super::database::Motion::opened(ui.now);
     ui.picker = Some(picker);
+    super::save_points::opened(ui, controller);
 }
 
 fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
+    picker_keys(ui, controller, name, key);
+    super::save_points::follow_highlight(ui, controller);
+}
+
+fn picker_keys(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
     if super::screens::switch_key(ui, controller, name) {
+        return;
+    }
+    let typing = ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
+    if !typing && super::save_points::key(ui, controller, name, typed(key)) {
         return;
     }
     let Some(picker) = ui.picker.as_mut() else { return };

@@ -250,7 +250,7 @@ pub fn current(ui: &Ui) -> Option<Screen> {
 /// Whether the open screen takes typed text now: its keys are letters then.
 fn typing(ui: &Ui) -> bool {
     if let Some(picker) = &ui.picker {
-        return picker.filtering || picker.new_name.is_some();
+        return picker.filtering || picker.new_name.is_some() || super::save_points::typing(ui);
     }
     match &ui.overlay {
         Some(Overlay::Requests(view)) => view.typing || view.url_edit.is_some(),

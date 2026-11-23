@@ -44,6 +44,9 @@ impl Controller {
             let started = only.map_or_else(|| self.keys(), <[String]>::to_vec);
             self.forget_crashes(&started); // a start by hand; a restart after a crash keeps its count
         }
+        if self.start_waits_for_rewind(only, force_build) {
+            return;
+        }
         if self.wait_for_ports(only, force_build) || self.wait_for_compose_stops(only, force_build) {
             return;
         }

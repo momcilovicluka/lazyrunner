@@ -29,11 +29,20 @@ const TAIL: usize = 30;
 /// The y/n box's widest text.
 const CONFIRM_INNER: usize = 90;
 
-/// What the y/n box does on a yes: these contexts move (key, target migration, what the log says); how much it risks.
+/// What the y/n box does on a yes: these contexts move (key, target migration, what the log says), or a save point
+/// is rewound to or dropped (#110); how much it risks.
 pub struct Confirm {
     pub lines: Vec<String>,
     pub jobs: Vec<(String, Option<String>, String)>,
     pub risk: Risk,
+    pub save_point: Option<SavePointYes>,
+}
+
+/// What a yes does to a save point, by its id.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SavePointYes {
+    Rewind(String),
+    Forget(String),
 }
 
 /// What a yes risks: nothing much (applying), a revert through Down(), or a step that drops or deletes data.
@@ -202,7 +211,7 @@ pub(super) fn apply_pending(ui: &mut Ui, controller: &mut Controller, keys: &[St
         controller.add_log(text, Hue::DarkGray);
         return;
     }
-    ask(ui, Confirm { lines, jobs, risk });
+    ask(ui, Confirm { lines, jobs, risk, save_point: None });
 }
 
 /// m: moves a context to the chosen migration (`at`, oldest first) - forward applies up to it, back reverts the
@@ -257,7 +266,8 @@ fn migrate_to(ui: &mut Ui, controller: &mut Controller, context: &Context, at: u
         true => Risk::Apply,
         false => Risk::Revert,
     };
-    ask(ui, Confirm { lines, jobs: vec![(context.key(), Some(migration.id.clone()), what)], risk });
+    let jobs = vec![(context.key(), Some(migration.id.clone()), what)];
+    ask(ui, Confirm { lines, jobs, risk, save_point: None });
 }
 
 /// The y/n box: y / Enter does it, n / Esc doesn't.
@@ -265,6 +275,10 @@ pub fn confirm_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     match name {
         "y" | "Enter" => {
             if let Some(Overlay::Confirm(confirm)) = ui.overlay.take() {
+                if let Some(yes) = confirm.save_point {
+                    super::save_points::yes(controller, yes);
+                    return;
+                }
                 if confirm.jobs.iter().all(|(_, target, _)| target.is_none()) {
                     let keys = confirm.jobs.iter().map(|(key, ..)| key.clone()).collect();
                     ui.again = Some(super::repeat::Again::Migrations(keys));

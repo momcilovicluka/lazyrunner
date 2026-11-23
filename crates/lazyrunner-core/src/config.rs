@@ -120,6 +120,7 @@ pub fn defaults() -> Map<String, Value> {
         "terminal": "",
         "layout": "auto",
         "frameRate": "auto",
+        "rewindPinned": "manualRestarts",
         "updateRepoUrl": "",
         "updateBranch": "",
     }) else {
