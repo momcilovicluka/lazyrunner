@@ -172,6 +172,24 @@ pub fn active_label(text: &str) -> Option<String> {
     })
 }
 
+/// The connection string an entry's line holds now, password and all: for running SQL on it, never to show.
+pub fn connection_value(text: &str, entry: &Entry) -> Option<String> {
+    let now = current(text, entry).ok()?;
+    let line = lines(text).into_iter().nth(now.line)?;
+    let found = LINE.captures(&line)?;
+    serde_json::from_str(&format!("\"{}\"", &found["value"])).ok()
+}
+
+/// A connection string in the file for `database` on `server` (ignoring case), the active ones first.
+pub fn connection_for(text: &str, server: &str, database: &str) -> Option<String> {
+    let mut found: Vec<Entry> = connections(text)
+        .into_iter()
+        .filter(|entry| entry.server.eq_ignore_ascii_case(server) && entry.database.eq_ignore_ascii_case(database))
+        .collect();
+    found.sort_by_key(|entry| !entry.active);
+    found.iter().find_map(|entry| connection_value(text, entry))
+}
+
 /// Line `index` of the file as it is there, and the key it sets: `y` in the picker copies it. `None` when that line
 /// isn't a connection string (the file changed since it was read).
 pub fn line_at(text: &str, index: usize) -> Option<(String, String)> {
@@ -414,6 +432,21 @@ mod tests {
         let added = connections(&text).into_iter().find(|entry| entry.database == "ShopTest").unwrap();
         assert!(!added.active, "added inactive");
         assert!(add(&path, &local, "bad;name").is_err());
+    }
+
+    #[test]
+    fn a_connection_string_is_read_whole_for_its_server_and_database_the_active_one_first() {
+        let text = "{\n  //\"Db\": \"Server=localhost;Database=Shop;User Id=old;Password=a\\\"b\",\n  \"Db\": \"Server=localhost;Database=Shop;User Id=new;Password=c\"\n}";
+        let entries = connections(text);
+        assert_eq!(
+            connection_value(text, &entries[0]).as_deref(),
+            Some("Server=localhost;Database=Shop;User Id=old;Password=a\"b")
+        );
+        assert_eq!(
+            connection_for(text, "LOCALHOST", "shop").as_deref(),
+            Some("Server=localhost;Database=Shop;User Id=new;Password=c")
+        );
+        assert_eq!(connection_for(text, "localhost", "Other"), None);
     }
 
     #[test]

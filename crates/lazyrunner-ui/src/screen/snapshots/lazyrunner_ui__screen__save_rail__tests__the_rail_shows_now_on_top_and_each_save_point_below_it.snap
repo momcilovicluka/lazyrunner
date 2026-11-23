@@ -1,0 +1,12 @@
+---
+source: crates/lazyrunner-ui/src/screen/save_rail.rs
+expression: "text(&rail(&sample(), 90, 20))"
+---
+ SAVE POINTS · Shop
+  ⡗ ◉  now  ◂ you are here
+  ⡇    +16 −2 rows in 5 tables since "before approval"
+  ⡇ ◆  before approval  10:42  snapshot · ⟲ pinned
+  ⡇
+  ⡇ ◇  after import  09:15  backup
+  ⡇
+  ⡇ ◌  before 08:00  gone - dropped outside lazyrunner

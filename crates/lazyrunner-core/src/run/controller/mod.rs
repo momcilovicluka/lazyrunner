@@ -27,6 +27,7 @@ mod npm_ci;
 mod overrides;
 mod parallel;
 pub mod profile;
+pub mod save_points;
 mod session;
 mod stack;
 mod start;
@@ -68,6 +69,7 @@ pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_h
 pub use launch::Choice;
 pub use migrations::{EfJob, Work};
 pub use overrides::Override;
+pub use save_points::{Counts, DbDone, DbWork, Doing, Pending, Sessions};
 pub use stack::{Database, Minute};
 pub use suites::{TestBuild, Totals};
 pub use test_watch::TestWatch;
@@ -331,6 +333,16 @@ pub struct Controller {
     pub otlp_port: Option<u16>,
     task_results: HashMap<String, tasks::TaskResult>,
     metric_roots: Arc<Mutex<Vec<(String, u32)>>>,
+    /// The database's save points (#110), the database job running and the last one done, and each database's tables
+    /// as last counted.
+    pub save_points: Vec<super::save_points::SavePoint>,
+    pub db_work: Option<DbWork>,
+    pub db_done: Option<DbDone>,
+    pub db_counts: HashMap<String, Counts>,
+    /// What runs SQL (sqlcmd; tests put a script in its place), and the secrets.json the tests use instead of the
+    /// apps' own.
+    pub(crate) sql: Arc<dyn super::sql::Sql>,
+    pub(crate) secrets_at: Option<PathBuf>,
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
     pub(crate) commands: Arc<dyn super::tools::Commands>,
     pub(crate) now: fn() -> Instant,
@@ -355,6 +367,7 @@ impl Controller {
         let mut runs = diff::load(&state_dir);
         let audits = crate::run::audit::load(&state_dir);
         let kept_levels = log_levels::load(&state_dir);
+        let save_points = super::save_points::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
             state.view = apptypes::column_view(&config, &state.key);
@@ -505,6 +518,12 @@ impl Controller {
             otlp_port,
             task_results: HashMap::new(),
             metric_roots,
+            save_points,
+            db_work: None,
+            db_done: None,
+            db_counts: HashMap::new(),
+            sql: Arc::new(super::sql::Sqlcmd),
+            secrets_at: None,
             commands: Arc::new(super::tools::Tools),
             now: Instant::now,
             reserved: super::net::reserved_ranges,
@@ -767,6 +786,7 @@ impl Controller {
             Event::HookFailed { event, run, problem } => self.hook_failed(&event, &run, &problem),
             Event::ComposeServices { key, generation, services } => self.compose_arrived(key, generation, services),
             Event::ComposePorts { key, ports } => self.compose_ports_arrived(key, ports),
+            Event::Sql { job, news } => self.sql_news(job, news),
         }
     }
 
@@ -869,6 +889,12 @@ impl Controller {
     }
 
     pub fn restart(&mut self, reason: &str, only: Option<&[String]>, force_build: bool) {
+        self.restart_from(reason, only, force_build, false);
+    }
+
+    /// A restart, `by_hand` when you asked for it (a key, the command line, an agent): with a save point pinned, it
+    /// rewinds there first when `"rewindPinned"` says so.
+    pub(crate) fn restart_from(&mut self, reason: &str, only: Option<&[String]>, force_build: bool, by_hand: bool) {
         let kept = if only.is_some() { Vec::new() } else { self.kept_keys(true) };
         let stop_keys: Option<Vec<String>> = match only {
             Some(only) => Some(only.to_vec()),
@@ -879,6 +905,9 @@ impl Controller {
         self.add_log(format!("Restarting{names} ({reason})"), Hue::Cyan);
         if stop_keys.is_some() || kept.is_empty() {
             self.stop(stop_keys.as_deref(), true);
+        }
+        if self.rewind_pinned_first(by_hand, only, force_build) {
+            return;
         }
         self.start(only, force_build);
     }

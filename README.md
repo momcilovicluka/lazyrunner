@@ -520,6 +520,52 @@ the screen opens, `◌ checking` breathing meanwhile, then `● 12 ms` or `✗ n
 pipe) - the apps on the active one, how many migrations are pending on that database, and when you last switched to
 it. `/` filters, `h` `l` pick another key when there are several.
 
+### Save points
+
+To check the same case again - a bug that needs the data in one state, which the action under test changes - make a
+save point first and rewind to it after each try. Under the databases, the highlighted one's save points are a rail:
+
+```text
+ SAVE POINTS · Shop                               SINCE "before approval" · 10:42            3 tables changed
+  ⡗ ◉  now  ◂ you are here                                      removed │ added
+  ⡇    +12 −2 rows in 2 tables, ~1 changed         AuditLog             │▰▰▰▰▰▰▰▰▰▰   +12     88 020 → 88 032
+  ⡇ ◆  before approval  10:42  snapshot            Drafts             ▰▰│              −2         47 → 45
+  ⡇                                                Approvals            ◆            ~ changed        412
+  ⡇ ◇  after import  09:15  backup
+```
+
+| Key | Does |
+|-----|------|
+| `s` | A save point of the highlighted database: a SQL Server database snapshot, made in a moment whatever its size (copy-on-write, beside its data files) |
+| `S` | A save point that's a `COPY_ONLY` backup, in the server's own backup folder: slower, but as many as you like |
+| `r` | Rewinds the database to the picked save point, after a yes that says what's lost |
+| `R` | Pins the picked save point (again: unpins it): a restart rewinds to it first |
+| `u` | Counts the rows again |
+| `Tab` | Gives the rail the keys: `j` `k` pick a save point, `F2` renames it, `Del` drops it (a snapshot is dropped on the server; a backup's file stays), `Esc` goes back to the databases |
+
+A save point is named `before 10:42` and keeps each table's row count - and a checksum of the tables with at most
+50 000 rows, so rows changed in place show too. Beside the rail, what changed since the picked one: rows added grow
+right in green, removed left in red, a table whose rows changed though their count didn't is an amber `◆`, the
+biggest change first. They're counted as the screen opens and with `u`.
+
+Rewinding stops the .NET apps on the database, takes it for itself (`SET SINGLE_USER WITH ROLLBACK IMMEDIATE`),
+restores it (`RESTORE DATABASE … FROM DATABASE_SNAPSHOT`, or from the backup's file) and gives it back
+(`SET MULTI_USER`, after a failure too), then starts the apps again. The yes it asks for names what's lost: what
+changed since, the other sessions connected to it (a SQL client) - they're cut off - and the database's other snapshot
+save points: SQL Server reverts only from a database's one snapshot, and restores over one with none, so they're
+dropped first. A snapshot dropped outside lazyrunner shows as gone.
+
+While a save point is pinned (`R`), a restart you ask for - `r` or `R` on the columns, `lazyrunner restart`, an agent's
+`restart_apps` - rewinds to it first and the apps start once it's done; with `"rewindPinned": "everyRestart"` the
+restarts after a code change rewind too. A start of an app on the database waits while a rewind runs. The status bar
+says so: `⟲ before approval`.
+
+The SQL runs through `sqlcmd` (`winget install Microsoft.Sqlcmd`; the ODBC one or go-sqlcmd), with the server,
+database and login of the connection string; a SQL login's password goes to it in `SQLCMDPASSWORD`, never on its
+command line, and never shows in the log or to an agent. The save points are kept in the project's state folder
+(`save-points.json`); the snapshots and backups are the server's. SQL Server only: snapshots need 2016 SP1 or later
+(Express and LocalDB included).
+
 ## lazygit (`L`)
 
 `L` opens [lazygit](https://github.com/jesseduffield/lazygit) in the project's folder without leaving lazyrunner. It
@@ -1126,9 +1172,10 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_snapshot` | This run as `, A v`'s snapshot holds it: each app's state, errors and last error, recent requests, test failures, alerts, the stack map, what's on screen - masked |
 | `open_in_editor` | A file of the repo at a line in your editor, as `O` does - to show you the code it's talking about; after `"confirm": true` |
 | `add_database` | A connection string added to secrets.json as `n` on the database screen does: a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet - or, with `switch` (and `confirm`), the one in use |
+| `save_point`, `rewind`, `database_changes` | A save point of a database (a snapshot, or a backup); a rewind to one (with `confirm`); what changed since one, table by table - rows then and now, and the small tables changed in place |
 
 What can't be undone or takes something away from you - quitting, killing a port's holder, reverting a migration,
-switching the database, clearing the output, reopening lazyrunner, the git tool over the screen, opening a file in your
+rewinding the database, switching the database, clearing the output, reopening lazyrunner, the git tool over the screen, opening a file in your
 editor - needs
 `"confirm": true`, and the agent is told to ask you first.
 
@@ -1383,6 +1430,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `mouse` | `true` | Clicks and the wheel (off: the terminal selects text) |
 | `reducedMotion` | `false` | No blinking, spinners, glides or fades |
 | `frameRate` | `"auto"` | Frames a second for what moves: `auto` is the fastest display's refresh rate (60 at least - 120, 144, 240 on displays that show them), or a number from 30 to 480 |
+| `rewindPinned` | `"manualRestarts"` | Which restarts rewind the database to a pinned save point first (Database, Save points): `manualRestarts` (the ones you ask for) or `everyRestart` (those after a code change too) |
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |
 | `tunnelTool` | | What `Alt+s` shares an app through: `devtunnel` or `ngrok` (without it, the first of them installed) |

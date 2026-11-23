@@ -2,6 +2,9 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+/// The function keys there are: `F1` to `F12`.
+const FUNCTION_KEYS: u8 = 12;
+
 pub fn parse(spec: &str) -> Result<Vec<KeyEvent>, String> {
     spec.split_whitespace().map(parse_one).collect()
 }
@@ -20,6 +23,11 @@ fn parse_one(token: &str) -> Result<KeyEvent, String> {
         let modifiers = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
         return Ok(KeyEvent::new(KeyCode::Char(c), modifiers));
     }
+    if let Some(n) =
+        token.strip_prefix('F').and_then(|n| n.parse::<u8>().ok()).filter(|n| (1..=FUNCTION_KEYS).contains(n))
+    {
+        return Ok(KeyEvent::new(KeyCode::F(n), KeyModifiers::NONE));
+    }
     let code = match token {
         "Tab" => KeyCode::Tab,
         "BackTab" => return Ok(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT)),
@@ -35,6 +43,8 @@ fn parse_one(token: &str) -> Result<KeyEvent, String> {
         "PageDown" => KeyCode::PageDown,
         "Home" => KeyCode::Home,
         "End" => KeyCode::End,
+        "Delete" | "Del" => KeyCode::Delete,
+        "Insert" => KeyCode::Insert,
         _ => return Err(format!("unknown key '{token}'")),
     };
     Ok(KeyEvent::new(code, KeyModifiers::NONE))
@@ -46,12 +56,14 @@ mod tests {
 
     #[test]
     fn parses_letters_names_and_ctrl() {
-        let keys = parse("l G Tab Ctrl+c PageUp").unwrap();
+        let keys = parse("l G Tab Ctrl+c PageUp F2 Delete").unwrap();
         assert_eq!(keys[0], KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE));
         assert_eq!(keys[1], KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT));
         assert_eq!(keys[2].code, KeyCode::Tab);
         assert_eq!(keys[3], KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
         assert_eq!(keys[4].code, KeyCode::PageUp);
+        assert_eq!((keys[5].code, keys[6].code), (KeyCode::F(2), KeyCode::Delete));
+        assert!(parse("F13").is_err());
     }
 
     #[test]

@@ -346,7 +346,7 @@ async fn variants_decide_ports_and_a_missing_script_skips_the_app() {
 
 /// The controller with quick scripts in place of dotnet and npm: builds, failures, restarts and waits, without
 /// those tools.
-mod scripted {
+pub(super) mod scripted {
     use std::path::Path;
     use std::sync::Arc;
     use std::time::Duration;
@@ -363,8 +363,8 @@ mod scripted {
     use crate::testing::{CONSOLE_PORT, TempDir, clock};
 
     /// A build prints its project's line and exits 0 (1 for the projects named in `failing`); a server just waits.
-    struct Scripts {
-        failing: Vec<&'static str>,
+    pub(in crate::run::controller) struct Scripts {
+        pub(in crate::run::controller) failing: Vec<&'static str>,
     }
 
     fn shell(script: String, dir: &Path) -> Spec {

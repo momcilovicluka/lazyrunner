@@ -26,11 +26,11 @@ fn needs_confirm(run: &Run) -> bool {
     matches!(run, Run::Quit | Run::KillPortUser | Run::Clear | Run::Reload | Run::ReloadProfile | Run::GitTool)
 }
 
-fn confirmed(args: &Value) -> bool {
+pub(super) fn confirmed(args: &Value) -> bool {
     args["confirm"].as_bool() == Some(true)
 }
 
-fn confirm_first(what: &str) -> Refusal {
+pub(super) fn confirm_first(what: &str) -> Refusal {
     let why = format!(
         "{what} can't be undone or takes something from the user - ask them, then call again with \"confirm\": true"
     );

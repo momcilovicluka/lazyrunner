@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use crate::screen::Ui;
 use crate::screen::copy::{self, Pick};
 
+pub(crate) mod databases;
 pub(crate) mod drive;
 pub(crate) mod views;
 
@@ -85,9 +86,11 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "marks" => Ok(views::marks(controller)),
         "changelog" => Ok(views::changelog(args)),
         "build_map" => views::build(ui, controller, args),
+        "database_changes" => databases::changes(controller, args),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
         | "run_action" | "press_keys" | "switch_database" | "add_database" | "install_packages"
-        | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile" | "open_in_editor") => {
+        | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile" | "open_in_editor"
+        | "save_point" | "rewind") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
@@ -184,6 +187,7 @@ pub(crate) fn status(ui: &Ui, controller: &Controller) -> Value {
         "root": controller.root.display().to_string(),
         "branch": controller.branch,
         "database": controller.db_label,
+        "save_points": databases::list(controller),
         "busy": {
             "build": controller.building.as_ref().map(|job| job.key.clone()),
             "build_queue": controller.build_queue,
@@ -193,6 +197,7 @@ pub(crate) fn status(ui: &Ui, controller: &Controller) -> Value {
             "tests": controller.tests_active(),
             "migrations": controller.migrations_active(),
             "profiling": controller.profiling.is_some(),
+            "database": controller.database_busy(),
         },
         "apps": apps,
         "tasks": tasks(controller),
@@ -1002,6 +1007,8 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
         "add_database" => drive::add_database(controller, args)?,
         "install_packages" => drive::install_packages(controller, args)?,
         "apply_migrations" => drive::apply_migrations(controller, args)?,
+        "save_point" => databases::make(controller, args)?,
+        "rewind" => databases::rewind(controller, args)?,
         "kill_port_holder" => drive::kill_port_holder(controller, args)?,
         "open_in_editor" => drive::open_in_editor(ui, controller, args)?,
         "set_setting" => drive::set_setting(controller, args)?,

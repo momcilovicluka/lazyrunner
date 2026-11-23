@@ -229,6 +229,50 @@ pub fn list(apps: &str) -> Vec<Value> {
             false,
         ),
         tool(
+            "save_point",
+            "Makes a save point of a database (as s and S on the database screen do): a SQL Server snapshot \
+             (kind snapshot, the default: made in a moment) or a COPY_ONLY backup in the server's backup folder \
+             (kind backup: slower). `database` is a connection string's database or label (get_status's \
+             database), the one in use when left out; `label` names it (`before 10:42` when left out). It runs in \
+             the background: get_status's save_points list it once it's made, busy.database says what runs.",
+            json!({
+                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
+                "kind": { "type": "string", "enum": ["snapshot", "backup"] },
+                "label": { "type": "string" },
+            }),
+            &[],
+            false,
+        ),
+        destructive(tool(
+            "rewind",
+            "Rewinds a database to a save point (as r on the database screen does): the .NET apps on it stop, it's \
+             restored and they start again; what changed since is lost, other connections to it are cut off, and \
+             the database's other snapshot save points are dropped first (SQL Server needs that). `save_point` is \
+             its label or id (get_status's save_points), the database's newest when left out. Needs confirm: true - \
+             ask the user first. Then wait for ready.",
+            json!({
+                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
+                "save_point": { "type": "string", "description": "A save point's label or id" },
+                "confirm": { "type": "boolean" },
+            }),
+            &[],
+            false,
+        )),
+        tool(
+            "database_changes",
+            "What changed in a database since a save point, table by table, as the database screen shows it: each \
+             table's rows then and now and the difference, and the small tables whose rows changed though their \
+             count didn't (changed_in_place). The rows are counted again when the last count is older than a few \
+             seconds - `counting` says so; call again for the new counts. Between two attempts at a fix it shows \
+             exactly what an action touched.",
+            json!({
+                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
+                "save_point": { "type": "string", "description": "A save point's label or id (the newest by default)" },
+            }),
+            &[],
+            true,
+        ),
+        tool(
             "run_task",
             "Runs one of the profile's tasks (get_status lists them: key, name, running, last) in the background - \
              a one-off command such as seeding the database. Its output goes to the panel's log. Then wait for \

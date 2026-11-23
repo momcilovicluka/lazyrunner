@@ -145,13 +145,18 @@ fn open_view(ui: &mut Ui, controller: &mut Controller, kind: &str, run: Run) {
 
 /// Brings what the agent read into view; what it did, in words.
 fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result: &Value) -> Option<String> {
-    if !matches!(op, "switch_database" | "add_database") {
+    let database = matches!(op, "switch_database" | "add_database" | "save_point" | "rewind" | "database_changes");
+    if !database {
         ui.picker = None; // the database screen would hide the view it goes to
     }
     match op {
-        "switch_database" | "add_database" => {
+        "switch_database" | "add_database" | "save_point" | "rewind" => {
             database_view(ui, controller, args);
             result["doing"].as_str().map(str::to_string)
+        }
+        "database_changes" => {
+            database_view(ui, controller, args);
+            Some(format!("read what changed in {}", result["database"].as_str().unwrap_or("the database")))
         }
         "kill_port_holder" => {
             open_view(ui, controller, "ports", Run::Ports);
@@ -322,7 +327,7 @@ fn database_view(ui: &mut Ui, controller: &mut Controller, args: &Value) {
             found.map(|at| (group, at))
         })
     };
-    let found = args["name"].as_str().and_then(named).or_else(|| args["from"].as_str().and_then(named));
+    let found = ["name", "from", "database"].iter().find_map(|field| args[*field].as_str().and_then(&named));
     if let Some((group, at)) = found {
         (picker.group, picker.index, picker.filter) = (group, at, String::new());
         ui.motion.flash(Spot::Clicked(Target::Item(at)), ui.now);
