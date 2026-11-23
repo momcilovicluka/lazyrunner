@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
+ DefaultConnection · secrets.json · 2 connection strings · the active one ●
+ j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin
+ u changes · c copy · b back up · e export · i import · Del drop · Tab save points, files
+ n new connection string · / filter · y copy row · Esc back
+
+   DATABASE @ SERVER           ANSWERS        APPS ON IT    MIGRATIONS    SIZE                  SWITCHED TO
+ ● Shop @ localhost            backing up · 64% · 1.5 GB of 2.4 GB · ab▌ut 20s left
+   Shop_copy @ localhost       – local        -             -              1.2 GB ▰▰▰▰          -
+
+ SAVE POINTS · Shop
+  ⡗ ◉  now  ◂ you are here
+     no save points yet - s makes a snapshot (a moment), S a backup (slower)
+
+ FILES · …\sample\databases
+ Tab picks a file · i imports it as a new database · Del deletes it
+  ▤ Shop_qa_20261120.bacpac  4.0 KB  ▰▰▰▰▰▰▰▰▰▰  just now
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

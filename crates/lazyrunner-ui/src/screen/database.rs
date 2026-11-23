@@ -2,7 +2,9 @@
 //! checked as the screen opens, the dots breathing meanwhile - the apps that use it, its pending migrations and when
 //! you last switched to it. `Enter` switches and restarts the APIs; `n` adds one (a copy), `/` filters, `y` copies a
 //! row, `h` `l` another key, `Esc` goes back. Its rows come in one after another as it opens, and each answer flashes
-//! as it arrives. Under them, the highlighted database's save points and what changed since ([`super::save_points`]).
+//! as it arrives. Under them, the highlighted database's save points and what changed since ([`super::save_points`]),
+//! then the files its backups and exports make; each row says how big its database is, and a copy, backup or export
+//! washes across it as it runs ([`super::database_files`]).
 
 use std::collections::HashMap;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -35,8 +37,11 @@ const SQL_PORT: u16 = 1433;
 /// The config's record of when each database was switched to, by its label.
 pub const SWITCHED: &str = "databaseSwitched";
 /// The columns' titles; between two columns at least `GAP` cells, at most `MOST_GAP` when the screen is wide; the
-/// database and server never narrower than `LABEL_LEAST`; before them the active one's dot.
-const TITLES: [&str; 5] = ["DATABASE @ SERVER", "ANSWERS", "APPS ON IT", "MIGRATIONS", "SWITCHED TO"];
+/// database and server never narrower than `LABEL_LEAST`; before them the active one's dot. The size column's beads
+/// are drawn in the accent, its number plain.
+const TITLES: [&str; 6] = ["DATABASE @ SERVER", "ANSWERS", "APPS ON IT", "MIGRATIONS", "SIZE", "SWITCHED TO"];
+const SIZE_AT: usize = 4;
+const SIZE_BEAD: char = '▰';
 const GAP: usize = 2;
 const MOST_GAP: usize = 6;
 const LABEL_LEAST: usize = 24;
@@ -153,9 +158,9 @@ fn ago(at: &str) -> Option<String> {
     Some(lazyrunner_core::run::session::ago(Duration::from_secs(seconds)))
 }
 
-/// An entry's columns: its database and server, whether it answers, the apps on it, its pending migrations, when it
-/// was last switched to.
-fn parts(ui: &Ui, controller: &Controller, entry: &Entry) -> [Seg; 5] {
+/// An entry's columns: its database and server, whether it answers, the apps on it, its pending migrations, its size
+/// (its bar a share of `most`, the biggest listed), when it was last switched to.
+fn parts(ui: &Ui, controller: &Controller, entry: &Entry, most: u64) -> [Seg; 6] {
     let apps = if entry.active {
         let users = controller.database_users();
         let names: Vec<&str> =
@@ -171,15 +176,16 @@ fn parts(ui: &Ui, controller: &Controller, entry: &Entry) -> [Seg; 5] {
     let last = controller.config[SWITCHED][&entry.label].as_str().and_then(ago).unwrap_or_else(|| "-".to_string());
     let label = seg(entry.label.clone(), if entry.active { C::Green } else { C::Gray });
     let apps = super::save_points::apps_back(ui, controller, entry).unwrap_or_else(|| seg(apps, C::Gray));
-    [label, answer(ui, &entry.server), apps, pending, seg(last, C::DarkGray)]
+    let size = super::database_jobs::size_cell(controller, entry, most);
+    [label, answer(ui, &entry.server), apps, pending, size, seg(last, C::DarkGray)]
 }
 
 /// Each column's width and the gap between them for `cells`: each as wide as the most it holds (its title at least,
 /// the answers as wide as [`NO_ANSWER`] so an answer coming in doesn't shift the columns after it); the database and
 /// server get what the others leave, down to [`LABEL_LEAST`]; what's still left widens the gaps.
-fn widths(all: &[[Seg; 5]], cells: usize) -> ([usize; 5], usize) {
+fn widths(all: &[[Seg; 6]], cells: usize) -> ([usize; 6], usize) {
     let most = |at: usize| all.iter().map(|parts| parts[at].text.width()).chain([TITLES[at].width()]).max();
-    let mut widths: [usize; 5] = std::array::from_fn(|at| most(at).unwrap_or_default());
+    let mut widths: [usize; 6] = std::array::from_fn(|at| most(at).unwrap_or_default());
     widths[1] = widths[1].max(NO_ANSWER.width());
     let others = MARK_CELLS + widths[1..].iter().sum::<usize>() + GAP * (TITLES.len() - 1);
     widths[0] = widths[0].min(cells.saturating_sub(others)).max(LABEL_LEAST);
@@ -199,8 +205,8 @@ fn cell(text: &str, cells: usize) -> String {
 /// under the selection bar lit across `cells`, keeping its colours.
 fn row(
     entry: &Entry,
-    parts: [Seg; 5],
-    (widths, gap): ([usize; 5], usize),
+    parts: [Seg; 6],
+    (widths, gap): ([usize; 6], usize),
     picked: Option<usize>,
     flash: bool,
 ) -> Vec<Seg> {
@@ -209,7 +215,14 @@ fn row(
     for (at, part) in parts.into_iter().enumerate() {
         let after = if at + 1 == TITLES.len() { 0 } else { gap };
         let text = pad(&cell(&part.text, widths[at]), widths[at] + after);
-        out.push(if at == 1 && flash { on(text, C::Black, part.fg) } else { Seg { text, ..part } });
+        match text.find(SIZE_BEAD).filter(|_| at == SIZE_AT) {
+            Some(beads) => {
+                out.push(seg(text[..beads].to_string(), C::Gray));
+                out.push(Seg { text: text[beads..].to_string(), ..part });
+            }
+            None if at == 1 && flash => out.push(on(text, C::Black, part.fg)),
+            None => out.push(Seg { text, ..part }),
+        }
     }
     match picked {
         Some(cells) => focus_row(out, cells),
@@ -243,11 +256,12 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         " type to filter · Enter keeps it · Esc clears it".to_string()
     } else if picker.new_name.is_some() {
         " type the database name · Enter adds it (inactive) · Esc cancels".to_string()
-    } else if let Some(hint) = super::save_points::hint(ui) {
+    } else if let Some(hint) = super::database_files::hint(ui).or_else(|| super::save_points::hint(ui)) {
         hint.to_string()
     } else {
-        " j k choose · Enter switch + restart the APIs · s snapshot · S backup · r rewind · R pin · u changes · Tab \
-         save points · n new (a copy) · / filter · y copy row · Esc back"
+        " j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin · u \
+         changes · c copy · b back up · e export · i import · Del drop · Tab save points, files · n new connection \
+         string · / filter · y copy row · Esc back"
             .to_string()
     };
     lines.extend(super::viewbar::keys(&hint, cells));
@@ -258,7 +272,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         )]);
     }
     lines.push(Vec::new());
-    let all: Vec<[Seg; 5]> = entries.iter().map(|entry| parts(ui, controller, entry)).collect();
+    let most = entries.iter().filter_map(|entry| controller.size_of(&entry.server, &entry.database)).max().unwrap_or(0);
+    let all: Vec<[Seg; 6]> = entries.iter().map(|entry| parts(ui, controller, entry, most)).collect();
     let (widths, gap) = widths(&all, cells);
     let titles: String = TITLES
         .iter()
@@ -282,7 +297,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     for (shown, ((at, entry), parts)) in entries.iter().enumerate().zip(all).skip(top).take(room).enumerate() {
         let comes = ROW_STAGGER * shown as u32;
         let picked = (at == bar).then_some(cells);
+        if let Some(gone) = super::database_jobs::leaving_at(ui, at) {
+            lines.push(gone);
+        }
         let mut line = super::columns::fit(row(entry, parts, (widths, gap), picked, flashing(ui, entry)), cells);
+        line = super::database_jobs::job_row(ui, controller, entry, line, cells, widths[0] + gap, picked.is_some());
         if let Some(through) = super::save_points::glint(ui, entry) {
             line = super::seg::sweep(line, through, cells, C::Black, C::Cyan);
         }
@@ -294,6 +313,19 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
             _ => {}
         }
         lines.push(aim(line, Target::Item(at)));
+        if let Some(ghost) = super::database_jobs::ghost_after(ui, controller, Some(entry), cells, widths[0] + gap) {
+            lines.push(ghost);
+        }
+    }
+    if let Some(gone) = super::database_jobs::leaving_at(ui, entries.len()) {
+        lines.push(gone);
+    }
+    if let Some(ghost) = super::database_jobs::ghost_after(ui, controller, None, cells, widths[0] + gap) {
+        lines.push(ghost);
+    }
+    if let Some(prompt) = super::database_files::prompt(ui) {
+        lines.push(Vec::new());
+        lines.push(prompt);
     }
     if let Some(name) = picker.new_name.clone() {
         lines.push(Vec::new());
@@ -304,8 +336,11 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     }
     let left = rows.saturating_sub(lines.len() + 1);
     if left > 0 && !entries.is_empty() {
+        let files = super::database_files::height(controller, left);
         lines.push(Vec::new());
-        lines.extend(super::save_points::rows(ui, controller, cells, left));
+        lines.extend(super::save_points::rows(ui, controller, cells, left.saturating_sub(files + 1)));
+        lines.push(Vec::new());
+        lines.extend(super::database_files::rows(ui, controller, cells, files));
     }
     lines.truncate(rows);
     lines.resize(rows, Vec::new());
@@ -316,12 +351,13 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
 mod tests {
     use super::*;
 
-    fn entry(label: &str) -> [Seg; 5] {
+    fn entry(label: &str) -> [Seg; 6] {
         [
             seg(label, C::Gray),
             seg("● 1 ms", C::Green),
             seg("WebAPI, Admin", C::Gray),
             seg("-", C::Gray),
+            seg("2.4 GB ▰▰▰▰▰▰▰▰▰▰", C::Cyan),
             seg("-", C::Gray),
         ]
     }
@@ -332,8 +368,8 @@ mod tests {
         let all = [entry("shop @ here"), entry(long)];
         let (wide, gap) = widths(&all, 200);
         assert_eq!((wide[0], gap), (long.width(), MOST_GAP), "the longest name whole, the gaps at their widest");
-        let (narrow, gap) = widths(&all, 80);
-        assert_eq!((narrow[0], gap), (80 - MARK_CELLS - narrow[1..].iter().sum::<usize>() - GAP * 4, GAP));
+        let (narrow, gap) = widths(&all, 110);
+        assert_eq!((narrow[0], gap), (110 - MARK_CELLS - narrow[1..].iter().sum::<usize>() - GAP * 5, GAP));
         assert_eq!(widths(&all, 40).0[0], LABEL_LEAST, "never narrower than that");
         assert_eq!(cell(long, 10), "shop-orde…");
         assert_eq!(cell("so", 4), "so  ");

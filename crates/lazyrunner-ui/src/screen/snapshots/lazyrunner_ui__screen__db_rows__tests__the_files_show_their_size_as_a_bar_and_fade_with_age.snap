@@ -1,0 +1,9 @@
+---
+source: crates/lazyrunner-ui/src/screen/db_rows.rs
+expression: "text(&files(&section, 110, 8))"
+---
+ FILES · …\shop\databases
+ Tab picks a file · i imports it · Del deletes it
+  ▤ Shop_20261123_1042.bak   2.4 GB  ▰▰▰▰▰▰▰▰▰▰  just now  in localhost's backup folder
+  ▤ Shop_qa_20261120.bacpac  612 MB  ▰▰          3 d ago
+  ▤ Shop_20261102_0900.bak   2.2 GB  ▰▰▰▰▰▰▰▰▰   21 d ago

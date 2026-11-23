@@ -87,10 +87,12 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "changelog" => Ok(views::changelog(args)),
         "build_map" => views::build(ui, controller, args),
         "database_changes" => databases::changes(controller, args),
+        "database_files" => Ok(databases::files(controller)),
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
         | "run_action" | "press_keys" | "switch_database" | "add_database" | "install_packages"
         | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile" | "open_in_editor"
-        | "save_point" | "rewind") => {
+        | "save_point" | "rewind" | "copy_database" | "backup_database" | "export_database"
+        | "import_database" | "drop_database") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
@@ -1009,6 +1011,11 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
         "apply_migrations" => drive::apply_migrations(controller, args)?,
         "save_point" => databases::make(controller, args)?,
         "rewind" => databases::rewind(controller, args)?,
+        "copy_database" => databases::copy(controller, args)?,
+        "backup_database" => databases::backup(controller, args)?,
+        "export_database" => databases::export(controller, args)?,
+        "import_database" => databases::import(controller, args)?,
+        "drop_database" => databases::drop_database(controller, args)?,
         "kill_port_holder" => drive::kill_port_holder(controller, args)?,
         "open_in_editor" => drive::open_in_editor(ui, controller, args)?,
         "set_setting" => drive::set_setting(controller, args)?,

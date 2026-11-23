@@ -16,6 +16,9 @@ pub mod copy;
 pub mod coverage;
 pub mod crashes;
 pub mod database;
+pub mod database_files;
+pub mod database_jobs;
+pub mod db_rows;
 pub mod diff;
 pub mod durations;
 pub mod editor;
@@ -487,6 +490,8 @@ pub struct Ui {
     pub db_motion: database::Motion,
     /// The database screen's save points: the rail's keys, the picked one, their motion (#110).
     pub save_view: save_points::View,
+    /// The database screen's files, and its copies, backups, exports and imports as they move (#110).
+    pub files_view: database_files::View,
     /// The resumed apps whose columns fade in once they run, and the fades under way, by app (#85).
     pub restoring: Vec<String>,
     pub fades: HashMap<String, Instant>,
@@ -646,6 +651,7 @@ impl Ui {
             db_reach: None,
             db_motion: database::Motion::default(),
             save_view: save_points::View::default(),
+            files_view: database_files::View::default(),
             restoring: Vec::new(),
             fades: HashMap::new(),
             help_typing: false,
@@ -899,6 +905,7 @@ impl Ui {
             || screens::animating(self)
             || database::animating(self)
             || save_points::animating(self, controller)
+            || database_files::animating(self, controller)
             || session::animating(self)
             || durations::animating(self)
             || problems::animating(self)
@@ -1113,6 +1120,7 @@ fn over_its_context(ui: &Ui) -> bool {
 fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     flame::open_fresh(ui, controller);
     save_points::poll(ui, controller);
+    database_files::poll(ui, controller);
     let screen = screens::current(ui);
     if screen != ui.last_screen {
         if let (Some(from), Some(to)) = (ui.last_screen, screen) {

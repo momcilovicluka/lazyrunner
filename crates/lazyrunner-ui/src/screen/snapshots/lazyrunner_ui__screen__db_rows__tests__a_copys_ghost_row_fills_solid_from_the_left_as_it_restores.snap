@@ -1,0 +1,5 @@
+---
+source: crates/lazyrunner-ui/src/screen/db_rows.rs
+expression: "text(&[drawn.clone()])"
+---
+   Shop_copy @ localhost ━━━━ restoring · 40% · 1.0 GB of 2.4 GB · about 12s left ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌

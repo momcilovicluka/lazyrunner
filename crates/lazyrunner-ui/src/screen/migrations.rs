@@ -38,11 +38,15 @@ pub struct Confirm {
     pub save_point: Option<SavePointYes>,
 }
 
-/// What a yes does to a save point, by its id.
+/// What a yes does to a save point, by its id - or to a database or a file (#110).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SavePointYes {
     Rewind(String),
     Forget(String),
+    Switch { server: String, database: String },
+    DropDatabase { server: String, database: String },
+    DeleteFile(String),
+    InstallSqlPackage,
 }
 
 /// What a yes risks: nothing much (applying), a revert through Down(), or a step that drops or deletes data.
@@ -276,7 +280,7 @@ pub fn confirm_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
         "y" | "Enter" => {
             if let Some(Overlay::Confirm(confirm)) = ui.overlay.take() {
                 if let Some(yes) = confirm.save_point {
-                    super::save_points::yes(controller, yes);
+                    super::database_files::yes(ui, controller, yes);
                     return;
                 }
                 if confirm.jobs.iter().all(|(_, target, _)| target.is_none()) {

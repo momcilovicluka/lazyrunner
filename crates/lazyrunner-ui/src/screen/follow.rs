@@ -145,18 +145,36 @@ fn open_view(ui: &mut Ui, controller: &mut Controller, kind: &str, run: Run) {
 
 /// Brings what the agent read into view; what it did, in words.
 fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result: &Value) -> Option<String> {
-    let database = matches!(op, "switch_database" | "add_database" | "save_point" | "rewind" | "database_changes");
+    let database = matches!(
+        op,
+        "switch_database"
+            | "add_database"
+            | "save_point"
+            | "rewind"
+            | "database_changes"
+            | "copy_database"
+            | "backup_database"
+            | "export_database"
+            | "import_database"
+            | "drop_database"
+            | "database_files"
+    );
     if !database {
         ui.picker = None; // the database screen would hide the view it goes to
     }
     match op {
-        "switch_database" | "add_database" | "save_point" | "rewind" => {
+        "switch_database" | "add_database" | "save_point" | "rewind" | "copy_database" | "backup_database"
+        | "export_database" | "import_database" | "drop_database" => {
             database_view(ui, controller, args);
             result["doing"].as_str().map(str::to_string)
         }
         "database_changes" => {
             database_view(ui, controller, args);
             Some(format!("read what changed in {}", result["database"].as_str().unwrap_or("the database")))
+        }
+        "database_files" => {
+            database_view(ui, controller, args);
+            Some("read the database files".into())
         }
         "kill_port_holder" => {
             open_view(ui, controller, "ports", Run::Ports);

@@ -12,6 +12,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::Controller;
 use crate::output::Hue;
+use crate::run::database_files::{Chore, Done, Progress};
 use crate::run::save_points::{self as points, Kind, News, SavePoint, Table};
 use crate::run::sql::{self, Sql};
 use crate::run::{Event, secrets};
@@ -27,6 +28,8 @@ pub enum Doing {
     Making(Kind),
     Rewinding(String),
     Dropping(String),
+    /// A copy, backup, export, import or drop of the database.
+    Database(Chore),
 }
 
 /// The database job running: what, on which database, since when, its share done as the server last said it (the one
@@ -44,6 +47,8 @@ pub struct DbWork {
     then_start: Option<(Option<Vec<String>>, bool)>,
     /// A new save point's id and label.
     pub made: Option<(String, String)>,
+    /// A copy's, backup's, export's or import's progress as it reports it.
+    pub progress: Progress,
 }
 
 /// The last database job done: what, on which database, when it ran, whether it went well, the apps it started again.
@@ -58,6 +63,9 @@ pub struct DbDone {
     pub apps: Vec<String>,
     /// The share done the server last reported, as the job had it.
     pub share: Option<(f64, f64, Instant)>,
+    /// A copy's, backup's, export's or import's last progress, and what it made.
+    pub progress: Progress,
+    pub made: Option<Done>,
 }
 
 /// A database's tables as last counted (and the job counting them again).
@@ -81,22 +89,22 @@ pub fn db_key(server: &str, database: &str) -> String {
 }
 
 /// Whether a snapshot is one of lazyrunner's save points of `database`.
-fn ours(snapshot: &str, database: &str) -> bool {
+pub(super) fn ours(snapshot: &str, database: &str) -> bool {
     snapshot.to_lowercase().starts_with(&format!("{}{}", database.to_lowercase(), points::NAME_PART))
 }
 
 impl Controller {
     /// The secrets.json the connection strings are in.
-    fn secrets_file(&self) -> Option<PathBuf> {
+    pub(super) fn secrets_file(&self) -> Option<PathBuf> {
         self.secrets_at.clone().or_else(|| secrets::secrets_path(&self.root, &self.apps))
     }
 
-    fn secrets_text(&self) -> Option<String> {
+    pub(super) fn secrets_text(&self) -> Option<String> {
         std::fs::read_to_string(self.secrets_file()?).ok()
     }
 
     /// The connection string to `database` on `server`, password and all: for running SQL, never to show.
-    fn connection(&self, server: &str, database: &str) -> Result<String, String> {
+    pub(super) fn connection(&self, server: &str, database: &str) -> Result<String, String> {
         let text = self.secrets_text().ok_or_else(|| "no secrets.json with its connection strings".to_string())?;
         secrets::connection_for(&text, server, database)
             .ok_or_else(|| format!("no connection string for {database} @ {server} in secrets.json"))
@@ -128,6 +136,7 @@ impl Controller {
             Doing::Making(kind) => format!("making a {} save point of {}", kind.name(), work.database),
             Doing::Rewinding(id) => format!("rewinding {} to {}", work.database, self.save_point_label(id)),
             Doing::Dropping(id) => format!("dropping {}", self.save_point_label(id)),
+            Doing::Database(chore) => chore.describe(&work.database),
         };
         Some(what)
     }
@@ -150,18 +159,18 @@ impl Controller {
         self.db_counts.get(&db_key(server, database))
     }
 
-    fn keep_save_points(&mut self) {
+    pub(super) fn keep_save_points(&mut self) {
         if let Err(error) = points::save(&self.state_dir, &self.save_points) {
             self.add_log(format!("! Couldn't keep the save points ({error})"), Hue::Yellow);
         }
     }
 
-    fn new_db_job(&mut self) -> u64 {
+    pub(super) fn new_db_job(&mut self) -> u64 {
         self.next_job += 1;
         self.next_job
     }
 
-    fn ready_for_sql(&self) -> Result<(), String> {
+    pub(super) fn ready_for_sql(&self) -> Result<(), String> {
         self.sql.ready()?;
         match self.database_busy() {
             Some(busy) => Err(format!("lazyrunner is {busy} - one database job at a time")),
@@ -211,7 +220,7 @@ impl Controller {
         Ok(label)
     }
 
-    fn work(&self, job: u64, doing: Doing, server: &str, database: &str) -> DbWork {
+    pub(super) fn work(&self, job: u64, doing: Doing, server: &str, database: &str) -> DbWork {
         DbWork {
             job,
             doing,
@@ -223,6 +232,7 @@ impl Controller {
             stopped: Vec::new(),
             then_start: None,
             made: None,
+            progress: Progress::default(),
         }
     }
 
@@ -502,7 +512,7 @@ impl Controller {
     }
 
     /// The job is over: kept as the last one done, and what it was.
-    fn finish_work(&mut self, job: u64, ok: bool) -> Option<DbWork> {
+    pub(super) fn finish_work(&mut self, job: u64, ok: bool) -> Option<DbWork> {
         let work = self.db_work.take_if(|work| work.job == job)?;
         let apps = work.stopped.clone();
         self.db_done = Some(DbDone {
@@ -514,6 +524,8 @@ impl Controller {
             ok,
             apps,
             share: work.share,
+            progress: work.progress.clone(),
+            made: None,
         });
         Some(work)
     }
@@ -600,7 +612,7 @@ fn clean_label(label: &str) -> String {
 const LABEL_MOST: usize = 60;
 
 /// The server's own database, where lazyrunner's SQL runs when it mustn't be in the one it changes.
-const MASTER: &str = "master";
+pub(super) const MASTER: &str = "master";
 
 fn say(events: &UnboundedSender<Event>, job: u64, news: News) {
     let _ = events.send(Event::Sql { job, news });
