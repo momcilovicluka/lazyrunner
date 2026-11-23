@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.105.3] - 2026-11-23
+
+### Fixed
+- A git worktree (or another repo) inside the project no longer doubles its tests: the search for test projects, the one that turns file names in errors into links and the one for solutions to audit leave out any folder with a `.git` of its own, so a worktree's copies don't run beside the project's or catch its links.
+
 ## [1.105.2] - 2026-11-23
 
 ### Changed
