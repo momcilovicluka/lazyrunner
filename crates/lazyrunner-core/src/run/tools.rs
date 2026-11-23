@@ -606,6 +606,21 @@ mod terminal_tests {
     }
 }
 
+/// Windows: a process started with this has a hidden console of its own, so it can't retitle lazyrunner's tab (npm
+/// names it "npm") or get its Ctrl+C.
+#[cfg(windows)]
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// `command` with a hidden console of its own on Windows (`CREATE_NO_WINDOW`); as it is elsewhere.
+pub fn own_console(command: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

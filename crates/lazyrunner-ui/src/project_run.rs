@@ -40,6 +40,8 @@ const MIN_GAP: Duration = Duration::from_millis(2);
 const TICK: Duration = Duration::from_millis(250);
 const FRAME_DUMP_EVERY: Duration = Duration::from_millis(100);
 const ANSWER_GRACE: Duration = Duration::from_millis(100);
+/// How often the console's title is compared with the one lazyrunner wrote, which something else may have changed.
+const TITLE_COMPARED_EVERY: Duration = Duration::from_millis(500);
 /// What's new in the log (when the checklist is off): this many bullets.
 const WHATS_NEW_LOG_LINES: usize = 5;
 
@@ -651,6 +653,9 @@ struct Outside {
     enabled: bool,
     title: Option<status::Title>,
     tab: String,
+    /// The title written last, and when the console's was last compared with it.
+    wrote: String,
+    compared: Option<Instant>,
     theme: Option<String>,
     colored: bool,
     /// The terminal shows a light theme's background.
@@ -660,7 +665,16 @@ struct Outside {
 impl Outside {
     fn new(enabled: bool) -> Self {
         let title = enabled.then(status::Title::save);
-        Self { enabled, title, tab: String::new(), theme: None, colored: false, light: false }
+        Self {
+            enabled,
+            title,
+            tab: String::new(),
+            wrote: String::new(),
+            compared: None,
+            theme: None,
+            colored: false,
+            light: false,
+        }
     }
 
     fn write(sequence: &str) {
@@ -680,10 +694,24 @@ impl Outside {
         if !self.enabled {
             return;
         }
-        let tab = status::tab_sequence(controller, &status::summary(controller));
+        let doctor = match &ui.overlay {
+            Some(Overlay::Checklist(list)) => Some((list.tally(None).done, list.items.len())),
+            _ => None,
+        };
+        let summary = status::summary(controller);
+        let title = status::tab_title(controller, &summary, doctor);
+        // A tool sharing the console (an npm script calls itself "npm") can retitle it: put ours back.
+        if self.compared.is_none_or(|at| at.elapsed() >= TITLE_COMPARED_EVERY) {
+            self.compared = Some(Instant::now());
+            if status::console_title().is_some_and(|now| now != self.wrote) {
+                self.tab.clear();
+            }
+        }
+        let tab = status::tab_sequence(controller, &summary, &title);
         if tab != self.tab {
             Self::write(&tab);
             self.tab = tab;
+            self.wrote = title;
         }
         if self.theme.as_deref() != Some(ui.theme.id.as_str()) && !screen::theme_picker::holds_terminal(ui, self.light)
         {

@@ -1337,7 +1337,7 @@ async fn a_run_moves_the_bead_a_node_a_hop_and_says_where_it_failed() {
     let invoices = line_with(&frame, "Invoices");
     assert!(invoices.contains('●') && invoices.contains("Invoices  ◂ applying Refunds…"), "{frame}");
     assert!(line_with(&frame, "  Refunds").contains('○'), "not there yet: {frame}");
-    assert!(frame.contains("▰▰▰ ▱▱▱ 1/2"), "the list's bar: {frame}");
+    assert!(frame.contains("▰▱ 1/2"), "the list's bar: {frame}");
     run.ended = Some((now - Duration::from_secs(1), Some("Invalid column name 'Total'.".into())));
     set(&mut screen, &run, Ef::Ok);
     let frame = screen.frame();
@@ -2608,6 +2608,20 @@ async fn the_copy_box_counts_again_only_when_the_output_changes() {
     assert!(screen.render(120, 30).contains("2 lines"), "a new line counts");
     screen.controller.states[0].output.clear();
     assert!(screen.render(120, 30).contains("none"), "cleared");
+}
+
+#[tokio::test]
+async fn the_tab_title_says_whats_going_on_first_then_the_project() {
+    let mut screen = screen("tab-title", json!({}));
+    let title = |screen: &Screen, doctor| {
+        super::status::tab_title(&screen.controller, &super::status::summary(&screen.controller), doctor)
+    };
+    let project = format!(" · {}", screen.controller.project.name);
+    assert_eq!(title(&screen, Some((7, 12))), format!("doctor 7/12{project}"), "the doctor counts its checks");
+    assert_eq!(title(&screen, None), format!("○ stopped{project}"));
+    screen.controller.states[0].status = AppStatus::Exited(Some(1));
+    let orders = screen.controller.apps[0].name.clone();
+    assert_eq!(title(&screen, Some((12, 12))), format!("✗ {orders} exited{project}"), "which app, not \"failed\"");
 }
 
 // ---------------------------------------------------------------- links
@@ -5954,7 +5968,7 @@ async fn a_branch_change_being_fixed_sweeps_its_row_and_the_header_gauges_how_ma
     screen.frame();
     screen.ui.branch_fixes.insert("a".into());
     let frame = screen.frame();
-    assert!(frame.contains("✓ 1 of 2 fixed ▰▰▰ ▱▱▱"), "{frame}");
+    assert!(frame.contains("✓ 1 of 2 fixed ▰▱"), "{frame}");
     assert!(screen.ui.motion.sweep("branch:a", screen.ui.now).is_some(), "fixed: it sweeps");
     assert!(screen.ui.motion.sweep("branch:b", screen.ui.now).is_none());
 }

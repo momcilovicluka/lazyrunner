@@ -438,7 +438,7 @@ fn gently(mut command: Command) -> Command {
     {
         use std::os::windows::process::CommandExt;
         const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
-        command.creation_flags(BELOW_NORMAL_PRIORITY_CLASS);
+        command.creation_flags(BELOW_NORMAL_PRIORITY_CLASS | tools::CREATE_NO_WINDOW);
     }
     command
 }
