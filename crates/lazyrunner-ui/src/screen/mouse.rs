@@ -200,7 +200,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         || super::health::click(ui, controller, target, double)
         || super::flame::click(ui, target, double)
         || super::code::click(ui, controller, target, double)
-        || super::durations::click(ui, target)
+        || super::durations::click(ui, controller, target)
         || super::problems::click(ui, target)
     {
         return;

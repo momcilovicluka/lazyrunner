@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.109.0] - 2026-11-25
+
+### Added
+- The durations' groups fold (`D`): `Enter` or `Space` on a group's title, a click on it, or `Space` on one of its items folds it - `▾` open, `▸` folded - so a long **Projects built** is out of the way. A folded title says how many it holds and how many got slower or failed, its details list its slowest, and its rows slide open and shut. The folds are kept while lazyrunner runs (#113, thanks @ognjen004028).
+
 ## [1.108.1] - 2026-11-25
 
 ### Fixed

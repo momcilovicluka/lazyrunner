@@ -15,8 +15,12 @@ use super::database_jobs::{backup, copy, delete_on_server, export, import, remov
 use super::save_points::{Doing, MASTER};
 use crate::output::Hue;
 use crate::run::database_files::{self as files, Chore, DbFile, Done, Kind, Made, News, Progress};
-use crate::run::sql::{self, Sql};
-use crate::run::sqlpackage::{self, Package};
+use crate::run::sql;
+#[cfg(any(test, feature = "test-support"))]
+use crate::run::sql::Sql;
+use crate::run::sqlpackage;
+#[cfg(any(test, feature = "test-support"))]
+use crate::run::sqlpackage::Package;
 use crate::run::{Event, secrets};
 
 /// The databases on a server and their sizes as last measured (and the job measuring them again).

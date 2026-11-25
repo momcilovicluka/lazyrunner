@@ -889,6 +889,50 @@ async fn durations_view() {
 }
 
 #[tokio::test]
+async fn durations_groups_fold_with_space_enter_or_a_click_on_their_title_and_stay_folded() {
+    let mut screen = screen("durations-folds", json!({}));
+    let durations = &mut screen.controller.durations;
+    for seconds in [20.0, 21.0, 19.0, 40.0] {
+        durations.add(Kind::Build, "orders", "Orders", seconds, true);
+        durations.add(Kind::Build, "api", "Api", seconds / 2.0, true);
+    }
+    for seconds in [9.0, 8.0, 10.0, 9.0] {
+        durations.add(Kind::Start, "orders", "Orders", seconds, true);
+    }
+    screen.press("D");
+    let frame = screen.render(140, 30);
+    assert!(frame.contains("▾ Builds (2)") && frame.contains("▾ Starts (1)"), "open, with a triangle: {frame}");
+    assert!(frame.contains("API · Builds"), "the first item is picked, not a title: {frame}");
+
+    screen.press("Space");
+    screen.ui.now += Duration::from_secs(1);
+    let frame = screen.render(140, 30);
+    assert!(frame.contains("▸ Builds (2) ") && frame.contains("folded · ▲ 2 slower"), "{frame}");
+    assert!(frame.contains("BUILDS · 2 items") && frame.contains("1 group folded"), "its title picked: {frame}");
+    let table_has =
+        |name: &str| frame.lines().any(|line| line.split('│').next().is_some_and(|table| table.contains(name)));
+    assert!(!table_has(" Api "), "its rows are gone from the table: {frame}");
+    insta::assert_snapshot!(screen.render(140, 30));
+
+    screen.press("Enter");
+    screen.ui.now += Duration::from_secs(1);
+    assert!(screen.render(140, 30).contains("▾ Builds (2)"), "Enter on the title unfolds it");
+
+    screen.click(Target::Item(3));
+    screen.ui.now += Duration::from_secs(1);
+    let frame = screen.render(140, 30);
+    assert!(
+        frame.contains("▸ Starts (1)") && frame.contains("STARTS · 1 item"),
+        "a click on a title folds it: {frame}"
+    );
+    screen.press("D D");
+    assert!(screen.render(140, 30).contains("▸ Starts (1)"), "still folded when the view opens again");
+    screen.press("Enter");
+    screen.press("Enter");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Durations { .. })), "Enter on a title never opens a map");
+}
+
+#[tokio::test]
 async fn a_small_terminal_asks_for_room() {
     let mut screen = screen("snap-small", json!({}));
     insta::assert_snapshot!(screen.render(50, 10));

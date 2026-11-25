@@ -1171,6 +1171,11 @@ sit beside the table (under it on a narrow terminal): its last and usual, its ru
 it's picked - the last run bright, a failed one red - and each run listed, newest first: when, how long, and whether it
 failed. The header names the item that slowed down most.
 
+Each group's title folds it, for a long list like **Projects built**: `▾ Projects built (96)` open, `▸` folded. `Enter`
+or `Space` on a title, a click on it, or `Space` on one of its items folds the group (or unfolds it), and its rows slide
+shut. A folded title still says how many of its items got slower and how many failed; picked, its details list its
+slowest last runs. The groups stay folded while lazyrunner runs, also when `D` opens again.
+
 ## Agents (MCP)
 
 `lazyrunner mcp` is an MCP server for an agent such as Claude Code. The agent reads and drives the lazyrunner you have
