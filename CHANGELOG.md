@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.108.0] - 2026-11-25
+
+### Added
+- Desktop notifications can be turned off from the settings (`,` then `n`, under Integrations), not only in the config file: the same errors show in lazyrunner's own columns (#111, thanks @ognjen004028).
+
 ## [1.107.0] - 2026-11-23
 
 ### Added
