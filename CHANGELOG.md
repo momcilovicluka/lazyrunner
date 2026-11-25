@@ -3,6 +3,11 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.108.1] - 2026-11-25
+
+### Fixed
+- Every startup checklist check has an icon with Nerd Font icons: dotnet-trace, sqlcmd and SqlPackage had none, and a command app whose language isn't known now gets a terminal's.
+
 ## [1.108.0] - 2026-11-25
 
 ### Added

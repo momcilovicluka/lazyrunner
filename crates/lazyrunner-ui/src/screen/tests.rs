@@ -5752,6 +5752,23 @@ async fn an_agent_gets_each_suites_coverage_its_change_and_the_files_that_change
 }
 
 #[tokio::test]
+async fn every_doctor_check_has_an_icon_of_its_own() {
+    let mut screen = screen("doctor-icons", json!({}));
+    screen.controller.set_toggle(Toggle::Coverage, true);
+    let checks = lazyrunner_core::run::checks::checks(&screen.controller);
+    let names: Vec<&str> = checks.iter().map(|check| check.name.as_str()).collect();
+    for name in ["dotnet-trace", "sqlcmd", "SqlPackage", "Database", "Coverage"] {
+        assert!(names.contains(&name), "{name} is checked: {names:?}");
+    }
+    let bare: Vec<&str> = checks
+        .iter()
+        .filter(|check| check.language.is_none() && super::icons::check(&check.name).is_none())
+        .map(|check| check.name.as_str())
+        .collect();
+    assert!(bare.is_empty(), "no icon: {bare:?}");
+}
+
+#[tokio::test]
 async fn the_doctor_checks_what_coverage_needs_only_with_the_setting_on_and_f_adds_it() {
     use super::checklist::Fix;
     use lazyrunner_core::run::coverage_needs::CHECK;

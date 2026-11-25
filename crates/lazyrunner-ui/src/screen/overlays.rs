@@ -497,15 +497,14 @@ fn icon(status: Status, spin: Option<&str>, nerd: bool) -> String {
     }
 }
 
-/// A check's name in its column, after its icon with Nerd Font icons - a command app's its language's, and its
-/// language's chip without them.
+/// A check's name in its column, after its icon with Nerd Font icons - every check has one: a command app's is its
+/// language's, else a terminal - and its language's chip without them.
 fn check_name(nerd: bool, name: &str, language: Option<&str>) -> String {
-    let icon = language.map(icons::language_icon).or_else(|| icons::check(name));
-    match (icon.filter(|_| nerd), language) {
-        (Some(icon), _) => format!("{} {name:<17}", icons::icon(true, icon)),
-        (None, Some(language)) if !nerd => format!("{} {name:<16}", icons::language_chip(language)),
-        (None, _) if nerd => format!("  {name:<17}"),
-        (None, _) => format!("{name:<19}"),
+    let icon = language.map(icons::language_icon).or_else(|| icons::check(name)).unwrap_or(Icon::Terminal);
+    match (nerd, language) {
+        (true, _) => format!("{} {name:<17}", icons::icon(true, icon)),
+        (false, Some(language)) => format!("{} {name:<16}", icons::language_chip(language)),
+        (false, None) => format!("{name:<19}"),
     }
 }
 
