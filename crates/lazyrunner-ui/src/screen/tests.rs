@@ -376,6 +376,11 @@ async fn settings_toggle_and_say_so() {
     screen.press("f");
     assert_eq!(screen.last_log(), "Reduced motion: no blinking, spinners or fades: on (saved)");
     assert!(screen.controller.setting(Toggle::ReducedMotion));
+    assert!(screen.controller.setting(Toggle::Notifications), "on by default");
+    screen.press("n");
+    assert_eq!(screen.last_log(), "Desktop notifications while you're elsewhere: off (saved)");
+    assert!(!screen.controller.setting(Toggle::Notifications));
+    assert_eq!(super::actions::setting_group(Toggle::Notifications), "Integrations");
 }
 
 #[tokio::test]

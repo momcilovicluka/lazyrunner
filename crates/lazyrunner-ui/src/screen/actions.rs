@@ -471,7 +471,7 @@ pub(crate) struct MenuToggle {
 }
 
 /// The , menu's toggles, by their group ([`setting_group`]).
-const MENU_TOGGLES: [MenuToggle; 16] = [
+const MENU_TOGGLES: [MenuToggle; 17] = [
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
     MenuToggle { letter: "w", toggle: Toggle::StartupChecklist, label: "Startup checklist when lazyrunner opens" },
     MenuToggle { letter: "v", toggle: Toggle::AutoUpdate, label: "Auto-update lazyrunner when it opens" },
@@ -502,6 +502,7 @@ const MENU_TOGGLES: [MenuToggle; 16] = [
         toggle: Toggle::GitBeside,
         label: "L opens the git tool beside lazyrunner (Windows Terminal)",
     },
+    MenuToggle { letter: "n", toggle: Toggle::Notifications, label: "Desktop notifications while you're elsewhere" },
     MenuToggle { letter: "F", toggle: Toggle::FollowAgent, label: "Follow an agent when it calls (F: your keys back)" },
     MenuToggle {
         letter: "t",
@@ -522,10 +523,9 @@ pub fn setting_group(toggle: Toggle) -> &'static str {
         | Toggle::StopFrontendOnStop
         | Toggle::RestartOnCodeChange
         | Toggle::SkipUnchangedBuilds
-        | Toggle::Notifications
         | Toggle::Coverage => "Running",
         Toggle::Mouse | Toggle::ReducedMotion | Toggle::NerdIcons | Toggle::LinksOnAltClick => "Display",
-        Toggle::GitBeside | Toggle::FollowAgent | Toggle::OpenTelemetry => "Integrations",
+        Toggle::GitBeside | Toggle::Notifications | Toggle::FollowAgent | Toggle::OpenTelemetry => "Integrations",
     }
 }
 

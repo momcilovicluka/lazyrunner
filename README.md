@@ -424,7 +424,8 @@ focused app's build or take it out of the queue, and `q`.
 - **A scrollbar** on the right of a column with more output than fits shows where the lines on screen are; it is
   bright while the column is scrolled back (`G` follows new output again).
 - **The terminal tab** title and progress show the overall state; **desktop notifications** cover a failed build, a
-  crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none.
+  crash, and a slow start finishing - while you're elsewhere: a terminal that says it has the focus gets none. `,` then
+  `n` turns them off (or on again).
 - **An app that crashes starts again by itself** when its profile says `"restart": "onCrash"`: after a wait that
   doubles each time (1 s, 2 s, 4 s, at most 30 s), its title counting it down (`↻ 2 · 3s`) while the wait drains along
   the title's rule - `s` cancels it. After 3 crashes within 2 minutes it's held (`↻ held`, its border pulsing red once,
