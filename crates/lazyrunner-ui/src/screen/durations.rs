@@ -2,6 +2,10 @@
 //! has a row per item (bars per run, the last, the usual and the trend), so one that got slower stands out; `j` `k`
 //! pick one, and its details show its runs as a taller chart - growing in as it's picked - and each run listed: when,
 //! how long, and whether it failed. The details sit beside the table on a wide terminal, under it on a narrow one.
+//!
+//! Each group's title (Builds, Projects built…) folds it (#113): `Enter` or `Space` on it, a click on it, or `Space` on
+//! one of its items. A folded title says how many it holds and how many got slower or failed; picked, its details list
+//! its slowest. The folds are kept while lazyrunner runs, and a group's rows slide open and shut.
 
 use std::time::{Duration, Instant};
 
@@ -34,15 +38,51 @@ const DETAIL_WIDTH: usize = 44;
 const CHART_ROWS: usize = 6;
 const GROW: Duration = Duration::from_millis(200);
 const DETAIL_FIXED: usize = 7;
-const KEYS: &str = " j k choose · g G first / last · Enter a build's map · Esc closes · usual = median of the earlier successful runs · \
-     red = failed";
+/// How long a group's rows take to slide open or shut.
+const FOLD: Duration = Duration::from_millis(150);
+/// A picked group's slowest, by name: at most this many cells of it.
+const GROUP_NAME: usize = 26;
+const KEYS: &str = " j k choose · Enter a build's map · Space, or a click on a title, folds its group · g G first / last · \
+     Esc closes · usual = median of the earlier successful runs · red = failed";
+
+/// The groups' folds: the folded ones, kept while lazyrunner runs, and the one sliding open or shut now.
+#[derive(Default)]
+pub struct Folds {
+    folded: Vec<Kind>,
+    moving: Option<Fold>,
+}
+
+#[derive(Clone, Copy)]
+struct Fold {
+    kind: Kind,
+    opening: bool,
+    at: Instant,
+}
+
+/// A line of the table that can be picked: a group's title, or an item (its place in `items`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Entry {
+    Group(Kind),
+    Item(usize),
+}
+
+/// What a key or a click on the table does.
+enum Act {
+    Fold(Kind),
+    Map,
+    Move(usize),
+}
 
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
     if controller.durations.is_empty() {
         controller.add_log("No durations yet: they're recorded from the next build, start or npm ci.", Hue::DarkGray);
-    } else {
-        ui.overlay = Some(Overlay::Durations { index: 0, picked: ui.now });
+        return;
     }
+    let index = entries(&ui.durations, &items(controller))
+        .iter()
+        .position(|entry| matches!(entry, Entry::Item(_)))
+        .unwrap_or(0);
+    ui.overlay = Some(Overlay::Durations { index, picked: ui.now });
 }
 
 /// The items as the table lists them: by kind, each kind's by name.
@@ -51,38 +91,90 @@ fn items(controller: &Controller) -> Vec<(Kind, &Item)> {
     grouped.into_iter().flat_map(|(kind, items)| items.into_iter().map(move |item| (kind, item))).collect()
 }
 
-/// j k choose an item, g G (Home End) the first and the last, Esc q D close.
+/// What can be picked, in order: each group's title, then its items while it's open.
+fn entries(folds: &Folds, all: &[(Kind, &Item)]) -> Vec<Entry> {
+    let mut out = Vec::new();
+    let mut last = None;
+    for (at, &(kind, _)) in all.iter().enumerate() {
+        if last != Some(kind) {
+            out.push(Entry::Group(kind));
+            last = Some(kind);
+        }
+        if !folds.folded.contains(&kind) {
+            out.push(Entry::Item(at));
+        }
+    }
+    out
+}
+
+/// j k choose a title or an item, g G (Home End) the first and the last, Enter a build's map or folds a group, Space
+/// folds the picked one's group, Esc q D close.
 pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
     if matches!(name, "Escape" | "q" | "D") {
         ui.overlay = None;
         return;
     }
-    if name == "Enter" {
-        open_build(ui, controller);
-        return;
-    }
-    let count = items(controller).len();
-    let now = ui.now;
-    let Some(Overlay::Durations { index, picked }) = &mut ui.overlay else { return };
-    let last = count.saturating_sub(1);
-    let to = match name {
-        "j" | "DownArrow" => super::keys::wrapped(*index, 1, count.max(1)),
-        "k" | "UpArrow" => super::keys::wrapped(*index, -1, count.max(1)),
-        "Ctrl+D" | "PageDown" => (*index + 10).min(last),
-        "Ctrl+U" | "PageUp" => index.saturating_sub(10),
-        "g" | "Home" | "<" => 0,
-        "G" | "End" | ">" => last,
-        _ => *index,
+    let Some(Overlay::Durations { index, .. }) = &ui.overlay else { return };
+    let act = {
+        let all = items(controller);
+        let entries = entries(&ui.durations, &all);
+        let last = entries.len().saturating_sub(1);
+        match (name, entries.get(*index).copied()) {
+            ("Enter" | "Space", Some(Entry::Group(kind))) => Act::Fold(kind),
+            ("Space", Some(Entry::Item(at))) => Act::Fold(all[at].0),
+            ("Enter", _) => Act::Map,
+            ("j" | "DownArrow", _) => Act::Move(super::keys::wrapped(*index, 1, entries.len().max(1))),
+            ("k" | "UpArrow", _) => Act::Move(super::keys::wrapped(*index, -1, entries.len().max(1))),
+            ("Ctrl+D" | "PageDown", _) => Act::Move((*index + 10).min(last)),
+            ("Ctrl+U" | "PageUp", _) => Act::Move(index.saturating_sub(10)),
+            ("g" | "Home" | "<", _) => Act::Move(0),
+            ("G" | "End" | ">", _) => Act::Move(last),
+            _ => Act::Move(*index),
+        }
     };
-    if to != *index {
+    match act {
+        Act::Fold(kind) => fold(ui, controller, kind),
+        Act::Map => open_build(ui, controller),
+        Act::Move(to) => pick(ui, to),
+    }
+}
+
+/// Picks entry `to`; its details grow in again when it's another.
+fn pick(ui: &mut Ui, to: usize) {
+    let now = ui.now;
+    if let Some(Overlay::Durations { index, picked }) = &mut ui.overlay
+        && *index != to
+    {
         (*index, *picked) = (to, now);
     }
+}
+
+/// Folds group `kind`, or unfolds it, and picks its title.
+fn fold(ui: &mut Ui, controller: &Controller, kind: Kind) {
+    let now = ui.now;
+    let folds = &mut ui.durations;
+    let opening = folds.folded.contains(&kind);
+    if opening {
+        folds.folded.retain(|folded| *folded != kind);
+    } else {
+        folds.folded.push(kind);
+    }
+    folds.moving = Some(Fold { kind, opening, at: now });
+    let title = entries(&ui.durations, &items(controller)).iter().position(|entry| *entry == Entry::Group(kind));
+    pick(ui, title.unwrap_or(0));
 }
 
 /// Enter on a build (or a project built): its app's build as a map, as it was kept.
 fn open_build(ui: &mut Ui, controller: &mut Controller) {
     let Some(Overlay::Durations { index, .. }) = &ui.overlay else { return };
-    let Some((kind, item)) = items(controller).get(*index).map(|(kind, item)| (*kind, (*item).clone())) else { return };
+    let picked = {
+        let all = items(controller);
+        match entries(&ui.durations, &all).get(*index) {
+            Some(Entry::Item(at)) => all.get(*at).map(|(kind, item)| (*kind, (*item).clone())),
+            _ => None,
+        }
+    };
+    let Some((kind, item)) = picked else { return };
     let app = match kind {
         Kind::Build => item.key.clone(),
         Kind::Project => item.key.split('/').next().unwrap_or_default().to_string(),
@@ -97,21 +189,24 @@ fn open_build(ui: &mut Ui, controller: &mut Controller) {
     super::code::open_build(ui, controller, app);
 }
 
-/// A click on an item picks it.
-pub fn click(ui: &mut Ui, target: Option<Target>) -> bool {
-    let now = ui.now;
-    let Some(Overlay::Durations { index, picked }) = &mut ui.overlay else { return false };
+/// A click on an item picks it; one on a group's title folds the group, or unfolds it.
+pub fn click(ui: &mut Ui, controller: &Controller, target: Option<Target>) -> bool {
+    if !matches!(ui.overlay, Some(Overlay::Durations { .. })) {
+        return false;
+    }
     let Some(Target::Item(at)) = target else { return false };
-    if *index != at {
-        (*index, *picked) = (at, now);
+    match entries(&ui.durations, &items(controller)).get(at) {
+        Some(Entry::Group(kind)) => fold(ui, controller, *kind),
+        _ => pick(ui, at),
     }
     true
 }
 
-/// Whether the picked item's chart is still growing in.
+/// Whether the picked item's chart is still growing in, or a group is sliding open or shut.
 pub fn animating(ui: &Ui) -> bool {
     let Some(Overlay::Durations { picked, .. }) = &ui.overlay else { return false };
-    ui.motion.enabled && !ui.reduced_motion && ui.now.saturating_duration_since(*picked) < GROW
+    let growing = ui.motion.enabled && !ui.reduced_motion && ui.now.saturating_duration_since(*picked) < GROW;
+    growing || folding(ui).is_some()
 }
 
 /// How far the picked item's chart has grown: 1 at rest.
@@ -120,6 +215,16 @@ fn grown(ui: &Ui, picked: Instant) -> f64 {
         return 1.0;
     }
     super::motion::ease(ui.now.saturating_duration_since(picked).as_secs_f64() / GROW.as_secs_f64())
+}
+
+/// The group sliding open or shut, whether it's opening, and how far along it is; none at rest or without motion.
+fn folding(ui: &Ui) -> Option<(Kind, bool, f64)> {
+    let fold = ui.durations.moving?;
+    if !ui.motion.enabled || ui.reduced_motion {
+        return None;
+    }
+    let done = ui.now.saturating_duration_since(fold.at).as_secs_f64() / FOLD.as_secs_f64();
+    (done < 1.0).then(|| (fold.kind, fold.opening, super::motion::ease(done)))
 }
 
 /// The trend in words: slower or faster by how much (a failed run has none; a small change is "≈").
@@ -136,15 +241,18 @@ fn change(trend: Option<&Trend>, nerd: bool) -> (String, C) {
     }
 }
 
+/// `label` in `cells` at most, cut with "…".
+fn cut(label: &str, cells: usize) -> String {
+    match label.width() > cells {
+        true => format!("{}…", take_cells(label, cells.saturating_sub(1))),
+        false => label.to_string(),
+    }
+}
+
 /// An item's row: its name, a bar per run, the last run, the usual, the trend and (with room) how many runs there are.
 fn line(item: &Item, label: usize, bars: usize, count: bool, nerd: bool) -> Vec<Seg> {
     let Some(trend) = trend(&item.runs) else { return Vec::new() };
-    let name = if item.label.width() > label {
-        format!("{}…", take_cells(&item.label, label.saturating_sub(1)))
-    } else {
-        item.label.clone()
-    };
-    let mut segs = vec![seg(format!("  {} ", pad(&name, label)), C::Gray)];
+    let mut segs = vec![seg(format!("  {} ", pad(&cut(&item.label, label), label)), C::Gray)];
     segs.extend(bar_segs(item, bars));
     segs.push(seg(format!("  {:>7}", format_duration(trend.last)), if trend.last_ok { C::White } else { C::Red }));
     segs.push(seg(format!("  {:>7}", trend.usual.map_or("–".to_string(), format_duration)), C::DarkGray));
@@ -153,6 +261,28 @@ fn line(item: &Item, label: usize, bars: usize, count: bool, nerd: bool) -> Vec<
     if count {
         let runs = item.runs.len();
         segs.push(seg(format!("  {runs:>3} run{}", if runs == 1 { "" } else { "s" }), C::DarkGray));
+    }
+    segs
+}
+
+/// A group's title: its fold mark, its name and how many it holds; open, the columns' names, folded, how many got
+/// slower or failed.
+fn group_line(kind: Kind, items: &[&Item], open: bool, label: usize, runs: &str, nerd: bool) -> Vec<Seg> {
+    let title = format!("{} {} ({})", icons::icon(nerd, Icon::Fold { open }), kind.title(), items.len());
+    let mut segs = vec![seg(pad(&title, label + 2), C::DarkCyan)];
+    if open {
+        segs.push(seg(format!(" {runs}  {:>7}  {:>7}", "last", "usual"), C::DarkCyan));
+        return segs;
+    }
+    let trends: Vec<Trend> = items.iter().filter_map(|item| trend(&item.runs)).collect();
+    let slower = trends.iter().filter(|trend| trend.notable().is_some_and(|change| change > 0.0)).count();
+    let failed = trends.iter().filter(|trend| !trend.last_ok).count();
+    segs.push(seg(" folded", C::DarkGray));
+    if slower > 0 {
+        segs.push(seg(format!(" · {} {slower} slower", icons::icon(nerd, Icon::Slower)), C::Red));
+    }
+    if failed > 0 {
+        segs.push(seg(format!(" · {failed} failed"), C::Red));
     }
     segs
 }
@@ -172,22 +302,46 @@ fn bar_segs(item: &Item, bars: usize) -> Vec<Seg> {
     segs
 }
 
-/// The table: a title row per kind and a row per item (aimed at it, for a click); and each item's row in it.
-fn table(controller: &Controller, width: usize, nerd: bool) -> (Vec<Vec<Seg>>, Vec<usize>) {
+/// The table: a title row per group and a row per item of an open group (each aimed at its entry, for a click); and
+/// each entry's row in it - a group's sliding open or shut shows as many of its rows as it has got to.
+fn table(
+    controller: &Controller,
+    folded: &[Kind],
+    moving: Option<(Kind, bool, f64)>,
+    width: usize,
+    nerd: bool,
+) -> (Vec<Vec<Seg>>, Vec<usize>) {
     let bars = width.saturating_sub(66).clamp(5, 20);
     let count = width >= COUNT_FROM;
     let label = width.saturating_sub(bars + ROW_FIXED + if count { COUNT_CELLS } else { 0 }).max(8);
-    let runs = if bars >= 11 { format!("last {bars} runs") } else { "runs".to_string() };
-    let (mut rows, mut at_item) = (Vec::new(), Vec::new());
+    let runs = pad(&if bars >= 11 { format!("last {bars} runs") } else { "runs".to_string() }, bars);
+    let (mut rows, mut at_entry) = (Vec::new(), Vec::new());
     for (kind, items) in controller.durations.grouped() {
-        let title = format!("{} {}  {:>7}  {:>7}", pad(kind.title(), label + 2), pad(&runs, bars), "last", "usual");
-        rows.push(vec![seg(title, C::DarkCyan)]);
-        for each in items {
-            rows.push(aim(line(each, label, bars, count, nerd), Target::Item(at_item.len())));
-            at_item.push(rows.len() - 1);
+        let open = !folded.contains(&kind);
+        rows.push(aim(group_line(kind, &items, open, label, &runs, nerd), Target::Item(at_entry.len())));
+        let title = rows.len() - 1;
+        at_entry.push(title);
+        let shown = match moving {
+            Some((moving, opening, done)) if moving == kind => {
+                let share = if opening { done } else { 1.0 - done };
+                (items.len() as f64 * share).ceil() as usize
+            }
+            _ if open => items.len(),
+            _ => 0,
+        };
+        for (at, each) in items.into_iter().enumerate() {
+            match (open, at < shown) {
+                (true, true) => {
+                    rows.push(aim(line(each, label, bars, count, nerd), Target::Item(at_entry.len())));
+                    at_entry.push(rows.len() - 1);
+                }
+                (true, false) => at_entry.push(title),
+                (false, true) => rows.push(line(each, label, bars, count, nerd)),
+                (false, false) => {}
+            }
         }
     }
-    (rows, at_item)
+    (rows, at_entry)
 }
 
 /// The picked item's chart: a column per run (as many of the last as fit), `height` rows tall in eighths, scaled to
@@ -253,8 +407,61 @@ fn details(ui: &Ui, kind: Kind, item: &Item, width: usize, room: usize, picked: 
     out
 }
 
-/// The header: the view, how many items, and the one that got the most slower.
-fn header(all: &[(Kind, &Item)], nerd: bool) -> Vec<Seg> {
+/// A picked group's details: its name and how many it holds, their last runs' time together, how to fold it, and
+/// its slowest last runs, as many as fit in `room`.
+fn group_details(kind: Kind, items: &[&Item], open: bool, nerd: bool, room: usize) -> Vec<Vec<Seg>> {
+    let plural = if items.len() == 1 { "" } else { "s" };
+    let mut ranked: Vec<(&Item, Trend)> = items.iter().filter_map(|item| Some((*item, trend(&item.runs)?))).collect();
+    ranked.sort_by(|a, b| b.1.last.total_cmp(&a.1.last));
+    let total: f64 = ranked.iter().map(|(_, trend)| trend.last).sum();
+    let verb = if open { "folds" } else { "unfolds" };
+    let mut out = vec![
+        vec![
+            seg(format!(" {}", kind.title().to_uppercase()), C::White),
+            seg(format!(" · {} item{plural}", items.len()), C::DarkCyan),
+        ],
+        vec![seg(format!(" their last runs: {} in all", format_duration(total)), C::Gray)],
+        vec![seg(format!(" Enter, Space or a click {verb} it"), C::DarkGray)],
+        Vec::new(),
+        vec![seg(" THE SLOWEST LAST", C::DarkCyan)],
+    ];
+    let left = room.saturating_sub(out.len());
+    for (item, trend) in ranked.into_iter().take(left) {
+        let (text, color) = change(Some(&trend), nerd);
+        let last = if trend.last_ok { C::Gray } else { C::Red };
+        out.push(vec![
+            seg(
+                format!(" {} {:>7}  ", pad(&cut(&item.label, GROUP_NAME), GROUP_NAME), format_duration(trend.last)),
+                last,
+            ),
+            seg(text, color),
+        ]);
+    }
+    out
+}
+
+/// The picked entry's details: an item's runs, or a group's slowest.
+fn picked_details(
+    ui: &Ui,
+    all: &[(Kind, &Item)],
+    entry: Entry,
+    width: usize,
+    room: usize,
+    picked: Instant,
+) -> Vec<Vec<Seg>> {
+    match entry {
+        Entry::Item(at) => {
+            all.get(at).map_or_else(Vec::new, |(kind, item)| details(ui, *kind, item, width, room, picked))
+        }
+        Entry::Group(kind) => {
+            let members: Vec<&Item> = all.iter().filter(|(of, _)| *of == kind).map(|(_, item)| *item).collect();
+            group_details(kind, &members, !ui.durations.folded.contains(&kind), ui.nerd, room)
+        }
+    }
+}
+
+/// The header: the view, how many items, the one that got the most slower, and how many groups are folded.
+fn header(all: &[(Kind, &Item)], folded: usize, nerd: bool) -> Vec<Seg> {
     let mut segs = Vec::new();
     let plural = if all.len() == 1 { "" } else { "s" };
     segs.push(seg(format!("  {} item{plural}", all.len()), C::Gray));
@@ -266,6 +473,10 @@ fn header(all: &[(Kind, &Item)], nerd: bool) -> Vec<Seg> {
     if let Some((item, change)) = slower {
         let icon = icons::icon(nerd, Icon::Slower);
         segs.push(seg(format!(" · slowed down most: {} {icon} +{}%", item.label, (change * 100.0).round()), C::Red));
+    }
+    if folded > 0 {
+        let plural = if folded == 1 { "" } else { "s" };
+        segs.push(seg(format!(" · {folded} group{plural} folded"), C::DarkGray));
     }
     segs
 }
@@ -283,35 +494,36 @@ fn window(rows: &[Vec<Seg>], selected: usize, room: usize) -> Vec<Vec<Seg>> {
 fn light(row: &mut [Seg]) {
     for part in row.iter_mut().filter(|part| part.bg.is_none()) {
         part.bg = Some(C::FocusBack);
-        if matches!(part.fg, C::Gray | C::DarkGray | C::White) {
+        if matches!(part.fg, C::Gray | C::DarkGray | C::White | C::DarkCyan) {
             part.fg = C::FocusText;
         }
     }
 }
 
-/// The view: its header and keys, then the table beside (or above) the picked item's details.
+/// The view: its header and keys, then the table beside (or above) the picked entry's details.
 pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<Vec<Seg>> {
     let Some(Overlay::Durations { index, picked }) = &ui.overlay else { return Vec::new() };
     let (index, picked) = (*index, *picked);
     let all = items(controller);
-    let index = index.min(all.len().saturating_sub(1));
-    let Some(&(kind, item)) = all.get(index) else { return Vec::new() };
+    let entries = entries(&ui.durations, &all);
+    let index = index.min(entries.len().saturating_sub(1));
+    let Some(&entry) = entries.get(index) else { return Vec::new() };
     let beside = cells >= BESIDE_FROM;
     let table_width = if beside { cells.saturating_sub(DETAIL_WIDTH + 3) } else { cells };
-    let (mut table, at_item) = table(controller, table_width, ui.nerd);
-    let row = at_item.get(index).copied().unwrap_or(0);
+    let (mut table, at_entry) = table(controller, &ui.durations.folded, folding(ui), table_width, ui.nerd);
+    let row = at_entry.get(index).copied().unwrap_or(0);
     let bar = ui.motion.bar(row, ui.now);
     if let Some(line) = table.get_mut(bar) {
         light(line);
     }
     let keys = super::viewbar::keys(KEYS, cells);
     let body = rows.saturating_sub(2 + keys.len());
-    let mut out = vec![header(&all, ui.nerd)];
+    let mut out = vec![header(&all, ui.durations.folded.len(), ui.nerd)];
     out.extend(keys);
     out.push(Vec::new());
     if beside {
         let table = window(&table, row, body);
-        let details = details(ui, kind, item, DETAIL_WIDTH, body, picked);
+        let details = picked_details(ui, &all, entry, DETAIL_WIDTH, body, picked);
         for at in 0..body {
             let mut line = fit(table.get(at).cloned().unwrap_or_default(), table_width);
             line.push(seg(" │ ", C::DarkGray));
@@ -322,7 +534,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         let room = table.len().min(body / 2).max(3);
         out.extend(window(&table, row, room));
         out.push(vec![seg("─".repeat(cells), C::DarkGray)]);
-        out.extend(details(ui, kind, item, cells, body.saturating_sub(room + 1), picked));
+        out.extend(picked_details(ui, &all, entry, cells, body.saturating_sub(room + 1), picked));
     }
     out.truncate(rows);
     out.into_iter().map(|line| aim(fit(line, cells), Target::Box)).collect()

@@ -598,6 +598,8 @@ pub struct Ui {
     pub last_checks: Option<(Instant, Vec<checklist::Item>)>,
     /// The nerdIcons setting (`, i`), read at every frame: Nerd Font icons in the chrome.
     pub nerd: bool,
+    /// The durations view's folded groups (#113), kept while lazyrunner runs.
+    pub durations: durations::Folds,
     /// The short effects that answer input: flashes, boxes opening, widths and scrolling gliding.
     pub motion: motion::Motion,
     /// A key that ended the startup checklist: the loop runs it as soon as the checklist is gone.
@@ -713,6 +715,7 @@ impl Ui {
             terminal_focused: None,
             last_checks: None,
             nerd: controller.setting(Toggle::NerdIcons),
+            durations: durations::Folds::default(),
             motion: motion::Motion::default(),
             replay: None,
             bars: HashMap::new(),

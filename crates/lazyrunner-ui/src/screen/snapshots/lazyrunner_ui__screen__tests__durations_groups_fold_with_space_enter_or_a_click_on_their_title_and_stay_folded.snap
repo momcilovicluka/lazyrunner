@@ -1,0 +1,28 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: "screen.render(140, 30)"
+---
+  K Stack  E Problems  H Requests  M Migrations  A Audit  T Tests  P Ports ⧗ DURATIONS   ~ Timeline  d Database
+  3 items · slowed down most: Orders ▲ +100% · 1 group folded
+ j k choose · Enter a build's map · Space, or a click on a title, folds its group · g G first / last · Esc closes
+ usual = median of the earlier successful runs · red = failed
+
+▸ Builds (2)                       folded · ▲ 2 slower                                        │  BUILDS · 2 items
+▾ Starts (1)                       last 20 runs             last    usual                     │  their last runs: 1m00s in all
+  Orders                           ▇▆▇▇                       9s       9s  ≈           4 runs │  Enter, Space or a click unfolds it
+                                                                                              │
+                                                                                              │  THE SLOWEST LAST
+                                                                                              │  Orders                         40s  ▲ +100%
+                                                                                              │  Api                            20s  ▲ +100%
+                                                                                              │
+                                                                                              │
+                                                                                              │
+                                                                                              │
+                                                                                              │
+                                                                                              │
+                                                                                              │
+                                                                                              │
+                                                                                              │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                                               :  commands   x  menu   ?  keys   ,  settings   q  quit

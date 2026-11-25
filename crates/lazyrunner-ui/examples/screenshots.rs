@@ -250,7 +250,7 @@ fn durations(demo: &mut Demo) {
             demo.controller.durations.add(kind, key, label, *seconds, !failed);
         }
     }
-    demo.ui.overlay = Some(Overlay::Durations { index: 0, picked: demo.ui.now });
+    demo.ui.overlay = Some(Overlay::Durations { index: 1, picked: demo.ui.now });
 }
 
 fn themes(demo: &mut Demo) {
