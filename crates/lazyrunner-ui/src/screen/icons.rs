@@ -330,12 +330,15 @@ pub fn language_chip(language: &str) -> &'static str {
     }
 }
 
-/// A startup check's icon, by its name.
+/// A startup check's icon, by its name; none for a command app's, which is its language's or a terminal.
 pub fn check(name: &str) -> Option<Icon> {
     match name {
         "lazyrunner" => Some(Icon::Rust),
         "git" => Some(Icon::Git),
         ".NET SDK" => Some(Icon::Dotnet),
+        "dotnet-trace" => Some(Icon::Fire),
+        lazyrunner_core::run::sql::PROGRAM => Some(Icon::Terminal),
+        lazyrunner_core::run::checks::SQLPACKAGE_CHECK => Some(Icon::Zip),
         "Node.js / npm" => Some(Icon::Npm),
         "Branch" => Some(Icon::Branch),
         "Ports" => Some(Icon::Plug),
