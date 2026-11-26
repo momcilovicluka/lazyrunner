@@ -250,6 +250,7 @@ impl Controller {
             self.timeline_entry(key).start_from = Some(since);
         }
         let now = (self.now)();
+        self.end_app_live_levels(key, "it starts again");
         self.remember_run(index);
         self.states[index].reset_for_start();
         self.probes.remove(key);

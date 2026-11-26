@@ -161,6 +161,7 @@ impl Controller {
         self.tick_recoveries(now);
         self.tick_tunnels(now);
         self.tick_faults();
+        self.tick_live_levels(now);
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {
@@ -195,6 +196,7 @@ impl Controller {
         state.add_line(&format!("■ exited with code {code_text}"), Hue::Red, now);
         state.flash_until = Some(now + Duration::from_secs(3));
         let name = self.apps[index].name.clone();
+        self.end_app_live_levels(key, "it exited");
         self.add_log(format!("✗ {name} exited unexpectedly (code {code_text}) - see its column"), Hue::Red);
         self.notifications.push((format!("{name} stopped unexpectedly"), format!("Exit code {code_text}")));
         self.happened("app.crashed", Some(key), format!("{name} exited with code {code_text}"));

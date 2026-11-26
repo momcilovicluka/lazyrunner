@@ -313,7 +313,7 @@ impl<C: Channel> Server<C> {
             "press_keys" => self.pressed(args).await,
             name @ ("run_action" | "switch_database" | "install_packages" | "apply_migrations" | "kill_port_holder"
             | "set_setting" | "run_task" | "open_in_editor" | "save_point" | "rewind" | "database_changes"
-            | "drop_database") => self.agent(name, args).await,
+            | "drop_database" | "set_log_level") => self.agent(name, args).await,
             name => match tools::renamed(name) {
                 Some(now) => Err(now),
                 None => return None,
@@ -672,7 +672,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 44));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 45));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);

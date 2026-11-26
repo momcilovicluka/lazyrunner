@@ -1,8 +1,9 @@
 //! `Alt+l` on a .NET app: its log levels (#101) - the default, EF Core's SQL, HttpClient's calls, ASP.NET Core and
 //! its own namespace, each at Trace, Debug, Information or Warning, or its own settings' level. `j` `k` pick a
 //! category, `h` `l` a level, `Enter` sets it (restarting the app when it runs), `x` gives the category back to the
-//! app's settings, `r` all of them; `s` keeps them beyond this session. Its title says `Debug` while it differs. Each
-//! category says how many lines it logged the last minute, and the loudest ones show under them.
+//! app's settings, `r` all of them; `s` keeps them beyond this session. Its title says `Debug` while it differs. `t`
+//! sets it live instead, for 10 minutes, without a restart (#112). Each category says how many lines it logged the
+//! last minute, and the loudest ones show under them.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -11,6 +12,7 @@ use lazyrunner_core::output::Hue;
 use lazyrunner_core::profile::AppKind;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::controller::{DEFAULT, LEVELS};
+use lazyrunner_core::run::live_level::MINUTES;
 
 use super::icons::{self, Icon};
 use super::keys;
@@ -36,7 +38,8 @@ const TRACK_FILLED: &str = "━";
 const TRACK_EMPTY: &str = "─";
 const KNOB: &str = "●";
 const SNAP: &str = "log-level-set";
-const FOOTER: &str = "j k category · h l level · Enter sets it (restarts it) · x its own · r all · s keeps · Esc";
+const FOOTER: &str =
+    "j k category · h l level · Enter sets (restarts) · t live 10 min · x its own · r all · s keeps · Esc";
 
 /// Alt+l: the focused app's log levels, on the default.
 pub fn open(ui: &mut Ui, controller: &mut Controller) {
@@ -78,6 +81,10 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) {
             ui.motion.flash(Spot::Title(app), ui.now);
         }
         "x" | "Backspace" => controller.set_log_level(&key, &category, None),
+        "t" => match controller.set_live_level(&key, &category, LEVELS[*level], MINUTES) {
+            Ok(set) => controller.add_log(set.said, Hue::Cyan),
+            Err(why) => controller.add_log(why, Hue::Yellow),
+        },
         "r" => controller.reset_log_levels(&key),
         "s" => controller.keep_log_levels(&key),
         _ => {}
@@ -153,12 +160,18 @@ pub fn rows(ui: &Ui, controller: &Controller, cells: usize, rows: usize) -> Vec<
         let rate = rate_of(&rates, category);
         let rate_text = if rate > 0 { format!("{rate:>4}/min") } else { format!("{:>8}", "·") };
         line.push(seg(rate_text, if rate >= LOUD { C::Yellow } else { C::DarkGray }));
-        let note = match current {
-            Some(each) if each.kept => " kept",
-            Some(_) => " session",
-            None => OWN,
+        let live = controller
+            .live_levels()
+            .iter()
+            .find(|live| live.app == found.key && live.category.eq_ignore_ascii_case(category));
+        let note = match (live, current) {
+            (Some(live), _) => format!(" live {} {}m", live.level, live.minutes_left(ui.now)),
+            (None, Some(each)) if each.kept => " kept".into(),
+            (None, Some(_)) => " session".into(),
+            (None, None) => OWN.into(),
         };
-        line.push(seg(format!("  {note}"), if current.is_some() { C::DarkCyan } else { C::DarkGray }));
+        let lit = live.is_some() || current.is_some();
+        line.push(seg(format!("  {note}"), if lit { C::DarkCyan } else { C::DarkGray }));
         lines.push(line);
     }
     let mut loud: Vec<(&String, &usize)> = rates.iter().filter(|(_, count)| **count >= LOUD).collect();

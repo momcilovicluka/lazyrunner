@@ -15,6 +15,8 @@ pub const DATABASE_OPS: [(&str, &str); 6] = [
     ("import", "import_database"),
     ("files", "database_files"),
 ];
+/// set_log_level's levels: .NET's, and putting them back.
+const LOG_LEVELS: [&str; 8] = ["Trace", "Debug", "Information", "Warning", "Error", "Critical", "None", "reset"];
 /// Tools merged into another (#112), with the call that does it now: an agent or a permission rule may still name them.
 const RENAMED: [(&str, &str); 12] = [
     ("get_changelog", "get_view with view \"changelog\""),
@@ -244,7 +246,7 @@ pub fn list(apps: &str) -> Vec<Value> {
         )),
         tool(
             "database",
-            "Database work that drops nothing, by `op`, as the database screen (d) does it: add - a connection \
+            "Database work that drops nothing, by `op`, as d does it: add - a connection \
              string in secrets.json copying `from` with database `name`, not in use (switch: true makes it the one \
              in use, restarting the APIs: needs confirm - ask the user first); copy - `database` to a new one; \
              backup - a COPY_ONLY .bak in the server's backup folder; export - a .bacpac; import - `file` as a new \
@@ -376,6 +378,20 @@ pub fn list(apps: &str) -> Vec<Value> {
             "Turns a setting (list_actions and get_status show them) on or off; saved, as , does.",
             json!({ "setting": { "type": "string" }, "on": { "type": "boolean" } }),
             &["setting", "on"],
+            false,
+        ),
+        tool(
+            "set_log_level",
+            "Sets a running .NET app's log category (Microsoft.EntityFrameworkCore.Database.Command, Default...) to \
+             a level live, via its user secrets; back by itself after `minutes` (10), on its restart or lazyrunner's \
+             quit. reset: back now (all without category).",
+            json!({
+                "app": app.clone(),
+                "category": { "type": "string" },
+                "level": { "type": "string", "enum": LOG_LEVELS },
+                "minutes": { "type": "integer", "minimum": 1, "maximum": 120 },
+            }),
+            &["app", "level"],
             false,
         ),
         tool(
@@ -519,7 +535,7 @@ mod tests {
     use super::*;
 
     /// What `tools/list` may weigh at most, in characters of its JSON: an agent pays for it in every session (#112).
-    const BUDGET: usize = 22_349;
+    const BUDGET: usize = 23_077;
 
     #[test]
     fn the_tool_list_stays_within_its_budget() {

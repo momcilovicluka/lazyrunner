@@ -359,6 +359,141 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<()> {
     write(path, &lines.join(newline), bom, &format!("with {key}"))
 }
 
+/// Setting `key`'s value (`Section:Key`, any case, flat or nested; never a commented-out one) in the file as it's
+/// written there - `"Debug"`, quotes and all; none when the file doesn't set it.
+pub fn value_in(path: &Path, key: &str) -> Result<Option<String>> {
+    let (text, _, _) = read(path)?;
+    Ok(value_at(&text, key).map(|(_, value)| value))
+}
+
+/// Sets `key` (as [`value_in`] finds it) to `raw`, JSON as it's to be written, where the file has it: everything
+/// around it stays as it was. Its value before, as it was written.
+pub fn replace(path: &Path, key: &str, raw: &str) -> Result<String> {
+    let (text, bom, _) = read(path)?;
+    let (at, before) = value_at(&text, key).ok_or_else(|| anyhow!("secrets.json doesn't set {key}"))?;
+    let changed = format!("{}{raw}{}", &text[..at.start], &text[at.end..]);
+    write(path, &changed, bom, &format!("with {key}"))?;
+    Ok(before)
+}
+
+/// Takes the line that sets `key` (flat, as [`set`] adds it; any case) out of the file.
+pub fn unset(path: &Path, key: &str) -> Result<()> {
+    let (text, bom, newline) = read(path)?;
+    let mut lines = lines(&text);
+    let sets = |line: &String| {
+        LINE.captures(line)
+            .is_some_and(|found| found.name("comment").is_none() && found["key"].eq_ignore_ascii_case(key))
+    };
+    let at = lines.iter().position(sets).ok_or_else(|| anyhow!("secrets.json has no line setting {key}"))?;
+    lines.remove(at);
+    write(path, &lines.join(newline), bom, &format!("without {key}"))
+}
+
+/// Where setting `key` has its value in JSONC `text`, and that value as written.
+fn value_at(text: &str, key: &str) -> Option<(std::ops::Range<usize>, String)> {
+    let mut scan = Scan { text, at: 0, found: Vec::new() };
+    scan.value("");
+    let (_, at) = scan.found.into_iter().find(|(name, _)| name.eq_ignore_ascii_case(key))?;
+    Some((at.clone(), text[at].to_string()))
+}
+
+/// A walk through JSONC text that notes each value's key as .NET reads it (`Section:Key`, an array's items by their
+/// index) and where the value is written. Text that isn't JSON stops it, with what it found so far.
+struct Scan<'a> {
+    text: &'a str,
+    at: usize,
+    found: Vec<(String, std::ops::Range<usize>)>,
+}
+
+impl Scan<'_> {
+    fn next(&self) -> Option<u8> {
+        self.text.as_bytes().get(self.at).copied()
+    }
+
+    /// Past blanks and comments.
+    fn blank(&mut self) {
+        loop {
+            let rest = &self.text[self.at..];
+            let trimmed = rest.trim_start();
+            self.at += rest.len() - trimmed.len();
+            if trimmed.starts_with("//") {
+                self.at += trimmed.find('\n').unwrap_or(trimmed.len());
+            } else if trimmed.starts_with("/*") {
+                self.at += trimmed.find("*/").map_or(trimmed.len(), |end| end + 2);
+            } else {
+                return;
+            }
+        }
+    }
+
+    /// A string, quotes and all.
+    fn string(&mut self) -> Option<std::ops::Range<usize>> {
+        let start = self.at;
+        (self.next()? == b'"').then_some(())?;
+        let mut escaped = false;
+        for (offset, c) in self.text[start + 1..].char_indices() {
+            match (escaped, c) {
+                (true, _) => escaped = false,
+                (false, '\\') => escaped = true,
+                (false, '"') => {
+                    self.at = start + 1 + offset + 1;
+                    return Some(start..self.at);
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    fn value(&mut self, key: &str) -> Option<()> {
+        let inner = |name: &str| if key.is_empty() { name.to_string() } else { format!("{key}:{name}") };
+        self.blank();
+        match self.next()? {
+            open @ (b'{' | b'[') => {
+                self.at += 1;
+                let close = if open == b'{' { b'}' } else { b']' };
+                let mut index = 0;
+                loop {
+                    self.blank();
+                    match self.next()? {
+                        found if found == close => {
+                            self.at += 1;
+                            return Some(());
+                        }
+                        b',' => self.at += 1,
+                        _ if open == b'[' => {
+                            self.value(&inner(&index.to_string()))?;
+                            index += 1;
+                        }
+                        _ => {
+                            let name = self.string()?;
+                            let name: String = serde_json::from_str(&self.text[name]).ok()?;
+                            self.blank();
+                            (self.next()? == b':').then_some(())?;
+                            self.at += 1;
+                            self.value(&inner(&name))?;
+                        }
+                    }
+                }
+            }
+            b'"' => {
+                let at = self.string()?;
+                self.found.push((key.to_string(), at));
+                Some(())
+            }
+            _ => {
+                let start = self.at;
+                while self.next().is_some_and(|c| !matches!(c, b',' | b'}' | b']' | b'/') && !c.is_ascii_whitespace()) {
+                    self.at += 1;
+                }
+                (self.at > start).then_some(())?;
+                self.found.push((key.to_string(), start..self.at));
+                Some(())
+            }
+        }
+    }
+}
+
 /// JSON with comments and trailing commas made plain JSON (for checking it).
 pub fn strip_jsonc(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -498,6 +633,29 @@ mod tests {
             Some("Server=localhost;Database=Shop;User Id=new;Password=c")
         );
         assert_eq!(connection_for(text, "localhost", "Other"), None);
+    }
+
+    #[test]
+    fn a_setting_is_found_flat_or_nested_and_replaced_or_taken_out_where_it_is() {
+        let temp = TempDir::new("secrets-value");
+        let path = temp.join("secrets.json");
+        let text = "{\n  // \"Seq:Url\": \"old\",\n  \"Seq:Url\": \"http://seq\",\n  /* \"x\": 1 */ \"Seq\": { \"Ports\": [1, \"two\"], \"On\": true },\n  \"A\\\"B\": { \"C\": \"d\" }\n}\n";
+        write_file(&path, text);
+        let value = |key: &str| value_in(&path, key).unwrap();
+        assert_eq!(
+            (value("seq:url").as_deref(), value("Seq:Ports:1").as_deref()),
+            (Some("\"http://seq\""), Some("\"two\""))
+        );
+        assert_eq!(
+            (value("Seq:On").as_deref(), value("A\"B:C").as_deref(), value("Seq")),
+            (Some("true"), Some("\"d\""), None)
+        );
+        assert_eq!(replace(&path, "Seq:Ports:0", "7").unwrap(), "1");
+        assert!(std::fs::read_to_string(&path).unwrap().contains("[7, \"two\"]"));
+        unset(&path, "SEQ:URL").unwrap();
+        let now = std::fs::read_to_string(&path).unwrap();
+        assert!(now.contains("// \"Seq:Url\": \"old\"") && value("Seq:Url").is_none(), "{now}");
+        assert!(unset(&path, "Seq:Url").is_err() && replace(&path, "Nope", "1").is_err());
     }
 
     #[test]

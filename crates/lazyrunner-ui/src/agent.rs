@@ -20,6 +20,7 @@ use crate::screen::copy::{self, Pick};
 
 pub(crate) mod databases;
 pub(crate) mod drive;
+pub(crate) mod levels;
 pub(crate) mod query;
 pub(crate) mod replay;
 pub(crate) mod views;
@@ -103,6 +104,9 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "database_files" => Ok(databases::files(controller)),
         "query_database" => query::start(controller, args, &client),
         "query_result" => query::answer(controller, args),
+        "set_log_level" => {
+            in_repo(controller, request["repo"].as_str()).and_then(|()| levels::set(controller, args, &client))
+        }
         "replay" => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| replay::plan(controller, args, &client))
         }
@@ -200,7 +204,7 @@ pub(crate) fn status(ui: &Ui, controller: &Controller) -> Value {
     let branch_changes = controller.branch_changes.as_ref().map(|(from, to, changes)| {
         json!({ "from": from, "to": to, "changes": changes.iter().map(|change| &change.text).collect::<Vec<_>>() })
     });
-    json!({
+    let mut status = json!({
         "branch_changes": branch_changes,
         "version": VERSION,
         "project": controller.project.name,
@@ -232,7 +236,21 @@ pub(crate) fn status(ui: &Ui, controller: &Controller) -> Value {
         "settings": { "restartOnCodeChange": controller.setting(Toggle::RestartOnCodeChange) },
         "ui": ui_block(ui, controller),
         "log": controller.log.iter().rev().take(STATUS_LOG).rev().map(|entry| entry.text.clone()).collect::<Vec<_>>(),
-    })
+    });
+    if !controller.live_levels().is_empty() {
+        status["live_log_levels"] = live_levels(controller);
+    }
+    status
+}
+
+/// The log categories at another level for a while (set_log_level): "Orders: Default at Debug, 9 min left".
+fn live_levels(controller: &Controller) -> Value {
+    let now = std::time::Instant::now();
+    let said = controller.live_levels().iter().map(|live| {
+        let name = controller.app(&live.app).map_or(live.app.as_str(), |app| app.name.as_str());
+        format!("{name}: {} at {}, {} min left", live.category, live.level, live.minutes_left(now))
+    });
+    json!(said.collect::<Vec<_>>())
 }
 
 /// The profile's tasks: each its key and name, whether it runs, and how its last run went.

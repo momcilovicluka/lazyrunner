@@ -16,7 +16,7 @@ expression: screen.frame()
   │    Orders                                          Trace─ Debug─ Information─ Warning       ·  its own │
   │                                                                                                        │
   │  After lazyrunner's own --Logging arguments, so they win; this session only, unless kept (s).          │
-  │ j k category · h l level · Enter sets it (restarts it) · x its own · r all · s keeps · Esc             │
+  │ j k category · h l level · Enter sets (restarts) · t live 10 min · x its own · r all · s keeps · Esc   │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
    U  starts all     ┃                     │                     │                     │
                      ┃                     │                     │                     │
