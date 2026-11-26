@@ -87,8 +87,11 @@ fn start(ui: &mut Ui, controller: &mut Controller) {
     }
 }
 
-/// A call in words, in the ticker.
+/// A call in words, in the ticker - once while it's said again (a wait asks over and over).
 fn remember(ui: &mut Ui, said: String) {
+    if ui.follow.ticker.back() == Some(&said) {
+        return;
+    }
     ui.follow.ticker.push_back(said);
     while ui.follow.ticker.len() > TICKER {
         ui.follow.ticker.pop_front();
@@ -225,6 +228,29 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             let id = result["id"].as_u64()?;
             open_request(ui, id);
             Some(format!("sent request {} again: {id}", args["id"]))
+        }
+        "next_request" => match result["request"]["id"].as_u64() {
+            Some(id) => {
+                open_request(ui, id);
+                Some(format!("got request {id}"))
+            }
+            None => {
+                if !matches!(ui.overlay, Some(Overlay::Requests(_))) {
+                    requests_view(ui, controller, args, result);
+                }
+                Some(format!("waits for the next {}", crate::agent::waits::described(controller, args)))
+            }
+        },
+        "next_error" => {
+            let Some(app) = app_of(controller, &result["error"]["app"]) else {
+                close_view(ui);
+                if let Some(app) = app_of(controller, &args["app"]) {
+                    ui.focus = app;
+                }
+                return Some("waits for the next error".to_string());
+            };
+            look_at(ui, controller, app, result["error"]["text"].as_str()?.lines().map(str::to_string).collect());
+            Some(format!("got {}'s error", controller.apps[app].name))
         }
         "tests" | "run_tests" | "stop_tests" => {
             let suite = args["suite"].as_str();

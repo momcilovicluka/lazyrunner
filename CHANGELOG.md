@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.113.0] - 2026-11-26
+
+### Added
+- `wait` with `for: "request"` waits for the next request to come - narrowed by `app`, `method`, `path`, `endpoint` and `errors_only` as in `get_requests` - and answers with its id, app, method, path, status and time, and how many more came: the agent asks you to reproduce a bug and gets exactly your request, not one it guesses from the list afterwards (#112, thanks @ognjen004028).
+- `wait` with `for: "error"` waits for the next error in any app, or in `app`, and answers with its app, line number, time and lines, and where `get_errors` and `get_logs` have the rest (#112, thanks @ognjen004028).
+- Only what comes after the wait begins counts. The log says what the agent waits for (`▸ claude-code: waits for your next request to /api/orders - reproduce it now`), and following (`F`), the screen shows the requests view meanwhile, then the request or the error that came (#112, thanks @ognjen004028).
+
 ## [1.112.0] - 2026-11-26
 
 ### Changed

@@ -1022,7 +1022,7 @@ app, `/` filters by path; `y` asks what to copy the selected request as - the ro
 bash (`c`), PowerShell (`p`), `curl.exe` for cmd (`w`), an `.http` request for REST Client, Rider and Visual Studio
 (`h`), JavaScript's `fetch` (`f`) or the URL (`u`); bodies aren't in ASP.NET's log, so a POST's comes empty, with
 its content type. `p` sends a GET (HEAD, OPTIONS) request again from lazyrunner: it shows as the newest, and the log
-says how it went; an agent's `replay_request` sends any request again, with the headers and body it gives (Agents, MCP). `w` opens a GET request in the
+says how it went; an agent's `replay_request` sends any request again, with the headers and body it gives, and its `wait` for a `request` answers with the next one you make, so when it asks you to reproduce a bug it gets exactly your request (Agents, MCP). `w` opens a GET request in the
 browser, `o` opens the selected row's app log, `c` clears the list, `Esc` / `q` / `H` close. The top row follows new requests; any other
 row stays put as new ones arrive. The last 5,000 are kept while lazyrunner runs (lazyrunner's own response-time probe
 isn't among them); the full lines are still in each app's log file.
@@ -1196,7 +1196,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `replay_request` | A request from `get_requests` sent again to its app on localhost - on the app's own port, over https when the app served it so - with the `headers` (an `Authorization` you give it) and `body` the app's log doesn't keep; answers with the new request's id, status and time, what differs from the first, and what was sent, secret headers masked. Anything but a GET, HEAD or OPTIONS repeats its writes: after `"confirm": true` |
 | `get_screen` | The screen as you see it, as text - for what the other tools don't show |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
-| `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
+| `wait` | Until `ready`, `build_done`, `tests_done`, `migrations_checked`, `task_done` or `profile_done` (10 minutes at most), then how it went; or for the next `request` (narrowed as in `get_requests`) or `error` (in any app, or `app`) to come, then which - its id for `get_request`, its lines |
 | `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, each failure's likely cause, what a change affects, and each suite's code coverage and its change; run all, a suite, its failed tests, one test or the affected suites |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_view` | A read-only view, by `view`: `changelog` (what the newest versions changed, and the version that runs; `count`), `durations` (builds, starts, installs, test suites and tasks - each one's last runs, its usual time and how the last compares; `kind`), `ports` (each app's port, who holds it - PID, name, command line - and for how long, its last minute, and the ranges Windows reserved), `audit` (the last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each; it doesn't scan), `checks` (the startup checks as the last checklist left them; `rerun` runs them again) or `snapshot` (this run as `, A v`'s snapshot holds it, masked) |
@@ -1227,7 +1227,7 @@ editor - needs
 `"confirm": true`, and the agent is told to ask you first.
 
 **Follow mode** (`F`) lets you watch it work: the screen goes where the agent looks - the column whose output it reads,
-scrolled to the lines it read; the requests view with its filters; the tests view on its suite; the migrations view;
+scrolled to the lines it read; the requests view with its filters, also while it waits for your request; the tests view on its suite; the migrations view;
 the database screen on the connection string it adds or switches to;
 the stack map, the code map, the ports, the audit, the durations, the timeline, an app's start sheet, your marks or the
 changelog, whichever it reads - and outlines what it read for a few seconds. When it asks you first (switching the

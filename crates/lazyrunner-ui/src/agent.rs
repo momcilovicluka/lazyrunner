@@ -22,6 +22,7 @@ pub(crate) mod databases;
 pub(crate) mod drive;
 pub(crate) mod replay;
 pub(crate) mod views;
+pub(crate) mod waits;
 
 /// The agent protocol this lazyrunner speaks; `lazyrunner mcp` sends it with every request.
 pub const PROTOCOL: u64 = 1;
@@ -83,6 +84,8 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
         "replayed" => replay::replayed(controller, args),
+        "next_request" => waits::next_request(controller, args, &client),
+        "next_error" => waits::next_error(ui.now, controller, args, &client),
         "actions" => Ok(drive::actions(ui, controller)),
         "durations" => Ok(views::durations(controller, args)),
         "health" => Ok(views::health(controller)),
@@ -404,31 +407,20 @@ fn endpoint_row(endpoint: &Endpoint) -> Value {
     })
 }
 
-/// The requests the .NET apps served (the requests view): newest first, or slowest; after `since` (a request's id),
-/// of one app, errors only (400 and up), with `path` in them (ignoring case), of one `endpoint` (and `method`) - or,
-/// with `endpoints`, summed up per
-/// endpoint, the most time first. `next` is the id to pass as `since` for what comes after.
-fn requests(controller: &Controller, args: &Value) -> Answer {
+/// The requests after `since` (a request's id), newest first: of one app, errors only (400 and up), with `path` in
+/// them (ignoring case), of one `endpoint` (and `method`).
+fn matching<'a>(controller: &'a Controller, args: &Value) -> Result<Vec<&'a Request>, Refusal> {
     let app = match &args["app"] {
         Value::Null => None,
         Value::String(_) => Some(controller.apps[app_index(controller, args)?].key.clone()),
         _ => return Err(("bad_args", "\"app\" is an app's key".into())),
-    };
-    let slowest = match args["sort"].as_str().unwrap_or("newest") {
-        "newest" => false,
-        "slowest" => true,
-        other => {
-            let other = clean(other, CLIENT_CHARS);
-            return Err(("bad_args", format!("\"sort\" is newest or slowest, not '{other}'")));
-        }
     };
     let since = args["since"].as_u64().unwrap_or(0);
     let errors_only = args["errors_only"].as_bool().unwrap_or(false);
     let path = args["path"].as_str().map(str::to_lowercase);
     let endpoint = args["endpoint"].as_str();
     let method = args["method"].as_str();
-    let limit = args["limit"].as_u64().map_or(REQUESTS, |limit| (limit as usize).clamp(1, MAX_REQUESTS));
-    let mut list: Vec<&Request> = controller
+    Ok(controller
         .requests
         .items
         .iter()
@@ -439,7 +431,23 @@ fn requests(controller: &Controller, args: &Value) -> Answer {
         .filter(|request| path.as_ref().is_none_or(|path| request.path.to_lowercase().contains(path)))
         .filter(|request| endpoint.is_none_or(|endpoint| request.endpoint.eq_ignore_ascii_case(endpoint)))
         .filter(|request| method.is_none_or(|method| request.method.eq_ignore_ascii_case(method)))
-        .collect();
+        .collect())
+}
+
+/// The requests the .NET apps served (the requests view) that `matching` lets through: newest first, or slowest - or,
+/// with `endpoints`, summed up per endpoint, the most time first. `next` is the id to pass as `since` for what comes
+/// after.
+fn requests(controller: &Controller, args: &Value) -> Answer {
+    let slowest = match args["sort"].as_str().unwrap_or("newest") {
+        "newest" => false,
+        "slowest" => true,
+        other => {
+            let other = clean(other, CLIENT_CHARS);
+            return Err(("bad_args", format!("\"sort\" is newest or slowest, not '{other}'")));
+        }
+    };
+    let limit = args["limit"].as_u64().map_or(REQUESTS, |limit| (limit as usize).clamp(1, MAX_REQUESTS));
+    let mut list = matching(controller, args)?;
     let mut answer = json!({ "next": controller.requests.seq });
     if controller.requests.items.is_empty() {
         answer["hint"] = json!(NO_REQUESTS);
