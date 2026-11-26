@@ -1,7 +1,8 @@
 //! Test history (T): each test's outcome over its suite's last runs, with the code each run ran on (the source
 //! fingerprint builds use), kept in test-history.json in the tests' folder. A failure is new when the test didn't
 //! fail the run before (or never ran), known when it did; a test that failed and passed on the same code is flaky;
-//! one that passes after failing the run before is fixed.
+//! one that passes after failing the run before is fixed. Each test's time in a run and its failure's first message
+//! line are kept too, so an agent can ask about one test's last runs (#112).
 
 use std::collections::{BTreeMap, HashMap};
 use std::io;
@@ -21,6 +22,8 @@ const FAILED: char = 'f';
 const SKIPPED: char = 's';
 /// A run the test wasn't in (a run of other tests only).
 pub const ABSENT: char = '-';
+/// What of a failure's first message line is kept, in characters.
+const MESSAGE_CHARS: usize = 200;
 
 /// A suite's last runs.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -40,6 +43,14 @@ pub struct SuiteHistory {
     /// front: a failure's likely cause is what changed between the run it last passed in and the one it failed in.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bases: Vec<Option<super::impact::Baseline>>,
+    /// Each test's time in the runs it passed or failed in, in milliseconds, oldest first; runs kept from before this
+    /// was are missing at the front.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ms: BTreeMap<String, Vec<u32>>,
+    /// The first line of each test's message in the runs it failed in, oldest first; runs kept from before this was
+    /// are missing at the front.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub messages: BTreeMap<String, Vec<String>>,
 }
 
 /// A failure's two runs: the last it failed in and the last before that it passed in, each with what it ran on.
@@ -98,20 +109,79 @@ impl SuiteHistory {
             let line = self.tests.entry(test.name.clone()).or_default();
             pad(line, column);
             line.push(mark);
+            if mark != SKIPPED {
+                self.ms.entry(test.name.clone()).or_default().push(test.ms.round() as u32);
+            }
+            if mark == FAILED {
+                let first = test.message.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or_default();
+                self.messages.entry(test.name.clone()).or_default().push(first.chars().take(MESSAGE_CHARS).collect());
+            }
         }
         for line in self.tests.values_mut() {
             pad(line, column + 1);
         }
         if self.runs.len() > RUNS_KEPT {
-            let drop = self.runs.len() - RUNS_KEPT;
-            self.runs.drain(..drop);
-            self.at.drain(..drop.min(self.at.len()));
-            self.bases.drain(..drop.min(self.bases.len()));
-            for line in self.tests.values_mut() {
-                *line = line.chars().skip(drop).collect();
-            }
-            self.tests.retain(|_, line| line.chars().any(|mark| mark != ABSENT));
+            self.forget(self.runs.len() - RUNS_KEPT);
         }
+    }
+
+    /// The `drop` oldest runs gone, and the tests in none of the others.
+    fn forget(&mut self, drop: usize) {
+        self.runs.drain(..drop);
+        self.at.drain(..drop.min(self.at.len()));
+        self.bases.drain(..drop.min(self.bases.len()));
+        for (name, line) in &mut self.tests {
+            let marks: Vec<char> = line.chars().collect();
+            let gone = &marks[..drop.min(marks.len())];
+            if let Some(ms) = self.ms.get_mut(name) {
+                let ran = |mark: &&char| **mark != SKIPPED && **mark != ABSENT;
+                drop_front(ms, marks.iter().filter(ran).count(), gone.iter().filter(ran).count());
+            }
+            if let Some(messages) = self.messages.get_mut(name) {
+                let failed = |mark: &&char| **mark == FAILED;
+                drop_front(messages, marks.iter().filter(failed).count(), gone.iter().filter(failed).count());
+            }
+            *line = marks[gone.len()..].iter().collect();
+        }
+        self.tests.retain(|_, line| line.chars().any(|mark| mark != ABSENT));
+        let tests = &self.tests;
+        self.ms.retain(|name, ms| tests.contains_key(name) && !ms.is_empty());
+        self.messages.retain(|name, messages| tests.contains_key(name) && !messages.is_empty());
+    }
+
+    /// Test `name`'s outcome in run `run` (0 = the oldest kept); `None` when it wasn't in it.
+    pub fn outcome_in(&self, name: &str, run: usize) -> Option<Outcome> {
+        match self.line(name).chars().nth(run)? {
+            PASSED => Some(Outcome::Passed),
+            FAILED => Some(Outcome::Failed),
+            SKIPPED => Some(Outcome::Skipped),
+            _ => None,
+        }
+    }
+
+    /// Test `name`'s time in run `run` (0 = the oldest kept), in milliseconds, when it passed or failed in it and
+    /// that's kept.
+    pub fn ms_in(&self, name: &str, run: usize) -> Option<u32> {
+        let (nth, marks) = self.nth_mark(name, run, |mark| mark == PASSED || mark == FAILED)?;
+        kept(self.ms.get(name)?, marks, nth).copied()
+    }
+
+    /// The first line of test `name`'s message in run `run` (0 = the oldest kept), when it failed in it and that's
+    /// kept.
+    pub fn message_in(&self, name: &str, run: usize) -> Option<&str> {
+        let (nth, marks) = self.nth_mark(name, run, |mark| mark == FAILED)?;
+        kept(self.messages.get(name)?, marks, nth).map(String::as_str)
+    }
+
+    /// Which of test `name`'s marks that `counts` run `run` is, and how many there are; `None` when its mark there
+    /// isn't one.
+    fn nth_mark(&self, name: &str, run: usize, counts: impl Fn(char) -> bool) -> Option<(usize, usize)> {
+        let marks: Vec<char> = self.line(name).chars().collect();
+        if !counts(*marks.get(run)?) {
+            return None;
+        }
+        let nth = marks[..run].iter().filter(|mark| counts(**mark)).count();
+        Some((nth, marks.iter().filter(|mark| counts(**mark)).count()))
     }
 
     /// What run `run` (0 = the oldest kept) ran on, when that's known.
@@ -198,6 +268,17 @@ impl SuiteHistory {
 fn pad(line: &mut String, runs: usize) {
     let missing = runs.saturating_sub(line.chars().count());
     line.extend(std::iter::repeat_n(ABSENT, missing));
+}
+
+/// `values` (the last of `marks` values) without the first `dropped` of those `marks`.
+fn drop_front<T>(values: &mut Vec<T>, marks: usize, dropped: usize) {
+    let missing = marks.saturating_sub(values.len());
+    values.drain(..dropped.saturating_sub(missing).min(values.len()));
+}
+
+/// The value of `values` (the last of `marks` values) for the `nth` of them, when it's kept.
+fn kept<T>(values: &[T], marks: usize, nth: usize) -> Option<&T> {
+    values.get(nth.checked_sub(marks.saturating_sub(values.len()))?)
 }
 
 /// Every suite's history, by its key.
@@ -349,6 +430,45 @@ mod tests {
         assert_eq!(history.runs.len(), RUNS_KEPT);
         assert_eq!(history.line("One").len(), RUNS_KEPT);
         assert_eq!(history.line("Two"), "", "a test in none of the runs kept is forgotten");
+    }
+
+    #[test]
+    fn each_run_keeps_a_tests_time_and_its_failures_first_line_and_the_oldest_go_with_their_runs() {
+        let mut history = SuiteHistory::default();
+        let failed =
+            |ms: f64, message: &str| TestResult { ms, message: message.into(), ..result("One", Outcome::Failed) };
+        history.record(Some("a"), &[failed(12.4, "\n  Expected 5 but was 6  \nat Totals()")]);
+        history.record(Some("a"), &[result("Two", Outcome::Passed)]);
+        history.record(Some("b"), &[result("One", Outcome::Skipped)]);
+        history.record(Some("b"), &[TestResult { ms: 7.0, ..result("One", Outcome::Passed) }]);
+        assert_eq!(history.line("One"), "f-sp");
+        assert_eq!((history.ms_in("One", 0), history.message_in("One", 0)), (Some(12), Some("Expected 5 but was 6")));
+        assert_eq!((history.outcome_in("One", 1), history.ms_in("One", 1)), (None, None), "not in that run");
+        assert_eq!((history.outcome_in("One", 2), history.ms_in("One", 2)), (Some(Outcome::Skipped), None));
+        assert_eq!((history.ms_in("One", 3), history.message_in("One", 3)), (Some(7), None), "passed: no message");
+        let long = "x".repeat(MESSAGE_CHARS + 50);
+        for at in 0..RUNS_KEPT {
+            history.record(Some("c"), &[failed(at as f64, &long)]);
+        }
+        let last = RUNS_KEPT - 1;
+        assert_eq!(history.ms_in("One", last), Some(last as u32), "aligned once the oldest went");
+        assert_eq!(history.message_in("One", 0).map(str::len), Some(MESSAGE_CHARS), "cut");
+        assert_eq!((history.ms["One"].len(), history.messages["One"].len()), (RUNS_KEPT, RUNS_KEPT));
+        assert!(!history.ms.contains_key("Two"), "forgotten with its runs");
+    }
+
+    #[test]
+    fn a_history_kept_before_times_and_messages_were_still_loads_and_new_runs_line_up() {
+        let old = r#"{"runs":["a","b"],"tests":{"One":"pf"},"at":["2026-11-02 09:41:07","2026-11-02 09:45:00"]}"#;
+        let mut history: SuiteHistory = serde_json::from_str(old).expect("it loads");
+        assert_eq!((history.ms_in("One", 0), history.message_in("One", 1)), (None, None), "not kept then");
+        history.record(Some("c"), &[TestResult { message: "Boom".into(), ..result("One", Outcome::Failed) }]);
+        assert_eq!((history.ms_in("One", 2), history.message_in("One", 2)), (Some(1), Some("Boom")));
+        assert_eq!(history.message_in("One", 1), None, "the older failure has none");
+        for _ in 0..RUNS_KEPT {
+            history.record(Some("d"), &[result("One", Outcome::Passed)]);
+        }
+        assert_eq!((history.ms["One"].len(), history.messages.get("One")), (RUNS_KEPT, None), "gone with its run");
     }
 
     #[test]
