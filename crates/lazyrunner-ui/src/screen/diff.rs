@@ -298,11 +298,6 @@ pub fn chip(ui: &Ui, controller: &Controller, index: usize) -> Option<String> {
     (errors > 0).then(|| format!("{name} +{errors} new {}", plural(errors, "error")))
 }
 
-/// Each app's chip, with its index.
-pub fn chips(ui: &Ui, controller: &Controller) -> Vec<(usize, String)> {
-    (0..controller.states.len()).filter_map(|index| Some((index, chip(ui, controller, index)?))).collect()
-}
-
 /// A chip's key or click: diff mode on its app's column, on the first new error or warning.
 pub fn open_news(ui: &mut Ui, controller: &mut Controller, index: usize) {
     ui.focus = index;

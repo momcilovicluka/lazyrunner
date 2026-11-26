@@ -536,19 +536,6 @@ fn endpoint_rows(
         .collect()
 }
 
-/// The panel's chip while the stack has alerts (`! K 1 alert`), red while one isn't acknowledged; none on this tab.
-pub fn chip(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
-    let alerts: Vec<&Breach> = controller.health.alerts().collect();
-    if alerts.is_empty() || view(ui).is_some() {
-        return None;
-    }
-    let open = alerts.iter().any(|alert| !alert.acknowledged);
-    let icon = icons::icon(ui.nerd, if open { Icon::Alert } else { Icon::Acknowledged });
-    let count = alerts.len();
-    let text = format!("{icon} K {count} alert{}", if count == 1 { "" } else { "s" });
-    Some((text, if open { C::Red } else { C::Yellow }))
-}
-
 /// The header: the tabs, how many apps are healthy, warning, failing and stopped, the stack's last minute, the alerts.
 fn header(ui: &Ui, controller: &Controller) -> Vec<Seg> {
     let mut segs = super::stack::tabs(ui.nerd, super::stack::Tab::Health);

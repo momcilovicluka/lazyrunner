@@ -26,7 +26,7 @@ expression: frame
                             │  in services/Billing · y copies it
                             │  a new major version: check what changed first
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
- lazyrunner   ○ stopped   ↶ 1/1   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ lazyrunner   ○ stopped   ⎇ main   ↶ 1/1   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
 
  12:00:00   Audit: Orders - 1 outdated
