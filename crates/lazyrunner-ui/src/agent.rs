@@ -20,6 +20,7 @@ use crate::screen::copy::{self, Pick};
 
 pub(crate) mod databases;
 pub(crate) mod drive;
+pub(crate) mod query;
 pub(crate) mod replay;
 pub(crate) mod views;
 pub(crate) mod waits;
@@ -100,6 +101,8 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "build_map" => views::build(ui, controller, args),
         "database_changes" => databases::changes(controller, args),
         "database_files" => Ok(databases::files(controller)),
+        "query_database" => query::start(controller, args, &client),
+        "query_result" => query::answer(controller, args),
         "replay" => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| replay::plan(controller, args, &client))
         }

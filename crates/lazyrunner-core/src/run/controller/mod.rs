@@ -29,6 +29,7 @@ mod npm_ci;
 mod overrides;
 mod parallel;
 pub mod profile;
+mod queries;
 pub mod save_points;
 mod session;
 mod stack;
@@ -71,6 +72,7 @@ pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_h
 pub use launch::Choice;
 pub use migrations::{EfJob, Work};
 pub use overrides::Override;
+pub use queries::Queried;
 pub use save_points::{Counts, DbDone, DbWork, Doing, Pending, Sessions};
 pub use stack::{Database, Minute};
 pub use suites::{TestBuild, Totals};
@@ -354,6 +356,8 @@ pub struct Controller {
     /// apps' own.
     pub(crate) sql: Arc<dyn super::sql::Sql>,
     pub(crate) secrets_at: Option<PathBuf>,
+    /// The agents' read-only queries (#112), running or answered.
+    queries: queries::Queries,
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
     pub(crate) commands: Arc<dyn super::tools::Commands>,
     pub(crate) now: fn() -> Instant,
@@ -541,6 +545,7 @@ impl Controller {
             package: Arc::new(super::sqlpackage::SqlPackage),
             sql: Arc::new(super::sql::Sqlcmd),
             secrets_at: None,
+            queries: Vec::new(),
             commands: Arc::new(super::tools::Tools),
             now: Instant::now,
             reserved: super::net::reserved_ranges,

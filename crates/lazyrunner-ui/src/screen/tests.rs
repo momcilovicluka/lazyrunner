@@ -3286,6 +3286,63 @@ fn agent(screen: &mut Screen, op: &str, args: Value, repo: Option<&std::path::Pa
     crate::agent::handle(&mut screen.ui, &mut screen.controller, &request)
 }
 
+/// SQL that answers an agent's query with one row, as the batch writes it: each line its kind, then UTF-16 hex.
+struct OneRow;
+
+impl lazyrunner_core::run::sql::Sql for OneRow {
+    fn run(&self, _: &str, _: Option<&str>, _: &str, _: &mut dyn FnMut(&str)) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn read(&self, _: &str, _: Option<&str>, _: &str, _: u32, line: &mut dyn FnMut(&str)) -> Result<(), String> {
+        let hex = |text: &str| {
+            text.encode_utf16().flat_map(u16::to_le_bytes).map(|byte| format!("{byte:02X}")).collect::<String>()
+        };
+        line(&format!("N{}", hex(r#"[{"name":"Customer"}]"#)));
+        line(&format!("R{}", hex(r#"{"c1":"Ana"}"#)));
+        line("E");
+        Ok(())
+    }
+
+    fn ready(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn query_database_reads_the_database_in_use_and_the_log_says_what_it_reads() {
+    let mut screen = screen("agent-query", json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{\n  \"DefaultConnection\": \"Server=localhost;Database=Shop;User Id=reader;Password=s3cret\"\n}\n";
+    std::fs::write(&path, secrets).unwrap();
+    screen.controller.use_sql(std::sync::Arc::new(OneRow), std::sync::Arc::new(Silent), path);
+    let sql = "SELECT TOP 5 Customer\n  FROM Orders ORDER BY Id DESC";
+    let started = agent(&mut screen, "query_database", json!({ "sql": sql, "max_rows": 5 }), None);
+    assert_eq!(started["result"]["database"], "Shop @ localhost", "{started}");
+    assert_eq!(
+        screen.last_log(),
+        "▸ claude-code: queries Shop (read-only): SELECT TOP 5 Customer FROM Orders ORDER BY Id DESC"
+    );
+    let id = started["result"]["id"].clone();
+    let answer = (0..200)
+        .map(|_| {
+            std::thread::sleep(Duration::from_millis(10));
+            agent(&mut screen, "query_result", json!({ "id": id }), None)
+        })
+        .find(|answer| answer["result"]["running"] != true)
+        .unwrap();
+    assert_eq!((answer["result"]["rows"].clone(), answer["result"]["count"].clone()), (json!([["Ana"]]), json!(1)));
+    assert!(!answer.to_string().contains("s3cret") && !answer.to_string().contains("reader"), "{answer}");
+
+    let refused = agent(&mut screen, "query_database", json!({ "sql": "UPDATE Orders SET Total = 0" }), None);
+    assert_eq!(refused["code"], "refused", "{refused}");
+    let unknown = agent(&mut screen, "query_database", json!({ "sql": "SELECT 1", "database": "Billing" }), None);
+    assert!(unknown["error"].as_str().unwrap().starts_with("no database 'Billing'"), "{unknown}");
+    let too_many = agent(&mut screen, "query_database", json!({ "sql": "SELECT 1", "max_rows": 5000 }), None);
+    assert_eq!(too_many["error"], "\"max_rows\" is 1 to 1000");
+    assert!(!screen.controller.log.iter().any(|entry| entry.text.contains("UPDATE")), "a refused query isn't logged");
+}
+
 #[tokio::test]
 async fn follow_mode_shows_what_the_agent_reads_while_your_keys_rest() {
     let mut screen = screen("follow", json!({}));

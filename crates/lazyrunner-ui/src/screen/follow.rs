@@ -161,6 +161,8 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             | "import_database"
             | "drop_database"
             | "database_files"
+            | "query_database"
+            | "query_result"
     );
     if !database {
         ui.picker = None; // the database screen would hide the view it goes to
@@ -179,6 +181,11 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             database_view(ui, controller, args);
             Some("read the database files".into())
         }
+        "query_database" => {
+            database_view(ui, controller, args);
+            result["doing"].as_str().map(str::to_string)
+        }
+        "query_result" => None,
         "kill_port_holder" => {
             open_view(ui, controller, "ports", Run::Ports);
             result["doing"].as_str().map(str::to_string)

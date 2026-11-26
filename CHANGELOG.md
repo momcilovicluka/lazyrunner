@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.114.0] - 2026-11-26
+
+### Added
+- `query_database` runs one read-only `SELECT` against the database in use, or the one `database` names by its name or label, and answers its columns, its rows (each an array of values, numbers as numbers), how many, whether there were more than `max_rows` (100 by default, 1000 at most) and how long it took - or the SQL error: checking data is the most common side trip while debugging, and it pairs with `save_point` and `database_changes` (#112, thanks @ognjen004028).
+- It can't write: anything but one `SELECT` (or `WITH ... SELECT`) is refused before it runs, saying why - `INSERT`, `UPDATE`, `DELETE`, `EXEC`, DDL, `SELECT ... INTO`, transactions, procedures, a second statement after `;` - and what passes runs in a transaction that's rolled back, waiting 5 s at most for a lock and 30 s for its rows. Values over 500 characters are cut, and the connection string never reaches the answer or the log (#112, thanks @ognjen004028).
+- The log says what the agent reads (`▸ claude-code: queries Shop (read-only): SELECT TOP 5 ...`), and following (`F`), the screen shows the database screen on that database (#112, thanks @ognjen004028).
+
 ## [1.113.0] - 2026-11-26
 
 ### Added

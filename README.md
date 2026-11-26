@@ -567,6 +567,14 @@ command line, and never shows in the log or to an agent. The save points are kep
 (`save-points.json`); the snapshots and backups are the server's. SQL Server only: snapshots need 2016 SP1 or later
 (Express and LocalDB included).
 
+An agent can read a database too (`query_database`; SQL Server 2017 or later), never write it: lazyrunner refuses
+anything but one `SELECT` (or `WITH ... SELECT`) before it runs - `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `EXEC`, DDL,
+`SELECT ... INTO`, `SET`, `DECLARE`, `WAITFOR`, transactions, `OPENROWSET` and the like, `sp_` and `xp_` procedures,
+`NEXT VALUE FOR` and a second statement after `;`, wherever they stand outside strings, `[names]` and comments. What
+passes runs in a transaction that's always rolled back, waits 5 s at most for a lock and 30 s for its rows, and stops
+after `max_rows` rows (100 by default, 1000 at most); a value over 500 characters is cut, and the answer says so. The
+log says what it reads - `▸ claude-code: queries Shop (read-only): SELECT TOP 5 ...` - and never the connection string.
+
 ### Copies, backups, exports and imports
 
 Each row says how big its database is - `2.4 GB` and a bar beside it, as a share of the biggest one listed - and the
@@ -1215,6 +1223,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `switch_database`, `install_packages`, `apply_migrations`, `kill_port_holder`, `set_setting` | The database by name, `npm ci` / `npm install`, a DbContext's pending migrations or one to move to, what holds a needed port, a setting |
 | `open_in_editor` | A file of the repo at a line in your editor, as `O` does - to show you the code it's talking about; after `"confirm": true` |
 | `save_point`, `rewind`, `database_changes` | A save point of a database (a snapshot, or a backup); a rewind to one (with `confirm`); what changed since one, table by table - rows then and now, and the small tables changed in place |
+| `query_database` | One read-only `SELECT` (`sql`) against the database in use or `database`: its columns, its rows (each an array of values in the columns' order, numbers as numbers), `count`, `more` when there were over `max_rows` (100; 1000 at most) and how long it took - or the SQL error. Pairs with `save_point` and `database_changes`: checking data is the most common side trip while debugging |
 | `database` | Database work that drops nothing, by `op`: `add` a connection string to secrets.json as `n` on the database screen does - a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet, or with `switch` (and `confirm`) the one in use; `copy` a database to a new one beside it; `backup` it to a `.bak`; `export` it to a `.bacpac`; `import` a file as a new database; `files`: the files, the databases' sizes and the job running - no connection string, ever |
 | `drop_database` | A database dropped (with `confirm`; never the one in use) |
 

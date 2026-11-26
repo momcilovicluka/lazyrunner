@@ -95,7 +95,7 @@ pub(super) fn ours(snapshot: &str, database: &str) -> bool {
 
 impl Controller {
     /// The secrets.json the connection strings are in.
-    pub(super) fn secrets_file(&self) -> Option<PathBuf> {
+    pub fn secrets_file(&self) -> Option<PathBuf> {
         self.secrets_at.clone().or_else(|| secrets::secrets_path(&self.root, &self.apps))
     }
 
