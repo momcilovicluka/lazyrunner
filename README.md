@@ -1022,7 +1022,7 @@ app, `/` filters by path; `y` asks what to copy the selected request as - the ro
 bash (`c`), PowerShell (`p`), `curl.exe` for cmd (`w`), an `.http` request for REST Client, Rider and Visual Studio
 (`h`), JavaScript's `fetch` (`f`) or the URL (`u`); bodies aren't in ASP.NET's log, so a POST's comes empty, with
 its content type. `p` sends a GET (HEAD, OPTIONS) request again from lazyrunner: it shows as the newest, and the log
-says how it went. `w` opens a GET request in the
+says how it went; an agent's `replay_request` sends any request again, with the headers and body it gives (Agents, MCP). `w` opens a GET request in the
 browser, `o` opens the selected row's app log, `c` clears the list, `Esc` / `q` / `H` close. The top row follows new requests; any other
 row stays put as new ones arrive. The last 5,000 are kept while lazyrunner runs (lazyrunner's own response-time probe
 isn't among them); the full lines are still in each app's log file.
@@ -1193,6 +1193,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
 | `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path, one endpoint - or summed up per endpoint (p50, p95, max); N+1s marked |
 | `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1), and its waterfall - each command and call where it ran, the exception's moment, the time in the app itself, from its OpenTelemetry trace when its app sends one (nested, the critical path marked); with `baseline`, another request's id, the two compared row against row |
+| `replay_request` | A request from `get_requests` sent again to its app on localhost - on the app's own port, over https when the app served it so - with the `headers` (an `Authorization` you give it) and `body` the app's log doesn't keep; answers with the new request's id, status and time, what differs from the first, and what was sent, secret headers masked. Anything but a GET, HEAD or OPTIONS repeats its writes: after `"confirm": true` |
 | `get_screen` | The screen as you see it, as text - for what the other tools don't show |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done` or `migrations_checked` (10 minutes at most), then how it went |
@@ -1221,7 +1222,7 @@ The tools merged in 1.110.0 answer with what they are now - `get_ports is now ge
 older permission rule says what to change.
 
 What can't be undone or takes something away from you - quitting, killing a port's holder, reverting a migration,
-rewinding or dropping a database, switching the database, clearing the output, reopening lazyrunner, the git tool over the screen, opening a file in your
+rewinding or dropping a database, switching the database, sending a request that writes again, clearing the output, reopening lazyrunner, the git tool over the screen, opening a file in your
 editor - needs
 `"confirm": true`, and the agent is told to ask you first.
 

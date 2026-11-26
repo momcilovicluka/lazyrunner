@@ -94,6 +94,15 @@ pub struct Finished {
     pub ended: Option<std::time::Instant>,
     /// It came to another host than this machine: through a tunnel (#102).
     pub outside: bool,
+    /// Where the app served it, when its line names this machine: it's sent again there.
+    pub served: Option<Served>,
+}
+
+/// The address on this machine an app served a request on: https or http, and the port.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Served {
+    pub secure: bool,
+    pub port: u16,
 }
 
 /// What a request did in the database: its EF Core commands - how many, their total and the slowest - and the query
@@ -239,17 +248,51 @@ fn finished(text: &str) -> Option<Finished> {
         content: content.trim_matches('-').trim().to_string(),
         proto: found.name("proto").map_or_else(String::new, |proto| proto.as_str().to_string()),
         outside: outside(&found["url"]),
+        served: served(&found["url"]),
         ..Finished::default()
     })
 }
 
-/// Whether a request's URL names another host than this machine (it came through a tunnel).
-fn outside(url: &str) -> bool {
-    let Some((_, rest)) = url.split_once("://") else { return false };
-    let host = rest.split('/').next().unwrap_or_default();
+/// The names of this machine a request is sent again to.
+const LOCAL_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "[::1]"];
+/// The schemes a request is sent again with.
+const SCHEMES: [&str; 2] = ["http", "https"];
+
+/// A URL's scheme and host (without its port), lowercased; `None` without a scheme.
+fn scheme_host(url: &str) -> Option<(String, String)> {
+    let (scheme, rest) = url.split_once("://")?;
+    let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
     let numbered = |port: &str| port.chars().all(|c| c.is_ascii_digit());
     let host = host.rsplit_once(':').filter(|(_, port)| numbered(port)).map_or(host, |(host, _)| host);
-    !matches!(host.to_ascii_lowercase().as_str(), "localhost" | "127.0.0.1" | "[::1]" | "")
+    Some((scheme.to_ascii_lowercase(), host.to_ascii_lowercase()))
+}
+
+/// Whether a request's URL names another host than this machine (it came through a tunnel).
+fn outside(url: &str) -> bool {
+    scheme_host(url).is_some_and(|(_, host)| !host.is_empty() && !LOCAL_HOSTS.contains(&host.as_str()))
+}
+
+/// Whether a URL is an app's on this machine: http or https to localhost, 127.0.0.1 or [::1].
+pub fn is_local(url: &str) -> bool {
+    scheme_host(url)
+        .is_some_and(|(scheme, host)| SCHEMES.contains(&scheme.as_str()) && LOCAL_HOSTS.contains(&host.as_str()))
+}
+
+/// Where a logged URL says its app served it, when that's this machine.
+fn served(url: &str) -> Option<Served> {
+    if !is_local(url) {
+        return None;
+    }
+    let secure = scheme_host(url).is_some_and(|(scheme, _)| scheme == "https");
+    crate::apptypes::url_port(url).map(|port| Served { secure, port })
+}
+
+/// Where a request is sent again: on its app's own `port`, over https when the app served it so there; `None` when
+/// the app's port isn't known.
+pub fn local_url(request: &Request, port: Option<u16>) -> Option<String> {
+    let port = port?;
+    let secure = request.served.is_some_and(|served| served.secure && served.port == port);
+    Some(format!("{}://localhost:{port}{}", if secure { "https" } else { "http" }, request.path))
 }
 
 /// An app's requests started and not finished yet, the oldest first, each with the output line count at its start
@@ -345,6 +388,8 @@ pub struct Request {
     pub ended: Option<std::time::Instant>,
     /// See [`Finished::outside`].
     pub outside: bool,
+    /// See [`Finished::served`].
+    pub served: Option<Served>,
 }
 
 /// The requests served, oldest first.
@@ -373,6 +418,7 @@ impl Requests {
             db,
             ended,
             outside,
+            served,
         } = request;
         let endpoint = endpoint(&path);
         let seq = self.seq;
@@ -396,6 +442,7 @@ impl Requests {
             db,
             ended,
             outside,
+            served,
         });
         while self.items.len() > MAX_REQUESTS {
             self.items.pop_front();
@@ -478,15 +525,35 @@ pub const REPLAYABLE: [&str; 3] = ["GET", "HEAD", "OPTIONS"];
 
 /// Sends a request again, `method` to `url` with no body: the status it got and how long it took (ms), or why not.
 pub fn replay(method: &str, url: &str) -> Result<(u16, f64), String> {
-    let agent: ureq::Agent =
-        ureq::Agent::config_builder().timeout_global(Some(REPLAY_TIMEOUT)).http_status_as_error(false).build().into();
+    send(method, url, &[], None)
+}
+
+/// Sends a request to an app on this machine - nowhere else - with `headers` and `body`: the status it got and how
+/// long it took (ms), or why not. A redirect isn't followed, no proxy is used, and since it's this machine's own
+/// address, the dev certificate an https app has is taken as it is.
+pub fn send(method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) -> Result<(u16, f64), String> {
+    if !is_local(url) {
+        return Err(format!("{url} isn't an app's on this machine (localhost, 127.0.0.1 or [::1])"));
+    }
+    let tls = ureq::tls::TlsConfig::builder().disable_verification(true).build();
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(REPLAY_TIMEOUT))
+        .http_status_as_error(false)
+        .max_redirects(0)
+        .proxy(None)
+        .tls_config(tls)
+        .build()
+        .into();
+    let mut request = ureq::http::Request::builder().method(method).uri(url);
+    for (name, value) in headers {
+        request = request.header(name, value);
+    }
     let started = Instant::now();
-    let sent = match method {
-        "HEAD" => agent.head(url).call(),
-        "OPTIONS" => agent.options(url).call(),
-        _ => agent.get(url).call(),
+    let sent = match body {
+        Some(body) => request.body(body.to_string()).map(|request| agent.run(request)),
+        None => request.body(()).map(|request| agent.run(request)),
     };
-    let response = sent.map_err(|error| error.to_string())?;
+    let response = sent.map_err(|error| error.to_string())?.map_err(|error| error.to_string())?;
     Ok((response.status().as_u16(), started.elapsed().as_secs_f64() * 1000.0))
 }
 
@@ -521,6 +588,60 @@ mod tests {
         let closed = dead.local_addr().unwrap().port();
         drop(dead);
         assert!(replay("GET", &format!("http://127.0.0.1:{closed}/")).is_err(), "nothing listens there");
+    }
+
+    #[test]
+    fn a_request_is_sent_again_with_its_headers_and_body() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (told, heard) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let mut asked = Vec::new();
+            let mut chunk = [0; 1024];
+            while !String::from_utf8_lossy(&asked).ends_with("{\"qty\":2}") {
+                let Ok(read) = stream.read(&mut chunk) else { break };
+                if read == 0 {
+                    break;
+                }
+                asked.extend_from_slice(&chunk[..read]);
+            }
+            let _ = stream.write_all(b"HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n");
+            let _ = told.send(String::from_utf8_lossy(&asked).to_string());
+        });
+        let headers = [
+            ("Authorization".to_string(), "Bearer abc".to_string()),
+            ("Content-Type".to_string(), "application/json".to_string()),
+        ];
+        let url = format!("http://127.0.0.1:{port}/api/orders?shop=1");
+        let (status, _) = send("POST", &url, &headers, Some("{\"qty\":2}")).unwrap();
+        assert_eq!(status, 201);
+        let asked = heard.recv_timeout(Duration::from_secs(5)).unwrap().to_lowercase();
+        assert!(asked.starts_with("post /api/orders?shop=1 http/1.1\r\n"), "{asked}");
+        assert!(asked.contains("authorization: bearer abc\r\n") && asked.contains("content-type: application/json"));
+        assert!(asked.ends_with("\r\n\r\n{\"qty\":2}"), "{asked}");
+    }
+
+    #[test]
+    fn a_request_goes_again_only_to_its_app_on_this_machine() {
+        assert!(is_local("http://localhost:5000/x") && is_local("https://127.0.0.1/") && is_local("http://[::1]:80"));
+        assert!(!is_local("http://example.test/") && !is_local("ftp://localhost/") && !is_local("/api/orders"));
+        assert!(!is_local("http://localhost@example.test/"), "a user name isn't the host");
+        assert!(
+            send("GET", "https://example.test/api", &[], None).unwrap_err().contains("isn't an app's on this machine")
+        );
+        let logged = "Request finished HTTP/2 POST https://localhost:47211/api/orders?x=1 - 201 0 - 3.2ms";
+        let mut requests = Requests::default();
+        requests.add("orders", finished(logged).unwrap(), jiff::ZonedDateTime::now());
+        let request = requests.items[0].clone();
+        assert_eq!(request.served, Some(Served { secure: true, port: 47211 }));
+        assert_eq!(local_url(&request, Some(47211)).unwrap(), "https://localhost:47211/api/orders?x=1");
+        assert_eq!(local_url(&request, Some(47201)).unwrap(), "http://localhost:47201/api/orders?x=1", "its own port");
+        assert_eq!(local_url(&request, None), None, "no port known");
+        let tunnel = "Request finished HTTP/1.1 GET https://k3x9-47201.euw.devtunnels.ms/api/x - 200 2 - 1.2ms";
+        assert_eq!(finished(tunnel).unwrap().served, None, "not this machine");
     }
 
     fn read(lines: &[&str]) -> Vec<Line> {

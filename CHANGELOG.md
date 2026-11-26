@@ -3,6 +3,16 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.111.0] - 2026-11-26
+
+### Added
+- `replay_request` sends a request from `get_requests` again to its app on this machine, with the `headers` and `body` the agent gives it (the app's log keeps neither), and answers with the new request's id, status and time and what differs from the first - so after a fix the agent checks it without rebuilding the request with curl; `get_request` with `baseline` compares the two in full (#112, thanks @ognjen004028).
+- It goes only to localhost, on the app's own port (over https when the app served the request so, its dev certificate taken as it is), follows no redirect, and needs the app running. Anything but a GET, HEAD or OPTIONS repeats what it changed, so it needs `"confirm": true` and the agent is told to ask you first (#112, thanks @ognjen004028).
+- The headers' values never reach lazyrunner's screen or log - the log line names them and the body's size - and the answer masks credentials, cookies and any header named for a token, key, secret or password. Following (`F`), the screen opens the request sent again, then the new one (#112, thanks @ognjen004028).
+
+### Changed
+- `p` in `H` and the requests copied as commands use https when the app served the request over https on its own port, and `p` takes a local app's dev certificate as it is (#112, thanks @ognjen004028).
+
 ## [1.110.0] - 2026-11-26
 
 ### Changed

@@ -649,6 +649,7 @@ mod tests {
             db: None,
             ended: None,
             outside: false,
+            served: None,
         };
         assert!(ran_in(&request, 15) && !ran_in(&request, 21));
         request.exact = Some(vec![30]);

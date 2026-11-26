@@ -21,6 +21,7 @@ use tokio::task::{AbortHandle, JoinSet};
 
 use crate::profile_cli::install_dir;
 
+mod replay;
 mod tools;
 
 /// The MCP versions this server speaks, newest first; a client asking for another gets the newest.
@@ -275,6 +276,10 @@ impl<C: Channel> Server<C> {
             "get_requests" => self.agent("requests", args).await,
             "get_request" if !args["id"].is_u64() => Err("bad_args: which request? (an id from get_requests)".into()),
             "get_request" => self.agent("request", args).await,
+            "replay_request" if !args["id"].is_u64() => {
+                Err("bad_args: which request? (an id from get_requests)".into())
+            }
+            "replay_request" => self.replay(args).await,
             "get_screen" => self.screen().await,
             "start_apps" => self.agent("start", args).await,
             "stop_apps" => self.agent("stop", args).await,
@@ -647,12 +652,14 @@ mod tests {
         assert_eq!(tool("get_logs")["annotations"]["readOnlyHint"], true);
         assert_eq!(tool("get_request")["annotations"]["readOnlyHint"], true);
         assert_eq!(tool("get_request")["inputSchema"]["required"], json!(["id"]));
+        let replay = tool("replay_request")["annotations"].clone();
+        assert_eq!(replay, json!({ "readOnlyHint": false, "openWorldHint": false, "destructiveHint": true }));
         assert_eq!(tool("build")["annotations"]["readOnlyHint"], false);
 
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 42));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 43));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);
@@ -697,6 +704,62 @@ mod tests {
         let old = text(&ask(&server, call(7, "add_database", json!({ "name": "Shop_2" }))).await.0.unwrap());
         assert_eq!(old, "renamed: add_database is now database with op \"add\" - call that instead");
         assert_eq!(server.channel.calls.load(Ordering::SeqCst), calls, "none of them reached lazyrunner");
+    }
+
+    #[tokio::test]
+    async fn replay_request_sends_the_request_from_here_and_answers_with_the_one_the_app_logged() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (told, heard) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let (mut asked, mut chunk) = (Vec::new(), [0; 1024]);
+            while !String::from_utf8_lossy(&asked).ends_with("{\"qty\":2}") {
+                match stream.read(&mut chunk) {
+                    Ok(read) if read > 0 => asked.extend_from_slice(&chunk[..read]),
+                    _ => break,
+                }
+            }
+            let _ = stream.write_all(b"HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n");
+            let _ = told.send(String::from_utf8_lossy(&asked).to_string());
+        });
+        let url = format!("http://127.0.0.1:{port}/api/orders");
+        let replaying = server(move |body, _| match body["agent"]["op"].as_str() {
+            Some("replay") => open(json!({ "method": "POST", "url": url, "since": 40,
+                "content_type": "application/json", "recorded_body": "9" })),
+            _ => open(json!({ "id": 41, "status": 201, "ms": 12.5,
+                "compare": { "baseline": 7, "digest": "1 row differs", "differs": [] } })),
+        });
+        let arguments = json!({ "id": 7, "confirm": true, "body": "{\"qty\":2}",
+            "headers": { "Authorization": "Bearer abc", "X-Tenant": "shop" } });
+        let answer = ask(&replaying, call(1, "replay_request", arguments)).await.0.unwrap();
+        assert_eq!(answer["result"]["isError"], false, "{answer}");
+        let said = text(&answer);
+        let answer: Value = serde_json::from_str(&said).unwrap();
+        assert_eq!((answer["id"].clone(), answer["status"].clone()), (json!(41), json!(201)));
+        assert_eq!(answer["compare"]["digest"], "1 row differs");
+        assert_eq!(answer["sent"]["headers"]["Authorization"], "***");
+        assert_eq!(answer["sent"]["headers"]["Content-Type"], "application/json", "the type it was logged with");
+        assert_eq!(answer["sent"]["body_bytes"], 9);
+        assert!(!said.contains("Bearer") && answer["note"].is_null(), "{said}");
+        let sent = heard.recv_timeout(Duration::from_secs(5)).unwrap().to_lowercase();
+        assert!(sent.starts_with("post /api/orders http/1.1") && sent.contains("authorization: bearer abc"), "{sent}");
+        assert!(sent.contains("x-tenant: shop") && sent.ends_with("{\"qty\":2}"), "{sent}");
+        let asked = replaying.channel.asked.lock().unwrap().clone();
+        assert_eq!(asked[0]["agent"]["args"]["headers"], json!(["Authorization", "X-Tenant"]));
+        assert!(!asked.iter().any(|body| body.to_string().contains("Bearer")), "no secret reaches lazyrunner");
+
+        let asking =
+            server(|_, _| Ok(json!({ "ok": false, "code": "needs_confirm", "error": "sending POST /x again" })));
+        let refused = text(&ask(&asking, call(2, "replay_request", json!({ "id": 7 }))).await.0.unwrap());
+        assert_eq!(refused, "needs_confirm: sending POST /x again");
+        let elsewhere = server(|_, _| open(json!({ "method": "GET", "url": "http://example.test/", "since": 1 })));
+        let refused = text(&ask(&elsewhere, call(3, "replay_request", json!({ "id": 7 }))).await.0.unwrap());
+        assert!(refused.starts_with("not_sent: GET http://example.test/ - "), "{refused}");
+        let missing = text(&ask(&elsewhere, call(4, "replay_request", json!({}))).await.0.unwrap());
+        assert!(missing.starts_with("bad_args: which request?"), "{missing}");
     }
 
     #[tokio::test]

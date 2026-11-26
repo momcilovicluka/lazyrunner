@@ -3409,6 +3409,40 @@ async fn an_agent_reads_the_requests_their_endpoints_and_one_request_in_full() {
 }
 
 #[tokio::test]
+async fn an_agent_sends_a_request_again_to_its_running_app_asking_first_when_it_writes() {
+    use lazyrunner_core::run::requests::Finished;
+    let mut screen = screen("agent-replay", json!({}));
+    with_requests(&mut screen);
+    let stopped = agent(&mut screen, "replay", json!({ "id": 1 }), None);
+    assert!(stopped["error"].as_str().unwrap().starts_with("Orders isn't running"), "{stopped}");
+    let orders = screen.controller.apps.iter().position(|app| app.key == "orders").unwrap();
+    screen.controller.states[orders].status = AppStatus::Running;
+    let get = agent(&mut screen, "replay", json!({ "id": 1, "headers": ["Authorization"] }), None);
+    assert_eq!(get["result"]["url"], "http://localhost:47201/api/orders/42", "{get}");
+    assert_eq!((get["result"]["method"].as_str(), get["result"]["since"].as_u64()), (Some("GET"), Some(4)));
+    assert_eq!(screen.last_log(), "▸ claude-code: send GET /api/orders/42 again (headers Authorization)");
+    let post = agent(&mut screen, "replay", json!({ "id": 2, "body_bytes": 9 }), None);
+    assert_eq!(post["code"], "needs_confirm", "a POST repeats what it changed: {post}");
+    assert!(post["error"].as_str().unwrap().starts_with("sending POST /api/orders again"), "{post}");
+    let confirmed = agent(&mut screen, "replay", json!({ "id": 2, "confirm": true, "body_bytes": 9 }), None);
+    assert_eq!(confirmed["result"]["method"], "POST", "{confirmed}");
+    assert_eq!(screen.last_log(), "▸ claude-code: send POST /api/orders again (a 9-byte body)");
+
+    screen.press("F");
+    let waiting = agent(&mut screen, "replayed", json!({ "id": 1, "since": 4 }), None);
+    assert_eq!(waiting["result"]["id"], Value::Null, "not logged yet: {waiting}");
+    let again =
+        Finished { method: "GET".into(), path: "/api/orders/42".into(), status: 404, ms: 3.0, ..Finished::default() };
+    screen.controller.requests.add("orders", again, jiff::ZonedDateTime::now());
+    let logged = agent(&mut screen, "replayed", json!({ "id": 1, "since": 4 }), None);
+    let found = &logged["result"];
+    assert_eq!((found["id"].as_u64(), found["status"].as_u64()), (Some(5), Some(404)), "{logged}");
+    assert_eq!(found["compare"]["differs"][0], json!({ "what": "status", "this": "404", "baseline": "200" }));
+    let Some(Overlay::Requests(view)) = &screen.ui.overlay else { panic!("following, the new request shows") };
+    assert_eq!((view.selected, view.details), (5, true));
+}
+
+#[tokio::test]
 async fn an_agent_reads_the_status_and_numbered_logs_and_the_last_error() {
     let mut screen = screen("agent", json!({}));
     let (at, base) = (screen.ui.now, screen.controller.states[0].output.total());
