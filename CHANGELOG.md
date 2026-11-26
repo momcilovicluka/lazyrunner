@@ -3,6 +3,13 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.116.0] - 2026-11-26
+
+### Added
+- `get_test_results` with `test` - a test's full name, or a part only it has in the suite - answers that test's history: its state as the tests view tells it (a new or known failure, fixed, passing or skipped, and how often it failed when it's flaky), and its last runs, the newest first, each with when, how it did, its time, its failure's first message line and the code it ran on - the commit and how many files differed from it. A part several tests have lists them to pick from (#112, thanks @ognjen004028).
+- It says where the test's outcome turned and on which code (`passed on a1b2c3d, failed since d4e5f6a + 2 uncommitted files`), and whether that was the same code - so an agent tells a regression from a flaky test (#112, thanks @ognjen004028).
+- The test history keeps each test's time and its failure's first message line in every run from now on; runs kept before say so. Following (`F`), the tests view opens on that test (#112, thanks @ognjen004028).
+
 ## [1.115.0] - 2026-11-26
 
 ### Added

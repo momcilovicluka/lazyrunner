@@ -1884,6 +1884,95 @@ async fn following_a_test_run_picks_its_test_and_a_look_at_the_status_keeps_it_i
     assert_eq!((index, screen.ui.tests_only), (4, super::suites::Only::All), "a filter hiding it set aside");
 }
 
+/// Orders.Tests' history: a run before commits were kept, one on a1b2c3d, then ten on d4e5f6a with two files changed,
+/// where Totals fails each time and Adds once.
+fn with_test_history(screen: &mut Screen) {
+    use lazyrunner_core::run::impact::Baseline;
+    use lazyrunner_core::run::suites::{Outcome, TestResult};
+    let result = |name: &str, outcome, message: &str| TestResult {
+        name: format!("Orders.Tests.CartTests.{name}"),
+        outcome,
+        ms: 41.0,
+        message: message.into(),
+        stack: String::new(),
+    };
+    let base = |head: &str, dirty: usize| Baseline {
+        head: format!("{head}{}", "0".repeat(33)),
+        dirty: (0..dirty).map(|file| (format!("src/Orders.Core/{file}.cs"), 1)).collect(),
+    };
+    let history = &mut screen.controller.test_history;
+    let old = [result("Totals(2, 3)", Outcome::Passed, ""), result("Removed", Outcome::Failed, "Boom\nat Removed()")];
+    history.record("dotnet:orders", Some("old"), &old);
+    let clean = [result("Totals(2, 3)", Outcome::Passed, ""), result("Removed", Outcome::Passed, "")];
+    history.record_on("dotnet:orders", Some("a"), Some(&base("a1b2c3d", 0)), &clean);
+    for run in 0..crate::agent::history::RUNS_SHOWN {
+        let adds = if run == 3 { Outcome::Failed } else { Outcome::Passed };
+        let results = [result("Totals(2, 3)", Outcome::Failed, "Expected 5 but was 6"), result("Adds", adds, "")];
+        history.record_on("dotnet:orders", Some("b"), Some(&base("d4e5f6a", 2)), &results);
+    }
+}
+
+#[tokio::test]
+async fn an_agent_asks_for_one_tests_history_by_its_name_or_a_part_only_it_has() {
+    let mut screen = screen("test-history-agent", json!({}));
+    with_suites(&mut screen);
+    with_test_history(&mut screen);
+    let ask = |screen: &mut Screen, test: &str| {
+        agent(screen, "tests", json!({ "suite": "Orders.Tests", "test": test }), None)
+    };
+
+    let totals = ask(&mut screen, "Orders.Tests.CartTests.Totals(2, 3)")["result"].clone();
+    assert_eq!((totals["state"].clone(), totals["flaky"].clone()), (json!("known failure"), Value::Null), "{totals}");
+    let runs = totals["runs"].as_array().expect("its runs");
+    assert_eq!((runs.len(), totals["runs_kept"].clone()), (crate::agent::history::RUNS_SHOWN, json!(12)));
+    let newest = &runs[0];
+    assert_eq!(newest["outcome"], "failed", "the newest first: {totals}");
+    assert_eq!((newest["ms"].clone(), newest["message"].clone()), (json!(41), json!("Expected 5 but was 6")));
+    assert_eq!(newest["code"], "d4e5f6a + 2 uncommitted files");
+    let changes = totals["changes"].as_array().expect("where it turned");
+    assert_eq!(changes.len(), 1, "{totals}");
+    let turned = changes[0].as_str().unwrap();
+    assert!(turned.starts_with("passed on a1b2c3d, failed since d4e5f6a + 2 uncommitted files (20"), "{turned}");
+    assert!(totals.get("note").is_none(), "every run shown has its code: {totals}");
+
+    let adds = ask(&mut screen, "cARTtests.adds")["result"].clone();
+    assert_eq!(adds["test"], "Orders.Tests.CartTests.Adds", "a part only it has, any case");
+    assert_eq!(
+        (adds["state"].clone(), adds["flaky"].clone()),
+        (json!("passing"), json!("failed 1 of its last 10 runs"))
+    );
+    let changes = adds["changes"].as_array().unwrap();
+    assert!(changes.len() == 2 && changes.iter().all(|change| change.as_str().unwrap().ends_with(" - the same code")));
+
+    let removed = ask(&mut screen, "Removed")["result"].clone();
+    assert_eq!(removed["state"], "fixed", "only in the history, passing after a failure: {removed}");
+    let runs = removed["runs"].as_array().unwrap();
+    assert_eq!((runs[1]["code"].clone(), runs[1]["message"].clone()), (Value::Null, json!("Boom")), "{removed}");
+    assert!(removed["note"].as_str().is_some_and(|note| note.starts_with("code is null")), "{removed}");
+    assert!(removed["changes"][0].as_str().unwrap().starts_with("failed on unrecorded code, passed since a1b2c3d"));
+
+    let several = ask(&mut screen, "CartTests");
+    assert_eq!((several["ok"].clone(), several["code"].clone()), (json!(false), json!("bad_args")));
+    assert!(several["error"].as_str().unwrap().starts_with("4 tests match 'CartTests' - name one: "), "{several}");
+    let none = ask(&mut screen, "Checkout");
+    assert_eq!(none["code"], "not_found", "{none}");
+}
+
+#[tokio::test]
+async fn following_an_agent_reading_a_tests_history_picks_that_test() {
+    let mut screen = screen("test-history-follow", json!({}));
+    with_suites(&mut screen);
+    with_test_history(&mut screen);
+    screen.ui.follow.on = true;
+    agent(&mut screen, "tests", json!({ "suite": "dotnet:orders", "test": "totals(2" }), None);
+    let Some(Overlay::Tests { index, picking, .. }) = screen.ui.overlay else { panic!("the tests view") };
+    let orders = &screen.controller.suites.as_deref().unwrap()[0];
+    let picked = picking.and_then(|at| super::suites::test_list(orders).get(at).map(|test| test.name.clone()));
+    assert_eq!((index, picked.as_deref()), (2, Some("Orders.Tests.CartTests.Totals(2, 3)")));
+    let said = screen.ui.follow.ticker.back().cloned().unwrap_or_default();
+    assert_eq!(said, "read Orders.Tests.CartTests.Totals(2, 3)'s history");
+}
+
 fn with_suites(screen: &mut Screen) {
     use lazyrunner_core::run::suites::{Outcome, Runner, Status as SuiteStatus, Suite, TestResult};
     let test = |name: &str, outcome, ms, message: &str, stack: &str| TestResult {

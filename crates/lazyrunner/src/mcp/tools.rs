@@ -181,9 +181,13 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "get_test_results",
-            "A suite's last results: its failed tests with messages, stacks and likely causes (sources changed since \
-             it last passed), its last output lines, and its code coverage when that setting is on.",
-            json!({ "suite": { "type": "string", "description": "A suite's key or name (list_tests)" } }),
+            "A suite's last results: failed tests with messages, stacks and likely causes (sources changed since \
+             they last passed), last output lines, code coverage when that setting is on. With test (a name or \
+             unique part): its state, last runs and their code.",
+            json!({
+                "suite": { "type": "string", "description": "A suite's key or name (list_tests)" },
+                "test": { "type": "string" },
+            }),
             &["suite"],
             true,
         ),
@@ -535,7 +539,7 @@ mod tests {
     use super::*;
 
     /// What `tools/list` may weigh at most, in characters of its JSON: an agent pays for it in every session (#112).
-    const BUDGET: usize = 23_077;
+    const BUDGET: usize = 23_160;
 
     #[test]
     fn the_tool_list_stays_within_its_budget() {

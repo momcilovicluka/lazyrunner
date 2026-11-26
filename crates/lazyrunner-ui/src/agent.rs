@@ -20,6 +20,7 @@ use crate::screen::copy::{self, Pick};
 
 pub(crate) mod databases;
 pub(crate) mod drive;
+pub(crate) mod history;
 pub(crate) mod levels;
 pub(crate) mod query;
 pub(crate) mod replay;
@@ -578,7 +579,7 @@ fn find_suites(controller: &mut Controller) {
     }
 }
 
-/// The suites, or one suite's results with its failures.
+/// The suites, one suite's results with its failures, or one of its tests' history.
 fn tests(controller: &mut Controller, args: &Value) -> Answer {
     find_suites(controller);
     if controller.suites.is_some() {
@@ -594,6 +595,9 @@ fn tests(controller: &mut Controller, args: &Value) -> Answer {
     let key = find_suite(suites, wanted)?.key.clone();
     controller.causes_now(&key);
     let Some(suite) = controller.suite(&key) else { return Err(("not_found", format!("no suite {key}"))) };
+    if let Some(test) = args["test"].as_str() {
+        return history::test(controller, suite, test);
+    }
     let history = controller.test_history.suite(&suite.key);
     let first = |text: &str| text.lines().take(FAILURE_LINES).collect::<Vec<_>>().join("\n");
     let failures: Vec<Value> = suite

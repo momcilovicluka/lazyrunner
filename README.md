@@ -1079,7 +1079,9 @@ and each test shows its last runs as a strip - two runs a cell, the newest on th
 a test that fails every time and one that fails now and then look different. A flaky test says how often it failed;
 the fixed and the flaky ones are listed after the failures. `v` lists all the suites, those with failures, those
 with flaky tests, or the affected ones (the chips in the header). The panel's chip says `1 suite done · 1 red · 3 new failures`, and the
-MCP's `get_test_results` marks each failure `new` and `flaky`.
+MCP's `get_test_results` marks each failure `new` and `flaky`. With `test` (its name, or a part only it has) it
+answers that one test's history: its state, its last runs - when, how it did, its time, its failure's first line and
+the commit it ran on with how many files differed - and where its outcome turned, on which code.
 
 Each suite's row in the list ends with its last time and a small line of its last times. Its details start with its
 last runs as a row of cells - green, red, the newest on the right - and its times as a braille line two rows high under
@@ -1205,7 +1207,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `get_screen` | The screen as you see it, as text - for what the other tools don't show |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
 | `wait` | Until `ready`, `build_done`, `tests_done`, `migrations_checked`, `task_done` or `profile_done` (10 minutes at most), then how it went; or for the next `request` (narrowed as in `get_requests`) or `error` (in any app, or `app`) to come, then which - its id for `get_request`, its lines |
-| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, each failure's likely cause, what a change affects, and each suite's code coverage and its change; run all, a suite, its failed tests, one test or the affected suites |
+| `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, each failure's likely cause, one test's history with the code each run used, what a change affects, and each suite's code coverage and its change; run all, a suite, its failed tests, one test or the affected suites |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_view` | A read-only view, by `view`: `changelog` (what the newest versions changed, and the version that runs; `count`), `durations` (builds, starts, installs, test suites and tasks - each one's last runs, its usual time and how the last compares; `kind`), `ports` (each app's port, who holds it - PID, name, command line - and for how long, its last minute, and the ranges Windows reserved), `audit` (the last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each; it doesn't scan), `checks` (the startup checks as the last checklist left them; `rerun` runs them again) or `snapshot` (this run as `, A v`'s snapshot holds it, masked) |
 | `get_stack` | The stack map: which app calls which (seen and declared), each edge's calls, p95 and failures over the last minute, the apps that use the database, and the newest failed calls |

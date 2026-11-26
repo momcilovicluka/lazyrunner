@@ -261,8 +261,13 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
         }
         "tests" | "run_tests" | "stop_tests" => {
             let suite = args["suite"].as_str();
-            tests_view(ui, controller, suite, args["test"].as_str());
-            let read = suite.map_or("read the test suites".to_string(), |suite| format!("read {suite}'s results"));
+            let history = if op == "tests" { result["test"].as_str() } else { None };
+            tests_view(ui, controller, suite, history.or(args["test"].as_str()));
+            let read = match (suite, history) {
+                (_, Some(test)) => format!("read {test}'s history"),
+                (Some(suite), None) => format!("read {suite}'s results"),
+                (None, None) => "read the test suites".to_string(),
+            };
             Some(result["doing"].as_str().map_or(read, str::to_string))
         }
         "migrations" | "check_migrations" | "apply_migrations" => {
