@@ -4,6 +4,41 @@ use serde_json::{Value, json};
 
 use super::{WAIT_MAX_SECS, WAITS};
 
+/// The views `get_view` reads, each the lazyrunner op that answers it.
+pub const VIEWS: [&str; 6] = ["changelog", "durations", "ports", "audit", "checks", "snapshot"];
+/// The `database` tool's ops, each with the lazyrunner op that does it.
+pub const DATABASE_OPS: [(&str, &str); 6] = [
+    ("add", "add_database"),
+    ("copy", "copy_database"),
+    ("backup", "backup_database"),
+    ("export", "export_database"),
+    ("import", "import_database"),
+    ("files", "database_files"),
+];
+/// Tools merged into another (#112), with the call that does it now: an agent or a permission rule may still name them.
+const RENAMED: [(&str, &str); 12] = [
+    ("get_changelog", "get_view with view \"changelog\""),
+    ("get_durations", "get_view with view \"durations\""),
+    ("get_ports", "get_view with view \"ports\""),
+    ("get_audit", "get_view with view \"audit\""),
+    ("get_checks", "get_view with view \"checks\""),
+    ("get_snapshot", "get_view with view \"snapshot\""),
+    ("add_database", "database with op \"add\""),
+    ("copy_database", "database with op \"copy\""),
+    ("backup_database", "database with op \"backup\""),
+    ("export_database", "database with op \"export\""),
+    ("import_database", "database with op \"import\""),
+    ("database_files", "database with op \"files\""),
+];
+
+/// What a tool that was merged into another is called now, as an error an agent reads.
+pub fn renamed(name: &str) -> Option<String> {
+    RENAMED
+        .iter()
+        .find(|(old, _)| *old == name)
+        .map(|(old, new)| format!("renamed: {old} is now {new} - call that instead"))
+}
+
 /// Every tool; `apps` names the open project's apps in the descriptions (": orders, shop"), empty when lazyrunner
 /// isn't open.
 pub fn list(apps: &str) -> Vec<Value> {
@@ -11,24 +46,21 @@ pub fn list(apps: &str) -> Vec<Value> {
     let some_apps = json!({
         "app": { "type": "string", "description": format!("An app's key (get_status lists them{apps}), or \"all\" (the default)") },
     });
+    let database = json!({ "type": "string", "description": "A database's name or label (the one in use by default)" });
     vec![
         tool(
             "get_status",
-            "What lazyrunner runs now: each app's state, port, url and error count; what's busy (a build, a \
-             rebuild after code changes, the apps getting ready, npm, tests, migrations); the test totals; the \
-             settings; what the user is looking at; lazyrunner's newest log lines. Call it first in every turn.",
+            "What lazyrunner runs now: each app's state, port, url and errors; what's busy; the test totals; the \
+             settings; what the user looks at; its newest log lines. Call it first in every turn.",
             json!({}),
             &[],
             true,
         ),
         tool(
             "get_logs",
-            "An app's output as one text, each line after its number: the newest `limit` (100, at most 500) \
-             after `since` (pass the last answer's `next` to get only what's new; `truncated` says older matching \
-             lines didn't fit), those containing `grep` (ignoring case), or only the error lines. With `parsed`, \
-             the log entries instead of lines, as the column's parsed view (v) shows them: each after its first \
-             line's number, its level, time, category and message on one line - an EF Core command's time and SQL, \
-             an exception's frame count, a repeated line's count (×12).",
+            "An app's output, each line after its number: the newest `limit` (100, 500 at most) after `since` (the \
+             last answer's `next`), matching `grep` (any case) or errors only. `parsed`: its log entries instead \
+             (level, time, category, message, EF Core SQL).",
             json!({
                 "app": app,
                 "since": { "type": "integer", "minimum": 0 },
@@ -42,28 +74,24 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "get_errors",
-            "An app's last error with its stack trace (after a failed build: the build's errors with their full \
-             paths), or every error, warning, or both, in order.",
+            "An app's last error with its stack (after a failed build, its errors with full paths), or every error, \
+             warning or both.",
             json!({ "app": app, "what": { "type": "string", "enum": ["last", "errors", "warnings", "both"] } }),
             &["app"],
             true,
         ),
         tool(
             "get_requests",
-            "The HTTP requests the .NET apps served (lazyrunner's requests view, from ASP.NET's request log): \
-             id, method, path, endpoint, status and milliseconds, newest first or slowest first (sort), after \
-             `since` (pass the last answer's `next` for only the new ones), of one app, errors only (status 400 \
-             and up), with `path` in them, or of one `endpoint` as the endpoints list names it (and `method`); \
-             `limit` (50, at most 500). With endpoints: true, summed up per \
-             endpoint instead - count, errors, avg, p50, p95, max. `n_plus_one` marks a request that ran one \
-             query over and over (and n_plus_one_requests an endpoint's); get_request has one in full.",
+            "The HTTP requests the .NET apps served, newest or slowest first: id, method, path, endpoint, status, ms. \
+             Narrow by `since` (the last answer's `next`), app, errors only (400+), `path`, `endpoint` (and \
+             `method`); `limit` 50 (500 at most). `endpoints`: per endpoint instead (count, errors, p50, p95, max).",
             json!({
                 "app": app,
                 "since": { "type": "integer", "minimum": 0 },
                 "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
                 "errors_only": { "type": "boolean" },
                 "path": { "type": "string" },
-                "endpoint": { "type": "string", "description": "As endpoints: true names it, e.g. /api/orders/{id}" },
+                "endpoint": { "type": "string", "description": "e.g. /api/orders/{id}" },
                 "method": { "type": "string" },
                 "sort": { "type": "string", "enum": ["newest", "slowest"] },
                 "endpoints": { "type": "boolean" },
@@ -73,31 +101,23 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "get_request",
-            "One request in full, by its id from get_requests: what it sent and returned, its endpoint's times \
-             to compare with (p50, p95, slower_than_p95), the log lines its app wrote while it ran \
-             (possibly_mixed: other requests ran meanwhile, so some lines may be theirs), and its EF Core \
-             database commands: how many, their total and the slowest, and `repeated` - the query it ran over \
-             and over (10 times or more), an N+1. Its waterfall: each database command and outbound call where it \
-             ran, from the log lines and when each arrived, the exception's moment, and the time no line accounts \
-             for (in_the_app_ms). With baseline, another request's id: the two compared row against row.",
-            json!({
-                "id": { "type": "integer", "minimum": 1 },
-                "baseline": { "type": "integer", "minimum": 1, "description": "Another request's id: compare the two." }
-            }),
+            "One request in full, by its id from get_requests: what it sent and returned, its endpoint's p50 and \
+             p95, its log lines and EF Core commands (an N+1 as `repeated`), and its waterfall. `baseline`: another \
+             request's id, the two compared.",
+            json!({ "id": { "type": "integer", "minimum": 1 }, "baseline": { "type": "integer", "minimum": 1 } }),
             &["id"],
             true,
         ),
         tool(
             "get_screen",
-            "lazyrunner's screen as the user sees it now, as text. In follow mode (F) it shows what you read last.",
+            "A fallback - use the dedicated tools first: lazyrunner's screen as the user sees it now, as text.",
             json!({}),
             &[],
             true,
         ),
         tool(
             "start_apps",
-            "Starts an app or every app (builds the .NET ones and command apps with a build first when their code \
-             changed). Then wait for ready.",
+            "Starts an app or every app (building what changed first). Then wait for ready.",
             some_apps.clone(),
             &[],
             false,
@@ -112,17 +132,16 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "build",
-            "Builds an app or every app that builds (.NET, a command app's build) without starting it (a running one \
-             stops first). Then wait for build_done and read get_errors when it failed.",
+            "Builds an app or every app that builds, without starting it (a running one stops first). Then wait for \
+             build_done; get_errors when it failed.",
             some_apps,
             &[],
             false,
         ),
         tool(
             "wait",
-            "Waits until something is done, then says how it went: ready (no build or rebuild, no npm install, \
-             every started app answers), build_done (the builds that ran while waiting), tests_done, \
-             migrations_checked or task_done (no task runs; how the last ones went). At most timeout_sec (120, at most 600); call it again when it timed out.",
+            "Waits until `for` is done, then says how it went; ready: no build or npm install runs and every started \
+             app answers. timeout_sec 120 (600 at most); call again when it timed out.",
             json!({
                 "for": { "type": "string", "enum": WAITS },
                 "timeout_sec": { "type": "integer", "minimum": 1, "maximum": WAIT_MAX_SECS },
@@ -132,32 +151,29 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "list_tests",
-            "The test suites (.NET test projects, npm and Nx test targets) with their last results, and whether \
-             what changed since each one's last whole run affects it (affected, affected_why: the projects from \
-             the suite to the changed file).",
+            "The test suites (.NET, npm and Nx) with their last results, and whether what changed since their last \
+             whole run affects them (affected, affected_why).",
             json!({}),
             &[],
             true,
         ),
         tool(
             "get_test_results",
-            "A suite's last results: its failed tests with their messages and stacks, each with its likely cause \
-             (the sources changed since it last passed, those in its stack first), and its last output lines; with \
-             the coverage setting on, its code coverage (percent, change since the full run before, the files that \
-             changed most with their first line not covered).",
+            "A suite's last results: its failed tests with messages, stacks and likely causes (sources changed since \
+             it last passed), its last output lines, and its code coverage when that setting is on.",
             json!({ "suite": { "type": "string", "description": "A suite's key or name (list_tests)" } }),
             &["suite"],
             true,
         ),
         tool(
             "run_tests",
-            "Runs every suite, one suite, its failed tests only, one test of a suite, or the suites what changed \
-             affects (affected). Then wait for tests_done.",
+            "Runs every suite, one suite, its failed tests, one test, or the suites what changed affects. Then wait \
+             for tests_done.",
             json!({
-                "suite": { "type": "string", "description": "A suite's key or name (list_tests); every suite without it" },
+                "suite": { "type": "string", "description": "A suite's key or name (list_tests); all without it" },
                 "failed_only": { "type": "boolean" },
                 "test": { "type": "string", "description": "One test's full name; needs its suite" },
-                "affected": { "type": "boolean", "description": "Only the suites what changed since their last runs affects (list_tests says why)" },
+                "affected": { "type": "boolean" },
             }),
             &[],
             false,
@@ -165,23 +181,19 @@ pub fn list(apps: &str) -> Vec<Value> {
         tool("stop_tests", "Stops the tests that run or wait.", json!({}), &[], false),
         tool(
             "list_actions",
-            "Everything lazyrunner can do: every action as its command palette lists it (key, label, hint, \
-             group, while_building: it runs while an app builds, focused_app: it acts on the focused app, \
-             needs_confirm) and every setting with its state. run_action runs an action, set_setting sets a \
-             setting.",
+            "A fallback - use the dedicated tools first: every action as the command palette lists it (key, label, \
+             group, while_building, focused_app, needs_confirm) and every setting with its state.",
             json!({}),
             &[],
             true,
         ),
         destructive(tool(
             "run_action",
-            "Runs an action by its key from list_actions, as the user's key would - on `app` (focused first) \
-             when it acts on the focused app. While an app builds, only the while_building ones run. One with \
-             needs_confirm (quit, kill a port's holder, clear the output, reopen lazyrunner, the git tool) needs \
-             confirm: true - ask the user first. One that opens a box or a view leaves it on the user's screen: \
-             press_keys Esc closes it.",
+            "Runs an action by its key from list_actions, as the user's key would, on `app` when it acts on the \
+             focused app. While an app builds, only while_building ones run. needs_confirm ones need confirm: true - \
+             ask the user first.",
             json!({
-                "key": { "type": "string", "description": "The action's key from list_actions, e.g. \"D\", \"i c\", \", r\"" },
+                "key": { "type": "string", "description": "e.g. \"D\", \"i c\", \", r\"" },
                 "app": app.clone(),
                 "confirm": { "type": "boolean" },
             }),
@@ -190,53 +202,54 @@ pub fn list(apps: &str) -> Vec<Value> {
         )),
         destructive(tool(
             "press_keys",
-            "Presses keys in the open lazyrunner, for what no tool covers - named as its key reference (?) \
-             shows them, space-separated: \"g g\", \"Ctrl+o\", \"Alt+Left\", \"Esc\", \"Enter\", \"Space\". \
-             Answers with the screen after. Refused while the user types in a prompt; q, Q, Ctrl+C, L, !, \
-             Ctrl+L and Ctrl+R need confirm: true.",
+            "A fallback - use the dedicated tools first: presses keys in lazyrunner, space-separated as its key \
+             reference (?) names them (\"g g\", \"Ctrl+o\", \"Esc\"); answers with the screen after. q, Q, Ctrl+C, \
+             L, !, Ctrl+L and Ctrl+R need confirm: true.",
             json!({ "keys": { "type": "string" }, "confirm": { "type": "boolean" } }),
             &["keys"],
             false,
         )),
         destructive(tool(
             "switch_database",
-            "Makes a SQL connection string in the APIs' secrets.json the active one (as d does), by its \
-             database or label; `key` picks between connection strings of one name. The running APIs restart \
-             on it. Needs confirm: true - ask the user first. Without a name, the answer lists them.",
+            "Makes a SQL connection string in the APIs' secrets.json the one in use (as d does), by its database or \
+             label; the running APIs restart on it. Needs confirm: true - ask the user first. Without name, lists \
+             them.",
             json!({
                 "name": { "type": "string" },
-                "key": { "type": "string", "description": "The connection string's key, e.g. ConnectionStrings:Default" },
+                "key": { "type": "string", "description": "Picks between ones of one name, e.g. ConnectionStrings:Default" },
                 "confirm": { "type": "boolean" },
             }),
             &[],
             false,
         )),
         tool(
-            "add_database",
-            "Adds a SQL connection string to the APIs' secrets.json as n on the database screen (d) does: a copy \
-             of one there (`from`, by its database or label; the one in use when left out; `key` picks between \
-             connection strings of one name) with another database (`name`), not in use yet, right under it. With \
-             switch: true it becomes the one in use too - the running APIs restart on it - which needs confirm: \
-             true: ask the user first. The user watches it on the database screen.",
+            "database",
+            "Database work that drops nothing, by `op`, as the database screen (d) does it: add - a connection \
+             string in secrets.json copying `from` with database `name`, not in use (switch: true makes it the one \
+             in use, restarting the APIs: needs confirm - ask the user first); copy - `database` to a new one; \
+             backup - a COPY_ONLY .bak in the server's backup folder; export - a .bacpac; import - `file` as a new \
+             database; files - the backup files, sizes and the job running. copy, backup, export and import run in \
+             the background.",
             json!({
-                "name": { "type": "string", "description": "The new database's name" },
-                "from": { "type": "string", "description": "The connection string to copy, by its database or label" },
-                "key": { "type": "string", "description": "The connection string's key, e.g. ConnectionStrings:Default" },
+                "op": { "type": "string", "enum": DATABASE_OPS.map(|(op, _)| op) },
+                "database": { "type": "string", "description": "copy, backup, export: which (name or label; the one in use by default); import: one on the target server" },
+                "name": { "type": "string", "description": "add, copy, import: the new database's name" },
+                "from": { "type": "string", "description": "add: the connection string to copy (database or label; the one in use by default)" },
+                "key": { "type": "string", "description": "add: picks between ones of one name, e.g. ConnectionStrings:Default" },
                 "switch": { "type": "boolean" },
                 "confirm": { "type": "boolean" },
+                "file": { "type": "string", "description": "import: a file's name or path (files lists them)" },
             }),
-            &["name"],
+            &["op"],
             false,
         ),
         tool(
             "save_point",
-            "Makes a save point of a database (as s and S on the database screen do): a SQL Server snapshot \
-             (kind snapshot, the default: made in a moment) or a COPY_ONLY backup in the server's backup folder \
-             (kind backup: slower). `database` is a connection string's database or label (get_status's \
-             database), the one in use when left out; `label` names it (`before 10:42` when left out). It runs in \
-             the background: get_status's save_points list it once it's made, busy.database says what runs.",
+            "Makes a save point of a database (s, S on the database screen): a SQL Server snapshot (the default, \
+             made in a moment) or a slower COPY_ONLY backup; `label` names it. In the background: get_status's \
+             save_points list it once it's made.",
             json!({
-                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
+                "database": database.clone(),
                 "kind": { "type": "string", "enum": ["snapshot", "backup"] },
                 "label": { "type": "string" },
             }),
@@ -245,14 +258,12 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         destructive(tool(
             "rewind",
-            "Rewinds a database to a save point (as r on the database screen does): the .NET apps on it stop, it's \
-             restored and they start again; what changed since is lost, other connections to it are cut off, and \
-             the database's other snapshot save points are dropped first (SQL Server needs that). `save_point` is \
-             its label or id (get_status's save_points), the database's newest when left out. Needs confirm: true - \
+            "Rewinds a database to a save point (r): its .NET apps stop, it's restored, they start again; what \
+             changed since is lost, other connections are cut off, its other snapshots dropped. Needs confirm: true - \
              ask the user first. Then wait for ready.",
             json!({
-                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
-                "save_point": { "type": "string", "description": "A save point's label or id" },
+                "database": database.clone(),
+                "save_point": { "type": "string", "description": "Its label or id (the newest by default)" },
                 "confirm": { "type": "boolean" },
             }),
             &[],
@@ -260,110 +271,44 @@ pub fn list(apps: &str) -> Vec<Value> {
         )),
         tool(
             "database_changes",
-            "What changed in a database since a save point, table by table, as the database screen shows it: each \
-             table's rows then and now and the difference, and the small tables whose rows changed though their \
-             count didn't (changed_in_place). The rows are counted again when the last count is older than a few \
-             seconds - `counting` says so; call again for the new counts. Between two attempts at a fix it shows \
-             exactly what an action touched.",
+            "What changed in a database since a save point, table by table: rows then and now, and the small tables \
+             whose rows changed in place - exactly what an action touched.",
             json!({
-                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
-                "save_point": { "type": "string", "description": "A save point's label or id (the newest by default)" },
+                "database": database.clone(),
+                "save_point": { "type": "string", "description": "Its label or id (the newest by default)" },
             }),
             &[],
             true,
         ),
-        tool(
-            "copy_database",
-            "Copies a database to a new one on the same server (as c on the database screen does): a COPY_ONLY \
-             backup restored WITH MOVE to new files, never over a database that's there; then a connection string \
-             to it is added beside the source's (inactive - switch_database makes it the one in use). `name` is \
-             the new database's (`<database>_copy` when left out). It runs in the background: busy.database and \
-             database_files say how far it is.",
-            json!({
-                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
-                "name": { "type": "string", "description": "The new database's name" },
-            }),
-            &[],
-            false,
-        ),
-        tool(
-            "backup_database",
-            "Backs a database up to `<database>_<yyyyMMdd_HHmm>.bak` in its server's own backup folder (as b on \
-             the database screen does): COPY_ONLY, so it changes no backup chain. In the background; \
-             database_files lists the file once it's written.",
-            json!({ "database": { "type": "string", "description": "The database's name or label (database @ server)" } }),
-            &[],
-            false,
-        ),
-        tool(
-            "export_database",
-            "Exports a database to a .bacpac with SqlPackage (as e on the database screen does), into lazyrunner's \
-             folder for the project (database_files' folder): portable across SQL Server versions and to Azure. \
-             Refused when SqlPackage isn't installed - the answer says how to install it; ask the user first. In \
-             the background, table by table.",
-            json!({ "database": { "type": "string", "description": "The database's name or label (database @ server)" } }),
-            &[],
-            false,
-        ),
-        tool(
-            "import_database",
-            "Imports a .bak or .bacpac from database_files as a new database (as i on the database screen does) - \
-             never over one that's there - then adds a connection string to it (inactive). A .bak in a server's \
-             backup folder goes to that server; one of lazyrunner's files to `database`'s server (the one in use \
-             when left out). `name` is the new database's (the file's name when left out).",
-            json!({
-                "file": { "type": "string", "description": "A file's name or path, as database_files lists it" },
-                "name": { "type": "string", "description": "The new database's name" },
-                "database": { "type": "string", "description": "A database on the server to import into (name or label)" },
-            }),
-            &["file"],
-            false,
-        ),
         destructive(tool(
             "drop_database",
-            "Drops a database (as Del on the database screen does): its lazyrunner save point snapshots first, \
-             everyone connected cut off, then its connection strings removed from secrets.json (the file before is \
-             kept). Never the one in use or one a running app is on. Its data is gone for good - needs confirm: \
-             true; ask the user first.",
-            json!({
-                "database": { "type": "string", "description": "The database's name or label (database @ server)" },
-                "confirm": { "type": "boolean" },
-            }),
+            "Drops a database (Del on the database screen): its save points, its connections cut off, its \
+             connection strings removed from secrets.json. Never the one in use or one a running app is on. Its data \
+             is gone for good - needs confirm: true; ask the user first.",
+            json!({ "database": database, "confirm": { "type": "boolean" } }),
             &["database"],
             false,
         )),
         tool(
-            "database_files",
-            "The database screen's files: the .bak backups lazyrunner made in servers' backup folders and the \
-             .bak / .bacpac files in its own folder for the project (name, path, size, age), each database's size \
-             as last measured, the copy, backup, export or import running (its share done, tables, step), and \
-             whether SqlPackage is missing. Never a connection string.",
-            json!({}),
-            &[],
-            true,
-        ),
-        tool(
             "run_task",
-            "Runs one of the profile's tasks (get_status lists them: key, name, running, last) in the background - \
-             a one-off command such as seeding the database. Its output goes to the panel's log. Then wait for \
-             task_done.",
+            "Runs one of the profile's tasks (get_status lists them) in the background - a one-off command such as \
+             seeding the database. Then wait for task_done.",
             json!({ "task": { "type": "string", "description": "The task's key or name" } }),
             &["task"],
             false,
         ),
         tool(
             "install_packages",
-            "npm ci (clean: true, the default) or npm install (clean: false) for an npm app; a command app's own \
-             install. Then wait for ready.",
+            "npm ci (clean, the default) or npm install (clean: false) for an npm app; a command app's own install. \
+             Then wait for ready.",
             json!({ "app": app.clone(), "clean": { "type": "boolean" } }),
             &["app"],
             false,
         ),
         destructive(tool(
             "apply_migrations",
-            "Applies a DbContext's pending migrations, or moves it to the migration `to` (its id or name): \
-             forward applies up to it, back reverts the newer ones through their Down() and needs confirm: \
-             true. The context must be checked first (check_migrations). Then wait for migrations_checked.",
+            "Applies a DbContext's pending migrations, or moves it to the migration `to` (id or name): back reverts \
+             the newer ones and needs confirm: true. check_migrations first. Then wait for migrations_checked.",
             json!({
                 "context": { "type": "string", "description": "A context's key or name (get_migrations)" },
                 "to": { "type": "string" },
@@ -374,25 +319,16 @@ pub fn list(apps: &str) -> Vec<Value> {
         )),
         destructive(tool(
             "kill_port_holder",
-            "Kills whatever holds a port an app needs, then starts the apps (as ! does). Needs confirm: true - \
-             ask the user first.",
+            "Kills whatever holds a port an app needs, then starts the apps (as ! does). Needs confirm: true - ask \
+             the user first.",
             json!({ "confirm": { "type": "boolean" } }),
             &[],
             false,
         )),
         tool(
-            "get_snapshot",
-            "This run as a read-only snapshot, as , A v writes it for a teammate: each app's state, port, errors and \
-             last error, the last 5 minutes' requests and slowest endpoints, the tests' failures and likely causes, \
-             Health's alerts, the stack map and what's on screen - masked as the diagnostics zip is.",
-            json!({}),
-            &[],
-            true,
-        ),
-        tool(
             "open_in_editor",
-            "Opens a file of the repo in the user's editor (their \"editor\" setting) at a line and column, as O does \
-             in lazyrunner - to show them the code you're talking about. Needs confirm: true - ask the user first.",
+            "Opens a file of the repo at a line and column in the user's editor (as O does), to show them code. \
+             Needs confirm: true - ask the user first.",
             json!({
                 "file": { "type": "string" },
                 "line": { "type": "integer" },
@@ -411,87 +347,51 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "get_migrations",
-            "The EF Core DbContexts and their migrations as last checked against the database the apps use: \
-             when, applied, pending. It doesn't check them (check_migrations does).",
-            json!({}),
-            &[],
-            true,
-        ),
-        tool(
-            "get_audit",
-            "Each app's outdated and vulnerable packages as last scanned (the audit view, A): their severity, \
-             advisories, current and latest versions, and the command that fixes each (and where to run it). It \
-             doesn't scan: the scans ask the package feeds, so the user starts them (A, then R).",
-            json!({}),
-            &[],
-            true,
-        ),
-        tool(
-            "get_ports",
-            "The port map (P): each app's port and who holds it - free, its own app running here, something else \
-             (its PID, name and command line) or a range Windows reserved - for how long, and who held it over the \
-             last minute. kill_port_holder stops what holds one.",
+            "The EF Core DbContexts and their migrations as last checked against the database: when, applied, \
+             pending. check_migrations checks them.",
             json!({}),
             &[],
             true,
         ),
         tool(
             "get_stack",
-            "The stack map (K): which app calls which - from the calls the .NET apps made (HttpClient's log, by the \
-             port a call went to) and the profile's dependsOn - with each edge's calls, p95 and failures over the \
-             last minute; each app's state and port; the apps that use the database; and the newest failed calls \
-             (url, status, or no answer).",
+            "The stack map (K): which app calls which, with each edge's calls, p95 and failures over the last \
+             minute; each app's state and port; the apps on the database; the newest failed calls.",
             json!({}),
             &[],
             true,
         ),
         tool(
             "profile_app",
-            "Samples a running app's CPU for a few seconds (10 by default) - a .NET app with dotnet-trace (dotnet \
-             tool install -g dotnet-trace), an npm app with Node's own inspector - while you make the slow request, \
-             then keeps the capture and opens its flame chart; wait for profile_done, then get_profile.",
-            json!({
-                "app": { "type": "string", "description": "The app's key or name." },
-                "seconds": { "type": "integer", "minimum": 3, "maximum": 120 }
-            }),
+            "Samples a running app's CPU for `seconds` (10) - a .NET app with dotnet-trace, an npm app with Node's \
+             inspector - while you make the slow request. Then wait for profile_done and read get_profile.",
+            json!({ "app": app.clone(), "seconds": { "type": "integer", "minimum": 3, "maximum": 120 } }),
             &["app"],
             false,
         ),
         tool(
             "get_profile",
-            "An app's newest CPU capture (profile_app): its time on the CPU, the top frames by self time (and in all \
-             they called), the split by namespace, and how each top frame changed since the capture before.",
-            json!({ "app": { "type": "string", "description": "The app's key or name." } }),
+            "An app's newest CPU capture (profile_app): its CPU time, the top frames by self and total time, the \
+             split by namespace, and each top frame's change since the capture before.",
+            json!({ "app": app.clone() }),
             &["app"],
             true,
         ),
         tool(
             "get_health",
-            "The stack's health (K, then Tab to Health): each app's p95 latency and 5xx rate over the last minute \
-             (.NET apps whose requests are logged), its memory, CPU and memory growth, each against its target (the \
-             profile's health, else p95 1000 ms, 5% 5xx, 2048 MB, 90% CPU); its breaches with how long each has \
-             lasted; and the alerts - breaches that lasted a minute - acknowledged or not. get_status lists the \
-             alerts too.",
+            "The stack's health (K, Tab): each app's p95, 5xx rate, memory, CPU and memory growth over the last \
+             minute against its targets, its breaches and how long they lasted, and the alerts.",
             json!({}),
             &[],
             true,
         ),
         tool(
             "get_dependencies",
-            "The code map: what depends on what in the code - .NET projects (their project references) and their \
-             namespaces (their usings), TypeScript projects (an Nx workspace's, through tsconfig paths and imports) \
-             and their folders, an Angular folder's NgModules and components (their imports), and Nx's implicit \
-             dependencies. Without part: the apps and their projects, every project (how many it depends on and how \
-             many use it), the cycles, and the links a rule doesn't allow (the profile's layers, Nx's module \
-             boundaries). With part (an app, project, namespace, folder, module or component by name, or a source \
-             file by its name or the end of its path - its namespace, folder or module): what it \
-             depends on and what uses it, each with its depth and the way to it, its own parts, the rules it breaks \
-             and what only Nx links it to.",
+            "The code map: what depends on what - .NET projects and namespaces, TypeScript and Nx projects and \
+             folders, Angular modules and components. Without part: the apps, every project, the cycles and the \
+             links a rule forbids. With part: what it depends on and what uses it, with depth and way.",
             json!({
-                "part": {
-                    "type": "string",
-                    "description": "An app, project, namespace, folder, module or component by its name, or a source file",
-                },
+                "part": { "type": "string", "description": "A project, namespace, folder, module, component or app by name, or a source file" },
                 "direction": { "type": "string", "enum": ["depends_on", "used_by", "both"] },
                 "depth": { "type": "integer", "minimum": 1, "description": "How far; all without it" },
             }),
@@ -499,22 +399,12 @@ pub fn list(apps: &str) -> Vec<Value> {
             true,
         ),
         tool(
-            "get_durations",
-            "The durations (D): how long builds, starts, npm ci and installs, test suites and tasks took - each \
-             item's last runs (when, seconds, whether it went fine), its usual time (the median of its good runs) and \
-             how the last compares. kind narrows them.",
-            json!({ "kind": { "type": "string", "description": "build, start, npm, test or task" } }),
-            &[],
-            true,
-        ),
-        tool(
             "get_timeline",
-            "The timeline (~): every app's output in the order it came, each line after how long ago it came and its \
-             app - what happened across the stack around a moment (a request in one app, its error in another). \
-             app, grep and errors_only narrow it; count lines, the newest (100 by default, 500 at most).",
+            "The timeline (~): every app's output in the order it came, each line with how long ago and its app - \
+             what happened across the stack around a moment. `count` newest lines (100, at most 500).",
             json!({
                 "app": { "type": "string" },
-                "grep": { "type": "string", "description": "Words a line holds (case doesn't matter)" },
+                "grep": { "type": "string" },
                 "errors_only": { "type": "boolean" },
                 "count": { "type": "integer", "minimum": 1, "maximum": 500 },
             }),
@@ -523,53 +413,47 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "get_start_sheet",
-            "An app's start sheet (x, e): what it's started with - its command line, its launch profile, or a command \
-             or compose app's profile fields - and its environment, each variable with where it comes from (the \
-             profile, the launch profile, this machine's overrides) and what it hides; secrets masked. Without app, \
-             the focused one.",
+            "An app's start sheet (x, e): its command line or launch profile, and its environment with where each \
+             variable comes from; secrets masked. Without app, the focused one.",
             json!({ "app": { "type": "string" } }),
             &[],
             true,
         ),
         tool(
-            "get_checks",
-            "The startup checks: git, the SDKs and tools the apps need (with their versions), ports, the database, \
-             packages, the profile, the branch and the update - each ok, warn or fail with what it found, as the \
-             last checklist left them. rerun: true runs them again (the checklist opens); call again for the results.",
-            json!({ "rerun": { "type": "boolean" } }),
-            &[],
-            true,
-        ),
-        tool(
             "get_marks",
-            "The lines the user marked in the columns (m; ' lists them), oldest first, each with its app and line \
-             number - what they want you to look at.",
+            "The lines the user marked (m), oldest first, with their app and line number - what they want you to \
+             look at.",
             json!({}),
             &[],
             true,
         ),
         tool(
             "get_build",
-            "A .NET app's build as a map (Alt+b): the projects it compiles, each one's state (queued, building, done, \
-             failed, skipped), its own time (from when what it references was done) against its usual, and the \
-             critical path - the chain of references that decided how long the build took. The running build, else \
-             the app's last; without app, the running one's, else the newest.",
+            "A .NET app's build as a map (Alt+b): each project's state, its own time against its usual, and the \
+             critical path. The running build, else the app's last; without app, the running or the newest.",
             json!({ "app": { "type": "string" } }),
             &[],
             true,
         ),
         tool(
-            "get_changelog",
-            "What the newest lazyrunner versions changed (count of them, 3 by default), and the version that runs - \
-             to know what lazyrunner can do.",
-            json!({ "count": { "type": "integer", "minimum": 1, "maximum": 20 } }),
-            &[],
+            "get_view",
+            "A read-only view, by `view`: changelog - the newest versions' changes and the running version; \
+             durations (D) - builds, starts, installs, test suites and tasks against their usual times; ports (P) - \
+             each app's port and who holds it; audit (A) - outdated and vulnerable packages as last scanned, with \
+             fixes; checks - the startup checks; snapshot - this run, masked, as , A v writes it for a teammate.",
+            json!({
+                "view": { "type": "string", "enum": VIEWS },
+                "count": { "type": "integer", "minimum": 1, "maximum": 20, "description": "changelog: how many versions (3)" },
+                "kind": { "type": "string", "description": "durations: build, start, npm, test or task" },
+                "rerun": { "type": "boolean", "description": "checks: run them again" },
+            }),
+            &["view"],
             true,
         ),
         tool(
             "check_migrations",
-            "Checks one DbContext against the database (`context`), or finds them again and checks them all. \
-             Then wait for migrations_checked.",
+            "Checks one DbContext (`context`) against the database, or finds and checks them all. Then wait for \
+             migrations_checked.",
             json!({ "context": { "type": "string", "description": "A context's key or name (get_migrations)" } }),
             &[],
             false,
@@ -583,11 +467,41 @@ fn destructive(mut tool: Value) -> Value {
     tool
 }
 
+/// A tool as `tools/list` says it, without what a client assumes anyway: no empty `required`, and no
+/// `destructiveHint` on a read-only tool (MCP reads it only when `readOnlyHint` is false).
 fn tool(name: &str, description: &str, properties: Value, required: &[&str], read_only: bool) -> Value {
-    json!({
-        "name": name,
-        "description": description,
-        "inputSchema": { "type": "object", "properties": properties, "required": required, "additionalProperties": false },
-        "annotations": { "readOnlyHint": read_only, "destructiveHint": false, "openWorldHint": false },
-    })
+    let mut schema = json!({ "type": "object", "properties": properties, "additionalProperties": false });
+    if !required.is_empty() {
+        schema["required"] = json!(required);
+    }
+    let mut annotations = json!({ "readOnlyHint": read_only, "openWorldHint": false });
+    if !read_only {
+        annotations["destructiveHint"] = json!(false);
+    }
+    json!({ "name": name, "description": description, "inputSchema": schema, "annotations": annotations })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// What `tools/list` may weigh at most, in characters of its JSON: an agent pays for it in every session (#112).
+    const BUDGET: usize = 21_500;
+
+    #[test]
+    fn the_tool_list_stays_within_its_budget() {
+        let size = json!({ "tools": list("") }).to_string().chars().count();
+        assert!(size <= BUDGET, "tools/list is {size} characters, over its budget of {BUDGET}");
+    }
+
+    #[test]
+    fn a_merged_tool_says_what_it_is_now_and_no_listed_tool_is_one() {
+        assert_eq!(
+            renamed("get_ports").unwrap(),
+            "renamed: get_ports is now get_view with view \"ports\" - call that instead"
+        );
+        assert_eq!(renamed("get_status"), None);
+        let listed: Vec<Value> = list("").iter().map(|tool| tool["name"].clone()).collect();
+        assert!(RENAMED.iter().all(|(old, _)| !listed.contains(&json!(old))));
+    }
 }

@@ -2,7 +2,7 @@
 //! state folder, its path copied: each app's state, port, errors and last error, the last 5 minutes' requests and
 //! slowest endpoints, the tests' failures and their likely causes, Health's alerts, the stack map, what's on screen and
 //! the screen itself as a picture - masked as the diagnostics zip masks. Read-only: nothing in it changes anything and
-//! it never updates itself; the JSON it holds is what `get_snapshot` answers. The last few are kept.
+//! it never updates itself; the JSON it holds is what `get_view` answers for `snapshot`. The last few are kept.
 //!
 //! It moves (not with reduced motion): the screen dims for a moment as it's taken, as a camera's flash; the panel says
 //! so for a few seconds.

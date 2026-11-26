@@ -43,6 +43,13 @@ const REQUEST_LOG_LINES: usize = 300;
 const NO_REQUESTS: &str = "No requests yet: they come from ASP.NET's request log of the .NET apps lazyrunner started. \
                            An app that logs only somewhere else (Serilog to Seq, say) needs \"args\" in its profile to \
                            log to the console (README, \"Requests\").";
+/// The notes an answer carries when it needs them (#112): a request that looks like an N+1, an endpoint with such
+/// requests, lines that didn't fit, a request's log lines that may hold other requests' too.
+const N_PLUS_ONE: &str = "n_plus_one: the times one query ran in that request - an N+1; get_request has it in full";
+const N_PLUS_ONE_ENDPOINTS: &str =
+    "n_plus_one_requests: the endpoint's requests that ran one query over and over - an N+1; get_request has one";
+const TRUNCATED: &str = "older matching lines didn't fit: raise limit, or narrow it with since or grep";
+const MIXED: &str = "other requests ran meanwhile, so some of these lines may be theirs";
 
 type Refusal = (&'static str, String);
 type Answer = Result<Value, Refusal>;
@@ -288,6 +295,7 @@ fn logs(controller: &Controller, args: &Value) -> Answer {
         "truncated": truncated,
         "older_lines_dropped": since.saturating_add(1) < oldest,
         "reset": reset,
+        "note": truncated.then_some(TRUNCATED),
     }))
 }
 
@@ -331,6 +339,7 @@ fn parsed_logs(controller: &Controller, index: usize, args: &Value) -> Answer {
         "truncated": truncated,
         "older_lines_dropped": since.saturating_add(1) < oldest,
         "reset": reset,
+        "note": truncated.then_some(TRUNCATED),
     }))
 }
 
@@ -434,14 +443,22 @@ fn requests(controller: &Controller, args: &Value) -> Answer {
         let mut summed = endpoints(list.into_iter());
         summed.sort_by(|a, b| b.total.total_cmp(&a.total));
         answer["matching"] = json!(summed.len());
-        answer["endpoints"] = summed.iter().take(limit).map(endpoint_row).collect();
+        let shown: Vec<Value> = summed.iter().take(limit).map(endpoint_row).collect();
+        if shown.iter().any(|row| row["n_plus_one_requests"].as_u64().is_some_and(|count| count > 0)) {
+            answer["note"] = json!(N_PLUS_ONE_ENDPOINTS);
+        }
+        answer["endpoints"] = json!(shown);
         return Ok(answer);
     }
     if slowest {
         list.sort_by(|a, b| b.ms.total_cmp(&a.ms));
     }
     answer["matching"] = json!(list.len());
-    answer["requests"] = list.iter().take(limit).map(|request| request_row(request)).collect();
+    let shown: Vec<Value> = list.iter().take(limit).map(|request| request_row(request)).collect();
+    if shown.iter().any(|row| !row["n_plus_one"].is_null()) {
+        answer["note"] = json!(N_PLUS_ONE);
+    }
+    answer["requests"] = json!(shown);
     Ok(answer)
 }
 
@@ -496,6 +513,7 @@ fn one_request(controller: &Controller, args: &Value) -> Answer {
         "kept": kept.len(),
         "errors": kept.iter().filter(|line| copy::is_error(line)).count(),
         "possibly_mixed": request.mixed,
+        "note": request.mixed.then_some(MIXED),
         "text": lines.join("\n"),
     });
     let db = request.db.clone().unwrap_or_default();
