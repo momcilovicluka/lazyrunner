@@ -21,6 +21,7 @@ use tokio::task::{AbortHandle, JoinSet};
 
 use crate::profile_cli::install_dir;
 
+mod next;
 mod replay;
 mod tools;
 
@@ -33,7 +34,8 @@ const WAIT_DEFAULT_SECS: u64 = 120;
 const WAIT_MAX_SECS: u64 = 600;
 /// What a tool answers at most; more is cut, with a note to ask for less.
 const MAX_ANSWER_CHARS: usize = 60_000;
-const WAITS: [&str; 6] = ["ready", "build_done", "tests_done", "migrations_checked", "task_done", "profile_done"];
+const WAITS: [&str; 8] =
+    ["ready", "build_done", "tests_done", "migrations_checked", "task_done", "profile_done", "request", "error"];
 const NOT_OPEN: &str = "not_running: lazyrunner isn't open - ask the user to open it in the project's folder (run \
                         lazyrunner in a terminal there), then try again.";
 const ELEVATED: &str = "elevated: lazyrunner runs as Administrator and this agent doesn't, and Windows doesn't let a \
@@ -369,6 +371,9 @@ impl<C: Channel> Server<C> {
             return Err(format!("bad_args: \"for\" is one of {}", WAITS.join(", ")));
         };
         let limit = args["timeout_sec"].as_u64().unwrap_or(WAIT_DEFAULT_SECS).clamp(1, WAIT_MAX_SECS);
+        if let Some(next) = next::NEXT.iter().find(|(name, ..)| *name == condition) {
+            return self.next(*next, args, limit, progress, out).await;
+        }
         let started = Instant::now();
         let mut built = HashSet::new();
         let mut polls = 0u64;
@@ -390,14 +395,19 @@ impl<C: Channel> Server<C> {
                 let summary = format!("still {doing} after {waited}s - call wait again, or look at get_status");
                 return Ok(json!({ "done": false, "waited_sec": waited, "summary": summary, "status": status }));
             }
-            if !progress.is_null() {
-                polls += 1;
-                let message = status.as_ref().map_or("lazyrunner isn't answering".to_string(), busy);
-                let params = json!({ "progressToken": progress, "progress": polls, "message": message });
-                let _ = out.send(json!({ "jsonrpc": "2.0", "method": "notifications/progress", "params": params }));
-            }
+            polls += 1;
+            let message = status.as_ref().map_or("lazyrunner isn't answering".to_string(), busy);
+            self::progress(out, progress, polls, &message);
             tokio::time::sleep(WAIT_POLL).await;
         }
+    }
+}
+
+/// Tells a client that asked for progress (`token`) what a wait waits for.
+fn progress(out: &UnboundedSender<Value>, token: &Value, polls: u64, message: &str) {
+    if !token.is_null() {
+        let params = json!({ "progressToken": token, "progress": polls, "message": message });
+        let _ = out.send(json!({ "jsonrpc": "2.0", "method": "notifications/progress", "params": params }));
     }
 }
 
@@ -795,6 +805,58 @@ mod tests {
         assert!(answer["summary"].as_str().unwrap().starts_with("still building Orders after 1s"));
         assert!(
             text(&ask(&stuck, call(4, "wait", json!({ "for": "lunch" }))).await.0.unwrap()).starts_with("bad_args:")
+        );
+    }
+
+    #[tokio::test]
+    async fn wait_for_a_request_starts_from_now_and_answers_the_first_that_came_with_progress_meanwhile() {
+        let waiting = server(|body, call| match call {
+            0 => open(json!({ "next": 4, "doing": "waits for the next request to /api/orders" })),
+            1 => open(json!({ "next": 4, "request": null })),
+            _ if body["agent"]["op"] == "next_request" => open(json!({ "next": 6, "more": 1,
+                "request": { "id": 5, "app": "orders", "method": "POST", "path": "/api/orders", "status": 500, "ms": 48.0 } })),
+            _ => open(json!({})),
+        });
+        let arguments = json!({ "for": "request", "path": "/api/orders", "errors_only": true, "timeout_sec": 30 });
+        let wait = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": { "name": "wait", "arguments": arguments, "_meta": { "progressToken": "t1" } } });
+        let (answer, notes) = ask(&waiting, wait).await;
+        let answer: Value = serde_json::from_str(&text(&answer.unwrap())).unwrap();
+        assert_eq!((answer["done"].clone(), answer["request"]["id"].clone()), (json!(true), json!(5)), "{answer}");
+        assert_eq!(
+            answer["summary"],
+            "POST /api/orders answered 500 in 48.0 ms (orders) - get_request with id 5 has it in full; 1 more came \
+             after it"
+        );
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0]["params"]["message"], "waiting for the next request to /api/orders");
+        let asked: Vec<Value> =
+            waiting.channel.asked.lock().unwrap().iter().map(|body| body["agent"].clone()).collect();
+        assert_eq!(asked[0]["args"], json!({ "path": "/api/orders", "errors_only": true }), "from now, narrowed");
+        assert_eq!(asked[1]["args"], json!({ "path": "/api/orders", "errors_only": true, "since": 4 }));
+        assert!(asked.iter().all(|asked| asked["op"] == "next_request"), "{asked:?}");
+    }
+
+    #[tokio::test]
+    async fn wait_for_an_error_says_so_when_none_came_in_time_and_a_refusal_ends_it() {
+        let quiet = server(|_, call| match call {
+            0 => open(json!({ "next": { "orders": 12 }, "doing": "waits for the next error in Orders" })),
+            _ => open(json!({ "next": { "orders": 14 }, "error": null })),
+        });
+        let arguments = json!({ "for": "error", "app": "orders", "timeout_sec": 1 });
+        let answer = ask(&quiet, call(1, "wait", arguments)).await.0.unwrap();
+        let answer: Value = serde_json::from_str(&text(&answer)).unwrap();
+        assert_eq!(answer["done"], false);
+        assert_eq!(answer["summary"], "no error came in 1s - call wait again");
+        let asked = quiet.channel.asked.lock().unwrap().clone();
+        assert_eq!(asked[0]["agent"]["args"], json!({ "app": "orders" }));
+        assert_eq!(asked[1]["agent"]["args"], json!({ "app": "orders", "since": { "orders": 12 } }));
+
+        let unknown = server(|_, _| Ok(json!({ "ok": false, "code": "bad_args", "error": "no app 'nope' here" })));
+        let refused = ask(&unknown, call(2, "wait", json!({ "for": "error", "app": "nope" }))).await.0.unwrap();
+        assert_eq!(
+            (text(&refused), refused["result"]["isError"].clone()),
+            ("bad_args: no app 'nope' here".into(), json!(true))
         );
     }
 

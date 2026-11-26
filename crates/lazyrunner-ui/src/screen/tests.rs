@@ -3443,6 +3443,91 @@ async fn an_agent_sends_a_request_again_to_its_running_app_asking_first_when_it_
 }
 
 #[tokio::test]
+async fn an_agent_waits_for_the_next_request_its_filters_let_through_and_only_one_after_it_began() {
+    use lazyrunner_core::run::requests::Finished;
+    let mut screen = screen("agent-next-request", json!({}));
+    with_requests(&mut screen);
+    screen.press("F");
+    let wanted = json!({ "path": "/api/orders", "errors_only": true });
+    let start = agent(&mut screen, "next_request", wanted.clone(), None);
+    assert_eq!(start["result"]["next"], 4, "{start}");
+    assert_eq!(
+        screen.last_log(),
+        "▸ claude-code: waits for your next failing request to /api/orders - reproduce it now"
+    );
+    assert!(matches!(&screen.ui.overlay, Some(Overlay::Requests(view)) if view.errors_only), "following, the requests");
+    let mut since = wanted.clone();
+    since["since"] = json!(4);
+    let nothing = agent(&mut screen, "next_request", since.clone(), None);
+    assert_eq!(nothing["result"]["request"], Value::Null, "the ones before it began don't count: {nothing}");
+    agent(&mut screen, "next_request", since.clone(), None);
+    let ticker: Vec<&String> = screen.ui.follow.ticker.iter().collect();
+    assert_eq!(ticker.last().map(|said| said.as_str()), Some("waits for the next failing request to /api/orders"));
+    assert_eq!(ticker.iter().filter(|said| said.starts_with("waits")).count(), 1, "said once: {ticker:?}");
+
+    for (app, method, path, status) in [
+        ("billing", "GET", "/api/invoices/7", 500),
+        ("orders", "POST", "/api/orders", 500),
+        ("orders", "GET", "/api/orders/44", 404),
+        ("orders", "GET", "/api/orders/45", 200),
+    ] {
+        let request = Finished { method: method.into(), path: path.into(), status, ms: 5.0, ..Finished::default() };
+        screen.controller.requests.add(app, request, jiff::ZonedDateTime::now());
+    }
+    let came = agent(&mut screen, "next_request", since.clone(), None);
+    let request = &came["result"]["request"];
+    assert_eq!((request["id"].as_u64(), request["method"].as_str()), (Some(6), Some("POST")), "{came}");
+    assert_eq!((came["result"]["more"].as_u64(), came["result"]["next"].as_u64()), (Some(1), Some(8)));
+    let Some(Overlay::Requests(view)) = &screen.ui.overlay else { panic!("following, the request that came shows") };
+    assert_eq!((view.selected, view.details), (6, true));
+
+    let get = agent(&mut screen, "next_request", json!({ "since": 4, "method": "get", "app": "Orders" }), None);
+    assert_eq!(get["result"]["request"]["id"], 7, "{get}");
+    let billing = agent(&mut screen, "next_request", json!({ "since": 4, "app": "billing" }), None);
+    assert_eq!((billing["result"]["request"]["id"].as_u64(), billing["result"]["more"].as_u64()), (Some(5), Some(0)));
+    let endpoint = agent(&mut screen, "next_request", json!({ "since": 4, "endpoint": "/api/orders/{id}" }), None);
+    assert_eq!((endpoint["result"]["request"]["id"].as_u64(), endpoint["result"]["more"].as_u64()), (Some(7), Some(1)));
+    let none = agent(&mut screen, "next_request", json!({ "since": 8 }), None);
+    assert_eq!(none["result"]["request"], Value::Null);
+    assert_eq!(agent(&mut screen, "next_request", json!({ "app": "nope" }), None)["code"], "bad_args");
+}
+
+#[tokio::test]
+async fn an_agent_waits_for_the_next_error_in_any_app_or_one() {
+    let mut screen = screen("agent-next-error", json!({}));
+    let now = screen.ui.now;
+    let billing = screen.controller.states.iter().position(|state| state.key == "billing").unwrap();
+    screen.controller.states[0].output.push("fail: Orders.Api.Old[0]", now);
+    let start = agent(&mut screen, "next_error", json!({}), None);
+    let since = start["result"]["next"].clone();
+    assert_eq!(since["orders"], screen.controller.states[0].output.total(), "{start}");
+    assert_eq!(screen.last_log(), "▸ claude-code: waits for the next error in any app - reproduce it now");
+    let asked = json!({ "since": since });
+    assert_eq!(agent(&mut screen, "next_error", asked.clone(), None)["result"]["error"], Value::Null, "not one before");
+
+    let later = now + Duration::from_secs(1);
+    for line in
+        ["info: Request starting", "fail: Orders.Api.Checkout[0]", "      System.InvalidOperationException: empty"]
+    {
+        screen.controller.states[0].output.push(line, later);
+    }
+    screen.controller.states[billing].output.push("fail: Billing.Api.Invoices[0]", later + Duration::from_secs(1));
+    let came = agent(&mut screen, "next_error", asked.clone(), None);
+    let error = &came["result"]["error"];
+    assert_eq!(error["app"], "orders", "the first to come: {came}");
+    assert_eq!(error["text"], "fail: Orders.Api.Checkout[0]\n      System.InvalidOperationException: empty");
+    assert_eq!(error["line"], since["orders"].as_u64().unwrap() + 2);
+    assert_eq!(came["result"]["more"], 1);
+
+    let one = agent(&mut screen, "next_error", json!({ "app": "Billing", "since": since }), None);
+    assert_eq!(one["result"]["error"]["app"], "billing", "{one}");
+    assert_eq!(one["result"]["more"], 0);
+    let start = agent(&mut screen, "next_error", json!({ "app": "Billing" }), None);
+    assert_eq!(start["result"]["next"].as_object().map(|next| next.len()), Some(1), "{start}");
+    assert_eq!(screen.last_log(), "▸ claude-code: waits for the next error in Billing - reproduce it now");
+}
+
+#[tokio::test]
 async fn an_agent_reads_the_status_and_numbered_logs_and_the_last_error() {
     let mut screen = screen("agent", json!({}));
     let (at, base) = (screen.ui.now, screen.controller.states[0].output.total());

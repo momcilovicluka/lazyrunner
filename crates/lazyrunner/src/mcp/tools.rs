@@ -154,11 +154,17 @@ pub fn list(apps: &str) -> Vec<Value> {
         ),
         tool(
             "wait",
-            "Waits until `for` is done, then says how it went; ready: no build or npm install runs and every started \
-             app answers. timeout_sec 120 (600 at most); call again when it timed out.",
+            "Waits until `for` is done and says how it went; ready: no build or npm install runs and every started app \
+             answers; request, error: the next to come, filtered as in get_requests - ask the user to reproduce it. \
+             timeout_sec 120 (600 max).",
             json!({
                 "for": { "type": "string", "enum": WAITS },
                 "timeout_sec": { "type": "integer", "minimum": 1, "maximum": WAIT_MAX_SECS },
+                "app": { "type": "string" },
+                "method": { "type": "string" },
+                "path": { "type": "string" },
+                "endpoint": { "type": "string" },
+                "errors_only": { "type": "boolean" },
             }),
             &["for"],
             true,
@@ -500,7 +506,7 @@ mod tests {
     use super::*;
 
     /// What `tools/list` may weigh at most, in characters of its JSON: an agent pays for it in every session (#112).
-    const BUDGET: usize = 21_600;
+    const BUDGET: usize = 21_810;
 
     #[test]
     fn the_tool_list_stays_within_its_budget() {

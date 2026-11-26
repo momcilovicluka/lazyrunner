@@ -276,6 +276,40 @@ fn block(lines: &[&OutputLine], start: usize) -> Vec<String> {
     block
 }
 
+/// An error in an app's output: its first line's number, when it came, and its lines (at most `MAX_LINES`).
+pub struct Found {
+    pub line: u64,
+    pub born: std::time::Instant,
+    pub lines: Vec<String>,
+}
+
+/// The errors an app printed after its line `since`, oldest first: each entry (a line and the indented ones below it)
+/// with an error in it, as far as it has come.
+pub fn errors_after(state: &AppState, since: u64) -> Vec<Found> {
+    let output = &state.output;
+    let total = output.total();
+    let oldest = total + 1 - output.len() as u64;
+    let mut after: Vec<(u64, &OutputLine)> =
+        (oldest..=total).rev().zip(output.newest_first(0)).take_while(|(number, _)| *number > since).collect();
+    after.reverse();
+    let mut entries: Vec<(u64, Vec<&OutputLine>)> = Vec::new();
+    for (number, line) in after {
+        match entries.last_mut() {
+            Some((_, entry)) if continues(&line.text) => entry.push(line),
+            _ => entries.push((number, vec![line])),
+        }
+    }
+    entries
+        .into_iter()
+        .filter(|(_, entry)| entry.iter().any(|line| is_error(line)))
+        .map(|(line, entry)| Found {
+            line,
+            born: entry[0].born,
+            lines: entry.iter().take(MAX_LINES).map(|line| line.text.clone()).collect(),
+        })
+        .collect()
+}
+
 /// The entries `keep` wants (by whether they have an error, a warning), in order, an empty line between them. An
 /// entry printed again (a dev server's rebuild repeats its errors) counts once, at its last place; when there are
 /// more than `MAX_COLLECTED` lines, the newest.
