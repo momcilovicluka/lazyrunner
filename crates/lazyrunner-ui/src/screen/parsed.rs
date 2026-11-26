@@ -12,6 +12,7 @@ use lazyrunner_core::links;
 use lazyrunner_core::output::{ColumnView, Level, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::AppState;
+use lazyrunner_core::run::browser;
 use lazyrunner_core::run::entries::{self, Entry};
 use lazyrunner_core::run::requests::Request;
 
@@ -238,11 +239,12 @@ impl Drawing<'_, '_> {
         let category_cells = if cells >= CATEGORY_FROM { (cells / 4).min(CATEGORY_CELLS) } else { 0 };
         if let Some(category) = entry.category.as_deref().filter(|_| category_cells > 0) {
             let same = before.is_some_and(|before| before.category.as_deref() == Some(category));
-            let text = if same {
-                seg::pad("│", category_cells)
+            let short = if category == browser::CATEGORY {
+                format!("{} {category}", icons::icon(self.ui.nerd, Icon::Globe))
             } else {
-                seg::ellipsis(&entries::short_category(category), category_cells)
+                entries::short_category(category)
             };
+            let text = if same { seg::pad("│", category_cells) } else { seg::ellipsis(&short, category_cells) };
             let target = Target::Entry { column: self.index, line: entry.first };
             row.push(seg(text, if same { C::DarkGray } else { C::DarkCyan }).at(target));
             row.push(seg(" ", C::Gray));

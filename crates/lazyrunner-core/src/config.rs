@@ -40,10 +40,11 @@ pub enum Toggle {
     OpenTelemetry,
     RestoreSession,
     Coverage,
+    BrowserErrors,
 }
 
 impl Toggle {
-    pub const ALL: [Toggle; 18] = [
+    pub const ALL: [Toggle; 19] = [
         Toggle::AutoStartOnOpen,
         Toggle::AutoRestartOnBranchChange,
         Toggle::StopFrontendOnStop,
@@ -62,6 +63,7 @@ impl Toggle {
         Toggle::OpenTelemetry,
         Toggle::RestoreSession,
         Toggle::Coverage,
+        Toggle::BrowserErrors,
     ];
 
     /// Its name in the settings file.
@@ -85,6 +87,7 @@ impl Toggle {
             Toggle::OpenTelemetry => "openTelemetry",
             Toggle::RestoreSession => "restoreSession",
             Toggle::Coverage => "coverage",
+            Toggle::BrowserErrors => "browserErrors",
         }
     }
 
@@ -266,6 +269,7 @@ mod tests {
         assert_eq!(defaults["autoRestartOnBranchChange"], false);
         assert_eq!(defaults["reducedMotion"], false);
         assert_eq!(defaults["coverage"], false, "coverage slows a run: off until asked for");
+        assert_eq!(defaults["browserErrors"], true);
     }
 
     fn file(name: &str) -> ConfigFile {

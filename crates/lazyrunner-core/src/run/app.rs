@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use regex::Regex;
 
 use super::child::Child;
-use super::{diff, requests};
+use super::{browser, diff, requests};
 use crate::output::{ColumnView, Hue, LevelFilter, Output};
 use crate::profile::{App, Command, Ready};
 
@@ -322,6 +322,14 @@ impl AppState {
         if self.outgoing.hook_line(&self.key, &text, now) {
             return None; // the Node hook's line for a call: for the stack map, not the column
         }
+        match browser::read(&text) {
+            browser::Line::Other => {}
+            browser::Line::Unreadable => return None,
+            browser::Line::Report(report) => {
+                self.browser_error(&report, now);
+                return None;
+            }
+        }
         if app.traits().counts_requests
             && let Some(id) = requests::scope(&text)
         {
@@ -386,6 +394,16 @@ impl AppState {
             self.tag(id, self.output.total());
         }
         None
+    }
+
+    /// A page's error the dev server passed on (#112): its lines in the error colour, counted and flashing the title
+    /// as an error the app printed does.
+    fn browser_error(&mut self, report: &browser::Report, now: Instant) {
+        for line in report.lines() {
+            self.add_line(&line, Hue::Red, now);
+        }
+        self.errors = self.errors.saturating_add(report.errors());
+        self.flash_until = Some(now + ERROR_FLASH);
     }
 
     /// Line `number` was logged in request `id`'s scope.

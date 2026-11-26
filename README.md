@@ -1200,7 +1200,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 |------|--------------|
 | `get_status` | Each app's state, port, url and error count, and its environment overrides (secrets masked); what's busy; the test totals; the settings; what's on screen |
 | `get_logs` | An app's output as one text, each line after its number: `since` (only what's new), `limit`, `grep`, `errors_only`; `parsed` gives its log entries instead of its lines, one a line after its first line's number - level, time, category, message, an EF Core command's time and SQL, an exception's frame count, a repeat's `×12` |
-| `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning |
+| `get_errors` | An app's last error with its stack (a failed build's errors, with full paths), or every error or warning - a frontend's browser errors among them (`browser ✗ ...`) |
 | `get_requests` | The requests the .NET apps served: newest or slowest first, `since`, one app, errors only, a path, one endpoint - or summed up per endpoint (p50, p95, max); N+1s marked |
 | `get_request` | One request in full: what it sent and returned, its endpoint's times, the log lines and database commands it caused, the query it repeated (an N+1), and its waterfall - each command and call where it ran, the exception's moment, the time in the app itself, from its OpenTelemetry trace when its app sends one (nested, the critical path marked); with `baseline`, another request's id, the two compared row against row |
 | `replay_request` | A request from `get_requests` sent again to its app on localhost - on the app's own port, over https when the app served it so - with the `headers` (an `Authorization` you give it) and `body` the app's log doesn't keep; answers with the new request's id, status and time, what differs from the first, and what was sent, secret headers masked. Anything but a GET, HEAD or OPTIONS repeats its writes: after `"confirm": true` |
@@ -1289,6 +1289,21 @@ Automatic restarts leave them alone, since `npm run` watches its own files - unl
 `package-lock.json` says), `n` runs `npm install` (adds and updates packages to match `package.json`; the lock file may
 change). Both stop the app first and start it again after, and pause the test suites that run from its folder. Once
 you've installed from lazyrunner, it warns when `package-lock.json` changes.
+
+**Browser errors** (`,` then `b`, `"browserErrors"`, on by default): what goes wrong in the frontend's pages shows in
+its column - an uncaught error, an unhandled rejection, `console.error` - as `browser ✗ TypeError: Cannot read
+properties of undefined (reading 'id')` with its stack and the page's path indented under it, in the error colour with
+a globe. Each counts as an error wherever errors count: the column's error count, `get_errors`, `get_logs` with
+`errors_only`, `wait` for an `error`, the Problems screen (`E`) and the rail. The Node hook lazyrunner loads into an npm
+app (see Stack) adds `<script src="/__lazyrunner/console.js">` right after the `<head>` of each HTML page the browser
+navigates to - the dev server is asked for it uncompressed; a page compressed anyway is left as it is - and answers that
+script and its reports itself; the app never sees those two paths, and scripts, JSON, websockets, server-sent events
+and everything else reach it as they came. The script sends only an error's message, its stack, its kind and the page's
+address without its query or hash (they can hold tokens) - never cookies, storage or form data - and only to the dev
+server that served the page; the same message again within 2 s is sent once more with how many times it came (`(again
+×5)`), and past 20 reports in 10 s one line says how many more weren't sent. For now the stack points into the bundle
+the browser ran, not the source (no source maps), and a dev server that serves https over HTTP/2 (`node:http2`, as Vite
+does with `https` and no proxy) isn't covered. Turning it off or on applies from the frontend's next start.
 
 ## Command apps
 
@@ -1511,6 +1526,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `checkMigrationsOnOpen` | `false` | `M` checks every DbContext against the database when it opens, and again after a database or branch switch |
 | `linksOnAltClick` | `true` | Links in the output open on Alt+click (Ctrl+click too, where the terminal allows); off, on a plain click |
 | `followAgent` | `true` | An agent's call over MCP starts follow mode (`F`): the screen shows what it reads, your keys rest until `F`; while the terminal is in the background a notification says an agent is at work |
+| `browserErrors` | `true` | A frontend's browser errors - uncaught errors, unhandled rejections, `console.error` - show in its column as errors (see npm apps); from its next start |
 | `spinner` | lazyrunner's | What spins while something runs, as lazygit's `gui.spinner`: `{ "frames": ["◐", "◓", "◑", "◒"], "rate": 120 }` - texts of up to 8 cells, and milliseconds a frame (16 to 2000; 100 left out) |
 | `columnView` | `"raw"` | The view a column starts with: `raw` (the lines as the app printed them) or `parsed` (a row per log entry) - until `v` picks one for it |
 | `layout` | `"auto"` | `columns` side by side, `stacked` top to bottom, or `auto`: stacked when the terminal is narrower than 120 cells (`\|`) |

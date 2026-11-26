@@ -41,7 +41,7 @@ static HOOKED: LazyLock<Regex> = LazyLock::new(|| {
 
 /// What the npm apps lazyrunner starts load (`NODE_OPTIONS=--require`): it writes a line for each call the app's
 /// Node processes make to a port on this machine - a dev server's proxy to an API - through Node's diagnostics
-/// channels.
+/// channels; it also faults their calls (#105) and has a dev server's pages report their errors (#112, `browser`).
 pub const NODE_HOOK: &str = include_str!("call-hook.cjs");
 /// Its file in the state folder.
 pub const NODE_HOOK_FILE: &str = "call-hook.cjs";

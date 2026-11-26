@@ -3389,7 +3389,8 @@ async fn shift_p_in_the_settings_opens_the_project_profile_in_the_editor() {
     let mut screen = screen("open-profile", json!({ "editor": "auto" }));
     let profile = screen.controller.project.path.clone();
     screen.press(",");
-    assert!(screen.frame().contains("Open the project profile in your editor"), "{}", screen.frame());
+    let tall = screen.render(SIZE.0, SIZE.1 + 10);
+    assert!(tall.contains("Open the project profile in your editor"), "{tall}");
     screen.press("P");
     let opened = OPENED.with(|opened| opened.borrow().clone());
     let wanted = profile.display().to_string();
@@ -3722,6 +3723,42 @@ async fn an_agent_waits_for_the_next_error_in_any_app_or_one() {
     let start = agent(&mut screen, "next_error", json!({ "app": "Billing" }), None);
     assert_eq!(start["result"]["next"].as_object().map(|next| next.len()), Some(1), "{start}");
     assert_eq!(screen.last_log(), "▸ claude-code: waits for the next error in Billing - reproduce it now");
+}
+
+#[tokio::test]
+async fn a_pages_error_counts_as_an_error_for_the_agent_and_has_a_globe_in_its_column() {
+    let mut screen = screen("browser-errors", json!({ "nerdIcons": false }));
+    let shop = screen.controller.states.iter().position(|state| state.key == "shop").unwrap();
+    let start = agent(&mut screen, "next_error", json!({ "app": "shop" }), None);
+    let since = start["result"]["next"].clone();
+    let report = r#"lazyrunner-browser {"level":"error","message":"Uncaught TypeError: Cannot read properties of undefined (reading 'id')","stack":"TypeError: Cannot read properties of undefined (reading 'id')\n    at Cart (http://localhost:4200/main.js:3:9)","page":"http://localhost:4200/cart","count":1}"#;
+    let generation = screen.controller.states[shop].generation;
+    for line in ["Compiled successfully.", report] {
+        let tag = lazyrunner_core::run::Tag::App { key: "shop".into(), generation };
+        screen.controller.handle(Event::Output { tag, line: line.into() });
+    }
+    let lines = [
+        "browser ✗ Uncaught TypeError: Cannot read properties of undefined (reading 'id')",
+        "    at Cart (http://localhost:4200/main.js:3:9)",
+        "    page /cart",
+    ];
+    let error = agent(&mut screen, "errors", json!({ "app": "shop" }), None);
+    assert_eq!(error["result"]["text"], lines.join("\n"), "{error}");
+    let came = agent(&mut screen, "next_error", json!({ "app": "shop", "since": since }), None);
+    assert_eq!(came["result"]["error"]["text"], lines.join("\n"), "{came}");
+    let logged = agent(&mut screen, "logs", json!({ "app": "shop", "errors_only": true }), None);
+    assert_eq!(logged["result"]["count"], 3, "{logged}");
+    let parsed = agent(&mut screen, "logs", json!({ "app": "shop", "errors_only": true, "parsed": true }), None);
+    let said = parsed["result"]["text"].as_str().unwrap_or_default();
+    assert!(
+        said.ends_with(
+            "ERR browser Uncaught TypeError: Cannot read properties of undefined (reading 'id') (+1 frames)"
+        ),
+        "{said}"
+    );
+    screen.ui.focus = shop;
+    let frame = screen.frame();
+    assert!(frame.contains("@ browser ✗ Uncaught") && frame.contains("  TypeError: Cannot"), "{frame}");
 }
 
 #[tokio::test]

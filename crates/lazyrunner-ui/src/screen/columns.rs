@@ -8,6 +8,7 @@ use lazyrunner_core::links;
 use lazyrunner_core::output::{ColumnView, Hue, Level, LevelFilter, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
+use lazyrunner_core::run::browser;
 use lazyrunner_core::run::compose::{self as services_of, State};
 use lazyrunner_core::run::controller::compose;
 use lazyrunner_core::run::entries::Entry;
@@ -961,6 +962,9 @@ fn body(
         let before = at.checked_sub(1).and_then(|before| line_service(composed, &list[before].line.text));
         let named = service.filter(|service| before != Some(*service));
         let tone = service.map(|service| service_tone(controller, index, service));
+        // A page's error (#112): a globe before its first line.
+        let globe = text.starts_with(browser::PREFIX).then(|| format!("{} ", icons::icon(ui.nerd, Icon::Globe)));
+        let globe_room = globe.as_ref().map_or(0, |globe| globe.width());
         let line_links = if back.is_none() { links::find_with(text, state.frames()) } else { Vec::new() };
         let ids: Vec<usize> = line_links
             .iter()
@@ -972,7 +976,8 @@ fn body(
         let marked = state.marks.binary_search(&number).is_ok();
         let gutter = diff.as_ref().filter(|diff| diff.has_gutter());
         let service_room = service.map_or(0, |_| 1) + named.map_or(0, |name| name.width() + 1);
-        let room = cells.saturating_sub(usize::from(marked) + usize::from(gutter.is_some()) + service_room);
+        let room =
+            cells.saturating_sub(usize::from(marked) + usize::from(gutter.is_some()) + service_room + globe_room);
         let chunks = chunk(text, room);
         let starts: Vec<usize> = chunks
             .iter()
@@ -992,6 +997,9 @@ fn body(
             } else {
                 linked(text, start, &line_links, &ids, color, index)
             };
+            if let Some(globe) = &globe {
+                segs.insert(0, seg(if start == 0 { globe.clone() } else { " ".repeat(globe_room) }, color));
+            }
             if let Some(tone) = tone {
                 let name = named.filter(|_| start == 0).map_or(" ".repeat(service_room - 1), |name| format!("{name} "));
                 segs.insert(0, seg(name, tone));

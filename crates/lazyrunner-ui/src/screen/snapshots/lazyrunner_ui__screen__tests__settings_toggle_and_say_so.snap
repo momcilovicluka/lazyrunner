@@ -20,11 +20,11 @@ expression: screen.frame()
    b  builds it  │   n     ● Desktop notifications while you're elsewhere                   │
    U  starts all │   F     ○ Follow an agent when it calls (F: your keys back)              │
                  │   t     ○ Request timelines from the .NET apps' OpenTelemetry spans      │
+                 │   b     ● Browser errors in the frontend's column (next start)           │
                  │   r     Run the startup checklist now (and check for an update)          │
                  │   c     What's new: the lazyrunner changelog                             │
                  │   A     About lazyrunner: version, contributors, links                   │
                  │   p     Reload the project profile                                       │
-                 │   P     Open the project profile in your editor  sample.json             │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
  lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

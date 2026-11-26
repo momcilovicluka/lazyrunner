@@ -212,7 +212,7 @@ impl Entries {
             self.start(entry);
             return;
         }
-        if let Some(newest) = self.list.back_mut().filter(|newest| continues(newest, text)) {
+        if let Some(newest) = self.list.back_mut().filter(|newest| continues(newest, line)) {
             newest.add(number, text);
             return;
         }
@@ -271,18 +271,30 @@ impl Entry {
     }
 }
 
-/// Whether `text` goes on the entry `newest`: a stack's frame, the end of an inner exception's stack, or - for an
-/// ASP.NET or Serilog entry - an indented line or the exception printed after it.
-fn continues(newest: &Entry, text: &str) -> bool {
+/// Whether `line` goes on the entry `newest`: a stack's frame, the end of an inner exception's stack, for an ASP.NET
+/// or Serilog entry an indented line or the exception printed after it, and for a page's error its own indented lines
+/// (in its colour, so the app's next indented line doesn't).
+fn continues(newest: &Entry, line: &OutputLine) -> bool {
+    let text = line.text.as_str();
     if FRAME.is_match(text) || text.starts_with("--- ") {
         return true;
+    }
+    if newest.category.as_deref() == Some(super::browser::CATEGORY) {
+        return INDENTED.is_match(text) && line.severity() == Level::Error;
     }
     newest.structured && (INDENTED.is_match(text) || EXCEPTION.is_match(text))
 }
 
 /// The entry a header line starts: ASP.NET's console logger (`info: Category[id]`, its message on the next line or
-/// after it), or Serilog's console sink (`[10:00:00 INF] message`).
+/// after it), Serilog's console sink (`[10:00:00 INF] message`), or a page's error lazyrunner was told about
+/// (`browser ✗ message`, its frames and page under it).
 fn header(number: u64, text: &str) -> Option<Entry> {
+    if let Some(message) = text.strip_prefix(super::browser::PREFIX) {
+        let mut entry = Entry::new(number, Level::Error);
+        entry.category = Some(super::browser::CATEGORY.to_string());
+        entry.message = message.to_string();
+        return Some(entry);
+    }
     if let Some(found) = ASPNET.captures(text) {
         let level = match found[1].to_lowercase().as_str() {
             "info" => Level::Info,
@@ -423,6 +435,26 @@ mod tests {
         ]);
         assert_eq!(found.len(), 1);
         assert_eq!((found[0].frames, found[0].level, found[0].last), (2, Level::Error, 3));
+    }
+
+    #[test]
+    fn a_pages_error_is_one_error_entry_with_its_frames_and_page() {
+        let found = entries(&[
+            ("browser ✗ Uncaught TypeError: Cannot read properties of undefined (reading 'id')", Hue::Red),
+            ("    at Orders (http://localhost:5173/src/Orders.tsx:12:5)", Hue::Red),
+            ("    page /orders", Hue::Red),
+            ("  ➜  Local:   http://localhost:5173/", Hue::Gray),
+        ]);
+        assert_eq!(found.len(), 2);
+        let error = &found[0];
+        assert_eq!(
+            (error.level, error.category.as_deref(), error.frames, error.details, error.last),
+            (Level::Error, Some("browser"), 1, 1, 3)
+        );
+        assert_eq!(
+            error.said(),
+            "ERR browser Uncaught TypeError: Cannot read properties of undefined (reading 'id') (+1 frames)"
+        );
     }
 
     #[test]
