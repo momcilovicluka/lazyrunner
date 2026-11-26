@@ -20,6 +20,7 @@ use crate::screen::copy::{self, Pick};
 
 pub(crate) mod databases;
 pub(crate) mod drive;
+pub(crate) mod replay;
 pub(crate) mod views;
 
 /// The agent protocol this lazyrunner speaks; `lazyrunner mcp` sends it with every request.
@@ -81,6 +82,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "dependencies" => dependencies(controller, args),
         "requests" => requests(controller, args),
         "request" => one_request(controller, args),
+        "replayed" => replay::replayed(controller, args),
         "actions" => Ok(drive::actions(ui, controller)),
         "durations" => Ok(views::durations(controller, args)),
         "health" => Ok(views::health(controller)),
@@ -95,6 +97,9 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "build_map" => views::build(ui, controller, args),
         "database_changes" => databases::changes(controller, args),
         "database_files" => Ok(databases::files(controller)),
+        "replay" => {
+            in_repo(controller, request["repo"].as_str()).and_then(|()| replay::plan(controller, args, &client))
+        }
         op @ ("start" | "stop" | "restart" | "build" | "run_tests" | "stop_tests" | "check_migrations"
         | "run_action" | "press_keys" | "switch_database" | "add_database" | "install_packages"
         | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile" | "open_in_editor"

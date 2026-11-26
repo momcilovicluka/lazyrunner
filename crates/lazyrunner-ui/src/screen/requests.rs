@@ -440,8 +440,8 @@ fn app_name(controller: &Controller, key: &str) -> String {
 }
 
 fn url(controller: &Controller, request: &Request) -> String {
-    let port = controller.port(&request.app).map_or(String::new(), |port| format!(":{port}"));
-    format!("http://localhost{port}{}", request.path)
+    requests::local_url(request, controller.port(&request.app))
+        .unwrap_or_else(|| format!("http://localhost{}", request.path))
 }
 
 /// y then a key: the selected request as the row, as something to send it again with, or its URL.

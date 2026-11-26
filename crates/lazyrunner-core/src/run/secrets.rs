@@ -50,6 +50,18 @@ pub fn looks_secret(name: &str, value: &str) -> bool {
     SECRET_WORDS.iter().any(|word| lower.contains(word)) || mask_text(value) != value
 }
 
+/// HTTP headers whose values are credentials, by name.
+const SECRET_HEADERS: [&str; 4] = ["authorization", "proxy-authorization", "cookie", "set-cookie"];
+/// Words in a header's name that say its value is a secret.
+const SECRET_HEADER_WORDS: [&str; 5] = ["token", "key", "secret", "password", "auth"];
+
+/// Whether an HTTP header's value is a secret, by its name: credentials, cookies, and any named for a token, key,
+/// secret or password.
+pub fn secret_header(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    SECRET_HEADERS.contains(&lower.as_str()) || SECRET_HEADER_WORDS.iter().any(|word| lower.contains(word))
+}
+
 /// The secrets.json the APIs read: `LAZYRUNNER_SECRETS_PATH`, else the first API with a UserSecretsId's.
 pub fn secrets_path(root: &Path, apps: &[App]) -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("LAZYRUNNER_SECRETS_PATH").filter(|path| !path.is_empty()) {
@@ -416,6 +428,14 @@ mod tests {
         assert_eq!(flatten(&std::fs::read_to_string(&fresh).unwrap()), [("Api:Token".to_string(), "t".to_string())]);
         assert!(looks_secret("API_TOKEN", "x") && looks_secret("DB", "Server=a;Password=p"));
         assert!(!looks_secret("ASPNETCORE_ENVIRONMENT", "Development"));
+    }
+
+    #[test]
+    fn credentials_cookies_and_keys_in_headers_are_secrets() {
+        for name in ["Authorization", "cookie", "Set-Cookie", "X-Api-Key", "X-CSRF-TOKEN", "X-Client-Secret"] {
+            assert!(secret_header(name), "{name}");
+        }
+        assert!(!secret_header("Content-Type") && !secret_header("Accept") && !secret_header("X-Tenant"));
     }
 
     #[test]

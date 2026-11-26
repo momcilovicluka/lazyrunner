@@ -214,10 +214,17 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
         }
         "request" => {
             let id = args["id"].as_u64()?;
-            let view = requests::View { follow: false, selected: id, details: true, ..Default::default() };
-            ui.overlay = Some(Overlay::Requests(Box::new(view)));
-            ui.motion.look(Spot::LookedRequests(HashSet::from([id])), ui.now);
+            open_request(ui, id);
             Some(format!("opened request {id}"))
+        }
+        "replay" => {
+            open_request(ui, args["id"].as_u64()?);
+            result["doing"].as_str().map(str::to_string)
+        }
+        "replayed" => {
+            let id = result["id"].as_u64()?;
+            open_request(ui, id);
+            Some(format!("sent request {} again: {id}", args["id"]))
         }
         "tests" | "run_tests" | "stop_tests" => {
             let suite = args["suite"].as_str();
@@ -374,6 +381,13 @@ fn look_at(ui: &mut Ui, controller: &mut Controller, app: usize, lines: HashSet<
     let scroll = shown.iter().rposition(read).map_or(0, |at| shown.len() - 1 - at);
     controller.states[app].scroll = scroll;
     ui.motion.look(Spot::Looked { app, lines }, ui.now);
+}
+
+/// The requests view on one request's details, outlined.
+fn open_request(ui: &mut Ui, id: u64) {
+    let view = requests::View { follow: false, selected: id, details: true, ..Default::default() };
+    ui.overlay = Some(Overlay::Requests(Box::new(view)));
+    ui.motion.look(Spot::LookedRequests(HashSet::from([id])), ui.now);
 }
 
 /// The requests view with the agent's filters, the requests it got outlined.

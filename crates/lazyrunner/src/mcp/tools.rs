@@ -108,6 +108,20 @@ pub fn list(apps: &str) -> Vec<Value> {
             &["id"],
             true,
         ),
+        destructive(tool(
+            "replay_request",
+            "Sends a request from get_requests again to its app on localhost, with `headers` (an Authorization the \
+             user gives you) and `body` the log lacks; answers the new id, status, ms and what differs. Any but GET, \
+             HEAD, OPTIONS repeats its writes: needs confirm: true - ask the user first.",
+            json!({
+                "id": { "type": "integer", "minimum": 1 },
+                "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+                "body": { "type": "string" },
+                "confirm": { "type": "boolean" },
+            }),
+            &["id"],
+            false,
+        )),
         tool(
             "get_screen",
             "A fallback - use the dedicated tools first: lazyrunner's screen as the user sees it now, as text.",
@@ -486,7 +500,7 @@ mod tests {
     use super::*;
 
     /// What `tools/list` may weigh at most, in characters of its JSON: an agent pays for it in every session (#112).
-    const BUDGET: usize = 21_500;
+    const BUDGET: usize = 21_600;
 
     #[test]
     fn the_tool_list_stays_within_its_budget() {
