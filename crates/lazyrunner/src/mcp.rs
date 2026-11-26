@@ -22,6 +22,7 @@ use tokio::task::{AbortHandle, JoinSet};
 use crate::profile_cli::install_dir;
 
 mod next;
+mod query;
 mod replay;
 mod tools;
 
@@ -298,6 +299,8 @@ impl<C: Channel> Server<C> {
             "get_migrations" => self.agent("migrations", json!({})).await,
             "get_view" => self.view(args).await,
             "database" => self.database(args).await,
+            "query_database" if !args["sql"].is_string() => Err("bad_args: \"sql\" is the SELECT to run".into()),
+            "query_database" => self.query(args).await,
             "get_stack" => self.agent("stack", json!({})).await,
             "get_health" => self.agent("health", json!({})).await,
             "get_dependencies" => self.agent("dependencies", args).await,
@@ -669,7 +672,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 43));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 44));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);
@@ -770,6 +773,42 @@ mod tests {
         assert!(refused.starts_with("not_sent: GET http://example.test/ - "), "{refused}");
         let missing = text(&ask(&elsewhere, call(4, "replay_request", json!({}))).await.0.unwrap());
         assert!(missing.starts_with("bad_args: which request?"), "{missing}");
+    }
+
+    #[tokio::test]
+    async fn query_database_starts_the_query_and_asks_for_its_answer_until_its_there() {
+        let querying = server(|body, call| match (body["agent"]["op"].as_str(), call) {
+            (Some("query_database"), _) => {
+                open(json!({ "id": 7, "database": "Shop @ localhost", "doing": "queries Shop" }))
+            }
+            (_, 1) => open(json!({ "running": true })),
+            _ => open(json!({ "columns": ["Id"], "rows": [[1]], "count": 1, "more": false, "ms": 12 })),
+        });
+        let arguments = json!({ "sql": "SELECT Id FROM Orders", "max_rows": 5 });
+        let answer = ask(&querying, call(1, "query_database", arguments)).await.0.unwrap();
+        assert_eq!(answer["result"]["isError"], false, "{answer}");
+        assert_eq!(
+            text(&answer),
+            r#"{"database":"Shop @ localhost","columns":["Id"],"rows":[[1]],"count":1,"more":false,"ms":12}"#
+        );
+        let asked = querying.channel.asked.lock().unwrap().clone();
+        assert_eq!(asked[0]["agent"]["args"], json!({ "sql": "SELECT Id FROM Orders", "max_rows": 5 }));
+        assert_eq!(
+            (asked.len(), asked[2]["agent"]["op"].clone(), asked[2]["agent"]["args"].clone()),
+            (3, json!("query_result"), json!({ "id": 7 }))
+        );
+
+        let failing = server(|body, _| match body["agent"]["op"].as_str() {
+            Some("query_database") => open(json!({ "id": 8, "database": "Shop @ localhost" })),
+            _ => Ok(json!({ "ok": false, "code": "sql_error", "error": "Invalid object name 'Nope'." })),
+        });
+        let failed = ask(&failing, call(2, "query_database", json!({ "sql": "SELECT * FROM Nope" }))).await.0.unwrap();
+        assert_eq!(
+            (text(&failed), failed["result"]["isError"].clone()),
+            ("sql_error: Invalid object name 'Nope'.".to_string(), json!(true))
+        );
+        let missing = text(&ask(&failing, call(3, "query_database", json!({}))).await.0.unwrap());
+        assert!(missing.starts_with("bad_args: \"sql\""), "{missing}");
     }
 
     #[tokio::test]

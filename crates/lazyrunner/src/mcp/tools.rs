@@ -201,8 +201,8 @@ pub fn list(apps: &str) -> Vec<Value> {
         tool("stop_tests", "Stops the tests that run or wait.", json!({}), &[], false),
         tool(
             "list_actions",
-            "A fallback - use the dedicated tools first: every action as the command palette lists it (key, label, \
-             group, while_building, focused_app, needs_confirm) and every setting with its state.",
+            "A fallback - use the dedicated tools first: every action as the command palette lists it, and every \
+             setting with its state.",
             json!({}),
             &[],
             true,
@@ -298,6 +298,19 @@ pub fn list(apps: &str) -> Vec<Value> {
                 "save_point": { "type": "string", "description": "Its label or id (the newest by default)" },
             }),
             &[],
+            true,
+        ),
+        tool(
+            "query_database",
+            "One SELECT (or WITH ... SELECT) on a database, read-only: anything else is refused, and it runs in a \
+             transaction that's rolled back. Answers columns, rows (arrays), count, more, ms; values cut at 500 \
+             characters.",
+            json!({
+                "sql": { "type": "string" },
+                "database": database.clone(),
+                "max_rows": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 },
+            }),
+            &["sql"],
             true,
         ),
         destructive(tool(
@@ -506,7 +519,7 @@ mod tests {
     use super::*;
 
     /// What `tools/list` may weigh at most, in characters of its JSON: an agent pays for it in every session (#112).
-    const BUDGET: usize = 21_810;
+    const BUDGET: usize = 22_349;
 
     #[test]
     fn the_tool_list_stays_within_its_budget() {

@@ -39,8 +39,9 @@ pub fn list(controller: &Controller) -> Vec<Value> {
 }
 
 /// The database `args["database"]` names - its label or name - else the one in use.
-fn database(controller: &Controller, args: &Value) -> Result<(String, String), Refusal> {
-    let path = secrets::secrets_path(&controller.root, &controller.apps)
+pub(super) fn database(controller: &Controller, args: &Value) -> Result<(String, String), Refusal> {
+    let path = controller
+        .secrets_file()
         .ok_or_else(|| ("not_found", "no secrets.json: no API has a UserSecretsId".to_string()))?;
     let text = std::fs::read_to_string(path)
         .map_err(|error| ("not_found", format!("secrets.json couldn't be read: {error}")))?;

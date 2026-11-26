@@ -159,6 +159,20 @@ pub struct Invocation {
 }
 
 pub fn invocation(target: &Target, database: Option<&str>, sql: &str) -> Invocation {
+    let fixed = ["-l", LOGIN_SECONDS, "-b", "-h", "-1", "-W", "-s", SEPARATOR, "-f", UTF8];
+    connected(target, database, &fixed, sql)
+}
+
+/// sqlcmd's arguments and environment for a query an agent asks for (#112): each value whole as the server sends it
+/// (`-y 0`: no header, no padding, nothing cut under 1 MB), the query given up after `seconds`.
+pub fn read_invocation(target: &Target, database: Option<&str>, sql: &str, seconds: u32) -> Invocation {
+    let seconds = seconds.to_string();
+    let fixed = ["-l", LOGIN_SECONDS, "-b", "-y", "0", "-f", UTF8, "-t", seconds.as_str()];
+    connected(target, database, &fixed, sql)
+}
+
+/// sqlcmd's arguments to reach `target` (in `database`, else its own), then `fixed`, then `sql`.
+fn connected(target: &Target, database: Option<&str>, fixed: &[&str], sql: &str) -> Invocation {
     let mut args: Vec<String> = vec!["-S".into(), target.server.clone()];
     if let Some(database) = database.or(target.database.as_deref()) {
         args.extend(["-d".into(), database.to_string()]);
@@ -173,9 +187,8 @@ pub fn invocation(target: &Target, database: Option<&str>, sql: &str) -> Invocat
     if target.encrypt {
         args.push("-N".into());
     }
-    let fixed = ["-l", LOGIN_SECONDS, "-b", "-h", "-1", "-W", "-s", SEPARATOR, "-f", UTF8, "-Q"];
     args.extend(fixed.iter().map(|arg| arg.to_string()));
-    args.push(sql.to_string());
+    args.extend(["-Q".into(), sql.to_string()]);
     let password = target.password.clone().filter(|_| !target.integrated);
     Invocation { args, env: vec![(PASSWORD_VARIABLE.into(), password)] }
 }
@@ -191,6 +204,19 @@ pub trait Sql: Send + Sync {
         sql: &str,
         line: &mut dyn FnMut(&str),
     ) -> Result<(), String>;
+
+    /// Runs an agent's query (#112) as `run` does, each value whole ([`read_invocation`]) and given up after
+    /// `seconds`.
+    fn read(
+        &self,
+        connection: &str,
+        database: Option<&str>,
+        sql: &str,
+        _seconds: u32,
+        line: &mut dyn FnMut(&str),
+    ) -> Result<(), String> {
+        self.run(connection, database, sql, line)
+    }
 
     /// Whether it can run at all; why not when it can't.
     fn ready(&self) -> Result<(), String>;
@@ -208,40 +234,55 @@ impl Sql for Sqlcmd {
         line: &mut dyn FnMut(&str),
     ) -> Result<(), String> {
         let program = tools::find_on_path(PROGRAM).ok_or_else(|| MISSING.to_string())?;
-        let target = target(connection)?;
-        let invocation = invocation(&target, database, sql);
-        let mut command = Command::new(program);
-        command.args(&invocation.args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        for (name, value) in &invocation.env {
-            match value {
-                Some(value) => command.env(name, value),
-                None => command.env_remove(name),
-            };
-        }
-        let mut child = tools::own_console(&mut command).spawn().map_err(|error| format!("{PROGRAM}: {error}"))?;
-        let errors = child.stderr.take().map(|stderr| {
-            std::thread::spawn(move || BufReader::new(stderr).lines().map_while(Result::ok).collect::<Vec<String>>())
-        });
-        let mut said = Vec::new();
-        if let Some(stdout) = child.stdout.take() {
-            for text in BufReader::new(stdout).split(b'\n').map_while(Result::ok) {
-                let text = String::from_utf8_lossy(&text);
-                let text = text.trim_end_matches('\r');
-                line(text);
-                said.push(text.to_string());
-            }
-        }
-        said.extend(errors.and_then(|errors| errors.join().ok()).unwrap_or_default());
-        let status = child.wait().map_err(|error| format!("{PROGRAM}: {error}"))?;
-        if status.success() {
-            return Ok(());
-        }
-        Err(error_of(&said).unwrap_or_else(|| format!("{PROGRAM} failed ({status})")))
+        spawn(program, &invocation(&target(connection)?, database, sql), line)
+    }
+
+    fn read(
+        &self,
+        connection: &str,
+        database: Option<&str>,
+        sql: &str,
+        seconds: u32,
+        line: &mut dyn FnMut(&str),
+    ) -> Result<(), String> {
+        let program = tools::find_on_path(PROGRAM).ok_or_else(|| MISSING.to_string())?;
+        spawn(program, &read_invocation(&target(connection)?, database, sql, seconds), line)
     }
 
     fn ready(&self) -> Result<(), String> {
         tools::find_on_path(PROGRAM).map(|_| ()).ok_or_else(|| MISSING.to_string())
     }
+}
+
+/// Runs sqlcmd (`program`) as `invocation` says, each line it prints to `line`; the error it reported when it failed.
+fn spawn(program: std::path::PathBuf, invocation: &Invocation, line: &mut dyn FnMut(&str)) -> Result<(), String> {
+    let mut command = Command::new(program);
+    command.args(&invocation.args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    for (name, value) in &invocation.env {
+        match value {
+            Some(value) => command.env(name, value),
+            None => command.env_remove(name),
+        };
+    }
+    let mut child = tools::own_console(&mut command).spawn().map_err(|error| format!("{PROGRAM}: {error}"))?;
+    let errors = child.stderr.take().map(|stderr| {
+        std::thread::spawn(move || BufReader::new(stderr).lines().map_while(Result::ok).collect::<Vec<String>>())
+    });
+    let mut said = Vec::new();
+    if let Some(stdout) = child.stdout.take() {
+        for text in BufReader::new(stdout).split(b'\n').map_while(Result::ok) {
+            let text = String::from_utf8_lossy(&text);
+            let text = text.trim_end_matches('\r');
+            line(text);
+            said.push(text.to_string());
+        }
+    }
+    said.extend(errors.and_then(|errors| errors.join().ok()).unwrap_or_default());
+    let status = child.wait().map_err(|error| format!("{PROGRAM}: {error}"))?;
+    if status.success() {
+        return Ok(());
+    }
+    Err(error_of(&said).unwrap_or_else(|| format!("{PROGRAM} failed ({status})")))
 }
 
 /// The error sqlcmd reported among the lines it printed, masked: a server's message (the line after its `Msg`), else
@@ -338,6 +379,23 @@ mod tests {
         assert!(!call.args.contains(&"-U".to_string()));
         assert_eq!(call.env, [(PASSWORD_VARIABLE.to_string(), None)], "an inherited one is taken away");
         assert_eq!(call.args[2..4], ["-d".to_string(), "Shop".to_string()], "its own database when none is given");
+    }
+
+    #[test]
+    fn an_agents_query_gets_whole_values_a_time_limit_and_the_password_in_the_environment_only() {
+        let login = target("Server=qa-sql.example.com;Database=Shop;User Id=reader;Password=s3cret").unwrap();
+        let call = read_invocation(&login, None, "SELECT 1", 30);
+        assert!(!call.args.iter().any(|arg| arg.contains("s3cret")), "{:?}", call.args);
+        assert_eq!(call.env, [(PASSWORD_VARIABLE.to_string(), Some("s3cret".to_string()))]);
+        assert!(
+            call.args.windows(2).any(|pair| pair == ["-y", "0"])
+                && call.args.windows(2).any(|pair| pair == ["-t", "30"])
+        );
+        assert!(
+            !call.args.contains(&"-W".to_string()) && !call.args.contains(&"-h".to_string()),
+            "sqlcmd refuses them with -y 0"
+        );
+        assert_eq!(call.args[call.args.len() - 2..], ["-Q".to_string(), "SELECT 1".to_string()]);
     }
 
     #[test]

@@ -33,6 +33,7 @@ pub mod openapi;
 pub mod otlp;
 pub mod ports;
 pub mod profile;
+pub mod query;
 pub mod requests;
 pub mod save_points;
 pub mod secrets;
