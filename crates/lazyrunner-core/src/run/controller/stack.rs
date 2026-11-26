@@ -52,7 +52,8 @@ pub struct Database {
 
 impl Controller {
     /// An npm app starts with the Node hook that writes a line for each call it makes (`--require` added to its
-    /// `NODE_OPTIONS`); as it was when the hook's file can't be written.
+    /// `NODE_OPTIONS`) - and, with `"browserErrors"` on, has its pages report their errors (#112); as it was when the
+    /// hook's file can't be written.
     pub(super) fn with_call_hook(&self, key: &str, mut command: ServerCommand) -> ServerCommand {
         if !matches!(self.app(key).map(|app| &app.kind), Some(AppKind::Npm { .. })) {
             return command;
@@ -79,6 +80,9 @@ impl Controller {
         let value = before.map_or_else(|| require.clone(), |before| format!("{} {require}", before.to_string_lossy()));
         command.spec.env.retain(|(each, _)| !each.eq_ignore_ascii_case(&name));
         command.spec.env.push((name, value.into()));
+        if self.setting(crate::config::Toggle::BrowserErrors) {
+            command.spec.env.push((crate::run::browser::ENV.into(), crate::run::browser::ON.into()));
+        }
         command
     }
 

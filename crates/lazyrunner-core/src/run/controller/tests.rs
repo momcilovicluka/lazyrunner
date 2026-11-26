@@ -149,6 +149,52 @@ async fn an_npm_app_starts_with_the_node_hook_on_top_of_its_own_node_options() {
 }
 
 #[tokio::test]
+async fn an_npm_apps_pages_report_their_errors_while_the_setting_is_on() {
+    let browser = |config: serde_json::Value| {
+        let temp = TempDir::new("controller-browser-errors");
+        let (sample, _rx) = controller(&temp, config);
+        let value = |key: &str| {
+            let command = sample.server_command(key).expect("it starts");
+            command.spec.env.iter().find(|(name, _)| name == crate::run::browser::ENV).map(|(_, value)| value.clone())
+        };
+        (value("shop"), value("orders"))
+    };
+    assert_eq!(browser(json!({})), (Some(crate::run::browser::ON.into()), None), "on by default, for an npm app");
+    assert_eq!(browser(json!({ "browserErrors": false })), (None, None), "off: the hook leaves the pages alone");
+}
+
+#[tokio::test]
+async fn a_pages_error_is_an_error_in_its_apps_column() {
+    let temp = TempDir::new("controller-browser-error-lines");
+    let (mut sample, _rx) = controller(&temp, json!({}));
+    let at = sample.apps.iter().position(|app| app.key == "shop").expect("the shop");
+    let generation = sample.states[at].generation;
+    let report = r#"lazyrunner-browser {"level":"error","message":"Uncaught TypeError: x is undefined","stack":"TypeError: x is undefined\n    at Cart (http://localhost:4200/main.js:3:9)","page":"http://localhost:4200/cart?id=7","count":1}"#;
+    for line in ["  ➜  Local:   http://localhost:4200/", report] {
+        let tag = crate::run::Tag::App { key: "shop".into(), generation };
+        sample.handle(crate::run::Event::Output { tag, line: line.into() });
+    }
+    let state = &sample.states[at];
+    let shown: Vec<(String, crate::output::Level)> =
+        state.output.newest_first(0).take(3).map(|line| (line.text.clone(), line.severity())).collect();
+    let error = crate::output::Level::Error;
+    assert_eq!(
+        shown,
+        [
+            ("    page /cart".to_string(), error),
+            ("    at Cart (http://localhost:4200/main.js:3:9)".to_string(), error),
+            ("browser ✗ Uncaught TypeError: x is undefined".to_string(), error),
+        ]
+    );
+    assert_eq!(state.errors, 1);
+    assert!(state.flash_until.is_some(), "it flashes the title");
+    assert!(
+        state.output.newest_first(0).all(|line| !line.text.contains("lazyrunner-browser")),
+        "the raw line stays out"
+    );
+}
+
+#[tokio::test]
 async fn a_browser_apps_calls_are_in_its_config_and_their_figures_what_the_api_served() {
     let temp = TempDir::new("controller-configured");
     let (mut sample, _rx) = controller(&temp, json!({}));

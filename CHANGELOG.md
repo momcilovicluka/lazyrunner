@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.117.0] - 2026-11-26
+
+### Added
+- A frontend's browser errors reach its column: the pages its dev server serves load a small script of lazyrunner's that reports an uncaught error, an unhandled rejection and `console.error` back to the dev server, and each shows as `browser ✗ TypeError: Cannot read properties of undefined (reading 'id')` with its stack and the page's path under it, in the error colour with a globe (#112, thanks @ognjen004028).
+- They count as errors wherever errors count: the column's error count, `get_errors`, `get_logs` with `errors_only`, `wait` for an `error`, the Problems screen (`E`) and the column's rail - so an agent that asks you to reproduce a bug sees the one the page threw (#112, thanks @ognjen004028).
+- The script sends only an error's message, stack, kind and the page's address without its query or hash - never cookies, storage or form data; the same message again within 2 s is sent once more with how many times it came, and past 20 reports in 10 s one line says how many more weren't sent (#112, thanks @ognjen004028).
+- The Node hook lazyrunner already loads into an npm app answers the script and its reports itself, and adds the script's tag to the HTML pages the browser navigates to - asking for them uncompressed - leaving everything else (scripts, JSON, websockets, server-sent events, compressed pages) as it was; `browserErrors` (`,` then `b`, on by default) turns it off from the frontend's next start (#112, thanks @ognjen004028).
+
 ## [1.116.0] - 2026-11-26
 
 ### Added

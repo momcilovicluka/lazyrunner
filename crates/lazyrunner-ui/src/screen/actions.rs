@@ -471,7 +471,7 @@ pub(crate) struct MenuToggle {
 }
 
 /// The , menu's toggles, by their group ([`setting_group`]).
-const MENU_TOGGLES: [MenuToggle; 17] = [
+const MENU_TOGGLES: [MenuToggle; 18] = [
     MenuToggle { letter: "u", toggle: Toggle::AutoStartOnOpen, label: "Auto-start when lazyrunner opens" },
     MenuToggle { letter: "w", toggle: Toggle::StartupChecklist, label: "Startup checklist when lazyrunner opens" },
     MenuToggle { letter: "v", toggle: Toggle::AutoUpdate, label: "Auto-update lazyrunner when it opens" },
@@ -509,6 +509,11 @@ const MENU_TOGGLES: [MenuToggle; 17] = [
         toggle: Toggle::OpenTelemetry,
         label: "Request timelines from the .NET apps' OpenTelemetry spans",
     },
+    MenuToggle {
+        letter: "b",
+        toggle: Toggle::BrowserErrors,
+        label: "Browser errors in the frontend's column (next start)",
+    },
 ];
 
 /// A setting's group in the , menu.
@@ -525,7 +530,11 @@ pub fn setting_group(toggle: Toggle) -> &'static str {
         | Toggle::SkipUnchangedBuilds
         | Toggle::Coverage => "Running",
         Toggle::Mouse | Toggle::ReducedMotion | Toggle::NerdIcons | Toggle::LinksOnAltClick => "Display",
-        Toggle::GitBeside | Toggle::Notifications | Toggle::FollowAgent | Toggle::OpenTelemetry => "Integrations",
+        Toggle::GitBeside
+        | Toggle::Notifications
+        | Toggle::FollowAgent
+        | Toggle::OpenTelemetry
+        | Toggle::BrowserErrors => "Integrations",
     }
 }
 
