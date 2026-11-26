@@ -3910,18 +3910,16 @@ async fn alt_d_dims_what_the_last_run_printed_too_and_counts_and_steps_through_w
 }
 
 #[tokio::test]
-async fn a_run_with_new_errors_puts_a_chip_in_the_panel_and_its_number_shows_them() {
+async fn a_run_with_new_errors_keeps_out_of_the_panel_and_its_number_shows_them() {
     let mut screen = screen("diff-chip", json!({}));
     let from = two_runs(&mut screen);
     let key = screen.controller.states[0].key.clone();
-    assert!(screen.frame().contains(" 1  Orders +1 new error"), "{}", screen.frame());
+    assert!(!screen.frame().contains("Orders +1 new error"), "its column and E say it, not the panel");
     screen.press("l 1");
     assert_eq!(screen.ui.focus, 0);
     let view = super::diff::view(&screen.ui, &screen.controller.states[0]).expect("diff mode on");
     assert_eq!(view.at, Some(from + 1), "on the first new error or warning");
-    assert!(!screen.frame().contains("Orders +1 new error"), "the chip is done with: {}", screen.frame());
     screen.press("Alt+d");
-    assert!(!screen.frame().contains("Orders +1 new error"), "for this run, even with diff mode off again");
     screen.press("1");
     assert!(!super::diff::is_on(&screen.ui, &key), "1 only focuses Orders again");
 }
@@ -4202,7 +4200,7 @@ async fn the_audit_view_opens_on_the_worst_app_lists_its_packages_and_copies_the
     let (first, second) = (screen.controller.apps[0].key.clone(), screen.controller.apps[1].key.clone());
     screen.controller.handle(Event::Audit { key: first, result: Ok(vec![old.clone()]) });
     screen.controller.handle(Event::Audit { key: second, result: Ok(vec![json_lib, old]) });
-    assert!(screen.frame().contains("! 1 high"), "the column's title says so: {}", screen.frame());
+    assert!(!screen.frame().contains("! 1 high"), "no badge in its title: A says it: {}", screen.frame());
     screen.press("A");
     let Some(Overlay::Audit { app, .. }) = &screen.ui.overlay else { panic!("the audit view is open") };
     assert_eq!(*app, 1, "it opens on the app with the worst finding");
@@ -5287,7 +5285,7 @@ async fn the_health_tab_holds_each_app_to_its_targets_and_says_its_alerts() {
     screen.controller.health.step("orders", Metric::Memory, Some((3000.0, 2048.0)), now - Duration::from_secs(30));
     assert_eq!(screen.controller.health.alerts().count(), 1);
     let frame = screen.frame();
-    assert!(frame.contains("K 1 alert"), "the panel's chip: {frame}");
+    assert!(!frame.contains("K 1 alert"), "no chip: its column and the Health tab say it: {frame}");
 
     screen.press("K Tab Tab");
     assert!(matches!(screen.ui.overlay, Some(Overlay::Health { .. })), "Map, Code, then Health");

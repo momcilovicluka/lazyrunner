@@ -80,7 +80,8 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Vec<Seg>>
 }
 
 /// The lazyrunner chip shimmers while something builds; a sparkle banner celebrates "ready". It fits `cells`: the
-/// summary first, then the chips (cut with `…`), then the branch, the database and the folder - the folder going first.
+/// summary first, then the branch, then the chips (cut with `…`), then the database and the folder - the folder going
+/// first.
 fn header(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
     let lead = lead(ui, controller);
     let chips = chips(ui, controller);
@@ -98,14 +99,18 @@ fn header(ui: &mut Ui, controller: &Controller, cells: usize) -> Vec<Seg> {
         database.push(seg(format!(" ○ {pending}"), C::Yellow)); // migrations pending on it
     }
     let folder = vec![seg(format!("   {}", controller.root.display()), C::DarkGray)];
-    fit_header(lead, chips, [branch, database, folder], cells)
+    fit_header(lead, branch, chips, [database, folder], cells)
 }
 
-/// The header's parts in `cells`, by priority: all of `lead`, the chips as far as they fit (cut with `…`), then each
-/// of `places` while the whole of it fits.
-fn fit_header(lead: Vec<Seg>, chips: Vec<Seg>, places: [Vec<Seg>; 3], cells: usize) -> Vec<Seg> {
+/// The header's parts in `cells`, by priority: all of `lead`, the `branch` when the whole of it fits, the chips as far
+/// as they fit (cut with `…`), then each of `places` while the whole of it fits.
+fn fit_header(lead: Vec<Seg>, branch: Vec<Seg>, chips: Vec<Seg>, places: [Vec<Seg>; 2], cells: usize) -> Vec<Seg> {
     let mut segs = limit(&lead, cells);
     let mut room = cells.saturating_sub(width(&segs));
+    if width(&branch) <= room {
+        room -= width(&branch);
+        segs.extend(branch);
+    }
     if width(&chips) > room {
         segs.extend(limit(&chips, room));
         return segs;
@@ -151,7 +156,8 @@ fn lead(ui: &Ui, controller: &Controller) -> Vec<Seg> {
 }
 
 /// What's going on besides the apps: following an agent, the tasks, the jumps, the tests, what's new in each view,
-/// coverage, the diffs, ports, health and the last snapshot.
+/// coverage, ports and the last snapshot. A run's new errors show in its column and in E, the alerts in its column and
+/// on the Health tab: the header keeps to what's going on.
 fn chips(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
     let mut segs = Vec::new();
     if ui.follow.on {
@@ -191,21 +197,10 @@ fn chips(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
         segs.push(on(format!(" {} ", chip.key), C::Black, chip.color).at(target));
         segs.push(seg(format!(" {}", chip.label), chip.color).at(target));
     }
-    for (index, label) in super::diff::chips(ui, controller) {
-        let target = Target::RunNews(index);
-        let key = if index < 9 { (index + 1).to_string() } else { icons::icon(ui.nerd, Icon::Diff).to_string() };
-        segs.push(seg("   ", C::Gray));
-        segs.push(on(format!(" {key} "), C::Black, C::Red).at(target));
-        segs.push(seg(format!(" {label}"), C::Red).at(target));
-    }
     if let Some((chip, popping)) = super::ports::chip(ui, controller) {
         segs.push(seg("   ", C::Gray));
         let chip = if popping { on(format!(" {chip} "), C::Black, C::Red) } else { seg(chip, C::Red) };
         segs.push(chip.at(Target::Ports)); // a click opens P on it
-    }
-    if let Some((chip, color)) = super::health::chip(ui, controller) {
-        segs.push(seg("   ", C::Gray));
-        segs.push(seg(chip, color).at(Target::Health)); // a click opens the Health tab
     }
     if let Some(chip) = super::snapshot::chip(ui) {
         segs.push(chip);
@@ -408,17 +403,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_header_keeps_the_summary_and_chips_first_and_drops_the_folder_first() {
+    fn the_header_keeps_the_summary_and_the_branch_first_and_drops_the_folder_first() {
         let text = |segs: Vec<Seg>| segs.iter().map(|part| part.text.as_str()).collect::<String>();
-        let places =
-            || [vec![seg("   main", C::Magenta)], vec![seg("   db", C::Yellow)], vec![seg("   /work", C::DarkGray)]];
+        let places = || [vec![seg("   db", C::Yellow)], vec![seg("   /work", C::DarkGray)]];
         let header = |cells: usize, chips: &str| {
-            text(fit_header(vec![seg(" up", C::Green)], vec![seg(chips.to_string(), C::Red)], places(), cells))
+            let (lead, branch) = (vec![seg(" up", C::Green)], vec![seg("   main", C::Magenta)]);
+            text(fit_header(lead, branch, vec![seg(chips.to_string(), C::Red)], places(), cells))
         };
-        assert_eq!(header(40, " chip"), " up chip   main   db   /work");
-        assert_eq!(header(22, " chip"), " up chip   main   db", "the folder goes first");
-        assert_eq!(header(16, " chip"), " up chip   main");
-        assert_eq!(header(12, " a long failure"), " up a long …", "chips cut with …, the rest gone");
+        assert_eq!(header(40, " chip"), " up   main chip   db   /work");
+        assert_eq!(header(22, " chip"), " up   main chip   db", "the folder goes first");
+        assert_eq!(header(16, " chip"), " up   main chip");
+        assert_eq!(
+            header(30, " a long failure and more"),
+            " up   main a long failure and…",
+            "chips cut, never the branch"
+        );
+        assert_eq!(header(8, " chip"), " up chip", "no room for the whole branch: none of it");
         assert_eq!(header(2, " chip"), " …", "the summary cut last");
     }
 }

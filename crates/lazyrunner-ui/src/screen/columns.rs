@@ -8,7 +8,6 @@ use lazyrunner_core::links;
 use lazyrunner_core::output::{ColumnView, Hue, Level, LevelFilter, OutputLine};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::app::{AppState, Status};
-use lazyrunner_core::run::audit::Severity;
 use lazyrunner_core::run::compose::{self as services_of, State};
 use lazyrunner_core::run::controller::compose;
 use lazyrunner_core::run::entries::Entry;
@@ -325,13 +324,6 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     segs.extend(super::parsed::title(ui, &controller.states[index]));
     if super::diff::is_on(ui, &app.key) {
         segs.push(seg(format!(" {}", icons::icon(ui.nerd, Icon::Diff)), C::Cyan));
-    }
-    if let Some(scan) = controller.audits().get(&app.key)
-        && let Some(worst) = scan.worst().filter(|worst| *worst >= Severity::High)
-    {
-        // Its last audit found a high or critical advisory (O shows it).
-        let chip = format!(" {} {} {}", icons::icon(ui.nerd, Icon::Warn), scan.count(worst), worst.name());
-        segs.push(seg(chip, C::Red));
     }
     if let Some(recovery) = controller.recovery(&app.key) {
         segs.push(recovery_chip(ui, recovery));

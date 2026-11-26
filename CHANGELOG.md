@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.112.0] - 2026-11-26
+
+### Changed
+- A calmer panel: the branch comes right after the summary and stays there, before any chip, so a busy run no longer pushes it out. A run's new errors (`1 Orders +2 new errors`) and the stack's alerts (`K 1 alert`) are no chips there any more - their columns, `E` and the Health tab say them, and a column's number still opens its new errors.
+- A column's title no longer says `⚠ 2 high` for its app's vulnerable packages, which read unclear on the main screen: the audit view (`A`) and the startup checklist's Vulnerabilities row say it.
+
 ## [1.111.0] - 2026-11-26
 
 ### Added

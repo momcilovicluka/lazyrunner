@@ -299,7 +299,7 @@ at once while the palette wipes away.
 | `v` | The focused column raw (what the app printed) or parsed: a row per log entry, by level (below, "What it shows"). `Enter` unfolds the selected entry - the search's match, else the newest one on screen that folds - and folds it again; a click on an entry's fold or category does too. Kept for the app between runs (`columnViews`); `columnView` picks the view a new column starts with |
 | `Alt+p` | Profile the focused .NET or npm app's CPU for 10 s, then its flame chart (below, "Profiling"); `Alt+p` again stops it. On an app that isn't running, its last captures |
 | `Alt+b` | The build as a map: the Code tab's projects with the running build, else the last one, over them - each project's state and own time, the critical path in the accent colour; `w` follows what's compiling, `B` shows the build's projects alone (below, "The build map") |
-| `Alt+d` | What's new since the app's last run, in the focused column: the lines the last run printed too dim (times, durations, ports and ids don't count as a change), new ones keep their colour - `▲` before a new error or warning, `●` before any other new line - and the top row counts them: `+2 new errors · 3 fixed · 41 new lines` (`fixed?` until the app is up). `n` / `N` step through the new errors and warnings (the new lines when there are none); the rail marks only what's new and sends its ember only for a new error. The last run is kept when lazyrunner quits, so the first run after it compares too. `Enter` lists what was fixed: the last run's errors and warnings that didn't come back. A run with new errors puts a chip in the panel's header - `1 Orders +2 new errors` - whose number (or a click) opens that column this way, on the first of them. A good build says how its warnings changed since the last good one - `12 warnings (+3)` - and lists the new ones under it. `Alt+d` again shows all |
+| `Alt+d` | What's new since the app's last run, in the focused column: the lines the last run printed too dim (times, durations, ports and ids don't count as a change), new ones keep their colour - `▲` before a new error or warning, `●` before any other new line - and the top row counts them: `+2 new errors · 3 fixed · 41 new lines` (`fixed?` until the app is up). `n` / `N` step through the new errors and warnings (the new lines when there are none); the rail marks only what's new and sends its ember only for a new error. The last run is kept when lazyrunner quits, so the first run after it compares too. `Enter` lists what was fixed: the last run's errors and warnings that didn't come back. A run with new errors shows them in its column (and `E` lists them); the column's number opens it this way, on the first of them. A good build says how its warnings changed since the last good one - `12 warnings (+3)` - and lists the new ones under it. `Alt+d` again shows all |
 | `+` / `-` / `=` | Widen / narrow the focused column (taller / shorter when stacked) / make all equal (saved) |
 | `<` / `>` | The first / last: the oldest output and following new output again in a column, the first and last item in a list or box (as in lazygit) |
 | `\|` | Layout: auto (stacked below 120 cells) → columns side by side → stacked top to bottom (saved) |
@@ -732,8 +732,8 @@ apps off (`2 of 5 done` and a bar), and when it's done the log says it in one li
 · 3 high · 1 critical`. The header's last scan is green today, amber after a week and red after a month (`R rescans`).
 A fix being installed spins in its own row, and one that failed pulses the row red; `y` lights the command it copied.
 
-A column's title says `⚠ 2 high` while its app's last scan found something high or critical, and the startup
-checklist's Vulnerabilities row says the same from the kept scans - it never scans itself - with `f` opening `A`. It
+The startup checklist's Vulnerabilities row says when an app's last scan found something high or critical, from the
+kept scans - it never scans itself - with `f` opening `A`; the main screen leaves it to them. It
 moves (not with reduced motion): its rows come in one after another as it opens, the table dims while its app is
 scanned, the rows that changed light up as the scan lands, what it fixed flashes green, and a new high or critical
 finding pulses once; with reduced motion a changed row keeps an accent edge instead. The header ends with the whole
@@ -916,8 +916,8 @@ alerts and recoveries with their times. The pointer on a chart says that moment'
 kept on this machine (`"healthTargets"` in lazyrunner's config, over the profile's). `s` orders the cards: the
 profile's order (they never move by themselves), worst first, or by CPU, memory or p95. A reading over its target fills a bar on the card toward an alert; one
 that lasts a minute **is an alert**: the log says `! Orders p95 1240 ms, over its 1000 ms target for 1m00s`, the app's
-title flashes twice and its column's border stays red, a desktop notification goes out (while you're elsewhere), the
-panel shows `! K 1 alert` (a click opens the tab), and the terminal tab's progress turns red. Memory that grows more
+title flashes twice and its column's border stays red, a desktop notification goes out (while you're elsewhere), and
+the terminal tab's progress turns red. Memory that grows more
 than a fifth over a minute - the title's `↗` - is an alert at once. `a` on a card acknowledges its alerts: amber until
 the app recovers, when the log says `✓ Orders p95 back under 1000 ms after 4m10s` and its card glints green. A stopped
 app's breaches go without a word. Under the cards, the slowest endpoints of the last five minutes by p95, as bars with

@@ -26,5 +26,5 @@ expression: frame
                                                             │
                                                             │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- lazyrunner   ○ stopped   ↶ 1/1   ⚗ ✓2 ✗1   ⎇ main   DB ShopLocal @ localhost   /work/sample
+ lazyrunner   ○ stopped   ⎇ main   ↶ 1/1   ⚗ ✓2 ✗1   DB ShopLocal @ localhost   /work/sample
   u  start   b  build   U  start all                                                         :  commands   x  menu   ?  keys   ,  settings   q  quit

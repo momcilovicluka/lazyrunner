@@ -47,8 +47,6 @@ pub enum Target {
     Tests,
     /// A view's chip of news on the panel's status line: a click opens the view on the first new thing.
     News(super::jumps::View),
-    /// An app's chip of new errors since its last run, by its index: a click shows its column's (`Alt+d`).
-    RunNews(usize),
     /// The panel's chip of a suite that lost coverage (#33): a click opens the tests view on it.
     CoverageDrop,
     /// A migration of the context selected in the migrations view, by its place in that list (newest first).
@@ -237,7 +235,6 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::Rail { column, scroll, .. }) => to_rail(ui, controller, column, scroll),
         Some(Target::Tests) => keys::run(ui, controller, &Run::Tests),
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
-        Some(Target::RunNews(index)) => super::diff::open_news(ui, controller, index),
         Some(Target::CoverageDrop) => super::coverage::open_drop(ui, controller),
         Some(Target::Ports) => super::ports::open_taken(ui, controller),
         Some(Target::Health) => super::health::open(ui, controller),
