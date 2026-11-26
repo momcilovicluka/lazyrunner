@@ -5629,7 +5629,7 @@ async fn the_place_opened_lights_up_and_its_arrow_rises_before_the_chooser_close
 // ---------------------------------------------------------------- a snapshot of the run (#106)
 
 #[tokio::test]
-async fn a_snapshot_is_a_masked_read_only_page_holding_what_get_snapshot_answers() {
+async fn a_snapshot_is_a_masked_read_only_page_holding_what_get_view_answers_for_it() {
     let mut screen = screen("snapshot", json!({}));
     screen.output(&["fail: Orders.Db[0]", "      Login failed: Server=db;User Id=sa;Password=hunter2;"]);
     super::snapshot::take(&mut screen.ui, &mut screen.controller);

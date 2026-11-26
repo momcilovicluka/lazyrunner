@@ -3,6 +3,15 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.110.0] - 2026-11-26
+
+### Changed
+- `lazyrunner mcp` offers 42 tools instead of 52, and their list is about a third smaller (about 5,200 tokens instead of 7,900), so an agent pays less for it in every session; nothing it could do is gone (#112, thanks @ognjen004028).
+- The read-only views are one tool, `get_view`, with `view` set to `changelog`, `durations`, `ports`, `audit`, `checks` or `snapshot`; their arguments (`count`, `kind`, `rerun`) stay, each saying which view takes it (#112, thanks @ognjen004028).
+- The database work that drops nothing is one tool, `database`, with `op` set to `add`, `copy`, `backup`, `export`, `import` or `files`; `drop_database`, `rewind` and `switch_database` stay their own tools, so their warnings and your permission rules still apply (#112, thanks @ognjen004028).
+- A call to an old tool's name answers what it is now, e.g. `get_ports is now get_view with view "ports"`, so an older permission rule or a habit of the agent's says what to change (#112, thanks @ognjen004028).
+- The longest tool descriptions (`get_requests`, `get_request`, `get_logs`, `get_dependencies` and others) are shorter; what matters only once a tool has answered is in its answer now, as a `note` when it applies - an N+1 in the requests, lines that didn't fit, a request's log lines that may be another's. `get_screen`, `press_keys` and `list_actions` say they're for what the other tools don't do (#112, thanks @ognjen004028).
+
 ## [1.109.0] - 2026-11-25
 
 ### Added

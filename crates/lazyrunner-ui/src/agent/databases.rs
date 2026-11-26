@@ -1,7 +1,7 @@
 //! Save points over MCP (#110): `save_point` makes one of a database, `rewind` takes it back to one (after
 //! `"confirm": true` - what changed since is lost), `database_changes` says what changed since one, table by table;
-//! get_status lists them. And copies, backups, exports and imports: `copy_database`, `backup_database`,
-//! `export_database`, `import_database`, `drop_database` (after `"confirm": true`) and `database_files`. A database is
+//! get_status lists them. And copies, backups, exports and imports - the `database` tool's copy, backup, export,
+//! import and files - and `drop_database` (after `"confirm": true`). A database is
 //! named by its label (`Shop @ localhost`) or its name, the one in use when left out; a save point by its label or id,
 //! the database's newest when left out; a file by its name or path. Passwords never leave lazyrunner.
 
@@ -171,7 +171,8 @@ pub fn copy(controller: &mut Controller, args: &Value) -> Result<String, Refusal
         .unwrap_or_else(|| controller.copy_default(&server, &name));
     let doing = controller.copy_database(&server, &name, &to).map_err(|why| ("refused", why))?;
     Ok(format!(
-        "{doing} - its connection string is added once it's made; database_files and busy.database say how it goes"
+        "{doing} - its connection string is added once it's made, not in use (switch_database makes it the one in \
+         use); database op files and busy.database say how it goes"
     ))
 }
 
@@ -179,20 +180,20 @@ pub fn copy(controller: &mut Controller, args: &Value) -> Result<String, Refusal
 pub fn backup(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
     let (server, name) = database(controller, args)?;
     let doing = controller.backup_database(&server, &name).map_err(|why| ("refused", why))?;
-    Ok(format!("{doing} - database_files lists the file once it's written"))
+    Ok(format!("{doing} - database op files lists the file once it's written"))
 }
 
 /// Exports a database to a `.bacpac` in lazyrunner's folder.
 pub fn export(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
     let (server, name) = database(controller, args)?;
     let doing = controller.export_database(&server, &name).map_err(|why| ("refused", why))?;
-    Ok(format!("{doing} - database_files lists the file once it's written"))
+    Ok(format!("{doing} - database op files lists the file once it's written"))
 }
 
 /// The file `args["file"]` names, by its name or path.
 fn file(controller: &Controller, args: &Value) -> Result<DbFile, Refusal> {
     let wanted =
-        args["file"].as_str().ok_or_else(|| ("bad_args", "\"file\" names a file of database_files".to_string()))?;
+        args["file"].as_str().ok_or_else(|| ("bad_args", "\"file\" names a file of database op files".to_string()))?;
     let found = controller
         .db_files
         .iter()

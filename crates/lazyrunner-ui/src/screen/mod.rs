@@ -594,7 +594,7 @@ pub struct Ui {
     pub reduced_motion: bool,
     /// Whether the terminal has the focus, once it has said (focus reports): a notification is for when it hasn't.
     pub terminal_focused: Option<bool>,
-    /// The last startup checklist's results, and when it finished (for an agent's get_checks).
+    /// The last startup checklist's results, and when it finished (for an agent's get_view checks).
     pub last_checks: Option<(Instant, Vec<checklist::Item>)>,
     /// The nerdIcons setting (`, i`), read at every frame: Nerd Font icons in the chrome.
     pub nerd: bool,

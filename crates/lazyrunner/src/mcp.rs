@@ -51,10 +51,11 @@ the user before stopping or restarting apps \
 they may be using. With restartOnCodeChange on (get_status settings), your own edits rebuild the running APIs by \
 themselves a moment after the last save: wait for build_done instead of calling build. list_actions names \
 everything else lazyrunner can do: run_action runs one by its key, press_keys presses keys for what no tool covers - \
-ask the user before anything that needs confirm. The user follows your work on lazyrunner's screen - it goes to the \
-view each call is about, as if they pressed its keys - so do things through lazyrunner's tools rather than by hand: \
-add_database and switch_database rather than editing secrets.json, apply_migrations rather than dotnet ef, \
-run_action or press_keys for the rest.";
+reach for them and get_screen only when no dedicated tool does it, and ask the user before anything that needs \
+confirm. The user follows your work on lazyrunner's screen - it goes to the view each call is about, as if they \
+pressed its keys - so do things through lazyrunner's tools rather than by hand: database (op add) and \
+switch_database rather than editing secrets.json, apply_migrations rather than dotnet ef, run_action or press_keys \
+for the rest.";
 
 /// How the server reaches the open lazyrunner (the tests use a fake).
 pub trait Channel: Send + Sync + 'static {
@@ -288,27 +289,25 @@ impl<C: Channel> Server<C> {
             "get_profile" => self.agent("profile_view", args).await,
             "stop_tests" => self.agent("stop_tests", json!({})).await,
             "get_migrations" => self.agent("migrations", json!({})).await,
-            "get_audit" => self.agent("audit", json!({})).await,
-            "get_ports" => self.agent("ports", json!({})).await,
+            "get_view" => self.view(args).await,
+            "database" => self.database(args).await,
             "get_stack" => self.agent("stack", json!({})).await,
             "get_health" => self.agent("health", json!({})).await,
             "get_dependencies" => self.agent("dependencies", args).await,
-            "get_durations" => self.agent("durations", args).await,
             "get_timeline" => self.agent("timeline", args).await,
             "get_start_sheet" => self.agent("sheet", args).await,
-            "get_checks" => self.agent("checks", args).await,
             "get_marks" => self.agent("marks", json!({})).await,
-            "get_snapshot" => self.agent("snapshot", json!({})).await,
-            "get_changelog" => self.agent("changelog", args).await,
             "get_build" => self.agent("build_map", args).await,
             "check_migrations" => self.agent("check_migrations", args).await,
             "list_actions" => self.agent("actions", json!({})).await,
             "press_keys" => self.pressed(args).await,
-            name @ ("run_action" | "switch_database" | "add_database" | "install_packages" | "apply_migrations"
-            | "kill_port_holder" | "set_setting" | "run_task" | "open_in_editor" | "save_point" | "rewind"
-            | "database_changes" | "copy_database" | "backup_database" | "export_database"
-            | "import_database" | "drop_database" | "database_files") => self.agent(name, args).await,
-            _ => return None,
+            name @ ("run_action" | "switch_database" | "install_packages" | "apply_migrations" | "kill_port_holder"
+            | "set_setting" | "run_task" | "open_in_editor" | "save_point" | "rewind" | "database_changes"
+            | "drop_database") => self.agent(name, args).await,
+            name => match tools::renamed(name) {
+                Some(now) => Err(now),
+                None => return None,
+            },
         };
         Some(match outcome {
             Ok(Value::String(text)) => tool_result(text, false),
@@ -316,6 +315,28 @@ impl<C: Channel> Server<C> {
             Ok(value) => tool_result(serde_json::to_string(&value).unwrap_or_default(), false),
             Err(why) => tool_result(why, true),
         })
+    }
+
+    /// get_view: the view `view` names, asked with the other arguments.
+    async fn view(&self, mut args: Value) -> Result<Value, String> {
+        let view = args.as_object_mut().and_then(|args| args.remove("view"));
+        match view.as_ref().and_then(Value::as_str).filter(|view| tools::VIEWS.contains(view)) {
+            Some(view) => self.agent(view, args).await,
+            None => Err(format!("bad_args: \"view\" is one of {}", tools::VIEWS.join(", "))),
+        }
+    }
+
+    /// database: the op `op` names, asked with the other arguments.
+    async fn database(&self, mut args: Value) -> Result<Value, String> {
+        let op = args.as_object_mut().and_then(|args| args.remove("op"));
+        let wanted = op.as_ref().and_then(Value::as_str);
+        match tools::DATABASE_OPS.iter().find(|(op, _)| Some(*op) == wanted) {
+            Some((_, agent_op)) => self.agent(agent_op, args).await,
+            None => {
+                let ops: Vec<&str> = tools::DATABASE_OPS.iter().map(|(op, _)| *op).collect();
+                Err(format!("bad_args: \"op\" is one of {}", ops.join(", ")))
+            }
+        }
     }
 
     /// press_keys, and the screen the keys left.
@@ -631,7 +652,7 @@ mod tests {
         let with = |kind: io::ErrorKind| server(move |_, _| Err(io::Error::new(kind, "no")));
         let closed = with(io::ErrorKind::NotFound);
         let (answer, _) = ask(&closed, list).await;
-        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 52));
+        assert!(answer.unwrap()["result"]["tools"].as_array().is_some_and(|tools| tools.len() == 42));
         let status_call = call(2, "get_status", json!({}));
         let answer = ask(&closed, status_call.clone()).await.0.unwrap();
         assert_eq!(answer["result"]["isError"], true);
@@ -649,6 +670,33 @@ mod tests {
         assert!(text(&ask(&older, status_call.clone()).await.0.unwrap()).starts_with("protocol_mismatch:"));
         let closing = server(|_, _| Ok(json!({ "ok": false, "error": "lazyrunner is closing" })));
         assert_eq!(text(&ask(&closing, status_call).await.0.unwrap()), "refused: lazyrunner is closing");
+    }
+
+    #[tokio::test]
+    async fn get_view_and_database_ask_for_their_op_and_a_merged_tool_says_what_it_is_now() {
+        let server = server(|_, _| open(json!({ "kinds": [] })));
+        let asked = || server.channel.asked.lock().unwrap().last().cloned().unwrap()["agent"].clone();
+        let answer =
+            ask(&server, call(1, "get_view", json!({ "view": "durations", "kind": "build" }))).await.0.unwrap();
+        assert_eq!(answer["result"]["isError"], false);
+        assert_eq!((asked()["op"].clone(), asked()["args"].clone()), (json!("durations"), json!({ "kind": "build" })));
+        ask(&server, call(2, "database", json!({ "op": "copy", "database": "Shop", "name": "Shop_2" }))).await;
+        assert_eq!(asked()["op"], "copy_database");
+        assert_eq!(asked()["args"], json!({ "database": "Shop", "name": "Shop_2" }));
+        ask(&server, call(3, "database", json!({ "op": "files" }))).await;
+        assert_eq!(asked()["op"], "database_files");
+
+        let calls = server.channel.calls.load(Ordering::SeqCst);
+        let wrong = text(&ask(&server, call(4, "get_view", json!({ "view": "weather" }))).await.0.unwrap());
+        assert!(wrong.starts_with("bad_args: \"view\" is one of changelog, durations"), "{wrong}");
+        let wrong = text(&ask(&server, call(5, "database", json!({}))).await.0.unwrap());
+        assert!(wrong.starts_with("bad_args: \"op\" is one of add, copy"), "{wrong}");
+        let old = ask(&server, call(6, "get_ports", json!({}))).await.0.unwrap();
+        assert_eq!(old["result"]["isError"], true);
+        assert_eq!(text(&old), "renamed: get_ports is now get_view with view \"ports\" - call that instead");
+        let old = text(&ask(&server, call(7, "add_database", json!({ "name": "Shop_2" }))).await.0.unwrap());
+        assert_eq!(old, "renamed: add_database is now database with op \"add\" - call that instead");
+        assert_eq!(server.channel.calls.load(Ordering::SeqCst), calls, "none of them reached lazyrunner");
     }
 
     #[tokio::test]

@@ -72,7 +72,8 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Value {
     json!({
         "actions": list,
         "settings": settings,
-        "hint": "run_action runs an action by its key (\"app\" focuses that app first); set_setting sets a setting; \
+        "hint": "run_action runs an action by its key (\"app\" focuses that app first); one that opens a box or a \
+                 view leaves it on the user's screen - press_keys Esc closes it; set_setting sets a setting; \
                  press_keys for what no tool covers",
     })
 }
