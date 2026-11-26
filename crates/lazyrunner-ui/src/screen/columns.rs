@@ -328,6 +328,7 @@ fn title(ui: &mut Ui, controller: &Controller, index: usize, cells: usize) -> Ve
     if let Some(recovery) = controller.recovery(&app.key) {
         segs.push(recovery_chip(ui, recovery));
     }
+    segs.extend(live_chip(ui, controller, &app.key));
     if let Some(tunnel) = controller.tunnel(&app.key) {
         segs.extend(super::share::chip(ui, controller, &app.key, tunnel));
     }
@@ -377,6 +378,17 @@ fn recovery_chip(ui: &Ui, recovery: &lazyrunner_core::run::controller::Recovery)
         Some((left, _)) => seg(format!(" {icon} {} · {}s", recovery.restarts, left.as_secs_f64().ceil()), C::Yellow),
         None => seg(format!(" {icon} {}", recovery.restarts), C::DarkYellow),
     }
+}
+
+/// A log category at another level for a while (#112): `± log Debug 9m` - with `+1` when there are more, and the
+/// minutes of the one that ends first.
+fn live_chip(ui: &Ui, controller: &Controller, key: &str) -> Option<Seg> {
+    let live: Vec<_> = controller.live_levels().iter().filter(|live| live.app == key).collect();
+    let first = live.first()?;
+    let left = live.iter().map(|live| live.minutes_left(ui.now)).min().unwrap_or_default();
+    let more = if live.len() > 1 { format!(" +{}", live.len() - 1) } else { String::new() };
+    let icon = icons::icon(ui.nerd, Icon::Loud);
+    Some(seg(format!(" {icon} log {}{more} {left}m", first.level), C::Magenta))
 }
 
 /// When a new line's colour next changes (white, then brighter than its own, then its own), while one still fades.

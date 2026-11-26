@@ -27,6 +27,7 @@ pub mod health;
 pub mod history;
 pub mod hooks;
 pub mod impact;
+pub mod live_level;
 pub mod migrations;
 pub mod net;
 pub mod openapi;

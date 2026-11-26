@@ -24,6 +24,7 @@ mod database_jobs;
 mod hooks;
 mod impact;
 mod launch;
+mod live_levels;
 mod migrations;
 mod npm_ci;
 mod overrides;
@@ -70,6 +71,7 @@ use crate::profile::{App, Project};
 pub use causes::LikelyCause;
 pub use handover::{HANDOVER_VERSION, Handover, Passed, Releasing, read as read_handover};
 pub use launch::Choice;
+pub use live_levels::{LiveLevel, LiveSet};
 pub use migrations::{EfJob, Work};
 pub use overrides::Override;
 pub use queries::Queried;
@@ -358,6 +360,8 @@ pub struct Controller {
     pub(crate) secrets_at: Option<PathBuf>,
     /// The agents' read-only queries (#112), running or answered.
     queries: queries::Queries,
+    /// The log categories at another level for a while, through the apps' user secrets (#112).
+    live_levels: Vec<LiveLevel>,
     /// What runs for an app (tests swap in scripts) and the time (tests move it by hand: testing::clock).
     pub(crate) commands: Arc<dyn super::tools::Commands>,
     pub(crate) now: fn() -> Instant,
@@ -546,6 +550,7 @@ impl Controller {
             sql: Arc::new(super::sql::Sqlcmd),
             secrets_at: None,
             queries: Vec::new(),
+            live_levels: Vec::new(),
             commands: Arc::new(super::tools::Tools),
             now: Instant::now,
             reserved: super::net::reserved_ranges,
@@ -565,6 +570,7 @@ impl Controller {
         }
         controller.set_root(&root);
         controller.apply_health_targets();
+        controller.put_back_left_over();
         Ok(controller)
     }
 
@@ -821,6 +827,7 @@ impl Controller {
         let Some(child) = self.states[index].child.take() else { return false };
         child.kill();
         drop(child);
+        self.end_app_live_levels(key, "it stopped");
         self.stop_compose(key);
         self.states[index].status = Status::Stopped;
         if let Some(port) = self.port(key) {
@@ -977,6 +984,7 @@ impl Controller {
         if kept.contains(&true) {
             self.save_runs();
         }
+        self.end_every_live_level();
         self.stop_tests(true);
         self.stop_migrations();
         if self.building.is_some() {

@@ -190,7 +190,7 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             open_view(ui, controller, "ports", Run::Ports);
             result["doing"].as_str().map(str::to_string)
         }
-        "install_packages" | "run_task" => {
+        "install_packages" | "run_task" | "set_log_level" => {
             close_view(ui);
             if let Some(app) = app_of(controller, &args["app"]) {
                 ui.focus = app;

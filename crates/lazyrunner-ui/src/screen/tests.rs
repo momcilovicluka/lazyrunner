@@ -3070,6 +3070,57 @@ async fn alt_l_sets_a_dotnet_apps_log_level_and_its_title_says_so_while_an_npm_a
     assert!(title.contains(&format!("{} · Debug", screen.controller.apps[0].name)), "{title}");
 }
 
+#[tokio::test]
+async fn set_log_level_raises_a_category_live_its_title_says_so_and_it_goes_back() {
+    const EF: &str = "Microsoft.EntityFrameworkCore.Database.Command";
+    let mut screen = screen("live-log-level", json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{\n  \"Logging\": { \"LogLevel\": { \"Default\": \"Warning\" } }\n}\n";
+    std::fs::write(&path, secrets).unwrap();
+    screen.controller.use_sql(std::sync::Arc::new(Silent), std::sync::Arc::new(Silent), path.clone());
+    screen.running();
+    let set = agent(&mut screen, "set_log_level", json!({ "app": "orders", "category": EF, "level": "debug" }), None);
+    assert_eq!(set["result"]["doing"], format!("Orders logs {EF} at Debug for 10 min"), "{set}");
+    assert!(set["result"]["note"].as_str().unwrap_or_default().starts_with("Billing reads the same"), "{set}");
+    assert_eq!(screen.last_log(), format!("▸ claude-code: Orders logs {EF} at Debug for 10 min"));
+    assert!(std::fs::read_to_string(&path).unwrap().contains(&format!("\"Logging:LogLevel:{EF}\": \"Debug\"")));
+    screen.ui.now = Instant::now(); // the controller's clock
+    let frame = screen.render(240, 30);
+    assert!(line_with(&frame, "Orders").contains(" ± log Debug 10m "), "{frame}");
+    let status = agent(&mut screen, "status", json!({}), None);
+    assert_eq!(status["result"]["live_log_levels"], json!([format!("Orders: {EF} at Debug, 10 min left")]));
+
+    screen.press("Alt+l j t");
+    assert_eq!(screen.last_log(), format!("Orders logs {EF} at Information for 10 min"), "the box's t, again");
+    let frame = screen.render(240, 30);
+    assert!(line_with(&frame, EF).contains("live Information 10m"), "{frame}");
+    screen.press("Esc");
+
+    let reset = agent(&mut screen, "set_log_level", json!({ "app": "Orders", "level": "reset" }), None);
+    assert_eq!(reset["result"]["doing"], "takes Orders back to its own log levels", "{reset}");
+    assert_eq!(screen.last_log(), format!("Orders' log levels are back: {EF} (put back now)"));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), secrets);
+    assert!(!screen.render(240, 30).contains("± log"));
+    assert!(agent(&mut screen, "status", json!({}), None)["result"].get("live_log_levels").is_none());
+
+    for (args, code, said) in [
+        (json!({ "app": "orders", "level": "reset" }), "not_found", "Orders has no live log level"),
+        (json!({ "app": "shop", "category": "Default", "level": "Debug" }), "refused", "Shop isn't a .NET app"),
+        (json!({ "app": "orders", "category": "a b", "level": "Debug" }), "bad_args", "'a b' isn't a log category"),
+        (json!({ "app": "orders", "category": "Default", "level": "loud" }), "bad_args", "\"level\" is one of"),
+        (
+            json!({ "app": "orders", "category": "Default", "level": "Debug", "minutes": 500 }),
+            "bad_args",
+            "\"minutes\"",
+        ),
+        (json!({ "app": "orders", "level": "Debug" }), "bad_args", "which \"category\"?"),
+    ] {
+        let refused = agent(&mut screen, "set_log_level", args, None);
+        assert_eq!(refused["code"], code, "{refused}");
+        assert!(refused["error"].as_str().unwrap().starts_with(said), "{refused}");
+    }
+}
+
 // ---------------------------------------------------------------- restart after a crash (#99)
 
 #[tokio::test]

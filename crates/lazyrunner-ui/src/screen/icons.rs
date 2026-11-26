@@ -115,6 +115,8 @@ pub enum Icon {
     Diff,
     /// A fault on an app's calls (#105).
     Fault,
+    /// A log category at another level for a while (#112).
+    Loud,
     /// The code map's tab, the endpoints' and the spec's.
     Code,
     Endpoints,
@@ -286,6 +288,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Diff, true) => "\u{e728}", // git compare
         (Icon::Fault, false) => "↯",
         (Icon::Fault, true) => "\u{f0e7}", // bolt
+        (Icon::Loud, false) => "±",
+        (Icon::Loud, true) => "\u{f0a1}", // bullhorn
         (Icon::Code, false) => "{",
         (Icon::Code, true) => "\u{f121}", // code
         (Icon::Endpoints, false) => "≡",
@@ -470,6 +474,7 @@ mod tests {
             Icon::Zip,
             Icon::Diff,
             Icon::Fault,
+            Icon::Loud,
             Icon::Code,
             Icon::Endpoints,
             Icon::Spec,

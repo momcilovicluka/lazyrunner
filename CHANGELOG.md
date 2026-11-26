@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.115.0] - 2026-11-26
+
+### Added
+- `set_log_level` turns one of a running .NET app's log categories to another level for a while - `Microsoft.EntityFrameworkCore.Database.Command` at `Debug` to see its SQL, say - without editing appsettings or restarting it: lazyrunner writes `Logging:LogLevel:<category>` into the app's user secrets, which ASP.NET Core reads again as they change. `minutes` is 10 by default and 120 at most; `"level": "reset"` puts it back now (#112, thanks @ognjen004028).
+- It goes back by itself when its time is up, when the app stops, exits or starts again, and when lazyrunner quits - the setting taken out again or its old value back, the rest of the file as it was, and only while the file still says what lazyrunner wrote. One a crash left is put back when lazyrunner opens next (#112, thanks @ognjen004028).
+- The column's title says `± log Debug 9m` while one lasts, `get_status` lists them, the log says when one is set (`▸ claude-code: Orders logs ... at Debug for 10 min`) and when it's back, and `t` in `Alt+l` sets the picked level the same way (#112, thanks @ognjen004028).
+- A category the app's command line sets - lazyrunner's own `--Logging` arguments, an `Alt+l` level - wins over its user secrets, so it's refused; an app that logs through Serilog gets `Serilog:MinimumLevel:Override:<category>` too, which Serilog reads live only when it reloads its configuration (#112, thanks @ognjen004028).
+
 ## [1.114.0] - 2026-11-26
 
 ### Added
