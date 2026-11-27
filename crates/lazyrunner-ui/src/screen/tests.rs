@@ -82,6 +82,11 @@ pub(crate) fn controller(label: &str) -> (TempDir, Controller) {
 }
 
 fn screen(label: &str, config: Value) -> Screen {
+    seeded(label, config, |_| {})
+}
+
+/// `screen` with what `seed` puts into the project's state folder first, as an earlier lazyrunner left it.
+fn seeded(label: &str, config: Value, seed: impl FnOnce(&std::path::Path)) -> Screen {
     let temp = TempDir::new(label);
     let repo = sample_repo(&temp.join("repo"));
     let paths = Paths {
@@ -107,6 +112,7 @@ fn screen(label: &str, config: Value) -> Screen {
     }
     lazyrunner_core::config::write(&paths.config_file, &config).unwrap();
     let project = import(&sample_profile(), &paths.profiles).unwrap();
+    seed(&paths.project_state(&project.id).unwrap());
     let (events, rx) = mpsc::unbounded_channel();
     let mut controller = Controller::new(Setup { project, root: repo, paths, events, guard: None }).unwrap();
     // What would differ between machines: the folder, the branch, the database, the log's times.
@@ -6736,4 +6742,207 @@ async fn an_agents_pull_is_refused_without_a_kept_password_and_never_sees_one() 
     for answer in [&pulling.to_string(), &files, &status] {
         assert!(!answer.contains("s3cret-Pa55") && !answer.contains("Password="), "{answer}");
     }
+}
+
+// ---------------------------------------------------------------- bookmarks (#84)
+
+/// Orders' lines around a payment that timed out, five seconds ago, and one of Billing's a second later.
+fn payment_lines(screen: &mut Screen) {
+    let at = screen.ui.now - Duration::from_secs(5);
+    let lines = [
+        "info: Checkout started",
+        "warn: Payment timed out after 30000 ms",
+        "      at Shop.Billing.Charge()",
+        "info: Retrying",
+    ];
+    for line in lines {
+        screen.controller.states[0].add_line(line, Hue::Gray, at);
+    }
+    screen.controller.states[1].add_line(
+        "Billing ready on http://localhost:47202",
+        Hue::Gray,
+        at + Duration::from_secs(1),
+    );
+}
+
+/// A line as app `key`'s current run prints it.
+fn printed(screen: &mut Screen, key: &str, line: &str) {
+    let index = screen.controller.apps.iter().position(|app| app.key == key).unwrap();
+    let generation = screen.controller.states[index].generation;
+    let tag = lazyrunner_core::run::Tag::App { key: key.into(), generation };
+    screen.controller.handle(Event::Output { tag, line: line.into() });
+}
+
+#[tokio::test]
+async fn b_keeps_a_mark_as_a_named_bookmark_listed_above_this_runs_marks() {
+    let mut screen = screen("bookmark-keep", json!({}));
+    payment_lines(&mut screen);
+    screen.controller.states[0].scroll = 2;
+    screen.press("m");
+    screen.controller.states[0].scroll = 0;
+    screen.press("2 m 1 '");
+    screen.press("a f i r s t Space s i g n Enter b");
+    assert!(keys::prompt(&screen.ui), "the name is typed");
+    insta::assert_snapshot!("bookmark_naming", screen.frame());
+    screen.press("P a y m e n t Space t i m e o u t q Backspace Enter");
+    let kept = screen.controller.bookmarks().to_vec();
+    assert_eq!(kept.len(), 1);
+    assert_eq!((kept[0].name.as_str(), kept[0].note.as_str()), ("Payment timeout", "first sign"));
+    assert_eq!(kept[0].line, "warn: Payment timed out after 30000 ms");
+    assert_eq!(kept[0].before, ["info: Checkout started"]);
+    assert_eq!(kept[0].after, ["      at Shop.Billing.Charge()", "info: Retrying"]);
+    assert!(screen.controller.states[0].notes.is_empty(), "the note went with it");
+    assert_eq!(screen.controller.bookmark_line(&kept[0].id), Some((0, 2)), "still marked, now a bookmark");
+    assert!(screen.last_log().starts_with("▸ Kept as a bookmark: Payment timeout"), "{}", screen.last_log());
+    insta::assert_snapshot!("bookmarks_above_marks", screen.frame());
+
+    screen.press("y");
+    let timeline = copied().pop().unwrap_or_default();
+    let lines: Vec<&str> = timeline.lines().collect();
+    assert!(
+        lines[0].ends_with("  Orders  [Payment timeout] first sign - warn: Payment timed out after 30000 ms"),
+        "{timeline}"
+    );
+    assert!(lines[1].ends_with("  Billing  Billing ready on http://localhost:47202"), "{timeline}");
+    assert!(screen.last_log().starts_with("Copied 1 bookmark and 1 mark as a timeline"), "{}", screen.last_log());
+    screen.press("e");
+    let path = copied().pop().unwrap_or_default();
+    assert!(path.ends_with("bookmarks.md"), "{path}");
+    assert!(std::fs::read_to_string(&path).unwrap().contains("## Payment timeout"));
+
+    screen.press("Esc");
+    let frame = screen.frame();
+    assert!(frame.contains("▌ 1"), "the panel's chip: one bookmark has its line: {frame}");
+    screen.click(Target::Marks);
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Marks { .. })), "a click on the chip opens the list");
+    screen.press("Esc");
+    screen.controller.states[0].scroll = 2;
+    screen.press("m");
+    assert!(screen.controller.states[0].marks.contains(&2), "m doesn't unmark a bookmark's line");
+    assert!(screen.last_log().starts_with("That line is a bookmark's"), "{}", screen.last_log());
+}
+
+/// The bookmarks an earlier lazyrunner kept: a payment timeout a week ago, a line not found for 40 days.
+fn earlier_bookmarks(state: &std::path::Path) {
+    let ago = |days: i64| (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24 * days)).to_string();
+    let bookmarks = json!([
+        {
+            "id": "a1", "name": "Payment timeout", "note": "comes before every failed checkout", "app": "orders",
+            "line": "warn: Payment 4f2a9c1e timed out on http://localhost:47202 after 30000 ms",
+            "before": ["info: Checkout started"], "after": ["      at Shop.Billing.Charge()"],
+            "kept": ago(7), "branch": "main",
+        },
+        {
+            "id": "b2", "name": "Old tax table", "app": "billing", "line": "info: Using the legacy tax table",
+            "kept": ago(40), "branch": "feature/tax",
+        },
+    ]);
+    lazyrunner_core::config::write(&state.join("bookmarks.json"), &bookmarks).unwrap();
+}
+
+#[tokio::test]
+async fn a_bookmark_from_an_earlier_run_shows_its_kept_lines_until_it_finds_its_line_again() {
+    let mut screen = seeded("bookmark-earlier", json!({}), earlier_bookmarks);
+    screen.press("'");
+    let frame = screen.frame();
+    assert!(frame.contains("from an earlier run") && frame.contains("not found for 40 days"), "{frame}");
+    insta::assert_snapshot!("bookmarks_from_an_earlier_run", frame);
+    screen.press("Enter");
+    insta::assert_snapshot!("bookmark_kept_lines", screen.frame());
+    screen.press("Esc");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Marks { kept: false, .. })), "back to the list");
+    screen.press("Esc");
+
+    printed(&mut screen, "orders", "info: Application started.");
+    printed(&mut screen, "orders", "warn: Payment 77bd0e12 timed out on http://localhost:51990 after 30001 ms");
+    let number = screen.controller.states[0].output.total();
+    assert_eq!(screen.controller.bookmark_line("a1"), Some((0, number)), "the same shape: found");
+    assert!(screen.controller.states[0].marks.contains(&number), "marked again");
+    let said = screen.controller.log.back().map(|entry| entry.text.clone()).unwrap_or_default();
+    assert!(said.contains("\"Payment timeout\" found its line again in Orders"), "{said}");
+    let frame = screen.frame();
+    assert!(frame.contains("▌warn: Payment") && frame.contains("▌77bd0e12") && frame.contains("▌ 1"), "{frame}");
+    screen.press("]");
+    assert_eq!(screen.last_log(), "Bookmark: Payment timeout - comes before every failed checkout");
+
+    let logs = agent(&mut screen, "logs", json!({ "app": "orders" }), None);
+    let text = logs["result"]["text"].as_str().unwrap_or_default().to_string();
+    assert!(text.contains(&format!("{number} [bookmark: Payment timeout] warn: Payment 77bd0e12")), "{text}");
+    assert!(!text.contains("[bookmark: Payment timeout] info"), "only its own line: {text}");
+    let parsed = agent(&mut screen, "logs", json!({ "app": "orders", "parsed": true }), None);
+    assert!(
+        parsed["result"]["text"].as_str().is_some_and(|text| text.contains("[bookmark: Payment timeout]")),
+        "{parsed}"
+    );
+    let marks = agent(&mut screen, "marks", json!({}), None);
+    assert_eq!(marks["result"]["bookmarks"][0]["line"], json!(number), "{marks}");
+    assert_eq!(marks["result"]["bookmarks"][1]["line"], Value::Null, "{marks}");
+
+    screen.press("' j d");
+    assert_eq!(screen.controller.bookmarks().len(), 1, "d deleted the old one");
+    let kept = lazyrunner_core::run::bookmarks::load(screen.controller.state_folder());
+    assert_eq!(kept.iter().map(|bookmark| bookmark.name.as_str()).collect::<Vec<_>>(), ["Payment timeout"]);
+    screen.press("Enter");
+    assert!(screen.ui.overlay.is_none(), "Enter on one that has its line jumps there");
+}
+
+#[tokio::test]
+async fn keeping_dissolves_the_edge_into_the_accent_and_the_name_slides_up_or_steps_with_reduced_motion() {
+    use super::bookmarks::{ACCENT, edge};
+    use super::theme::C;
+    let mut screen = screen("bookmark-motion", json!({}));
+    screen.ui.motion.enabled = true;
+    payment_lines(&mut screen);
+    screen.press("m '");
+    screen.frame();
+    screen.ui.now += Duration::from_millis(500);
+    screen.press("b");
+    assert!(!screen.frame().contains("name: "), "it starts below the box's bottom edge");
+    screen.ui.now += Duration::from_millis(150);
+    assert!(screen.frame().contains("name: "), "and has slid up");
+    screen.press("S l o w Enter");
+    let line = screen.controller.states[0].output.total();
+    let step = super::motion::KEPT_STEP;
+    screen.ui.now += step / 2;
+    let mut seen = Vec::new();
+    for _ in 0..4 {
+        seen.push(edge(&screen.ui, 0, line));
+        screen.ui.now += step;
+    }
+    assert_eq!(seen, [C::Magenta, C::Blue, ACCENT, ACCENT], "magenta to the accent in three steps");
+
+    let mut still = self::screen("bookmark-still", json!({ "reducedMotion": true }));
+    payment_lines(&mut still);
+    still.ui.motion.enabled = true;
+    still.press("m '");
+    still.frame();
+    still.press("b");
+    assert!(still.frame().contains("name: "), "with reduced motion it's there at once");
+    still.press("Enter");
+    let line = still.controller.states[0].output.total();
+    assert_eq!(edge(&still.ui, 0, line), ACCENT, "and the edge steps straight to the accent");
+    assert_eq!(still.controller.bookmarks()[0].name, "info: Retrying", "no name typed: after its line");
+}
+
+#[tokio::test]
+async fn a_bookmark_finding_its_line_sends_the_ember_and_flashes_it_once() {
+    let mut screen = seeded("bookmark-found", json!({}), earlier_bookmarks);
+    screen.ui.motion.enabled = true;
+    let at = screen.ui.now - Duration::from_secs(5);
+    for n in 1..=100 {
+        screen.controller.states[0].add_line(&format!("line {n}"), Hue::Gray, at);
+    }
+    screen.controller.states[0].scroll = 50;
+    screen.frame();
+    printed(&mut screen, "orders", "warn: Payment 0badf00d timed out on http://localhost:5000 after 29000 ms");
+    let (number, found) = screen.controller.states[0].found_at.unwrap();
+    screen.ui.now = found;
+    assert_eq!(super::columns::found_flash(&screen.ui, &screen.controller.states[0]), Some(number), "lit");
+    screen.frame();
+    assert!(super::rail_motion::animating(&screen.ui), "the ember is on its way to its row");
+    screen.ui.now += super::columns::FOUND_FLASH;
+    assert_eq!(super::columns::found_flash(&screen.ui, &screen.controller.states[0]), None, "once");
+    screen.ui.reduced_motion = true;
+    screen.ui.now = found;
+    assert_eq!(super::columns::found_flash(&screen.ui, &screen.controller.states[0]), None, "not with reduced motion");
 }

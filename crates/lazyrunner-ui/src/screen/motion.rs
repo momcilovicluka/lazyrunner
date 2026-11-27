@@ -31,6 +31,9 @@ pub const WIPE: Duration = Duration::from_millis(60);
 pub const ERRORED: Duration = Duration::from_millis(1200);
 /// A band sweeping once across a row that just reached a good state (a context up to date, a change fixed).
 pub const SWEEP: Duration = Duration::from_millis(300);
+/// A mark kept as a bookmark: its edge dissolves into the bookmarks' colour in three steps of this long (#84).
+pub const KEPT_STEP: Duration = Duration::from_millis(50);
+pub const KEPT: Duration = KEPT_STEP.saturating_mul(3);
 
 /// The palette closing after Enter: shown pressed, then wiping (how much of it is left, 1 to 0).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -68,6 +71,8 @@ pub enum Spot {
     Errored(usize),
     /// A list's row (by an id of its own) that just reached a good state: a band sweeps across it once.
     Reached(String),
+    /// A marked line of an app's (by its number) just kept as a bookmark: its edge dissolves into the accent.
+    Kept { app: usize, line: u64 },
     /// What was clicked.
     Clicked(Target),
     /// The startup doctor's selection bar going round the end of its list.
@@ -82,6 +87,7 @@ impl Spot {
             Spot::Switched(_) | Spot::Unfolded { .. } | Spot::Folded { .. } => REVEAL,
             Spot::Errored(_) => ERRORED,
             Spot::Reached(_) => SWEEP,
+            Spot::Kept { .. } => KEPT,
             _ => FLASH,
         }
     }

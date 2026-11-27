@@ -1,7 +1,8 @@
 //! The rail's motion: an ember from the bracket to the mark of a new error that lands off-screen - the mark waits, dim,
 //! until the ember eases into it, then settles in (a burst sends one, at most one every 750 ms, its tail longer for
-//! each error it carries) - one shimmer as `G` snaps the view back to live, down the map from where the view was to
-//! where the bracket starts at live, then down the bracket to its `▼`, which glows - one pulse, bright then fading, on the row of a search's match
+//! each error it carries), and one in the bookmarks' accent to the row of a bookmark that found its line again (#84) -
+//! one shimmer as `G` snaps the view back to live, down the map from where the view was to where the bracket starts at
+//! live, then down the bracket to its `▼`, which glows - one pulse, bright then fading, on the row of a search's match
 //! when the search jumps there, and the rail's top end dim while the buffer drops its oldest lines (the map rescales;
 //! the dim says that end is moving). In the theme's focus colour, which every theme sets apart from its background.
 //! None with reduced motion; nothing the column had before its rail first showed counts as new.
@@ -10,10 +11,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use super::Ui;
 use super::motion::ease;
 use super::seg::{Seg, on, seg};
 use super::theme::C;
+use super::{Ui, bookmarks};
 
 /// How long an ember takes to a new error's mark, and how soon another can follow.
 const COMET: Duration = Duration::from_millis(450);
@@ -39,6 +40,8 @@ struct Column {
     /// Its rail has shown before: what changed since is new.
     seen: bool,
     errors: u64,
+    /// The bookmarks that found their lines again.
+    found: u64,
     /// The lines its buffer has dropped.
     dropped: u64,
     /// When it last dropped one.
@@ -59,6 +62,8 @@ struct Comet {
     to: usize,
     started: Instant,
     carried: usize,
+    /// Its colour: an error's, or the bookmarks' accent.
+    color: C,
 }
 
 /// Each column's, by its app's key.
@@ -86,6 +91,9 @@ pub struct Now {
     pub matched: Option<usize>,
     pub error_row: Option<usize>,
     pub match_row: Option<usize>,
+    /// The bookmarks that found their lines again (#84), and the row of the last one's.
+    pub found: u64,
+    pub found_row: Option<usize>,
     pub top: usize,
     pub bottom: usize,
     pub height: usize,
@@ -94,8 +102,9 @@ pub struct Now {
 /// What moves on a rail in this frame.
 #[derive(Default)]
 pub struct Moving {
-    /// The ember's rows, its head first.
+    /// The ember's rows, its head first, and its colour (an error's when none is given).
     comet: Vec<usize>,
+    ember: Option<C>,
     /// The row the ember flies to: its mark waits, dim, until it lands.
     landing: Option<usize>,
     /// The row it just landed on: its mark settles in.
@@ -126,16 +135,17 @@ impl Moving {
 
     /// Row `at`'s map cell as what moves on it shows it.
     pub fn paint(&self, at: usize, cell: Seg) -> Seg {
-        match self.comet.iter().position(|ember| *ember == at) {
-            Some(0) => return seg("◉", C::Red),
-            Some(_) => return seg("·", C::Red),
+        let ember = self.ember.unwrap_or(C::Red);
+        match self.comet.iter().position(|row| *row == at) {
+            Some(0) => return seg("◉", ember),
+            Some(_) => return seg("·", ember),
             None => {}
         }
         if self.landing == Some(at) {
             return seg("⡇", C::DarkGray);
         }
         if self.landed == Some(at) {
-            return on("◆", C::Red, C::FocusBack);
+            return on("◆", ember, C::FocusBack);
         }
         if at < self.trimmed {
             return Seg { fg: C::DarkGray, bg: None, ..cell };
@@ -162,13 +172,14 @@ pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
     let column = all.entry(key.to_string()).or_default();
     let seen = std::mem::replace(&mut column.seen, true);
     let new_errors = if seen { now.errors.saturating_sub(column.errors) } else { 0 };
+    let found = seen && now.found > column.found;
     let dropping = seen && now.dropped > column.dropped;
     // From the moment G (or a click at the bottom) sets it, not when the drawn scroll has glided home: the shimmer
     // starts from where the bracket was and runs down with the glide.
     let back_to_live = column.target > 0 && now.target == 0;
     let jumped = seen && now.matched.is_some() && now.matched != column.matched;
     let was_at = column.top;
-    (column.errors, column.dropped) = (now.errors, now.dropped);
+    (column.errors, column.dropped, column.found) = (now.errors, now.dropped, now.found);
     (column.target, column.matched, column.top) = (now.target, now.matched, now.top);
     if ui.reduced_motion {
         (column.comet, column.shimmer, column.pulse, column.trimmed) = (None, None, None, None);
@@ -187,9 +198,15 @@ pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
             }
             _ => {
                 let from = if to >= now.bottom { now.bottom.saturating_sub(1) } else { now.top };
-                column.comet = Some(Comet { from, to, started: at, carried });
+                column.comet = Some(Comet { from, to, started: at, carried, color: C::Red });
             }
         }
+    }
+    if let Some(to) = now.found_row.filter(|_| found) {
+        // From the end of the bracket farther from its row, so it's seen to travel there.
+        let last = now.bottom.saturating_sub(1);
+        let from = if to.abs_diff(now.top) > to.abs_diff(last) { now.top } else { last };
+        column.comet = Some(Comet { from, to, started: at, carried: 1, color: bookmarks::ACCENT });
     }
     if back_to_live {
         column.shimmer = Some((at, was_at));
@@ -203,8 +220,10 @@ pub fn moving(ui: &Ui, key: &str, now: Now) -> Moving {
         if elapsed < COMET {
             moving.comet = embers(comet, through(elapsed, COMET));
             moving.landing = Some(comet.to);
+            moving.ember = Some(comet.color);
         } else if elapsed < COMET + SETTLE {
             moving.landed = Some(comet.to);
+            moving.ember = Some(comet.color);
         }
     }
     if let Some((started, from)) = column.shimmer {
@@ -282,7 +301,7 @@ mod tests {
 
     #[test]
     fn an_ember_eases_into_its_mark_with_a_tail_for_what_it_carries() {
-        let comet = Comet { from: 2, to: 12, started: Instant::now(), carried: 2 };
+        let comet = Comet { from: 2, to: 12, started: Instant::now(), carried: 2, color: C::Red };
         assert_eq!(embers(&comet, 0.0), [2, 2, 2]);
         assert_eq!(embers(&comet, 0.5)[0], 11, "most of the way at half time: it slows into the mark");
         assert_eq!(embers(&comet, 1.0), [12, 11, 10]);
@@ -300,6 +319,15 @@ mod tests {
         let pulse = |through| Moving { pulse: Some((3, through)), ..Moving::default() }.paint(3, mark.clone());
         assert_eq!(pulse(0.2).bg, Some(C::FocusBack), "bright first");
         assert_eq!((pulse(0.8).bg, pulse(0.8).fg), (None, C::FocusBack), "then fading");
+    }
+
+    #[test]
+    fn a_bookmarks_ember_is_in_the_accent() {
+        let mark = seg("▌", C::Cyan);
+        let flying = Moving { comet: vec![5, 4], ember: Some(bookmarks::ACCENT), ..Moving::default() };
+        assert_eq!(flying.paint(5, mark.clone()).fg, bookmarks::ACCENT);
+        let landed = Moving { landed: Some(9), ember: Some(bookmarks::ACCENT), ..Moving::default() };
+        assert_eq!(landed.paint(9, mark).fg, bookmarks::ACCENT);
     }
 
     #[test]

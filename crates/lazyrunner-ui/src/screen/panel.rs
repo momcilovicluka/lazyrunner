@@ -171,6 +171,9 @@ fn chips(ui: &mut Ui, controller: &Controller) -> Vec<Seg> {
     if let Some((at, of)) = ui.jumps.count() {
         segs.push(seg(format!("   {} {at}/{of}", icons::icon(ui.nerd, Icon::Back)), C::DarkCyan));
     }
+    if let Some(bookmarks) = super::bookmarks::chip(ui, controller) {
+        segs.push(bookmarks); // a click opens '
+    }
     if let Some(badge) = super::suites::badge(ui, controller) {
         segs.push(seg("   ", C::Gray));
         segs.extend(super::seg::aim(badge, Target::Tests)); // a click opens T

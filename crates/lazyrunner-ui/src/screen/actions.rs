@@ -379,7 +379,7 @@ pub fn actions(ui: &Ui, controller: &Controller) -> Vec<Action> {
             .focused(),
         action("View", "[", "Older mark", "in the focused column", Run::PrevMark).safe(),
         action("View", "]", "Newer mark", "in the focused column", Run::NextMark).safe(),
-        action("View", "'", "Marks: every column's, to jump to", "", Run::Marks).safe(),
+        action("View", "'", "Marks and bookmarks, to jump to", "b keeps a mark as a bookmark", Run::Marks).safe(),
         action("View", "~", "Timeline: every app's output in the order it came", "", Run::Timeline).safe(),
         action("View", "Alt+d", "What's new since the last run", "the rest dims; n N step through it", Run::Diff)
             .safe()

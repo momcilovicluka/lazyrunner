@@ -1,6 +1,6 @@
 //! The rail beside a column's output, in place of a scrollbar: a map of every line the column shows - errors red,
-//! warnings yellow, search matches cyan, marks magenta, the rest dotted by how fast they came (`rail_density`) - with
-//! a bracket on the lines on screen.
+//! warnings yellow, search matches cyan, marks magenta, bookmarks in the accent (#84), the rest dotted by how fast
+//! they came (`rail_density`) - with a bracket on the lines on screen.
 //! Each row stands for an equal share of the lines and takes the colour of the most serious one in it; a click on a
 //! row brings that line to the middle of the column, a drag along it scrolls, and the pointer on a row previews that
 //! line over the column, in its own colours. A narrow column gets the map alone, the lines on screen lit in it. What
@@ -33,6 +33,8 @@ enum Mark {
     /// A line the app's last run didn't print (`Alt+d`).
     New,
     Marked,
+    /// A bookmark's line (#84).
+    Bookmarked,
     Match,
     Warning,
     Error,
@@ -56,6 +58,7 @@ struct Drawn {
     filter: LevelFilter,
     search: Option<(String, bool, bool)>,
     marks: usize,
+    bookmarks: usize,
     /// The first line of the run compared with the last one (`Alt+d`).
     diff: Option<u64>,
     view: ColumnView,
@@ -125,6 +128,8 @@ pub fn add(
         matched,
         error_row: marks.iter().rposition(|(mark, _)| *mark == Mark::Error),
         match_row: match_at.map(|at| at * height / total),
+        found: state.found,
+        found_row: found_row(state, list, height),
         top,
         bottom,
         height,
@@ -151,6 +156,10 @@ pub fn add(
             Mark::Warning => seg("█", C::Yellow),
             Mark::Match => seg("█", C::Cyan),
             Mark::Marked => seg("▌", C::Magenta),
+            Mark::Bookmarked => {
+                let number = list.get(line).and_then(|item| item.bookmarked(state));
+                seg("▌", number.map_or(super::bookmarks::ACCENT, |number| super::bookmarks::edge(ui, index, number)))
+            }
             Mark::New => seg("•", C::Cyan),
             _ if seen && cells == 1 => seg("▐", bracket),
             Mark::Normal => match map.density.get(at) {
@@ -177,6 +186,13 @@ pub fn preview(ui: &Ui, state: &AppState, index: usize, rows: &mut [Vec<Seg>], c
     found.extend(edge);
 }
 
+/// The row of the line a bookmark found last (#84), while the column shows it.
+fn found_row(state: &AppState, list: &[Shown], height: usize) -> Option<usize> {
+    let position = state.found_at.and_then(|(number, _)| state.output.position_of(number))?;
+    let at = list.iter().position(|item| item.holds(state, position))?;
+    Some(at * height / list.len().max(1))
+}
+
 /// Where a click scrolls to: line `line` of `total` (0 = the oldest) in the middle of the column.
 fn jump(line: usize, height: usize, total: usize) -> usize {
     (total - 1 - line.min(total - 1)).saturating_sub(height / 2).min(total.saturating_sub(height))
@@ -193,6 +209,7 @@ fn map(ui: &Ui, state: &AppState, list: &[Shown], search: Option<&Search>, diff:
         filter: state.filter,
         search: search.map(|search| (search.query.clone(), search.regex, search.case)),
         marks: state.marks.len(),
+        bookmarks: state.bookmarked.len(),
         diff: diff.map(|_| state.run_from),
         view: state.view,
     };
@@ -224,6 +241,7 @@ fn mark(state: &AppState, item: &Shown, search: Option<&Search>, diff: Option<&V
         (Some(Kind::Problem { level: Level::Error, .. }) | None, Level::Error) => Mark::Error,
         (Some(Kind::Problem { .. }) | None, Level::Warn | Level::Error) => Mark::Warning,
         _ if search.is_some_and(|search| item.matches(state, search)) => Mark::Match,
+        _ if item.bookmarked(state).is_some() => Mark::Bookmarked,
         _ if item.marked(state) => Mark::Marked,
         (Some(Kind::New | Kind::Problem { .. }), _) => Mark::New,
         _ => Mark::Normal,

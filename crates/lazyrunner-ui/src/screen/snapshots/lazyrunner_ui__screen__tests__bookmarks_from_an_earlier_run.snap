@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+ ▸ ◆ Orders   ○ stopp┳ ■ Billing   ○ stoppe┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
+                     ┃                     │   dev server · dev  │   watch build · wat…│   live · dev
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+           ┌─ Marks ──────────────────────────────────────────────────────────────────────────────┐
+          ◆│  Bookmarks                                                                           │
+           │  ▌ Payment timeout    Orders     from an earlier run  comes before every failed chec │
+  not start│  ▌ Old tax table      Billing    not found for 40 days  info: Using the legacy tax … │
+           │                                                                                      │
+  port 4720│  This run's marks: none yet - m marks a line, and b here keeps one as a bookmark     │ed yet
+           │ Enter shows its lines · a note · e exports · y copies all · d deletes · Esc closes   │
+   u  start└──────────────────────────────────────────────────────────────────────────────────────┘3 · free
+   b  builds it      ┃                     │                     │                     │
+   U  starts all     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

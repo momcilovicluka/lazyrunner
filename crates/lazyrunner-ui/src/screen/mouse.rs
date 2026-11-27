@@ -58,6 +58,8 @@ pub enum Target {
     Reveal(usize),
     /// The panel's chip of a stopped app's port that something else took: a click opens the port map on it.
     Ports,
+    /// The panel's chip of the bookmarks that have their lines (#84): a click opens the marks box.
+    Marks,
     /// A failed task's chip in the panel's header, by its place in the profile's tasks: a click puts it away.
     TaskResult(usize),
     /// A screen's name in the bar over every screen: a click goes there.
@@ -240,6 +242,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         Some(Target::News(view)) => super::seen::open(ui, controller, view),
         Some(Target::CoverageDrop) => super::coverage::open_drop(ui, controller),
         Some(Target::Ports) => super::ports::open_taken(ui, controller),
+        Some(Target::Marks) => super::marks::open(ui),
         Some(Target::Health) => super::health::open(ui, controller),
         Some(Target::Branch) => super::branch_changes::open(ui),
         Some(Target::TaskResult(index)) => {

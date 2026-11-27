@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ▸ ◆ Orders   ○ stopp┳ ■ Billing   ○ stoppe┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
+                     ┃                     │   dev server · dev  │   watch build · wat…│   live · dev
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+           ┌─ Payment timeout ────────────────────────────────────────────────────────────────────┐
+          ◆│  Orders · kept 7 d ago · on main · from an earlier run                               │
+           │  note: comes before every failed checkout                                            │
+  not start│                                                                                      │
+           │   ┆ info: Checkout started                                                           │
+  port 4720│   ▌ warn: Payment 4f2a9c1e timed out on http://localhost:47202 after 30000 ms        │ed yet
+           │   ┆       at Shop.Billing.Charge()                                                   │
+   u  start│ Esc back to the list · d deletes it · e exports them all                             │3 · free
+   b  build└──────────────────────────────────────────────────────────────────────────────────────┘
+   U  starts all     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

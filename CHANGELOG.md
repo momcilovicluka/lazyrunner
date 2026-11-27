@@ -3,6 +3,17 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.119.0] - 2026-11-27
+
+### Added
+- Bookmarks: `b` in the marks list (`'`) keeps the picked mark as a bookmark and asks for its name (its note comes along) - kept for the project in the state folder's `bookmarks.json` with its line, the two lines either side, its app, when and on which branch. The list shows the bookmarks in a section above this run's marks (#84).
+- After a restart a bookmark finds its line again when its app prints one of the same shape - `Alt+d`'s comparison, so times, ids and ports don't count: the line is marked again, the rail shows it and `[` `]` jump to it. Until then it says `from an earlier run`, and `Enter` shows the lines it kept in a box; one that hasn't found its line in 30 days says so, dimmed (#84).
+- Bookmarks are in the accent colour on the rail and in the column (`▌`), marks stay magenta; with Nerd Font icons the list shows a bookmark icon before each (#84).
+- `e` in the list exports the bookmarks to Markdown - name, app, time, branch, note and their lines - as `bookmarks.md` in the state folder, its path copied; `y` copies them with the marks as a timeline, `a` writes a bookmark's note, `d` deletes one (#84).
+- The panel shows a bookmark chip with how many bookmarks have their line in a column; a click opens the list (#84).
+- Keeping a mark dissolves its edge from magenta to the accent in three steps, in place; a bookmark finding its line again sends the rail's ember to its row and flashes the line once; the naming input slides up from the bottom of the box - none of it with reduced motion (#84).
+- MCP: `get_logs` puts `[bookmark: <name>]` before a bookmarked line (and before an entry holding one with `parsed`), and `get_marks` lists the bookmarks too, each with its line number when it has found its line (#84).
+
 ## [1.118.0] - 2026-11-27
 
 ### Added
