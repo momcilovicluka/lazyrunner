@@ -5,6 +5,7 @@
 use std::cell::RefCell;
 use std::time::Duration;
 
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use lazyrunner_core::run::catalog::{Catalog, Listed};
 use lazyrunner_core::run::controller::sources::{Place, Tried};
 use lazyrunner_core::run::credentials::{self, Password, Store};
@@ -248,4 +249,87 @@ async fn an_agent_reads_the_sources_and_links_but_never_a_password_and_asks_befo
     assert_eq!(screen.controller.link_of("localhost", "Shop").unwrap().twin(), "qa/Shop");
     let asked = agent(&mut screen, "update_database", json!({ "database": "Shop" }), None).to_string();
     assert!(asked.contains("needs_confirm") && asked.contains("swaps it in under its name"), "{asked}");
+}
+
+#[tokio::test]
+async fn a_connection_string_the_terminal_types_in_stays_in_the_form() {
+    let (mut screen, _) = pulling_screen("source-form-typed");
+    screen.press("Tab a");
+    let typed = "Data Source=qa-sql.example.com,24016\\sqlstandard;Persist Security Info=True;User ID=reader;\
+                 Password=p4ss;Pooling=False;MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;\
+                 TrustServerCertificate=True;Packet Size=4096;Application Name=\"SQL Server Management Studio\";\
+                 Command Timeout=0";
+    for c in typed.chars() {
+        let shift = if c.is_ascii_uppercase() || "\"_:".contains(c) { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+        for kind in [KeyEventKind::Press, KeyEventKind::Release] {
+            let key = KeyEvent::new_with_kind(KeyCode::Char(c), shift, kind);
+            if !super::super::held::dropped(&mut screen.ui, &key) {
+                super::super::keys::press(&mut screen.ui, &mut screen.controller, key);
+            }
+        }
+        assert!(matches!(screen.ui.overlay, Some(Overlay::Pull(_))), "the form closed at {c:?}");
+    }
+}
+
+#[tokio::test]
+async fn the_screens_capital_letters_are_text_in_the_form() {
+    let (mut screen, _) = pulling_screen("source-form-capitals");
+    screen.press("Tab a");
+    screen.press("K E H M A T P D ~");
+    assert!(matches!(screen.ui.overlay, Some(Overlay::Pull(_))), "still the form");
+    assert_eq!(form(&screen).text[source_form::NAME], "KEHMATPD~", "typed, not a screen's key");
+}
+
+#[tokio::test]
+async fn every_printable_key_is_text_in_the_form() {
+    let (mut screen, _) = pulling_screen("source-form-every-key");
+    screen.press("Tab a");
+    let every: String = (' '..='~').collect();
+    let mut eaten = String::new();
+    for c in every.chars() {
+        let before = form(&screen).text[source_form::NAME].clone();
+        let shift = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+        let key = KeyEvent::new_with_kind(KeyCode::Char(c), shift, KeyEventKind::Press);
+        super::super::keys::press(&mut screen.ui, &mut screen.controller, key);
+        assert!(matches!(screen.ui.overlay, Some(Overlay::Pull(_))), "the form closed at {c:?}");
+        if form(&screen).text[source_form::NAME] == before {
+            eaten.push(c);
+        }
+    }
+    assert_eq!(eaten, "", "keys that never reached the name");
+}
+
+#[tokio::test]
+async fn every_text_field_takes_every_key_and_the_database_choice_goes_back_with_left() {
+    let (mut screen, _) = pulling_screen("source-form-every-field");
+    screen.press("Tab a");
+    let every: String = (' '..='~').collect();
+    let value = |screen: &Screen, at: usize| match at {
+        source_form::PASSWORD => form(screen).password.expose().to_string(),
+        _ => form(screen).text[at].clone(),
+    };
+    for field in
+        [source_form::NAME, source_form::SERVER, source_form::USER, source_form::PASSWORD, source_form::DATABASE]
+    {
+        while form(&screen).at != field {
+            screen.press("Tab");
+        }
+        if field == source_form::DATABASE {
+            screen.press("Right");
+            assert_eq!(form(&screen).choice[source_form::DATABASE], 1, "one database");
+        }
+        let mut eaten = String::new();
+        for c in every.chars() {
+            let before = value(&screen, field);
+            let shift = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+            super::super::keys::press(&mut screen.ui, &mut screen.controller, KeyEvent::new(KeyCode::Char(c), shift));
+            assert!(matches!(screen.ui.overlay, Some(Overlay::Pull(_))), "the form closed at {c:?} in field {field}");
+            if value(&screen, field) == before {
+                eaten.push(c);
+            }
+        }
+        assert_eq!(eaten, "", "keys that never reached field {field}");
+    }
+    screen.press("Left");
+    assert_eq!(form(&screen).choice[source_form::DATABASE], 0, "back to the whole server while typing a name");
 }

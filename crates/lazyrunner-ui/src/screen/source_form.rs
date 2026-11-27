@@ -324,6 +324,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent)
         "UpArrow" => form.step(false),
         "Space" if listing => toggle_pick(form),
         "LeftArrow" | "RightArrow" | "Space" if choice => cycle(form, name != "LeftArrow"),
+        "LeftArrow" | "RightArrow" if form.at == DATABASE => cycle(form, name == "RightArrow"),
         "Ctrl+G" => try_it(ui, controller),
         "g" if choice => try_it(ui, controller),
         "Ctrl+V" => match paste() {
