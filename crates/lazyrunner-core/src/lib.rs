@@ -6,6 +6,7 @@ pub mod config;
 pub mod contributors;
 pub mod ipc;
 pub mod json;
+pub mod json_edit;
 pub mod links;
 pub mod metrics;
 pub mod output;

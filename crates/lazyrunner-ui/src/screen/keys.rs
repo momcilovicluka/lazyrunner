@@ -60,6 +60,7 @@ pub fn prompt(ui: &Ui) -> bool {
         || ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
         || super::save_points::typing(ui)
         || super::database_files::typing(ui)
+        || super::sources::typing(ui)
         || matches!(&ui.overlay, Some(Overlay::Pull(card)) if card.typing())
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. } | Overlay::Marks { naming: Some(_), .. }))
@@ -1068,7 +1069,14 @@ fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEve
 fn picker_keys(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
     let typing = ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
     let pulls = name == "P" && !controller.pull_sources().is_empty();
-    if !pulls && super::screens::switch_key(ui, controller, name) {
+    let linked = ui.picker.as_ref().and_then(|picker| picker.entries().get(picker.index).cloned());
+    let updates =
+        name == "U" && linked.is_some_and(|entry| controller.link_of(&entry.server, &entry.database).is_some());
+    let sources_keys = super::sources::typing(ui) || (ui.sources_view.focused && name == "E");
+    if !pulls && !updates && !sources_keys && super::screens::switch_key(ui, controller, name) {
+        return;
+    }
+    if !typing && super::sources::key(ui, controller, name, typed(key)) {
         return;
     }
     if !typing && !super::database_files::typing(ui) && super::pull_view::key(ui, controller, name) {

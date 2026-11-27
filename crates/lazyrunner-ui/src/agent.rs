@@ -24,6 +24,7 @@ pub(crate) mod history;
 pub(crate) mod levels;
 pub(crate) mod query;
 pub(crate) mod replay;
+pub(crate) mod sources;
 pub(crate) mod views;
 pub(crate) mod waits;
 
@@ -103,6 +104,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         "build_map" => views::build(ui, controller, args),
         "database_changes" => databases::changes(controller, args),
         "database_files" => Ok(databases::files(controller)),
+        "database_sources" => sources::sources(controller, args),
         "query_database" => query::start(controller, args, &client),
         "query_result" => query::answer(controller, args),
         "set_log_level" => {
@@ -115,7 +117,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         | "run_action" | "press_keys" | "switch_database" | "add_database" | "install_packages"
         | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile" | "open_in_editor"
         | "save_point" | "rewind" | "copy_database" | "backup_database" | "export_database"
-        | "import_database" | "drop_database" | "pull_database") => {
+        | "import_database" | "drop_database" | "pull_database" | "update_database" | "link_database") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
@@ -1088,6 +1090,8 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
         "import_database" => databases::import(controller, args)?,
         "drop_database" => databases::drop_database(controller, args)?,
         "pull_database" => databases::pull(controller, args)?,
+        "update_database" => sources::update(controller, args)?,
+        "link_database" => sources::link(controller, args)?,
         "kill_port_holder" => drive::kill_port_holder(controller, args)?,
         "open_in_editor" => drive::open_in_editor(ui, controller, args)?,
         "set_setting" => drive::set_setting(controller, args)?,

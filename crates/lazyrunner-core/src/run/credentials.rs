@@ -1,11 +1,19 @@
 //! The passwords of database sources (#110), kept in the OS's credential store: Windows Credential Manager, under
-//! `lazyrunner/<project>/<source>`. They're never written to the profile, the config, a log or an answer to an agent:
-//! a password goes from the store to sqlcmd's environment and SqlPackage's response file, and nowhere else. Other OSes'
-//! stores aren't supported yet: there, the password is asked for each time.
+//! `lazyrunner/<project>/<login>@<server>` - one password for every source with that server and login (#114); one
+//! kept by 1.118.0 under `lazyrunner/<project>/<source>` is still found, and moved there quietly. They're never
+//! written to the profile, the config, a log or an answer to an agent: a password goes from the store to sqlcmd's
+//! environment and SqlPackage's response file, and nowhere else. Other OSes' stores aren't supported yet: there, the
+//! password is asked for each time.
 
-/// Where a source's password is kept: `lazyrunner/<project>/<source>`.
+/// Where 1.118.0 kept a source's password: `lazyrunner/<project>/<source>`.
 pub fn target(project: &str, source: &str) -> String {
     format!("lazyrunner/{project}/{source}")
+}
+
+/// Where a server and login's password is kept: `lazyrunner/<project>/<login>@<server>` (a source's name never has
+/// an `@`, so the two never meet).
+pub fn shared_target(project: &str, login: &str) -> String {
+    format!("lazyrunner/{project}/{login}")
 }
 
 /// A password: what it holds is read with [`Password::expose`] only, and never shown by `Debug`.
@@ -209,6 +217,7 @@ mod tests {
     #[test]
     fn a_password_is_kept_by_its_source_and_never_shown() {
         assert_eq!(target("shop", "qa"), "lazyrunner/shop/qa");
+        assert_eq!(shared_target("shop", "reader@qa-sql"), "lazyrunner/shop/reader@qa-sql");
         let password = Password::new("s3cret");
         assert_eq!(format!("{password:?}"), "Password(***)");
         let store = Memory::default();

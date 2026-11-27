@@ -123,6 +123,8 @@ pub enum Icon {
     Spec,
     /// A snapshot of the run (#106).
     Camera,
+    /// A whole server among the database sources (#114).
+    Server,
     /// A suite's code coverage (#33): none in the plain set, where the `%` says it.
     Coverage,
     /// A parsed view's entry with more lines than it shows, folded or open (#27).
@@ -298,6 +300,8 @@ pub fn icon(nerd: bool, icon: Icon) -> &'static str {
         (Icon::Spec, true) => "\u{f15c}", // file text
         (Icon::Camera, false) => "◉",
         (Icon::Camera, true) => "\u{f030}", // camera
+        (Icon::Server, false) => "≡",
+        (Icon::Server, true) => "\u{f233}", // server
         (Icon::Coverage, false) => "",
         (Icon::Coverage, true) => "\u{f132}", // shield
         (Icon::Fold { open: false }, false) => "▸",
@@ -479,6 +483,7 @@ mod tests {
             Icon::Endpoints,
             Icon::Spec,
             Icon::Camera,
+            Icon::Server,
             Icon::Coverage,
             Icon::Fold { open: false },
             Icon::Fold { open: true },

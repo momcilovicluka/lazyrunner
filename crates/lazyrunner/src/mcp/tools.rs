@@ -7,7 +7,7 @@ use super::{WAIT_MAX_SECS, WAITS};
 /// The views `get_view` reads, each the lazyrunner op that answers it.
 pub const VIEWS: [&str; 6] = ["changelog", "durations", "ports", "audit", "checks", "snapshot"];
 /// The `database` tool's ops, each with the lazyrunner op that does it.
-pub const DATABASE_OPS: [(&str, &str); 7] = [
+pub const DATABASE_OPS: [(&str, &str); 10] = [
     ("add", "add_database"),
     ("copy", "copy_database"),
     ("backup", "backup_database"),
@@ -15,6 +15,9 @@ pub const DATABASE_OPS: [(&str, &str); 7] = [
     ("import", "import_database"),
     ("files", "database_files"),
     ("pull", "pull_database"),
+    ("sources", "database_sources"),
+    ("update", "update_database"),
+    ("link", "link_database"),
 ];
 /// set_log_level's levels: .NET's, and putting them back.
 const LOG_LEVELS: [&str; 8] = ["Trace", "Debug", "Information", "Warning", "Error", "Critical", "None", "reset"];
@@ -255,9 +258,10 @@ pub fn list(apps: &str) -> Vec<Value> {
              string in secrets.json copying `from` with database `name`, not in use (switch: true makes it the one \
              in use, restarting the APIs: needs confirm - ask the user first); copy - `database` to a new one; \
              backup - a COPY_ONLY .bak in the server's backup folder; export - a .bacpac; import - `file` as a new \
-             database; files - the backup files, sizes and the jobs running; pull - a copy of `source` (the \
-             profile's databaseSources) as a new database, then switches to it: needs confirm. All but add and \
-             files run in the background.",
+             database; files - the backup files, sizes and the jobs running; pull - a copy of `source` as a new \
+             database, then switches to it: needs confirm; sources - the sources, links, a `source`'s databases; \
+             update - a linked `database` from its twin: needs confirm; link - `database` to `source`'s `remote`. \
+             export, import with `source` (+ `database`): a source's. add, files, sources, link answer at once.",
             json!({
                 "op": { "type": "string", "enum": DATABASE_OPS.map(|(op, _)| op) },
                 "database": { "type": "string", "description": "copy, backup, export: which (name or label; the one in use by default); import: one on the target server" },
@@ -268,6 +272,7 @@ pub fn list(apps: &str) -> Vec<Value> {
                 "confirm": { "type": "boolean" },
                 "file": { "type": "string", "description": "import: a file's name or path (files lists them)" },
                 "source": { "type": "string" },
+                "remote": { "type": "string" },
             }),
             &["op"],
             false,
@@ -542,7 +547,7 @@ mod tests {
     use super::*;
 
     /// What `tools/list` may weigh at most, in characters of its JSON: an agent pays for it in every session (#112).
-    const BUDGET: usize = 23_310;
+    const BUDGET: usize = 23_540;
 
     #[test]
     fn the_tool_list_stays_within_its_budget() {

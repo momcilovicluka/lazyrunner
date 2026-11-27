@@ -630,7 +630,8 @@ secrets:
 
 ```json
 "databaseSources": [
-  { "name": "qa", "server": "qa-sql.example.com,1433", "database": "Shop", "auth": "sql", "user": "reader" },
+  { "name": "qa-shop", "server": "qa-sql.example.com,1433", "database": "Shop", "auth": "sql", "user": "reader" },
+  { "name": "qa", "server": "qa-sql.example.com,1433", "auth": "sql", "user": "reader" },
   { "name": "staging", "connectionStringEnv": "SHOP_STAGING_DB" }
 ],
 "afterPull": ["scripts/local-urls.sql", "scripts/test-logins.sql"],
@@ -641,9 +642,65 @@ secrets:
 `auth` is `sql` (a user, and a password asked for once), `windows`, or `entra` (not supported by pulls yet: give such a
 source `connectionStringEnv`); a whole connection string can come from an environment variable instead. A SQL login's
 password is asked for the first time on a small card - typed masked, a `•` a character - and kept in Windows
-Credential Manager under `lazyrunner/<project>/<source>`. It's never written to the profile, the config, a log or an
-answer to an agent, and `y` never copies it; `,` changes it or, with nothing typed, `Del` forgets it. Other OSes'
-credential stores aren't supported yet: there, it's asked for each time.
+Credential Manager under `lazyrunner/<project>/<login>@<server>`: sources with the same server and login share one (a
+password 1.118.0 kept under `lazyrunner/<project>/<source>` is found there and moved quietly). It's never written to the
+profile, the config, a log or an answer to an agent, and `y` never copies it; `,` changes it or, with nothing typed,
+`Del` forgets it. Other OSes' credential stores aren't supported yet: there, it's asked for each time.
+
+A source **with** `database` is one database: `p` pulls it, `P` pulls it again. A source **without** it is a whole
+server: its databases are listed and picked (below). Both can be in one list, also for the same server. The same list
+under the project in `lazyrunner.config.json` (`"projects": { "<id>": { "databaseSources": [...] } }`) is this
+machine's only - a server only you use, or one you're trying out; with the same name in both, yours wins, and the
+list marks it `only mine`.
+
+**The Sources section** is under the files on the database screen (`Tab` to it): every source, the team's and yours. A
+whole server opens (`Enter`) into its databases - name, size, when it last changed, where the login may see it
+(`sys.databases`, `sys.master_files`, the index usage since the server's start; `-` otherwise, never a failure) - as
+last listed: the list is kept in lazyrunner's state with its age, so opening the screen never reaches the server; `g`
+lists again and `/` filters. Everything run against a source only reads. On a remote database (a database source, or
+one under a server):
+
+| Key | Does |
+|-----|------|
+| `p` | Pulls it, as above |
+| `e` | Only exports its `.bacpac` into lazyrunner's folder - no import, no switch; it shows in the files list |
+| `i` | Imports it as a new local database without switching to it |
+| `l` | Links a local database to it (below) |
+| `+` | Keeps it as a database source of its own (`<server source>-<database>`), saved where the server source is |
+
+On a source, `,` sets or changes its password, `E` edits it and `Del` takes it out of its list (asked - nothing on the
+server is touched - then offering to forget its password when no other source shares it).
+
+**Adding a source without JSON.** `a` in the Sources section - or `p` when there's no source yet - opens a form: name,
+server, login (SQL, Windows, or an environment variable), user, password (masked, straight to Credential Manager),
+database (the whole server, or one) and where it's saved - the team's (the profile) or only mine (this machine's
+config). Pasting a connection string (`Ctrl+V`, or typed into the first field) fills it: `Data Source`/`Server`,
+`User ID`, `Initial Catalog`/`Database` and `Integrated Security` go to their fields, the password to the credential
+store, and what a pull sets itself (`Encrypt`, `TrustServerCertificate`, timeouts, `Application Name`, `Pooling`...) is
+left out and listed once; `host,port\instance` keeps `host,port`. The name is suggested from the server (`qa-sql` is
+`qa`), lowercase and free. `Ctrl+G` (or `g` on a choice) tries it - signs in as a pull's check does and lists its
+databases - and `Database` becomes a pick of them, the whole server first; picking several (`Space`) makes a database
+source each, `<name>-<database>`. `Enter` saves it. The profile keeps its shape: only `databaseSources` changes - its
+item added, replaced or taken out, written as the items around it are - with the file's order, indentation and line
+endings, and lazyrunner trusts the profile it just wrote without asking (a change from outside still asks). `E` opens
+the same form filled in.
+
+**Links.** A local database can be linked to its remote twin: `L` on one (the table at the top) suggests the closest
+first - the same name, then the same without a pull's suffix (`Shop_qa_20261123` is `Shop`), then the most alike - lit,
+its matching part underlined; `Enter` takes it, `j` `k` pick another. `l` on a remote database in Sources links the
+other way round, and `L` on a linked database unlinks it. A pull or an import from a source links what it made. Links
+are this machine's, in lazyrunner's state. A linked row says `↔ qa/Shop · pulled 12 d ago`, and `•` when its twin changed
+after the copy, where the server says so.
+
+**`U` updates a linked database from its twin**, as a pull's graph with one more step: export from the twin, import it
+as a new database beside the local one, the after-pull scripts and migrations on that, then **swap** - the apps on the
+old one stop, it's renamed `Shop_old_<yyyyMMdd>` and the new one takes its name `Shop` (`ALTER DATABASE ... MODIFY NAME`,
+`SINGLE_USER WITH ROLLBACK IMMEDIATE` then `MULTI_USER`, in one batch), and the apps start again. Connection strings,
+other tools and the SQL client keep working, since the name stays. Nothing is dropped or renamed before the new copy
+is fully in; `x` before the swap, or a failure, leaves everything as it was (the new copy dropped), and a swap that fails
+puts every name back. Afterwards the old copy is offered for dropping (or kept, as `keepPulled` says). The setting
+`stalePulled` (days, off by default) dims a linked database older than that and puts `U` in its hint - lazyrunner never
+pulls on its own.
 
 With several sources `p` asks which. The pull then runs in the background while the apps keep working on the database
 in use - one database job at a time - through these steps:
@@ -1286,7 +1343,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `open_in_editor` | A file of the repo at a line in your editor, as `O` does - to show you the code it's talking about; after `"confirm": true` |
 | `save_point`, `rewind`, `database_changes` | A save point of a database (a snapshot, or a backup); a rewind to one (with `confirm`); what changed since one, table by table - rows then and now, and the small tables changed in place |
 | `query_database` | One read-only `SELECT` (`sql`) against the database in use or `database`: its columns, its rows (each an array of values in the columns' order, numbers as numbers), `count`, `more` when there were over `max_rows` (100; 1000 at most) and how long it took - or the SQL error. Pairs with `save_point` and `database_changes`: checking data is the most common side trip while debugging |
-| `database` | Database work that drops nothing, by `op`: `add` a connection string to secrets.json as `n` on the database screen does - a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet, or with `switch` (and `confirm`) the one in use; `copy` a database to a new one beside it; `backup` it to a `.bak`; `export` it to a `.bacpac`; `import` a file as a new database; `pull` a copy of `source` (the profile's `databaseSources`; the last one when left out) as a new database and switch to it (with `confirm`) - refused while its password isn't kept, since only you type it: pull once from lazyrunner first; `files`: the files, the databases' sizes, the job running and the pull's steps - no connection string or password, ever |
+| `database` | Database work that drops nothing, by `op`: `add` a connection string to secrets.json as `n` on the database screen does - a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet, or with `switch` (and `confirm`) the one in use; `copy` a database to a new one beside it; `backup` it to a `.bak`; `export` it to a `.bacpac`; `import` a file as a new database; `pull` a copy of `source` (a `databaseSources` one, with `database` for a whole server's; the last one when left out) as a new database and switch to it (with `confirm`) - refused while its password isn't kept, since only you type it: pull once from lazyrunner first; `export` and `import` with a `source` (and `database`) take a source's database - only its `.bacpac`, or a new database not switched to; `sources`: the sources, the links and, with `source`, its databases as last listed; `update` a linked `database` from its twin (with `confirm`); `link` a local `database` to `source`'s `remote`; `files`: the files, the databases' sizes, the job running and the pull's steps - no connection string or password, ever. An agent never adds a source or types a password |
 | `drop_database` | A database dropped (with `confirm`; never the one in use) |
 | `set_log_level` | One of a running .NET app's log categories (`category`; `Default` too) at `level` for `minutes` (10; 120 at most), live through its user secrets - no restart; back by itself when its time is up, when the app stops or starts again and when lazyrunner quits. `"level": "reset"` puts it back now (all of the app's without `category`) |
 
@@ -1580,6 +1637,7 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `frameRate` | `"auto"` | Frames a second for what moves: `auto` is the fastest display's refresh rate (60 at least - 120, 144, 240 on displays that show them), or a number from 30 to 480 |
 | `keepPulled` | | How many pulled copies of a source are kept (Database, Pulling a copy): after a pull, lazyrunner offers to drop the older ones; overrides the profile's |
 | `migrateAfterPull` | | Whether a pull applies the pending migrations to its copy; overrides the profile's |
+| `stalePulled` | | Days after which a linked database (Database, Pulling a copy) is dimmed and its hint offers `U` - never pulls by itself; off when not set |
 | `rewindPinned` | `"manualRestarts"` | Which restarts rewind the database to a pinned save point first (Database, Save points): `manualRestarts` (the ones you ask for) or `everyRestart` (those after a code change too) |
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |

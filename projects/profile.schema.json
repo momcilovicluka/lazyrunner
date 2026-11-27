@@ -63,8 +63,8 @@
     "databaseSources": {
       "type": "array",
       "items": { "$ref": "#/$defs/databaseSource" },
-      "description": "Optional. The other environments a copy of the database is pulled from (p on the database screen, the database source table below) - never a password: one is asked for once and kept in the OS's credential store.",
-      "examples": [[{ "name": "qa", "server": "qa-sql.example.com,1433", "database": "Shop", "auth": "sql", "user": "reader" }, { "name": "staging", "connectionStringEnv": "SHOP_STAGING_DB" }]]
+      "description": "Optional. The other environments a copy of the database is pulled from (p on the database screen, the database source table below): one database each, or a whole server whose databases are listed and picked - never a password: one is asked for once and kept in the OS's credential store, one per server and login. The same list under the project in lazyrunner.config.json is this machine's only, and wins by name. The database screen's Sources section adds and edits them (a), changing only this key.",
+      "examples": [[{ "name": "qa-shop", "server": "qa-sql.example.com,1433", "database": "Shop", "auth": "sql", "user": "reader" }, { "name": "qa", "server": "qa-sql.example.com,1433", "auth": "sql", "user": "reader" }, { "name": "staging", "connectionStringEnv": "SHOP_STAGING_DB" }]]
     },
     "afterPull": {
       "type": "array",
@@ -293,14 +293,14 @@
     },
     "databaseSource": {
       "title": "A database source (\"databaseSources\")",
-      "description": "Another environment's database a copy is pulled from (#110): p checks the login, exports a .bacpac with SqlPackage - the only thing ever run there, and it only reads - imports it as a new database <database>_<source>_<yyyyMMdd> on the server in use, runs afterPull, applies the migrations (migrateAfterPull) and switches to it. Either its server and database, or connectionStringEnv.",
+      "description": "Another environment's database a copy is pulled from (#110), or its whole server (#114): p checks the login, exports a .bacpac with SqlPackage - the only thing ever run there, and it only reads - imports it as a new database <database>_<source>_<yyyyMMdd> on the server in use, runs afterPull, applies the migrations (migrateAfterPull) and switches to it. Either its server (and a database, or none for the whole server), or connectionStringEnv.",
       "type": "object",
       "required": ["name"],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "Short name, unique among the sources: in a pulled copy's name and where its password is kept (lazyrunner/<project>/<name>).", "examples": ["qa"] },
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "Short name, unique among the sources: in a pulled copy's name. Its password is kept per server and login (lazyrunner/<project>/<user>@<server>).", "examples": ["qa"] },
         "server": { "type": "string", "minLength": 1, "description": "Its server, as a connection string names it.", "examples": ["qa-sql.example.com,1433"] },
-        "database": { "type": "string", "minLength": 1, "description": "The database to pull a copy of.", "examples": ["Shop"] },
+        "database": { "type": "string", "minLength": 1, "description": "Optional. The database to pull a copy of; without it the source is the whole server, its databases listed and picked on the database screen.", "examples": ["Shop"] },
         "auth": { "enum": ["sql", "windows", "entra"], "description": "Optional. How it logs in: sql (user, and a password asked for once), windows, or entra (not supported yet). sql with a user, windows without.", "examples": ["sql"] },
         "user": { "type": "string", "minLength": 1, "description": "Optional. A SQL login's name.", "examples": ["reader"] },
         "connectionStringEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Optional, instead of the rest: an environment variable holding its whole connection string.", "examples": ["SHOP_STAGING_DB"] }

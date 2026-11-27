@@ -22,6 +22,12 @@ const BUILD_HEADER: &str = "──── ⚙";
 
 /// Copies text to the system clipboard (the tests swap this for one that only records).
 pub type Clipboard = fn(&str) -> Result<(), String>;
+/// Reads the system clipboard's text.
+pub type Paste = fn() -> Result<String, String>;
+
+pub fn from_clipboard() -> Result<String, String> {
+    arboard::Clipboard::new().and_then(|mut clipboard| clipboard.get_text()).map_err(|error| error.to_string())
+}
 
 pub fn to_clipboard(text: &str) -> Result<(), String> {
     arboard::Clipboard::new()

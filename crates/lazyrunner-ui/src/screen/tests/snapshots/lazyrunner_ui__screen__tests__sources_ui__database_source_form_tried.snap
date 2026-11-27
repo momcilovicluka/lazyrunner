@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests/sources_ui.rs
+expression: frame
+---
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
+ DefaultConnection · secrets.json · 1 connection strings · the active one ●
+ p pull · e export · i import · l link · , password · E edit · Del remove · a add · / filter · Esc back
+                    ┌─ New source ───────────────────────────────────────────────────────┐
+   DATABASE @ SERVER│  Paste a connection string (Ctrl+V), or fill in:                   │  SWITCHED TO
+ ● Shop @ localhost │  Name     qa-2                                                     │  -
+                    │  Server   qa-sql.example.com,1433                                  │
+ SAVE POINTS · Shop │  Login    ◉ SQL  ○ Windows  ○ from an environment variable         │
+  ⡗ ◉  now  ◂ you ar│  User     reader                                                   │
+     no save points │  Password •••••••••••   * kept in the tests' store                 │
+                    │  Database ◉ one: Shop                                              │
+ FILES · …\sample\da│             ☐ the whole server                                     │
+ none yet - b backs │             ☑ Shop              4.2 GB                             │
+                    │             ☐ Shop_Audit        1.1 GB                             │
+ SOURCES   1 · the t│  Save for ◉ the team (.lazyrunner.json)  ○ only me                 │
+   DB qa          qa│  left out (a pull sets them itself): Encrypt,                      │
+                    │   TrustServerCertificate, Application Name                         │
+                    │                                                                    │
+                    │  ✓ signed in as reader · 38 ms · 2 databases                       │
+                    │  ↑ ↓ pick · Space choose · Tab next · Enter save · Esc cancel      │
+                    └────────────────────────────────────────────────────────────────────┘
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

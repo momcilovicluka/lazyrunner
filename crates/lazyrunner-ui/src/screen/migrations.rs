@@ -55,6 +55,9 @@ pub enum SavePointYes {
     InstallSqlPackage,
     /// `keepPulled`'s offer: the older pulled copies (#110).
     DropPulled(Vec<lazyrunner_core::run::pull::Pulled>),
+    /// `Del` on a source: taken out of the list (#114); then its password, when no other source shares it.
+    RemoveSource(String),
+    ForgetPassword(Box<lazyrunner_core::profile::sources::DatabaseSource>),
 }
 
 /// What a yes risks: nothing much (applying), a revert through Down(), or a step that drops or deletes data.

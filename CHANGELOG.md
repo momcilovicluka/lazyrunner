@@ -3,6 +3,20 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.120.0] - 2026-11-27
+
+### Added
+- Database sources can be whole servers: a source without `database` is one, its databases listed and picked on the database screen, beside the single-database sources of 1.118.0 - also for the same server. The same `databaseSources` list under the project in `lazyrunner.config.json` is this machine's only (`only mine`), winning by name (#114).
+- The database screen's Sources section, under the files (`Tab`): a whole server opens (`Enter`) into its databases - size, when each last changed where the login may see it, `-` otherwise - listed in the background, kept in the state folder with its age, listed again with `g` and filtered with `/`. On a remote database `p` pulls, `e` only exports its `.bacpac`, `i` imports it without switching, `l` links it and `+` keeps it as a source of its own; on a source `,` sets its password, `E` edits it and `Del` removes it from its list (asked; nothing on the server is touched) (#114).
+- Adding a source without JSON: `a` in Sources (or `p` with no source yet) opens a form - name, server, login, user, password straight to Credential Manager, database, and the team's or only mine. Pasting a connection string (`Ctrl+V`, or typed into the first field) fills it, the parts a pull sets itself left out and listed once; `Ctrl+G` tries it and turns `Database` into a pick of the server's databases, the whole server first, several making a source each (#114).
+- A source saved for the team changes only `databaseSources` in the profile - its order, indentation and line endings kept - and lazyrunner trusts the profile it just wrote; a change from outside still asks (#114).
+- Links: `L` on a local database links it to its remote twin, the closest suggested first (the same name, the same without a pull's suffix, the most alike); a pull or an import links what it made. A linked row says `↔ qa/Shop · pulled 12 d ago`, `•` when the twin changed since. Links are per machine (#114).
+- `U` updates a linked database from its twin as a pull's graph with one more step, the swap: its new copy imported beside it, the after-pull scripts and migrations run on that, then the old one renamed `Shop_old_<yyyyMMdd>` and the new one given its name, its apps stopped and started again - connection strings unchanged. Nothing is renamed or dropped before the new copy is in; `x` or a failure before the swap leaves everything as it was, a failed swap puts every name back, and the old copy is offered for dropping afterwards (#114).
+- `stalePulled` (days, off by default) dims a linked database older than that and puts `U` in its hint; lazyrunner never pulls on its own (#114).
+- Sources with the same server and login share one password; one 1.118.0 kept per source is found and moved there quietly (#114).
+- Motion: a pasted connection string's parts glide into their fields; a try's dot breathes and the databases cascade in; a failure shakes the form once; saving folds it into its new row, which glints; a server's databases unfold row by row; a new link's `↔` draws itself in; the swap shows the two names trading places; an updated row glints, `pulled just now` - none of it with reduced motion (#114).
+- MCP: `database` gains `op: "sources"` (the sources, links and a source's listed databases - no secrets), `op: "update"` (a linked database, with `confirm`) and `op: "link"`; `export` and `import` take a `source` and a `database`. An agent never adds a source or types a password (#114).
+
 ## [1.119.0] - 2026-11-27
 
 ### Added

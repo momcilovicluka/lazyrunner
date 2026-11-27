@@ -11,6 +11,7 @@
 pub mod change;
 pub mod check;
 pub mod load;
+pub mod pasted;
 pub mod preset;
 pub mod sources;
 #[cfg(test)]

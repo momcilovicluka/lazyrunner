@@ -5,8 +5,8 @@ expression: screen.frame()
   K  E  H  M  A  T  P  D  ~ DB DATABASE
  DefaultConnection · secrets.json · 2 connection strings · the active one ●
  j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin
- u changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · o folder
- Tab save points, files, pull · n new connection string · / filter · y copy row · Esc back
+ u changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · L link · o folder
+ Tab save points, files, pull, sources · n new connection string · / filter · y copy row · Esc back
 
    DATABASE @ SERVER           ANSWERS        APPS ON IT    MIGRATIONS    SIZE                  SWITCHED TO
  ● Shop @ localhost            backing up · 64% · 1.5 GB of 2.4 GB · ab▌ut 20s left
@@ -20,8 +20,8 @@ expression: screen.frame()
  Tab picks a file · i imports it as a new database · Del deletes it · o opens the folder
   ▤ Shop_qa_20261120.bacpac  4.0 KB  ▰▰▰▰▰▰▰▰▰▰  just now
 
-
-
+ SOURCES   none yet
+   Tab here, then a adds one: a whole server or one database
 
 
 

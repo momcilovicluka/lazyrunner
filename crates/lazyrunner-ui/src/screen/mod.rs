@@ -35,6 +35,7 @@ pub mod icons;
 pub mod jumps;
 pub mod keys;
 pub mod launch;
+pub mod link_card;
 pub mod links;
 pub mod log_levels;
 pub mod marks;
@@ -68,6 +69,8 @@ pub mod session;
 pub mod share;
 pub mod sheet;
 pub mod snapshot;
+pub mod source_form;
+pub mod sources;
 pub mod spec;
 pub mod spinner;
 pub mod stack;
@@ -504,6 +507,10 @@ pub struct Ui {
     pub files_view: database_files::View,
     /// The database screen's pull: the graph's keys, the picked step, its motion (#110).
     pub pull_view: pull_view::View,
+    /// The database screen's sources: the section's keys, the row picked, the servers open, their motion (#114).
+    pub sources_view: sources::View,
+    /// Reads the system clipboard (`Ctrl+V` in the add-source form; the tests swap this for their own text).
+    pub paste: copy::Paste,
     /// The resumed apps whose columns fade in once they run, and the fades under way, by app (#85).
     pub restoring: Vec<String>,
     pub fades: HashMap<String, Instant>,
@@ -667,6 +674,8 @@ impl Ui {
             save_view: save_points::View::default(),
             files_view: database_files::View::default(),
             pull_view: pull_view::View::default(),
+            sources_view: sources::View::default(),
+            paste: copy::from_clipboard,
             restoring: Vec::new(),
             fades: HashMap::new(),
             help_typing: false,
@@ -924,6 +933,7 @@ impl Ui {
             || database_files::animating(self, controller)
             || pull_graph::animating(self, controller)
             || pull_view::animating(self)
+            || sources::animating(self, controller)
             || session::animating(self)
             || durations::animating(self)
             || problems::animating(self)

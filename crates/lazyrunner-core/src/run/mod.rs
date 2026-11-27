@@ -12,6 +12,7 @@ pub mod build;
 pub mod build_map;
 pub mod calls;
 pub mod cancel;
+pub mod catalog;
 pub mod cause;
 pub mod checks;
 pub mod child;
@@ -24,6 +25,7 @@ pub mod coverage;
 pub mod coverage_needs;
 pub mod credentials;
 pub mod database_files;
+pub mod db_links;
 pub mod diff;
 pub mod entries;
 pub mod faults;
@@ -201,6 +203,8 @@ pub enum Event {
         job: u64,
         news: pull::News,
     },
+    /// A source's databases listed, or a new source tried (#114).
+    Sources(controller::sources::News),
 }
 
 /// "4s", "1m05s", as the panel says durations.

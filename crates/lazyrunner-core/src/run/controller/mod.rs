@@ -32,12 +32,17 @@ mod overrides;
 mod parallel;
 pub mod profile;
 pub mod pull;
+#[cfg(any(test, feature = "test-support"))]
+mod pull_pretend;
 mod pull_steps;
 #[cfg(test)]
 mod pull_tests;
 mod queries;
 pub mod save_points;
 mod session;
+pub mod sources;
+#[cfg(test)]
+mod sources_tests;
 mod stack;
 mod start;
 mod suites;
@@ -45,6 +50,7 @@ mod tasks;
 mod test_watch;
 #[cfg(test)]
 mod tests;
+mod update;
 mod watch;
 
 use std::collections::{HashMap, VecDeque};
@@ -366,6 +372,12 @@ pub struct Controller {
     pub pull_stale: Vec<super::pull::Pulled>,
     pull_drops: Vec<(String, String)>,
     pub(crate) credentials: Arc<dyn super::credentials::Store>,
+    /// Each source's databases as last listed, the sources being listed now, the local databases linked to their
+    /// remote twins, and the add form's try running and its answer (#114).
+    pub catalogs: std::collections::BTreeMap<String, super::catalog::Catalog>,
+    pub listing: Vec<String>,
+    pub db_links: Vec<super::db_links::Link>,
+    pub tried: Option<(u64, Result<sources::Tried, String>)>,
     /// What runs SqlPackage (tests put a script in its place).
     pub(crate) package: Arc<dyn super::sqlpackage::Package>,
     /// What runs SQL (sqlcmd; tests put a script in its place), and the secrets.json the tests use instead of the
@@ -404,6 +416,8 @@ impl Controller {
         let bookmarks = super::bookmarks::load(&state_dir);
         let made_files = super::database_files::load(&state_dir);
         let pulled = super::pull::load(&state_dir);
+        let catalogs = super::catalog::load(&state_dir);
+        let db_links = super::db_links::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
             state.view = apptypes::column_view(&config, &state.key);
@@ -568,6 +582,10 @@ impl Controller {
             pull_stale: Vec::new(),
             pull_drops: Vec::new(),
             credentials: super::credentials::system(),
+            catalogs,
+            listing: Vec::new(),
+            db_links,
+            tried: None,
             package: Arc::new(super::sqlpackage::SqlPackage),
             sql: Arc::new(super::sql::Sqlcmd),
             secrets_at: None,
@@ -841,6 +859,7 @@ impl Controller {
             Event::Sql { job, news } => self.sql_news(job, news),
             Event::DatabaseFiles { job, news } => self.files_news(job, news),
             Event::Pull { job, news } => self.pull_news(job, news),
+            Event::Sources(news) => self.sources_news(news),
         }
     }
 
