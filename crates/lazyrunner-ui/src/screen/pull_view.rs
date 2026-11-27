@@ -109,6 +109,7 @@ pub enum Card {
     Password { want: Want, typed: String, last: Option<Instant>, saved: Option<(Instant, &'static str)> },
     Form(Box<super::source_form::Form>),
     Link(Box<super::link_card::LinkCard>),
+    Sync(Box<super::db_sync::SyncCard>),
 }
 
 impl Card {
@@ -306,6 +307,7 @@ pub fn card_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyE
     match card.as_mut() {
         Card::Form(_) => super::source_form::key(ui, controller, name, key),
         Card::Link(_) => super::link_card::key(ui, controller, name),
+        Card::Sync(_) => super::db_sync::key(ui, controller, name),
         Card::Choose { purpose, index } => {
             let count = controller.pull_sources().len();
             match name {
@@ -431,6 +433,7 @@ pub fn animating(ui: &Ui) -> bool {
         Card::Password { .. } => !still(ui),
         Card::Form(form) => super::source_form::animating(ui, form),
         Card::Link(link) => super::link_card::animating(ui, link),
+        Card::Sync(sync) => super::db_sync::animating(ui, sync),
         Card::Choose { .. } => false,
     }
 }
@@ -456,6 +459,7 @@ pub fn card_rows(ui: &Ui, controller: &Controller, width: usize, rows: usize) ->
     match card.as_ref() {
         Card::Form(form) => super::source_form::rows(ui, controller, form, width, rows),
         Card::Link(link) => super::link_card::rows(ui, link, width, rows),
+        Card::Sync(sync) => super::db_sync::rows(ui, controller, sync, width, rows),
         Card::Choose { purpose, index } => {
             let mut lines: Vec<Vec<Seg>> = controller
                 .pull_sources()

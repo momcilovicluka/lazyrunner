@@ -57,6 +57,13 @@ pub enum SavePointYes {
     DropPulled(Vec<lazyrunner_core::run::pull::Pulled>),
     /// `Del` on a source: taken out of the list (#114); then its password, when no other source shares it.
     RemoveSource(String),
+    /// `Del` on a connection string whose server doesn't answer or whose database is gone: only connection strings
+    /// leave secrets.json - this one, or with `a` all of `all` (every one to that server).
+    ForgetConnections {
+        server: String,
+        database: String,
+        all: Vec<String>,
+    },
     ForgetPassword(Box<lazyrunner_core::profile::sources::DatabaseSource>),
 }
 
@@ -301,6 +308,15 @@ pub fn confirm_key(ui: &mut Ui, controller: &mut Controller, name: &str) {
                 for (key, target, what) in confirm.jobs {
                     controller.migrate(&key, target, what);
                 }
+            }
+        }
+        "a" => {
+            let Some(Overlay::Confirm(confirm)) = &ui.overlay else { return };
+            let Some(SavePointYes::ForgetConnections { server, all, .. }) = &confirm.save_point else { return };
+            if all.len() > 1 {
+                let (server, all) = (server.clone(), all.clone());
+                ui.overlay = None;
+                super::database_files::forget(ui, controller, &server, &all);
             }
         }
         "n" | "Escape" | "q" => ui.overlay = None,

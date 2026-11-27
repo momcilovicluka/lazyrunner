@@ -6,22 +6,22 @@ expression: frame
  DefaultConnection · secrets.json · 1 connection strings · the active one ●
  j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin
  u changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · L link · o folder
- Tab save points, files, pull, sources · n new connection string · / filter · y copy row · Esc back
+ Tab save points, files, pull, sources · n new connection string · a servers vs secrets.json · / filter
+ y copy row · Esc back
 
    DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SIZE      SWITCHED TO
- ● Shop @ localhost              – local          -               -               -         -
-                       ┌─ Link Shop to ───────────────────────────────────────────────┐
- SAVE POINTS · Shop    │  ▸ qa/Shop   suggested                                       │
-  ⡗ ◉  now  ◂ you are h│    qa-all/Shop                                               │
-     no save points yet│    qa-all/Shop_Audit                                         │
-                       │                                                              │
- FILES · …\sample\datab│  Enter link · j k pick another · Esc cancel                  │
- none yet - b backs a d└──────────────────────────────────────────────────────────────┘re
+ ● Shop @ localhost    ┌─ Link Shop to ───────────────────────────────────────────────┐     -
+                       │  ▸ qa/Shop   suggested                                       │
+ SAVE POINTS · Shop    │    qa-all/Shop                                               │
+  ⡗ ◉  now  ◂ you are h│    qa-all/Shop_Audit                                         │
+     no save points yet│                                                              │
+                       │  Enter link · j k pick another · Esc cancel                  │
+ FILES · …\sample\datab└──────────────────────────────────────────────────────────────┘
+ none yet - b backs a database up to the server's backup folder, e exports a .bacpac here
 
  SOURCES   2 · Tab here: Enter open · p pull · e export · l link · a add
    DB qa          qa-sql.example.com,1433 · Shop · reader
  ▸ ≡  qa-all      qa-sql.example.com,1433 · reader   2 databases · listed 1 min ago   only mine
-
 
 
 

@@ -121,7 +121,7 @@ pub fn check(entries: &[Entry]) -> Reachability {
     reach
 }
 
-fn reach_of(ui: &Ui, server: &str) -> Option<Reach> {
+pub(super) fn reach_of(ui: &Ui, server: &str) -> Option<Reach> {
     ui.db_reach.as_ref()?.lock().ok()?.get(server).copied()
 }
 
@@ -340,7 +340,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         format!(
             "{update} j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin \
              · u changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · L link{} · o \
-             folder · Tab save points, files, pull, sources · n new connection string · / filter · y copy row · Esc back",
+             folder · Tab save points, files, pull, sources · n new connection string · a servers vs secrets.json · / filter · y copy row · Esc back",
             if linked.is_some() { " (unlink)" } else { "" }
         )
     };
@@ -435,7 +435,10 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         }
     } else if let Some((server, spare)) = &spare {
         let count = spare.len();
-        let text = format!(" + {count} more on {server} not in secrets.json (n adds one): {}", spare.join(", "));
+        let text = format!(
+            " + {count} more on {server} not in secrets.json (a compares them all, n adds one): {}",
+            spare.join(", ")
+        );
         lines.push(super::columns::fit(vec![seg(text, C::DarkGray)], cells));
     }
     if let Some(picker) = ui.picker.as_mut() {
