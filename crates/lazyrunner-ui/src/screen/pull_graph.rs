@@ -52,6 +52,8 @@ const LIST_BELOW: usize = 60;
 /// A box's rows, and the section's rows besides the graph: its header, a blank row, the picked step's two.
 const BOX_ROWS: usize = 5;
 const AROUND: usize = 4;
+/// The fewest rows the graph is drawn in whole: one row of boxes with its title and progress around it.
+pub const LEAST: usize = BOX_ROWS + 2 + AROUND;
 /// The swap's names trade places over this long, in a loop while it runs.
 const TRADE: Duration = Duration::from_millis(1200);
 
