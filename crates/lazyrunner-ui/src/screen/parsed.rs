@@ -229,7 +229,11 @@ impl Drawing<'_, '_> {
     fn head(&mut self, item: &Shown, entry: &Entry, before: Option<&Entry>, open: bool) -> Vec<Seg> {
         let (state, cells) = (self.state, self.frame.cells);
         let color = level_color(entry.level);
-        let gutter = if item.marked(state) { seg("▌", C::Magenta) } else { seg(" ", color) };
+        let gutter = match item.bookmarked(state) {
+            Some(number) => seg("▌", super::bookmarks::edge(self.ui, self.index, number)),
+            None if item.marked(state) => seg("▌", C::Magenta),
+            None => seg(" ", color),
+        };
         let label = entries::level_name(entry.level);
         let label_fg = if entry.level == Level::Debug { C::Gray } else { C::Black };
         let mut row = vec![gutter, seg("▐", color), on(label, label_fg, color), seg("▌ ", color)];

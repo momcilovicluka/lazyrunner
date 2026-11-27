@@ -5,6 +5,7 @@
 pub mod about;
 pub mod actions;
 pub mod audit;
+pub mod bookmarks;
 pub mod branch_changes;
 pub mod bundle;
 pub mod checklist;
@@ -207,11 +208,15 @@ pub enum Overlay {
         index: usize,
         picked: Instant,
     },
-    /// `'`: every column's marks; the selected one.
+    /// `'`: the bookmarks, then every column's marks; the selected one.
     Marks {
         index: usize,
-        /// The note being written for the selected mark (`a`).
+        /// The note being written for the selected mark or bookmark (`a`).
         note: Option<String>,
+        /// The name being typed to keep the selected mark as a bookmark (`b`), and when its input opened (#84).
+        naming: Option<(String, Instant)>,
+        /// The selected bookmark's kept lines are shown (`Enter` on one from an earlier run).
+        kept: bool,
     },
     /// `~`: every app's output in the order it came.
     Timeline(timeline::View),
@@ -928,6 +933,7 @@ impl Ui {
             || editor::animating(self)
             || snapshot::animating(self)
             || branch_changes::animating(self)
+            || bookmarks::animating(self)
             || spec::animating(self)
             || phases::animating(self)
             || panel::sliding(self)

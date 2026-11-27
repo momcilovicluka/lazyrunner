@@ -73,6 +73,12 @@ pub struct AppState {
     pub marks: Vec<u64>,
     /// The marks' notes, by line number; they go with their marks.
     pub notes: std::collections::BTreeMap<u64, String>,
+    /// The marked lines that are bookmarks (#84), by number: the bookmark's id. They go when the app starts again;
+    /// a bookmark finds its line again in the new run.
+    pub bookmarked: std::collections::BTreeMap<u64, String>,
+    /// How many times a bookmark found its line again this session, and the last one's line and when.
+    pub found: u64,
+    pub found_at: Option<(u64, Instant)>,
     pub errors: u64,
     pub warnings: u64,
     pub requests: u64,
@@ -172,6 +178,9 @@ impl AppState {
             view: ColumnView::Raw,
             marks: Vec::new(),
             notes: std::collections::BTreeMap::new(),
+            bookmarked: std::collections::BTreeMap::new(),
+            found: 0,
+            found_at: None,
             errors: 0,
             warnings: 0,
             requests: 0,
@@ -461,6 +470,8 @@ impl AppState {
         self.run_from = self.output.total() + 1;
         self.marks.clear();
         self.notes.clear();
+        self.bookmarked.clear();
+        self.found_at = None;
         self.errors = 0;
         self.warnings = 0;
         self.requests = 0;

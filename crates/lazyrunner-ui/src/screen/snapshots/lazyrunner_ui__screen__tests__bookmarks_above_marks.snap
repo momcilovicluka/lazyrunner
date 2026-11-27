@@ -1,0 +1,34 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: screen.frame()
+---
+ ▸ ◆ Orders   ○ stopp┳ ■ Billing   ○ stoppe┬ ■ Shop   ○ stopped ─┬ ■ Docs   ○ stopped ─┬ ■ Console   ○ stopped
+                     ┃                     │   dev server · dev  │   watch build · wat…│   live · dev
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+                     ┃                     │                     │                     │
+           ┌─ Marks ──────────────────────────────────────────────────────────────────────────────┐
+           │  Bookmarks                                                                           │
+           │  ▌ Payment timeout    Orders     5s ago  first sign · warn: Payment timed out after  │
+           │   ┆ before info: Checkout started                                                    │
+           │   ┆ after  at Shop.Billing.Charge()                                                  │
+           │                                                                                      │
+           │  This run's marks                                                                    │ed yet
+           │  Billing         4s ago  Billing ready on http://localhost:47202                     │
+           │ Enter jumps · a note · e exports · y copies all · d deletes · Esc closes             │3 · free
+info: Check└──────────────────────────────────────────────────────────────────────────────────────┘
+started              ┃                     │                     │                     │
+▌warn: Payment       ┃                     │                     │                     │
+▌timed out after     ┃                     │                     │                     │
+▌30000 ms            ┃                     │                     │                     │
+      at Shop.       ┃▌Billing ready on    │                     │                     │
+Billing.Charge()     ┃▌http://localhost:   │                     │                     │
+info: Retrying       ┃▌47202               │                     │                     │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   ▌ 1   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   /  search   U  start all     :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00   Marked Orders: warn: Payment timed out after 30000 ms  ([ ] jump between marks, ' lists them)
+ 12:00:00   Marked Billing: Billing ready on http://localhost:47202  ([ ] jump between marks, ' lists them)
+ 12:00:00 ▸ Kept as a bookmark: Payment timeout - it finds its line again after a restart

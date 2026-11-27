@@ -654,6 +654,8 @@ const RUNNING: &str = "running";
 const BREATH: Duration = Duration::from_millis(1600);
 /// How long the line that made a command app up stays outlined.
 pub(super) const READY_OUTLINE: Duration = Duration::from_secs(3);
+/// A bookmark's line found again flashes once, this long (#84).
+pub(super) const FOUND_FLASH: Duration = Duration::from_millis(400);
 /// The colours a compose app's services' lines are told apart by, in the order of its services.
 const SERVICE_COLORS: [C; 8] =
     [C::Cyan, C::Magenta, C::Blue, C::Green, C::DarkCyan, C::DarkMagenta, C::DarkBlue, C::DarkGreen];
@@ -682,9 +684,22 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
     let outlined =
         |state: &AppState| state.ready_at.is_some_and(|(_, at)| ui.now.saturating_duration_since(at) < READY_OUTLINE);
     controller.states.iter().any(outlined)
+        || controller.states.iter().any(|state| found_flash(ui, state).is_some())
         || super::parsed::animating(ui)
         || controller.restarting()
         || (!ui.reduced_motion && controller.apps.iter().any(|app| breathing(&app.key)))
+}
+
+/// A marked line's edge: magenta, a bookmark's in the accent (dissolving into it just after it was kept).
+pub(super) fn mark_color(ui: &Ui, state: &AppState, index: usize, number: u64) -> C {
+    if state.bookmarked.contains_key(&number) { super::bookmarks::edge(ui, index, number) } else { C::Magenta }
+}
+
+/// The line a bookmark just found again, while it flashes (not with reduced motion).
+pub(super) fn found_flash(ui: &Ui, state: &AppState) -> Option<u64> {
+    let moving = ui.motion.enabled && !ui.reduced_motion;
+    let (number, at) = state.found_at.filter(|_| moving)?;
+    (ui.now.saturating_duration_since(at) < FOUND_FLASH).then_some(number)
 }
 
 /// The compose service a line of a compose app's is from.
@@ -894,6 +909,7 @@ fn body(
     let cells = column - rail;
     let scroll = scroll.min(shown.saturating_sub(1));
     let copied = ui.motion.copied(index, ui.now);
+    let just_found = found_flash(ui, state);
     let looked = ui.motion.looked(index, ui.now);
     let composed = controller.apps[index].command().is_some_and(|command| command.compose.is_some());
     let mut result: Vec<Vec<Seg>> = Vec::with_capacity(rows);
@@ -956,6 +972,9 @@ fn body(
         if copied.is_some_and(|lines| lines.contains(&line.text)) {
             (color, back) = (C::Black, Some(C::Cyan)); // just copied
         }
+        if just_found == Some(number) {
+            (color, back) = (C::Black, Some(super::bookmarks::ACCENT)); // a bookmark found its line again
+        }
         // A compose service's line: its prefix becomes a gutter in its colour, its name shown where it changes.
         let split = if composed { services_of::split_line(&line.text) } else { None };
         let (service, text) = split.map_or((None, line.text.as_str()), |(service, text)| (Some(service), text));
@@ -1006,7 +1025,7 @@ fn body(
                 segs.insert(0, seg("▎", tone));
             }
             if marked {
-                segs.insert(0, seg("▌", C::Magenta));
+                segs.insert(0, seg("▌", mark_color(ui, state, index, number)));
             }
             if let Some(diff) = gutter {
                 segs.insert(0, diff.gutter(kind, start == 0));
@@ -1153,6 +1172,15 @@ impl Shown<'_> {
     /// Whether a search matches it.
     pub fn matches(&self, state: &AppState, search: &super::Search) -> bool {
         self.any_line(state, |line| search.matches(&line.text))
+    }
+
+    /// The bookmarked line it holds (#84): the line, or one of its entry's.
+    pub fn bookmarked(&self, state: &AppState) -> Option<u64> {
+        let Some(entry) = self.entry else {
+            let number = state.output.number_at(self.position);
+            return state.bookmarked.contains_key(&number).then_some(number);
+        };
+        state.bookmarked.range(entry.first..=entry.last).next().map(|(number, _)| *number)
     }
 
     /// Whether it's marked (`m`): the line, or one of its entry's.

@@ -137,7 +137,8 @@ pub fn checks(ui: &mut Ui, controller: &mut Controller, args: &Value) -> Value {
     json!({ "running": running, "seconds_ago": ago, "checks": checks, "hint": hint })
 }
 
-/// The marks (`'`): the lines the user marked in the columns, oldest first - what they want looked at.
+/// The marks (`'`): the lines the user marked in the columns, oldest first - what they want looked at - and the
+/// bookmarks they keep across restarts (#84), each with its line number this run when it found its line.
 pub fn marks(controller: &Controller) -> Value {
     let marks: Vec<Value> = crate::screen::marks::all(controller)
         .into_iter()
@@ -146,7 +147,15 @@ pub fn marks(controller: &Controller) -> Value {
             json!({ "app": controller.apps[app].key, "line": number, "text": text })
         })
         .collect();
-    json!({ "marks": marks })
+    let bookmarks: Vec<Value> = controller
+        .bookmarks()
+        .iter()
+        .map(|bookmark| {
+            let line = controller.bookmark_line(&bookmark.id).map(|(_, number)| number);
+            json!({ "name": bookmark.name, "app": bookmark.app, "note": bookmark.note, "text": bookmark.line, "line": line })
+        })
+        .collect();
+    json!({ "marks": marks, "bookmarks": bookmarks })
 }
 
 /// An app's build as a map (#82): the running one, else its last - each project's state, its own time and usual,

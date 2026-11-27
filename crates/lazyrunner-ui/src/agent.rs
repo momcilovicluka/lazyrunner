@@ -313,7 +313,7 @@ fn logs(controller: &Controller, args: &Value) -> Answer {
         .filter(|(line, _)| !errors_only || copy::is_error(line))
         .filter(|(line, _)| grep.as_ref().is_none_or(|grep| line.text.to_lowercase().contains(grep)))
         .take(limit + 1)
-        .map(|(line, seq)| format!("{seq} {}", line.text))
+        .map(|(line, seq)| format!("{seq} {}{}", bookmarked(controller, index, seq..=seq), line.text))
         .collect();
     let truncated = lines.len() > limit;
     lines.truncate(limit);
@@ -328,6 +328,18 @@ fn logs(controller: &Controller, args: &Value) -> Answer {
         "reset": reset,
         "note": truncated.then_some(TRUNCATED),
     }))
+}
+
+/// What `get_logs` puts before a line the user bookmarked (#84) - an entry with one among its lines - its name.
+fn bookmarked(controller: &Controller, index: usize, lines: std::ops::RangeInclusive<u64>) -> String {
+    let state = &controller.states[index];
+    let names: Vec<&str> = state
+        .bookmarked
+        .range(lines)
+        .filter_map(|(_, id)| controller.bookmark(id))
+        .map(|bookmark| bookmark.name.as_str())
+        .collect();
+    if names.is_empty() { String::new() } else { format!("[bookmark: {}] ", names.join(", ")) }
 }
 
 /// `get_logs` with `parsed`: the newest `limit` entries that end after `since`, those whose lines contain `grep`
@@ -357,7 +369,9 @@ fn parsed_logs(controller: &Controller, index: usize, args: &Value) -> Answer {
         .filter(|entry| !errors_only || entry.level == lazyrunner_core::output::Level::Error)
         .filter(found)
         .take(limit + 1)
-        .map(|entry| format!("{} {}", entry.first, entry.said()))
+        .map(|entry| {
+            format!("{} {}{}", entry.first, bookmarked(controller, index, entry.first..=entry.last), entry.said())
+        })
         .collect();
     let truncated = entries.len() > limit;
     entries.truncate(limit);

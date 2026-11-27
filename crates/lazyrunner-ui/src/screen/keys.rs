@@ -62,7 +62,7 @@ pub fn prompt(ui: &Ui) -> bool {
         || super::database_files::typing(ui)
         || matches!(&ui.overlay, Some(Overlay::Pull(card)) if card.typing())
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
-        || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
+        || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. } | Overlay::Marks { naming: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Sheet { typing: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Audit { typing: true, .. }))
         || matches!(&ui.overlay, Some(Overlay::Requests(view)) if view.typing)

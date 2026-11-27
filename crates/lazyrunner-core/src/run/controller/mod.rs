@@ -4,6 +4,7 @@
 //! in tasks of their own, so keys and output keep flowing during a build.
 
 mod audit;
+mod bookmarks;
 mod builds;
 mod causes;
 mod code_map;
@@ -345,6 +346,8 @@ pub struct Controller {
     pub otlp_port: Option<u16>,
     task_results: HashMap<String, tasks::TaskResult>,
     metric_roots: Arc<Mutex<Vec<(String, u32)>>>,
+    /// The bookmarks kept in the state folder (#84), oldest first.
+    bookmarks: Vec<super::bookmarks::Bookmark>,
     /// The database's save points (#110), the database job running and the last one done, and each database's tables
     /// as last counted.
     pub save_points: Vec<super::save_points::SavePoint>,
@@ -398,6 +401,7 @@ impl Controller {
         let audits = crate::run::audit::load(&state_dir);
         let kept_levels = log_levels::load(&state_dir);
         let save_points = super::save_points::load(&state_dir);
+        let bookmarks = super::bookmarks::load(&state_dir);
         let made_files = super::database_files::load(&state_dir);
         let pulled = super::pull::load(&state_dir);
         for state in &mut states {
@@ -552,6 +556,7 @@ impl Controller {
             task_results: HashMap::new(),
             metric_roots,
             save_points,
+            bookmarks,
             db_work: None,
             db_done: None,
             db_counts: HashMap::new(),
@@ -751,7 +756,9 @@ impl Controller {
                 if self.states[index].generation == generation {
                     let app = self.apps[index].clone();
                     let was_ready = self.states[index].ready_line;
+                    let lines_before = self.states[index].output.total();
                     let request = self.states[index].receive(&app, &line, now);
+                    self.find_bookmarks(index, lines_before, now);
                     if self.states[index].ready_line != was_ready {
                         self.watch_states();
                     }

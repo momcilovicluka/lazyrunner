@@ -5,6 +5,7 @@
 
 pub mod app;
 pub mod audit;
+pub mod bookmarks;
 pub mod branch_changes;
 pub mod browser;
 pub mod build;
