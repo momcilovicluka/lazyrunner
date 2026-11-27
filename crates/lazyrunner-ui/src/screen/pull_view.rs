@@ -3,7 +3,9 @@
 //! (`pull_graph`) the keys, where `h` `l` pick a step and `Enter` opens its whole output. A source's password is asked
 //! for on a small centred card - a lock, the source's server, each character a `•` with a soft pop - and kept in the
 //! OS's credential store: the card says so with one glint, then folds away. Once a pull is done, `keepPulled`'s offer
-//! to drop the older copies comes as a y/n box, and the new database's row glints.
+//! to drop the older copies comes as a y/n box, and the new database's row glints. The same card asks for the
+//! password an export, an import, a listing or an update needs (#114), and holds the add-source form
+//! (`source_form`) and the link picker (`link_card`); `U` updates a linked database and `L` links one.
 
 use std::time::{Duration, Instant};
 
@@ -13,7 +15,7 @@ use lazyrunner_core::profile::sources::{DatabaseSource, Reach};
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::controller::save_points::db_key;
 use lazyrunner_core::run::credentials::Password;
-use lazyrunner_core::run::pull::Step;
+use lazyrunner_core::run::pull::{Mode, Step};
 
 use super::icons::{self, Icon};
 use super::migrations::{Confirm, Risk, SavePointYes};
@@ -46,43 +48,93 @@ pub struct View {
     pub dots: super::pull_graph::Dots,
 }
 
-/// What a source is picked for.
+/// What a source is picked for: a pull, an export, an import, its databases listed, a linked database updated, or
+/// its password.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Purpose {
     Pull,
+    Export,
+    Import,
+    List,
+    Update,
     Password,
 }
 
-/// The card: a source to pick, or its password being typed (the time of each character, when it was kept).
-#[derive(Debug)]
-pub enum Card {
-    Choose {
-        purpose: Purpose,
-        index: usize,
-    },
-    Password {
-        source: String,
-        purpose: Purpose,
-        typed: String,
-        last: Option<Instant>,
-        saved: Option<(Instant, &'static str)>,
-    },
-}
+impl Purpose {
+    /// The pull's mode it starts, when it starts one.
+    fn mode(self) -> Option<Mode> {
+        match self {
+            Self::Pull => Some(Mode::Pull),
+            Self::Export => Some(Mode::Export),
+            Self::Import => Some(Mode::Import),
+            Self::Update => Some(Mode::Update),
+            Self::List | Self::Password => None,
+        }
+    }
 
-impl Card {
-    /// Whether keys are text in it: the password is being typed.
-    pub fn typing(&self) -> bool {
-        matches!(self, Self::Password { saved: None, .. })
+    /// What `Enter` does once the password is typed.
+    fn then(self) -> &'static str {
+        match self {
+            Self::Pull => "keeps it and pulls",
+            Self::Export => "keeps it and exports",
+            Self::Import => "keeps it and imports",
+            Self::List => "keeps it and lists the databases",
+            Self::Update => "keeps it and updates",
+            Self::Password => "keeps it",
+        }
     }
 }
 
-/// Whether the card asks for a password: an agent's keys never reach it.
+/// What the user asked of a source: what for, which source, which of its server's databases, and for an update the
+/// linked local database (its server and name).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Want {
+    pub purpose: Purpose,
+    pub source: String,
+    pub database: Option<String>,
+    pub local: Option<(String, String)>,
+}
+
+impl Want {
+    pub fn new(purpose: Purpose, source: &str, database: Option<&str>) -> Self {
+        Self { purpose, source: source.into(), database: database.map(String::from), local: None }
+    }
+}
+
+/// The card: a source to pick, its password being typed (the time of each character, when it was kept), the add or
+/// edit form, or the link picker.
+#[derive(Debug)]
+pub enum Card {
+    Choose { purpose: Purpose, index: usize },
+    Password { want: Want, typed: String, last: Option<Instant>, saved: Option<(Instant, &'static str)> },
+    Form(Box<super::source_form::Form>),
+    Link(Box<super::link_card::LinkCard>),
+}
+
+impl Card {
+    /// Whether keys are text in it: the password or the form being typed.
+    pub fn typing(&self) -> bool {
+        match self {
+            Self::Password { saved, .. } => saved.is_none(),
+            Self::Form(form) => form.typing(),
+            _ => false,
+        }
+    }
+}
+
+/// Whether the card asks for a password or holds the add form: an agent's keys never reach it.
 pub fn asking_password(ui: &Ui) -> bool {
-    matches!(&ui.overlay, Some(Overlay::Pull(card)) if matches!(**card, Card::Password { .. }))
+    matches!(&ui.overlay, Some(Overlay::Pull(card)) if matches!(**card, Card::Password { .. } | Card::Form(_)))
 }
 
 fn still(ui: &Ui) -> bool {
     ui.reduced_motion || !ui.motion.enabled
+}
+
+/// The highlighted local database: its server and name.
+fn highlighted(ui: &Ui) -> Option<(String, String)> {
+    let picker = ui.picker.as_ref()?;
+    picker.entries().get(picker.index).map(|entry| (entry.server.clone(), entry.database.clone()))
 }
 
 /// The database screen's pull keys; whether the key was one of them.
@@ -92,8 +144,10 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     }
     match name {
         "p" => choose(ui, controller, Purpose::Pull),
-        "P" if !controller.pull_sources().is_empty() => match controller.last_pull_source() {
-            Some(source) => proceed(ui, controller, Purpose::Pull, &source),
+        "P" if !controller.pull_sources().is_empty() => match controller.last_pull() {
+            Some((source, database)) => {
+                proceed(ui, controller, Want { database, ..Want::new(Purpose::Pull, &source, None) })
+            }
             None => controller.add_log("Nothing pulled yet - p pulls a copy from a source", Hue::Gray),
         },
         "x" if controller.pull.as_ref().is_some_and(|pull| !pull.is_over()) => match controller.cancel_pull() {
@@ -101,9 +155,30 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
             Err(why) => controller.add_log(format!("✗ {why}"), Hue::Red),
         },
         "," => choose(ui, controller, Purpose::Password),
+        "U" => {
+            let Some((server, database)) = highlighted(ui) else { return false };
+            update(ui, controller, &server, &database);
+        }
+        "L" => {
+            let Some((server, database)) = highlighted(ui) else { return false };
+            super::link_card::open_for_local(ui, controller, &server, &database);
+        }
         _ => return false,
     }
     true
+}
+
+/// `U`: updates the linked database from its twin, its password asked for first when one is needed.
+pub fn update(ui: &mut Ui, controller: &mut Controller, server: &str, database: &str) {
+    let Some(link) = controller.link_of(server, database).cloned() else {
+        controller.add_log(format!("{database} isn't linked to a remote database - L links it"), Hue::Gray);
+        return;
+    };
+    let want = Want {
+        local: Some((server.to_string(), database.to_string())),
+        ..Want::new(Purpose::Update, &link.source, Some(&link.remote))
+    };
+    proceed(ui, controller, want);
 }
 
 /// The keys while the graph has them; whether the key was one of them.
@@ -112,11 +187,12 @@ fn focused_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
         ui.pull_view.focused = false;
         return false;
     };
-    let at = super::pull_graph::picked(ui, pull).index();
+    let steps = pull.steps().len();
+    let at = super::pull_graph::picked_at(ui, pull);
     let view = &mut ui.pull_view;
     match name {
         "h" | "LeftArrow" if !view.output => view.picked = Some(at.saturating_sub(1)),
-        "l" | "RightArrow" if !view.output => view.picked = Some((at + 1).min(Step::ALL.len() - 1)),
+        "l" | "RightArrow" if !view.output => view.picked = Some((at + 1).min(steps - 1)),
         "j" | "DownArrow" if view.output => view.scroll = view.scroll.saturating_sub(1),
         "k" | "UpArrow" if view.output => view.scroll += 1,
         "Enter" => (view.output, view.scroll) = (!view.output, 0),
@@ -151,7 +227,7 @@ pub fn can_focus(controller: &Controller) -> bool {
 /// A click on a step picks it (the graph gets the keys); a double click opens its output.
 pub fn click(ui: &mut Ui, target: Option<Target>, double: bool) -> bool {
     let Some(Target::Step(at)) = target.filter(|_| ui.picker.is_some()) else { return false };
-    (ui.save_view.on_rail, ui.files_view.on_files) = (false, false);
+    (ui.save_view.on_rail, ui.files_view.on_files, ui.sources_view.focused) = (false, false, false);
     let view = &mut ui.pull_view;
     (view.focused, view.picked) = (true, Some(at));
     if double {
@@ -160,54 +236,67 @@ pub fn click(ui: &mut Ui, target: Option<Target>, double: bool) -> bool {
     true
 }
 
-/// `p` / `,`: the one source, else a card to pick one.
+/// `p` / `,`: the one source, else a card to pick one - and with none yet, the form that adds one.
 fn choose(ui: &mut Ui, controller: &mut Controller, purpose: Purpose) {
     let sources = controller.pull_sources();
-    match sources {
-        [] => controller.add_log(
-            "No databaseSources in the profile - add one to pull a copy from another environment (projects/README.md)",
-            Hue::Gray,
-        ),
-        [one] => {
-            let name = one.name.clone();
-            proceed(ui, controller, purpose, &name);
+    match sources.as_slice() {
+        [] if purpose == Purpose::Pull => super::source_form::open_new(ui, controller),
+        [] => controller.add_log("No database sources yet - a in the Sources section adds one", Hue::Gray),
+        [one] if purpose == Purpose::Password || !one.is_server() => {
+            proceed(ui, controller, Want::new(purpose, &one.name.clone(), None));
         }
         _ => open(ui, Card::Choose { purpose, index: 0 }),
     }
 }
 
-fn open(ui: &mut Ui, card: Card) {
+pub(super) fn open(ui: &mut Ui, card: Card) {
     ui.overlay = Some(Overlay::Pull(Box::new(card)));
 }
 
-/// A source picked: its password asked for when one is needed and none is kept, else the pull starts.
-fn proceed(ui: &mut Ui, controller: &mut Controller, purpose: Purpose, source: &str) {
-    let Some(found) = controller.pull_sources().iter().find(|known| known.name == source).cloned() else {
-        controller.add_log(format!("No source {source} in the profile"), Hue::Yellow);
+/// What a source was picked for: its password asked for when one is needed and none is kept, else it's done.
+pub fn proceed(ui: &mut Ui, controller: &mut Controller, want: Want) {
+    let Some(found) = controller.source(&want.source) else {
+        controller.add_log(format!("No source {}", want.source), Hue::Yellow);
         return;
     };
     ui.overlay = None;
-    let password = || Card::Password { source: source.into(), purpose, typed: String::new(), last: None, saved: None };
-    if purpose == Purpose::Password {
+    let password = |want: Want| Card::Password { want, typed: String::new(), last: None, saved: None };
+    if want.purpose == Purpose::Password {
         if !found.needs_password() {
-            controller.add_log(format!("{source} logs in without a password lazyrunner keeps"), Hue::Gray);
+            controller.add_log(format!("{} logs in without a password lazyrunner keeps", found.name), Hue::Gray);
             return;
         }
-        return open(ui, password());
+        return open(ui, password(want));
     }
-    if let Some(busy) = controller.database_busy() {
-        controller.add_log(format!("lazyrunner is {busy} - pull once it's done"), Hue::Yellow);
+    if want.purpose == Purpose::Pull && found.is_server() && want.database.is_none() {
+        super::sources::open_source(ui, controller, &found.name);
+        controller.add_log(format!("{} is a whole server - pick one of its databases, then p", found.name), Hue::Gray);
         return;
     }
-    if found.needs_password() && !controller.password_kept(source) {
-        return open(ui, password());
+    if let Some(busy) = controller.database_busy().filter(|_| want.purpose != Purpose::List) {
+        controller.add_log(format!("lazyrunner is {busy} - once it's done"), Hue::Yellow);
+        return;
     }
-    start(ui, controller, source, None);
+    if found.needs_password() && !controller.password_kept(&found.name) {
+        return open(ui, password(want));
+    }
+    start(ui, controller, &want, None);
 }
 
-fn start(ui: &mut Ui, controller: &mut Controller, source: &str, typed: Option<Password>) {
-    match controller.pull_database(source, typed) {
-        Ok(_) => ui.pull_view = View { dismissed: ui.pull_view.dismissed, ..View::default() },
+/// Does what was asked, with the password just typed (else the kept one).
+fn start(ui: &mut Ui, controller: &mut Controller, want: &Want, typed: Option<Password>) {
+    let database = want.database.as_deref();
+    let result = match (want.purpose.mode(), &want.local) {
+        (Some(Mode::Update), Some((server, local))) => controller.update_linked(server, local, typed),
+        (Some(mode), _) => controller.pull_from(mode, &want.source, database, typed),
+        (None, _) if want.purpose == Purpose::List => controller.list_databases(&want.source, typed),
+        (None, _) => Ok(String::new()),
+    };
+    match result {
+        Ok(_) if want.purpose.mode().is_some() => {
+            ui.pull_view = View { dismissed: ui.pull_view.dismissed, ..View::default() };
+        }
+        Ok(_) => {}
         Err(why) => controller.add_log(format!("✗ {why}"), Hue::Red),
     }
 }
@@ -217,15 +306,18 @@ pub fn card_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyE
     let Some(Overlay::Pull(card)) = ui.overlay.as_mut() else { return };
     let now = ui.now;
     match card.as_mut() {
+        Card::Form(_) => super::source_form::key(ui, controller, name, key),
+        Card::Link(_) => super::link_card::key(ui, controller, name),
         Card::Choose { purpose, index } => {
             let count = controller.pull_sources().len();
             match name {
                 "j" | "DownArrow" => *index = (*index + 1) % count.max(1),
                 "k" | "UpArrow" => *index = (*index + count.max(1) - 1) % count.max(1),
+                "a" => super::source_form::open_new(ui, controller),
                 "Enter" => {
                     let (purpose, picked) = (*purpose, *index);
                     if let Some(source) = controller.pull_sources().get(picked).map(|source| source.name.clone()) {
-                        proceed(ui, controller, purpose, &source);
+                        proceed(ui, controller, Want::new(purpose, &source, None));
                     }
                 }
                 "Escape" | "q" => ui.overlay = None,
@@ -233,13 +325,13 @@ pub fn card_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyE
             }
         }
         Card::Password { saved: Some(_), .. } => {}
-        Card::Password { source, purpose, typed, last, .. } => match name {
+        Card::Password { want, typed, last, .. } => match name {
             "Escape" => ui.overlay = None,
             "Backspace" => {
                 typed.pop();
             }
-            "Delete" if typed.is_empty() && *purpose == Purpose::Password => {
-                let source = source.clone();
+            "Delete" if typed.is_empty() && want.purpose == Purpose::Password => {
+                let source = want.source.clone();
                 ui.overlay = None;
                 if let Err(why) = controller.forget_password(&source) {
                     controller.add_log(format!("✗ {why}"), Hue::Red);
@@ -247,9 +339,9 @@ pub fn card_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyE
             }
             "Enter" if typed.is_empty() => {}
             "Enter" => {
-                let (source, purpose) = (source.clone(), *purpose);
+                let want = want.clone();
                 let password = Password::new(std::mem::take(typed));
-                submit(ui, controller, &source, purpose, password);
+                submit(ui, controller, &want, password);
             }
             _ => {
                 if let Some(c) = super::keys::typed(key).filter(|_| typed.chars().count() < PASSWORD_MOST) {
@@ -261,9 +353,9 @@ pub fn card_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyE
     }
 }
 
-/// The password typed: kept in the credential store (the card says where, then folds away), and the pull started.
-fn submit(ui: &mut Ui, controller: &mut Controller, source: &str, purpose: Purpose, password: Password) {
-    let kept = controller.keep_password(source, &password);
+/// The password typed: kept in the credential store (the card says where, then folds away), and what was asked done.
+fn submit(ui: &mut Ui, controller: &mut Controller, want: &Want, password: Password) {
+    let kept = controller.keep_password(&want.source, &password);
     match &kept {
         Ok(store) => {
             if let Some(Overlay::Pull(card)) = ui.overlay.as_mut()
@@ -277,13 +369,13 @@ fn submit(ui: &mut Ui, controller: &mut Controller, source: &str, purpose: Purpo
             controller.add_log(format!("! {why}"), Hue::Yellow);
         }
     }
-    if purpose == Purpose::Pull {
-        start(ui, controller, source, Some(password));
+    if want.purpose != Purpose::Password {
+        start(ui, controller, want, Some(password));
     }
 }
 
-/// Each frame: the card folded away once it has said where the password went; a pull that's done handled once - the
-/// new database's row read in and glinting, `keepPulled`'s offer made.
+/// Each frame: the card folded away once it has said where the password went; the form's paste and try followed;
+/// a pull that's done handled once - the new database's row read in and glinting, `keepPulled`'s offer made.
 pub fn poll(ui: &mut Ui, controller: &Controller) {
     if let Some(Overlay::Pull(card)) = &ui.overlay
         && let Card::Password { saved: Some((at, _)), .. } = **card
@@ -293,26 +385,37 @@ pub fn poll(ui: &mut Ui, controller: &Controller) {
             ui.overlay = None;
         }
     }
+    super::source_form::poll(ui, controller);
     let Some(pull) = controller.pull.as_ref().filter(|pull| pull.is_over()) else { return };
     if ui.pull_view.handled == Some(pull.job) || ui.picker.is_none() {
         return;
     }
     ui.pull_view.handled = Some(pull.job);
-    if !pull.went_well() {
+    if !pull.went_well() || pull.mode == Mode::Export {
         return;
     }
-    super::database_files::reload(ui, Some((&pull.server, &pull.database)));
-    ui.files_view.glint = Some((db_key(&pull.server, &pull.database), ui.now));
+    let shown = pull.target.as_deref().unwrap_or(&pull.database);
+    super::database_files::reload(ui, Some((&pull.server, shown)));
+    ui.files_view.glint = Some((db_key(&pull.server, shown), ui.now));
+    if pull.mode == Mode::Update {
+        ui.sources_view.updated = Some((db_key(&pull.server, shown), ui.now));
+    }
     if controller.pull_stale.is_empty() || ui.overlay.is_some() {
         return;
     }
     let names: Vec<&str> = controller.pull_stale.iter().map(|old| old.database.as_str()).collect();
-    let keep = controller.keep_pulled().unwrap_or(1);
-    let lines = vec![
-        format!("keepPulled keeps the newest {keep} pulled copies of {}.", pull.source),
-        format!("Drop the older {} ({})?", if names.len() == 1 { "one" } else { "ones" }, names.join(", ")),
-        "Their data is gone for good; the one in use is never dropped.".to_string(),
-    ];
+    let lines = match controller.keep_pulled() {
+        Some(keep) => vec![
+            format!("keepPulled keeps the newest {keep} pulled copies of {}.", pull.source),
+            format!("Drop the older {} ({})?", if names.len() == 1 { "one" } else { "ones" }, names.join(", ")),
+            "Their data is gone for good; the one in use is never dropped.".to_string(),
+        ],
+        None => vec![
+            format!("{shown} is up to date with {} - its old copy is {}.", pull.twin(), names.join(", ")),
+            "Drop the old copy? Its data is gone for good.".to_string(),
+            "n keeps it (keepPulled keeps the newest so many by itself).".to_string(),
+        ],
+    };
     let yes = SavePointYes::DropPulled(controller.pull_stale.clone());
     ui.overlay = Some(Overlay::Confirm(Box::new(Confirm {
         lines,
@@ -322,22 +425,27 @@ pub fn poll(ui: &mut Ui, controller: &Controller) {
     })));
 }
 
-/// Whether the card moves: the cursor while typing, a pop, the glint, the fold.
+/// Whether the card moves: the cursor while typing, a pop, the glint, the fold, the form's own motion.
 pub fn animating(ui: &Ui) -> bool {
     let Some(Overlay::Pull(card)) = &ui.overlay else { return false };
-    match **card {
+    match card.as_ref() {
         Card::Password { saved: Some(_), .. } => true,
         Card::Password { .. } => !still(ui),
+        Card::Form(form) => super::source_form::animating(ui, form),
+        Card::Link(link) => super::link_card::animating(ui, link),
         Card::Choose { .. } => false,
     }
 }
 
 /// Where a source is and how it logs in, as the card says it - never a password.
-fn reached(source: &DatabaseSource) -> String {
+pub fn reached(source: &DatabaseSource) -> String {
     match &source.reach {
         Reach::Server { server, database, auth, user } => {
             let login = user.as_ref().map_or_else(|| auth.name().to_string(), |user| format!("as {user}"));
-            format!("{server} · {database} · {login}")
+            match database {
+                Some(database) => format!("{server} · {database} · {login}"),
+                None => format!("{server} · the whole server · {login}"),
+            }
         }
         Reach::Env(name) => format!("${name}"),
     }
@@ -348,6 +456,8 @@ pub fn card_rows(ui: &Ui, controller: &Controller, width: usize, rows: usize) ->
     let Some(Overlay::Pull(card)) = &ui.overlay else { return Vec::new() };
     let lock = icons::icon(ui.nerd, Icon::Lock);
     match card.as_ref() {
+        Card::Form(form) => super::source_form::rows(ui, controller, form, width, rows),
+        Card::Link(link) => super::link_card::rows(ui, link, width, rows),
         Card::Choose { purpose, index } => {
             let mut lines: Vec<Vec<Seg>> = controller
                 .pull_sources()
@@ -367,13 +477,22 @@ pub fn card_rows(ui: &Ui, controller: &Controller, width: usize, rows: usize) ->
                     if at == *index { super::seg::focus_row(line, CARD_INNER) } else { line }
                 })
                 .collect();
-            let what = if *purpose == Purpose::Pull { "pulls a copy of it" } else { "changes or forgets its password" };
-            lines.extend([Vec::new(), vec![seg(format!(" j k pick · Enter {what} · Esc cancels"), C::DarkGray)]]);
+            let what = match purpose {
+                Purpose::Password => "changes or forgets its password",
+                _ => "pulls a copy of it (a whole server opens)",
+            };
+            lines.extend([
+                Vec::new(),
+                vec![seg(format!(" j k pick · Enter {what} · a add one · Esc cancels"), C::DarkGray)],
+            ]);
             boxed_in(C::Cyan, &icons::titled(ui.nerd, Icon::Database, "Pull from"), lines, "", width, rows, CARD_INNER)
         }
-        Card::Password { source, purpose, typed, last, saved } => {
-            let found = controller.pull_sources().iter().find(|known| &known.name == source);
-            let place = found.map(reached).unwrap_or_default();
+        Card::Password { want, typed, last, saved } => {
+            let found = controller.source(&want.source);
+            let place = found
+                .as_ref()
+                .map(|found| reached(&want.database.as_deref().map_or_else(|| found.clone(), |db| found.on(db))))
+                .unwrap_or_default();
             let mut lines = vec![vec![seg(format!(" {place}"), C::Gray)], Vec::new()];
             lines.push(dots(ui, typed.chars().count(), *last, saved.is_some()));
             lines.push(Vec::new());
@@ -389,12 +508,11 @@ pub fn card_rows(ui: &Ui, controller: &Controller, width: usize, rows: usize) ->
                 }
                 None => {
                     lines.push(vec![seg(format!(" Kept in {store}, never in a file or a log"), C::DarkGray)]);
-                    let forget = if *purpose == Purpose::Password { " · Del forgets the kept one" } else { "" };
-                    let then = if *purpose == Purpose::Pull { "keeps it and pulls" } else { "keeps it" };
-                    lines.push(vec![seg(format!(" Enter {then}{forget} · Esc cancels"), C::DarkGray)]);
+                    let forget = if want.purpose == Purpose::Password { " · Del forgets the kept one" } else { "" };
+                    lines.push(vec![seg(format!(" Enter {}{forget} · Esc cancels", want.purpose.then()), C::DarkGray)]);
                 }
             }
-            let title = format!("{lock} {source}'s password");
+            let title = format!("{lock} {}'s password", want.source);
             let boxed = boxed_in(C::Cyan, &title, lines, "", width, rows, CARD_INNER);
             match saved.map(|(at, _)| ui.now.saturating_duration_since(at)).filter(|after| *after > SAVED && !still(ui))
             {
@@ -408,7 +526,7 @@ pub fn card_rows(ui: &Ui, controller: &Controller, width: usize, rows: usize) ->
 }
 
 /// The password as typed: a `•` a character, the newest popping (bigger, lit) a moment; the cursor after.
-fn dots(ui: &Ui, count: usize, last: Option<Instant>, saved: bool) -> Vec<Seg> {
+pub(super) fn dots(ui: &Ui, count: usize, last: Option<Instant>, saved: bool) -> Vec<Seg> {
     let popping = last.is_some_and(|at| !still(ui) && ui.now.saturating_duration_since(at) < POP) && count > 0;
     let settled = if popping { count - 1 } else { count };
     let mut line = vec![seg(format!(" {}", "•".repeat(settled)), C::White)];
@@ -419,4 +537,9 @@ fn dots(ui: &Ui, count: usize, last: Option<Instant>, saved: bool) -> Vec<Seg> {
         line.push(seg(ui.cursor().to_string(), C::Cyan));
     }
     line
+}
+
+/// Whether a step is the pull's last: the switch, or an update's swap.
+pub fn is_last(step: Step) -> bool {
+    matches!(step, Step::Switch | Step::Swap)
 }

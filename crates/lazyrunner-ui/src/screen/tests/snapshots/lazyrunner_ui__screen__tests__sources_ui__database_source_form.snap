@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests/sources_ui.rs
+expression: frame
+---
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
+ DefaultConnection · secrets.json · 1 connection strings · the active one ●
+ p pull · e export · i import · l link · , password · E edit · Del remove · a add · / filter · Esc back
+
+   DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SIZE      SWITCHED TO
+ ● Shop @ localhost ┌─ New source ───────────────────────────────────────────────────────┐  -
+                    │  Paste a connection string (Ctrl+V), or fill in:                   │
+ SAVE POINTS · Shop │  Name     qa-2                                                     │
+  ⡗ ◉  now  ◂ you ar│  Server   qa-sql.example.com,1433▏                                 │
+     no save points │  Login    ◉ SQL  ○ Windows  ○ from an environment variable         │
+                    │  User     reader                                                   │
+ FILES · …\sample\da│  Password •••••••••••   * kept in the tests' store                 │
+ none yet - b backs │  Database ○ the whole server  ◉ one: Shop                          │
+                    │  Save for ◉ the team (.lazyrunner.json)  ○ only me                 │
+ SOURCES   1 · the t│  left out (a pull sets them itself): Encrypt,                      │
+   DB qa          qa│   TrustServerCertificate, Application Name                         │
+                    │                                                                    │
+                    │  Tab next · ← → choose · Ctrl+G try it · Enter save · Esc cancel   │
+                    └────────────────────────────────────────────────────────────────────┘
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

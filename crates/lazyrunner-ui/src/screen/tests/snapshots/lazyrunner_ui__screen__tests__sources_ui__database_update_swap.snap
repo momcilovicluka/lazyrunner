@@ -1,0 +1,34 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests/sources_ui.rs
+expression: frame
+---
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
+ DefaultConnection · secrets.json · 1 connection strings · the active one ●
+ U update from qa/Shop · j k choose · Enter switch + restart the APIs · s snapshot · S backup save point
+ r rewind · R pin · u changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again
+ L link (unlink) · o folder · Tab save points, files, pull, sources · n new connection string · / filter
+ y copy row · Esc back
+
+   DATABASE @ SERVER                              ANSWERS       APPS ON IT   MIGRATIONS   SIZE   SWITCHED TO
+ ● Shop @ localhost  ↔ qa/Shop · pulled 1 d ago   – local       -            -            -      -
+
+ UPDATE Shop @ localhost ← qa/Shop                                                                      1m35s
+  ─────╮       ╭────────────────╮       ╭────────────────╮       ╭┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╮       ╭────────────────╮
+       │       │ ✓ import       │       │ ✓ after-pull   │       ┆ – migrations   ┆       │ ● swap         │┄┄
+       │──────▶│ Shop_qa_20261… │──────▶│                │──────▶┆                ┆──────▶│ Shop           │┄┄
+       │       │                │       │                │       ┆                ┆       │ ↑ Shop_qa_202… │
+  ─────╯       ╰────────────────╯       ╰────────────────╯       ╰┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯       ╰────────────────╯
+
+
+ ● swap · ALTER DATABASE … MODIFY NAME
+
+
+ FILES · …\sample\databases
+ none yet - b backs a database up to the server's backup folder, e exports a .bacpac here
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00   Linked Shop @ localhost ↔ qa/Shop - U updates it from there
+ 12:00:00   qa's password is kept in the tests' store
+ 12:00:00   ⇣ Updating Shop @ localhost from qa/Shop - its new copy comes in beside it…

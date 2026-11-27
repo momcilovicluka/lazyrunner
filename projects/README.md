@@ -96,7 +96,7 @@ What a project is for lazyrunner: the file that marks its repo, the folder whose
 | `tasks` | array of objects |  | Optional. One-off commands run from the palette or by an agent (the task table below). Example: `[{"key":"seed","name":"Seed the database","run":"python seed.py"}]`. |
 | `presets` | object |  | Optional. This profile's own presets, by name: a command app's "preset" finds them before yours and lazyrunner's (the preset table below). Example: `{"fastapi":{"run":"uvicorn main:app --port {port}","install":"uv sync"}}`. |
 | `layers` | object |  | Optional. Rules for the code map (K, then Tab): each key a project's name (* for anything, e.g. *.Api), and the projects it must not reference - a link that does is marked as a rule break. Nx's module boundaries (.eslintrc.json's depConstraints) are read as well. Example: `{"Orders.Core":{"mustNotReference":["Orders.Api"]}}`. |
-| `databaseSources` | array of objects |  | Optional. The other environments a copy of the database is pulled from (p on the database screen, the database source table below) - never a password: one is asked for once and kept in the OS's credential store. Example: `[{"name":"qa","server":"qa-sql.example.com,1433","database":"Shop","auth":"sql","user":"reader"},{"name":"staging","connectionStringEnv":"SHOP_STAGING_DB"}]`. |
+| `databaseSources` | array of objects |  | Optional. The other environments a copy of the database is pulled from (p on the database screen, the database source table below): one database each, or a whole server whose databases are listed and picked - never a password: one is asked for once and kept in the OS's credential store, one per server and login. The same list under the project in lazyrunner.config.json is this machine's only, and wins by name. The database screen's Sources section adds and edits them (a), changing only this key. Example: `[{"name":"qa-shop","server":"qa-sql.example.com,1433","database":"Shop","auth":"sql","user":"reader"},{"name":"qa","server":"qa-sql.example.com,1433","auth":"sql","user":"reader"},{"name":"staging","connectionStringEnv":"SHOP_STAGING_DB"}]`. |
 | `afterPull` | array of paths |  | Optional. .sql files from the repo root run in order on a pulled copy, stopping at the first error: point integration URLs at local, reset test logins, mask personal data. GO lines split a file into batches. Example: `["scripts/local-urls.sql","scripts/test-logins.sql"]`. |
 | `keepPulled` | integer |  | Optional. How many pulled copies of a source are kept: after a pull, lazyrunner offers to drop the older ones (never the one in use). The keepPulled setting overrides it on this machine. Example: `2`. |
 | `migrateAfterPull` | boolean |  | Optional. A pull applies the pending EF Core migrations to its copy before switching to it, as the migrations screen does (false without it). The migrateAfterPull setting overrides it on this machine. Example: `true`. |
@@ -297,13 +297,13 @@ A one-off command run from the palette (: then its name) or by an agent (run_tas
 
 #### A database source ("databaseSources")
 
-Another environment's database a copy is pulled from (#110): p checks the login, exports a .bacpac with SqlPackage - the only thing ever run there, and it only reads - imports it as a new database <database>_<source>_<yyyyMMdd> on the server in use, runs afterPull, applies the migrations (migrateAfterPull) and switches to it. Either its server and database, or connectionStringEnv.
+Another environment's database a copy is pulled from (#110), or its whole server (#114): p checks the login, exports a .bacpac with SqlPackage - the only thing ever run there, and it only reads - imports it as a new database <database>_<source>_<yyyyMMdd> on the server in use, runs afterPull, applies the migrations (migrateAfterPull) and switches to it. Either its server (and a database, or none for the whole server), or connectionStringEnv.
 
 | Field | Type | Required | What it does |
 |---|---|---|---|
-| `name` | string | yes | Short name, unique among the sources: in a pulled copy's name and where its password is kept (lazyrunner/<project>/<name>). Example: `"qa"`. |
+| `name` | string | yes | Short name, unique among the sources: in a pulled copy's name. Its password is kept per server and login (lazyrunner/<project>/<user>@<server>). Example: `"qa"`. |
 | `server` | string |  | Its server, as a connection string names it. Example: `"qa-sql.example.com,1433"`. |
-| `database` | string |  | The database to pull a copy of. Example: `"Shop"`. |
+| `database` | string |  | Optional. The database to pull a copy of; without it the source is the whole server, its databases listed and picked on the database screen. Example: `"Shop"`. |
 | `auth` |  |  | Optional. How it logs in: sql (user, and a password asked for once), windows, or entra (not supported yet). sql with a user, windows without. Example: `"sql"`. |
 | `user` | string |  | Optional. A SQL login's name. Example: `"reader"`. |
 | `connectionStringEnv` | string |  | Optional, instead of the rest: an environment variable holding its whole connection string. Example: `"SHOP_STAGING_DB"`. |

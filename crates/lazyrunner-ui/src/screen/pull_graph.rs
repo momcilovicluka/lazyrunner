@@ -5,13 +5,16 @@
 //! that one lights; a failed one pulses red twice and keeps a red border, the steps after it dim. Under the graph, the
 //! picked step's line - what it runs, a real progress bar, its last output - and the error's first line. Done, one
 //! light sweep runs over it, it holds a moment (each box with its duration, the slowest tinted), then folds into a
-//! summary row. Narrower than its boxes, it scrolls sideways to the running step; much narrower, it's a list.
+//! summary row. Narrower than its boxes, it scrolls sideways to the running step; much narrower, it's a list. An
+//! export, an import and an update (#114) draw their own steps; an update's swap shows the two names trading places,
+//! the old one sliding down and dimming as the new one rises into its place, and fans out to the apps it stops and
+//! starts again.
 
 use std::time::{Duration, Instant};
 
 use lazyrunner_core::run::controller::pull::{PullRun, StepRun};
 use lazyrunner_core::run::database_files as files;
-use lazyrunner_core::run::pull::{State, Step};
+use lazyrunner_core::run::pull::{Mode, State, Step};
 use lazyrunner_core::run::{Controller, format_duration};
 use unicode_width::UnicodeWidthStr;
 
@@ -49,6 +52,8 @@ const LIST_BELOW: usize = 60;
 /// A box's rows, and the section's rows besides the graph: its header, a blank row, the picked step's two.
 const BOX_ROWS: usize = 5;
 const AROUND: usize = 4;
+/// The swap's names trade places over this long, in a loop while it runs.
+const TRADE: Duration = Duration::from_millis(1200);
 
 /// Where the dots are along the edge into the running step: how far, when last moved, for which job and step.
 #[derive(Debug, Default)]
@@ -124,12 +129,28 @@ pub fn animating(ui: &Ui, controller: &Controller) -> bool {
 
 /// The step picked: the one `h` `l` picked, else the running one, the failed one, the last done.
 pub fn picked(ui: &Ui, pull: &PullRun) -> Step {
-    if let Some(step) = ui.pull_view.picked.and_then(|at| Step::ALL.get(at)) {
+    if let Some(step) = ui.pull_view.picked.and_then(|at| pull.steps().get(at)) {
         return *step;
     }
     let failed = pull.error.as_ref().map(|(step, _)| *step);
-    let done = Step::ALL.into_iter().rev().find(|step| pull.step(*step).state == State::Done);
+    let done = pull.steps().iter().rev().copied().find(|step| pull.step(*step).state == State::Done);
     pull.running().or(failed).or(done).unwrap_or(Step::Check)
+}
+
+/// Where the picked step is among the pull's steps.
+pub fn picked_at(ui: &Ui, pull: &PullRun) -> usize {
+    let step = picked(ui, pull);
+    pull.steps().iter().position(|known| *known == step).unwrap_or_default()
+}
+
+/// Where a step is among the pull's steps (its box's place in the graph).
+fn at(pull: &PullRun, step: Step) -> usize {
+    pull.steps().iter().position(|known| *known == step).unwrap_or_default()
+}
+
+/// The step that restarts the apps: the switch, or an update's swap.
+fn last(pull: &PullRun) -> Step {
+    if pull.mode == Mode::Update { Step::Swap } else { Step::Switch }
 }
 
 /// How long a step took, once it's done.
@@ -139,7 +160,7 @@ fn took(run: &StepRun) -> Option<Duration> {
 
 /// The step that took longest, once the pull went well: its box is tinted.
 fn slowest(pull: &PullRun) -> Option<Step> {
-    pull.went_well().then(|| Step::ALL.into_iter().max_by_key(|step| took(pull.step(*step))))?
+    pull.went_well().then(|| pull.steps().iter().copied().max_by_key(|step| took(pull.step(*step))))?
 }
 
 /// A step as it shows now: running only once the edge into it has drawn in.
@@ -199,6 +220,8 @@ fn doing(controller: &Controller, pull: &PullRun, step: Step) -> [String; 2] {
         (Step::Migrations, State::Running) => ["applying…".into(), String::new()],
         (Step::Switch, State::Done) => [run.detail.clone(), duration],
         (Step::Switch, _) => ["make it the".into(), "active one".into()],
+        (Step::Swap, State::Running) => ["renaming…".into(), pull.target.clone().unwrap_or_default()],
+        (Step::Swap, _) => [format!("→ {}", pull.target.as_deref().unwrap_or_default()), "names trade".into()],
         (_, State::Done) => [run.detail.clone(), duration],
     }
 }
@@ -252,13 +275,40 @@ fn step_node(ui: &Ui, controller: &Controller, pull: &PullRun, step: Step) -> gr
         State::Done => C::Gray,
         _ => C::DarkGray,
     };
+    if step == Step::Swap && matches!(state, State::Running | State::Done) {
+        node_lines.truncate(1);
+        node_lines.extend(trading(ui, pull, run));
+    }
     let dashed = matches!(state, State::Waiting | State::Skipped);
-    graph::Node { lines: node_lines, pad: 1, border, dashed, target: Some(Target::Step(step.index())), bare: false }
+    graph::Node { lines: node_lines, pad: 1, border, dashed, target: Some(Target::Step(at(pull, step))), bare: false }
+}
+
+/// The swap's two names trading places: the linked database's old copy sliding down and dimming, the new one rising
+/// into its place - looping while it runs, settled once it's done (still: settled).
+fn trading(ui: &Ui, pull: &PullRun, run: &StepRun) -> Vec<Vec<Seg>> {
+    let target = pull.target.clone().unwrap_or_default();
+    let old = pull.old.clone().unwrap_or_else(|| format!("{target}_old"));
+    let fit = |text: &str| {
+        if text.width() > INNER { format!("{}…", take_cells(text, INNER - 1)) } else { pad(text, INNER) }
+    };
+    let phase = match (run.state, run.started) {
+        (State::Running, Some(at)) if moving(ui) => {
+            let looped = since(ui, at).as_millis() % TRADE.as_millis();
+            ease(looped as f64 / TRADE.as_millis() as f64)
+        }
+        (State::Running, _) => 0.0,
+        _ => 1.0,
+    };
+    if phase < 0.5 {
+        vec![vec![seg(fit(&target), C::Gray)], vec![seg(fit(&format!("↑ {}", pull.database)), C::Cyan)]]
+    } else {
+        vec![vec![seg(fit(&format!("✓ {target}")), C::Green)], vec![seg(fit(&format!("↓ {old}")), C::DarkGray)]]
+    }
 }
 
 /// An API's box beyond the switch: waiting, restarting (lit, breathing) or answering again.
 fn app_node(ui: &Ui, controller: &Controller, pull: &PullRun, (key, before): &(String, u64)) -> graph::Node {
-    let switch = pull.step(Step::Switch).state;
+    let switch = pull.step(last(pull)).state;
     let state = controller.state(key);
     let up = state.is_some_and(|state| state.generation > *before && state.is_up()) || switch == State::Done;
     let restarting = switch == State::Running && !up;
@@ -276,10 +326,10 @@ fn app_node(ui: &Ui, controller: &Controller, pull: &PullRun, (key, before): &(S
 
 /// The graph's boxes, lines and motion.
 fn model(ui: &mut Ui, controller: &Controller, pull: &PullRun) -> (Vec<graph::Node>, Vec<graph::Edge>, Vec<Motion>) {
-    let mut nodes: Vec<graph::Node> = Step::ALL.iter().map(|step| step_node(ui, controller, pull, *step)).collect();
+    let mut nodes: Vec<graph::Node> = pull.steps().iter().map(|step| step_node(ui, controller, pull, *step)).collect();
     nodes.extend(pull.apps.iter().map(|app| app_node(ui, controller, pull, app)));
     let (mut edges, mut motion) = (Vec::new(), Vec::new());
-    for pair in Step::ALL.windows(2) {
+    for pair in pull.steps().windows(2) {
         let (from, to) = (pair[0], pair[1]);
         let run = pull.step(to);
         let state = run.state;
@@ -299,8 +349,8 @@ fn model(ui: &mut Ui, controller: &Controller, pull: &PullRun) -> (Vec<graph::No
             look.dot = Some((travelled, C::White));
         }
         edges.push(graph::Edge {
-            from: from.index(),
-            to: to.index(),
+            from: at(pull, from),
+            to: at(pull, to),
             color,
             dashed,
             label: String::new(),
@@ -309,14 +359,15 @@ fn model(ui: &mut Ui, controller: &Controller, pull: &PullRun) -> (Vec<graph::No
         });
         motion.push(look);
     }
-    let switch = pull.step(Step::Switch).state;
-    for (at, (key, before)) in pull.apps.iter().enumerate() {
+    let switch = pull.step(last(pull)).state;
+    let steps = pull.steps().len();
+    for (app, (key, before)) in pull.apps.iter().enumerate() {
         let restarted = controller.state(key).is_some_and(|state| state.generation > *before);
         let lit = switch == State::Done || (switch == State::Running && restarted);
         let color = if lit { C::Cyan } else { C::DarkGray };
         edges.push(graph::Edge {
-            from: Step::Switch.index(),
-            to: Step::ALL.len() + at,
+            from: at(pull, last(pull)),
+            to: steps + app,
             color: if switch == State::Done { C::Gray } else { color },
             dashed: !lit,
             label: String::new(),
@@ -330,7 +381,14 @@ fn model(ui: &mut Ui, controller: &Controller, pull: &PullRun) -> (Vec<graph::No
 
 /// The header: where from and to, how long it has taken and about how long is left.
 fn header(ui: &Ui, pull: &PullRun, cells: usize) -> Vec<Seg> {
-    let left = format!(" PULL {} → {} · {}", pull.source, pull.server, pull.database);
+    let left = match pull.mode {
+        Mode::Export => format!(" EXPORT {} → {}", pull.twin(), file_name(&pull.file)),
+        Mode::Update => {
+            format!(" UPDATE {} @ {} ← {}", pull.target.as_deref().unwrap_or_default(), pull.server, pull.twin())
+        }
+        Mode::Import => format!(" IMPORT {} → {} · {}", pull.twin(), pull.server, pull.database),
+        Mode::Pull => format!(" PULL {} → {} · {}", pull.source, pull.server, pull.database),
+    };
     let end = pull.ended.unwrap_or(ui.now);
     let mut right = format_duration(end.saturating_duration_since(pull.started).as_secs_f64());
     let running = pull.running().filter(|step| step.flows() && !pull.is_over());
@@ -354,6 +412,11 @@ fn shown_share(ui: &Ui, pull: &PullRun) -> Option<f64> {
     Some(before + (newest - before) * glide)
 }
 
+/// A path's file name.
+fn file_name(path: &str) -> String {
+    std::path::Path::new(path).file_name().map_or_else(String::new, |name| name.to_string_lossy().into_owned())
+}
+
 /// What a step runs.
 fn runs(step: Step) -> &'static str {
     match step {
@@ -361,6 +424,7 @@ fn runs(step: Step) -> &'static str {
         Step::Export | Step::Import => "SqlPackage",
         Step::Migrations => "dotnet ef",
         Step::Switch => "secrets.json",
+        Step::Swap => "ALTER DATABASE … MODIFY NAME",
     }
 }
 
@@ -407,7 +471,7 @@ fn picked_lines(ui: &Ui, pull: &PullRun, cells: usize) -> Vec<Vec<Seg>> {
 
 /// The steps as a list, for a window narrower than the graph's boxes.
 fn list(ui: &Ui, controller: &Controller, pull: &PullRun, cells: usize) -> Vec<Vec<Seg>> {
-    Step::ALL
+    pull.steps()
         .iter()
         .map(|step| {
             let run = pull.step(*step);
@@ -428,22 +492,34 @@ fn list(ui: &Ui, controller: &Controller, pull: &PullRun, cells: usize) -> Vec<V
 /// The summary row a finished pull folds into.
 fn summary(pull: &PullRun) -> Vec<Seg> {
     let took = pull.ended.map(|at| format_duration(at.saturating_duration_since(pull.started).as_secs_f64()));
+    let took = took.unwrap_or_default();
+    let what = pull.mode.name();
     match &pull.error {
-        None => vec![seg(
-            format!(
-                " ✓ pulled {} in {} · {} is active · Tab shows the steps",
-                pull.source,
-                took.unwrap_or_default(),
-                pull.database
-            ),
-            C::Green,
-        )],
+        None => {
+            let said = match pull.mode {
+                Mode::Pull => {
+                    format!(" ✓ pulled {} in {took} · {} is active · Tab shows the steps", pull.source, pull.database)
+                }
+                Mode::Import => {
+                    format!(" ✓ imported {} in {took} as {} · Tab shows the steps", pull.twin(), pull.database)
+                }
+                Mode::Export => {
+                    format!(" ✓ exported {} in {took} · {} · Tab shows the steps", pull.twin(), file_name(&pull.file))
+                }
+                Mode::Update => format!(
+                    " ✓ updated {} from {} in {took} · pulled just now · Tab shows the steps",
+                    pull.target.as_deref().unwrap_or_default(),
+                    pull.twin()
+                ),
+            };
+            vec![seg(said, C::Green)]
+        }
         Some((step, _)) if pull.cancelled => {
-            vec![seg(format!(" ■ the pull from {} was cancelled at {}", pull.source, step.name()), C::Yellow)]
+            vec![seg(format!(" ■ the {what} from {} was cancelled at {}", pull.source, step.name()), C::Yellow)]
         }
         Some((step, why)) => vec![seg(
             format!(
-                " ✗ the pull from {} failed at {}: {}",
+                " ✗ the {what} from {} failed at {}: {}",
                 pull.source,
                 step.name(),
                 why.lines().next().unwrap_or_default()
@@ -510,7 +586,7 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     } else {
         let (nodes, edges, motion) = model(ui, controller, pull);
         let map = Map::draw(&nodes, &edges, &motion);
-        let keep = pull.running().unwrap_or_else(|| picked(ui, pull)).index();
+        let keep = at(pull, pull.running().unwrap_or_else(|| picked(ui, pull)));
         let from = map.layout.boxes.get(keep).map_or(0, |at| (at.x + at.w + MARGIN).saturating_sub(room));
         let mut drawn: Vec<Vec<Seg>> = map.rows(from, room).into_iter().take(graph_rows).collect();
         match over(ui, pull) {

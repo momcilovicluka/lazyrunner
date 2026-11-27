@@ -1,0 +1,33 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests/sources_ui.rs
+expression: frame
+---
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
+ DefaultConnection · secrets.json · 1 connection strings · the active one ●
+ Enter open · g list again · , password · E edit · Del remove · a add · / filter · Tab databases · Esc back
+
+   DATABASE @ SERVER                                    ANSWERS      APPS ON IT  MIGRATIONS  SIZE  SWITCHED TO
+ ● Shop @ localhost  ↔ qa-all/Shop · pulled 12 d ago •  – local      -           -           -     -
+
+ SAVE POINTS · Shop
+  ⡗ ◉  now  ◂ you are here
+     no save points yet - s makes a snapshot (a moment), S a backup (slower)
+
+ FILES · …\sample\databases
+ none yet - b backs a database up to the server's backup folder, e exports a .bacpac here
+
+ SOURCES   2 · the team's and only mine
+   DB qa          qa-sql.example.com,1433 · Shop · reader
+ ▾ ≡  qa-all      qa-sql.example.com,1433 · reader   3 databases · listed 3 min ago   only mine
+     Shop               4.2 GB   changed 1 h ago     ↔ Shop · pulled 12 d ago
+     Shop_Audit         1.1 GB   changed 2 d ago
+     Tenant_Acme        380 MB   changed 8 d ago
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit
+
+ 12:00:00   Saved qa-all (only mine)
+ 12:00:00   Linked Shop @ localhost ↔ qa-all/Shop - U updates it from there

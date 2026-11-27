@@ -6585,6 +6585,8 @@ impl lazyrunner_core::run::sqlpackage::Package for ReadyPackage {
     }
 }
 
+mod sources_ui;
+
 /// The database screen on Shop @ localhost, with the source `qa` (a SQL login) and the tests' credential store.
 fn pulling_screen(label: &str) -> (Screen, std::sync::Arc<lazyrunner_core::run::credentials::Memory>) {
     use lazyrunner_core::profile::sources::{Auth, DatabaseSource, Pulling, Reach};
@@ -6598,12 +6600,12 @@ fn pulling_screen(label: &str) -> (Screen, std::sync::Arc<lazyrunner_core::run::
     screen.controller.use_credentials(store.clone());
     let reach = Reach::Server {
         server: "qa-sql.example.com,1433".into(),
-        database: "Shop".into(),
+        database: Some("Shop".into()),
         auth: Auth::Sql,
         user: Some("reader".into()),
     };
     screen.controller.project.pulling = Pulling {
-        sources: vec![DatabaseSource { name: "qa".into(), reach }],
+        sources: vec![DatabaseSource::new("qa", reach)],
         after_pull: vec!["scripts/local-urls.sql".into(), "scripts/test-logins.sql".into()],
         keep_pulled: Some(2),
         migrate: true,
@@ -6692,7 +6694,8 @@ async fn a_sources_password_is_typed_masked_kept_and_never_shown() {
     insta::assert_snapshot!("database_pull_password", frame);
 
     screen.press("Enter");
-    let target = lazyrunner_core::run::credentials::target(&screen.controller.project.id, "qa");
+    let login = "reader@qa-sql.example.com,1433";
+    let target = lazyrunner_core::run::credentials::shared_target(&screen.controller.project.id, login);
     use lazyrunner_core::run::credentials::Store;
     assert_eq!(store.get(&target).unwrap().unwrap().expose(), "s3crety");
     assert!(screen.frame().contains("✓ saved in the tests' store"), "{}", screen.frame());

@@ -302,7 +302,7 @@ impl Controller {
     pub fn drop_database(&mut self, server: &str, database: &str) -> Result<String, String> {
         self.sql.ready()?;
         self.can_drop(server, database)?;
-        let connection = self.connection(server, database)?;
+        let connection = self.connection(server, database).or_else(|_| self.server_connection(server))?;
         let job = self.new_db_job();
         let (sql, events, name) = (Arc::clone(&self.sql), self.events.clone(), database.to_string());
         std::thread::spawn(move || {

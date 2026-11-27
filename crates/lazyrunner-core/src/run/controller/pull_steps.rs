@@ -2,7 +2,8 @@
 //! `.bacpac` from it - the only things ever run there, and both only read - import it as a new database on the local
 //! server, and run the after-pull scripts on that. Each step's lines and progress are reported as they come. A
 //! cancel (`x`) kills the program running; a half-imported database is dropped after, the job no longer watched.
-//! The migrations and the switch run in the controller (`controller::pull`).
+//! An export-only job stops after the export (#114). The migrations, the switch and an update's swap run in the
+//! controller (`controller::pull`).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -11,15 +12,16 @@ use std::time::Instant;
 use super::database_jobs::{exists, export, first, import, remove_database};
 use crate::run::cancel::{CANCELLED, Cancel};
 use crate::run::database_files::{self as files, Progress};
-use crate::run::pull::{self, News, Step};
+use crate::run::pull::{self, Mode, News, Step};
 use crate::run::secrets::mask_text;
 use crate::run::sql::Sql;
 use crate::run::sqlpackage::{Action, Package};
 
-/// What a pull's thread does: its source (by name, and its database, connection string and all), the local server's
-/// connection string, the new database, the `.bacpac` it goes through, the private folder for SqlPackage's response
-/// file, and the after-pull scripts (each its name and text).
+/// What a pull's thread does: what it makes, its source (by name, and its database, connection string and all), the
+/// local server's connection string, the new database, the `.bacpac` it goes through, the private folder for
+/// SqlPackage's response file, and the after-pull scripts (each its name and text).
 pub(super) struct Plan {
+    pub mode: Mode,
     pub source: String,
     pub source_database: String,
     pub source_connection: String,
@@ -141,6 +143,9 @@ fn steps(
         export(sql, &exporting, &plan.source_connection, &plan.source_database, &plan.file, &plan.private, &report)
             .map_err(at(Step::Export))?;
     say(News::Done(Step::Export, exported.bytes.map(files::size).unwrap_or_default()));
+    if plan.mode == Mode::Export {
+        return Ok(());
+    }
 
     start(Step::Import, say)?;
     if exists(sql, &plan.local, &plan.database).map_err(at(Step::Import))? {
@@ -239,6 +244,7 @@ mod tests {
 
     fn plan(scripts: &[(&str, &str)]) -> Plan {
         Plan {
+            mode: Mode::Pull,
             source: "qa".into(),
             source_database: "Shop".into(),
             source_connection: "Server=qa-sql.example.com;Database=Shop;User ID=reader;Password=s3cret".into(),
@@ -328,6 +334,14 @@ mod tests {
         assert!(dropped(&sql), "cancelled half-way: dropped, though the job is cancelled");
         assert!(said.iter().any(|news| news.contains("was half-imported: dropped")));
         assert!(!sql.asked.lock().unwrap().iter().any(|(_, text)| text.contains("UPDATE A")), "no script after");
+
+        let sql = Scripted::default();
+        let package = Packaged { sql: &sql, import: Ok(()), cancel: None };
+        let export = Plan { mode: Mode::Export, ..plan(&[("scripts/a.sql", "UPDATE A SET X = 1;")]) };
+        let said = ran(&sql, &package, &export, &Arc::default());
+        let started: Vec<&String> = said.iter().filter(|news| news.starts_with("Started")).collect();
+        assert_eq!(started, ["Started(Check)", "Started(Export)"], "an export only exports: {said:#?}");
+        assert_eq!(ended(&said), "Ended(Ok(()))");
 
         let there = Scripted { imported: AtomicBool::new(true), ..Scripted::default() };
         let package = Packaged { sql: &there, import: Ok(()), cancel: None };

@@ -4,7 +4,10 @@
 //! row, `h` `l` another key, `Esc` goes back. Its rows come in one after another as it opens, and each answer flashes
 //! as it arrives. Under them, the highlighted database's save points and what changed since ([`super::save_points`]),
 //! then the files its backups and exports make; each row says how big its database is, and a copy, backup or export
-//! washes across it as it runs ([`super::database_files`]).
+//! washes across it as it runs ([`super::database_files`]). Under the files, the database sources
+//! ([`super::sources`], #114). A database linked to its remote twin says so on its row - `↔ qa/Shop · pulled 12 d
+//! ago`, a `•` when the twin changed after the copy, dim once it's older than `stalePulled` - the `↔` drawing itself
+//! in as it's linked; `L` links or unlinks, `U` updates it from its twin.
 
 use std::collections::HashMap;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -53,6 +56,13 @@ const NO_ANSWER: &str = "✗ no answer";
 const ROW_STAGGER: Duration = Duration::from_millis(35);
 const ROW_DIM: Duration = Duration::from_millis(120);
 const ANSWER_FLASH: Duration = Duration::from_millis(500);
+/// A link's text draws itself in this long; its row's name and its link are told apart at this mark; a copy younger
+/// than this was pulled "just now".
+pub const LINK_DRAW: Duration = Duration::from_millis(360);
+const LINK_MARK: &str = "  ↔ ";
+const JUST_NOW: Duration = Duration::from_secs(60);
+/// What a linked row's twin shows when it changed after the copy.
+const CHANGED_MARK: &str = " •";
 
 /// The screen's motion: when it opened, and when each server's answer came in.
 #[derive(Debug, Default)]
@@ -158,8 +168,34 @@ fn ago(at: &str) -> Option<String> {
     Some(lazyrunner_core::run::session::ago(Duration::from_secs(seconds)))
 }
 
-/// An entry's columns: its database and server, whether it answers, the apps on it, its pending migrations, its size
-/// (its bar a share of `most`, the biggest listed), when it was last switched to.
+/// A linked database's link as its row says it: `↔ qa/Shop · pulled 12 d ago`, `•` when its twin changed after the
+/// copy; drawing itself in for a moment once it's linked.
+fn link_text(ui: &Ui, controller: &Controller, entry: &Entry) -> Option<(String, bool)> {
+    let link = controller.link_of(&entry.server, &entry.database)?;
+    let age = link.pulled.as_deref().and_then(|at| at.parse::<jiff::Timestamp>().ok()).map(|at| {
+        let seconds = jiff::Timestamp::now().duration_since(at).as_secs().max(0) as u64;
+        match Duration::from_secs(seconds) {
+            age if age < JUST_NOW => " · pulled just now".to_string(),
+            age => format!(" · pulled {}", lazyrunner_core::run::session::ago(age)),
+        }
+    });
+    let changed = if controller.twin_changed(link) { CHANGED_MARK } else { "" };
+    let text = format!("{}{}{changed}", link.twin(), age.unwrap_or_default());
+    let key = lazyrunner_core::run::controller::save_points::db_key(&entry.server, &entry.database);
+    let drawn =
+        ui.sources_view.linked.as_ref().filter(|(linked, _)| *linked == key && !ui.reduced_motion && ui.motion.enabled);
+    let text = match drawn.map(|(_, at)| ui.now.saturating_duration_since(*at)) {
+        Some(after) if after < LINK_DRAW => {
+            let count = text.chars().count();
+            text.chars().take((count as f64 * after.as_secs_f64() / LINK_DRAW.as_secs_f64()).ceil() as usize).collect()
+        }
+        _ => text,
+    };
+    Some((text, controller.is_stale(link)))
+}
+
+/// An entry's columns: its database and server (and its link), whether it answers, the apps on it, its pending
+/// migrations, its size (its bar a share of `most`, the biggest listed), when it was last switched to.
 fn parts(ui: &Ui, controller: &Controller, entry: &Entry, most: u64) -> [Seg; 6] {
     let apps = if entry.active {
         let users = controller.database_users();
@@ -174,7 +210,18 @@ fn parts(ui: &Ui, controller: &Controller, entry: &Entry, most: u64) -> [Seg; 6]
         contexts.iter().filter(|context| context.db == entry.database).map(|context| context.pending().len()).sum();
     let pending = if pending > 0 { seg(format!("{pending} pending"), C::Yellow) } else { seg("-", C::DarkGray) };
     let last = controller.config[SWITCHED][&entry.label].as_str().and_then(ago).unwrap_or_else(|| "-".to_string());
-    let label = seg(entry.label.clone(), if entry.active { C::Green } else { C::Gray });
+    let link = link_text(ui, controller, entry);
+    let stale = link.as_ref().is_some_and(|(_, stale)| *stale);
+    let color = match (entry.active, stale) {
+        (_, true) => C::DarkGray,
+        (true, _) => C::Green,
+        _ => C::Gray,
+    };
+    let text = match &link {
+        Some((link, _)) => format!("{}{LINK_MARK}{link}", entry.label),
+        None => entry.label.clone(),
+    };
+    let label = seg(text, color);
     let apps = super::save_points::apps_back(ui, controller, entry).unwrap_or_else(|| seg(apps, C::Gray));
     let size = super::database_jobs::size_cell(controller, entry, most);
     [label, answer(ui, &entry.server), apps, pending, size, seg(last, C::DarkGray)]
@@ -215,6 +262,19 @@ fn row(
     for (at, part) in parts.into_iter().enumerate() {
         let after = if at + 1 == TITLES.len() { 0 } else { gap };
         let text = pad(&cell(&part.text, widths[at]), widths[at] + after);
+        if at == 0
+            && let Some(mark) = text.find(LINK_MARK)
+        {
+            let link_color = if part.fg == C::DarkGray { C::DarkGray } else { C::DarkCyan };
+            let (link, changed) = match text[mark..].find(CHANGED_MARK.trim()) {
+                Some(dot) => (&text[mark..mark + dot], &text[mark + dot..]),
+                None => (&text[mark..], ""),
+            };
+            out.push(Seg { text: text[..mark].to_string(), ..part.clone() });
+            out.push(seg(link.to_string(), link_color));
+            out.push(seg(changed.to_string(), C::Yellow));
+            continue;
+        }
         match text.find(SIZE_BEAD).filter(|_| at == SIZE_AT) {
             Some(beads) => {
                 out.push(seg(text[..beads].to_string(), C::Gray));
@@ -252,20 +312,29 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         seg(format!(" {key}"), C::White),
         seg(format!("{groups} · secrets.json · {size} connection strings · the active one ●"), C::DarkGray),
     ]];
+    let linked = entries.get(picker.index).and_then(|entry| controller.link_of(&entry.server, &entry.database));
+    let update = linked.map_or_else(String::new, |link| {
+        let stale = if controller.is_stale(link) { " (older than stalePulled)" } else { "" };
+        format!(" U update from {}{stale} ·", link.twin())
+    });
     let hint = if picker.filtering {
         " type to filter · Enter keeps it · Esc clears it".to_string()
     } else if picker.new_name.is_some() {
         " type the database name · Enter adds it (inactive) · Esc cancels".to_string()
-    } else if let Some(hint) =
-        super::database_files::hint(ui).or_else(|| super::pull_view::hint(ui)).or_else(|| super::save_points::hint(ui))
+    } else if let Some(hint) = super::database_files::hint(ui)
+        .map(str::to_string)
+        .or_else(|| super::pull_view::hint(ui).map(str::to_string))
+        .or_else(|| super::save_points::hint(ui).map(str::to_string))
+        .or_else(|| super::sources::hint(ui, controller))
     {
-        hint.to_string()
+        hint
     } else {
-        " j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin · u \
-         changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · o folder · Tab save points, \
-         files, pull · n new connection \
-         string · / filter · y copy row · Esc back"
-            .to_string()
+        format!(
+            "{update} j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin \
+             · u changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · L link{} · o \
+             folder · Tab save points, files, pull, sources · n new connection string · / filter · y copy row · Esc back",
+            if linked.is_some() { " (unlink)" } else { "" }
+        )
     };
     lines.extend(super::viewbar::keys(&hint, cells));
     if picker.filtering || !picker.filter.is_empty() {
@@ -308,6 +377,14 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         if let Some(through) = super::save_points::glint(ui, entry) {
             line = super::seg::sweep(line, through, cells, C::Black, C::Cyan);
         }
+        if let Some((_, at)) = ui.sources_view.updated.as_ref().filter(|(key, _)| {
+            *key == lazyrunner_core::run::controller::save_points::db_key(&entry.server, &entry.database)
+        }) && !ui.reduced_motion
+            && ui.now.saturating_duration_since(*at) < super::motion::SWEEP
+        {
+            let through = ui.now.saturating_duration_since(*at).as_secs_f64() / super::motion::SWEEP.as_secs_f64();
+            line = super::seg::sweep(line, through, cells, C::Black, C::Green);
+        }
         match opened {
             Some(since) if since < comes => line = Vec::new(),
             Some(since) if since < comes + ROW_DIM && at != index => {
@@ -341,17 +418,24 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     if left > 0 && !entries.is_empty() {
         let files = super::database_files::height(controller, left);
         let pull = super::pull_graph::height(ui, controller, left.saturating_sub(files + 2));
+        let taken = files + 2 + if pull > 0 { pull + 1 } else { 0 };
+        let sources = super::sources::height(ui, controller, left.saturating_sub(taken + 1));
+        let below = files + if sources > 0 { sources + 1 } else { 0 };
         lines.push(Vec::new());
         if pull > 0 {
             lines.extend(super::pull_graph::rows(ui, controller, cells, pull));
             lines.push(Vec::new());
         }
-        let points = left.saturating_sub(files + 1 + if pull > 0 { pull + 1 } else { 0 });
+        let points = left.saturating_sub(below + 1 + if pull > 0 { pull + 1 } else { 0 });
         if points > 0 {
             lines.extend(super::save_points::rows(ui, controller, cells, points));
         }
         lines.push(Vec::new());
         lines.extend(super::database_files::rows(ui, controller, cells, files));
+        if sources > 0 {
+            lines.push(Vec::new());
+            lines.extend(super::sources::rows(ui, controller, cells, sources));
+        }
     }
     lines.truncate(rows);
     lines.resize(rows, Vec::new());

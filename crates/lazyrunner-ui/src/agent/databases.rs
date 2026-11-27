@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::database_files::{self as files, DbFile, Kind as FileKind};
-use lazyrunner_core::run::pull::Step;
+use lazyrunner_core::run::pull::{Mode, Step};
 use lazyrunner_core::run::save_points::{self as points, Kind, SavePoint};
 use lazyrunner_core::run::secrets::{self, Entry};
 use serde_json::{Value, json};
@@ -186,8 +186,11 @@ pub fn backup(controller: &mut Controller, args: &Value) -> Result<String, Refus
     Ok(format!("{doing} - database op files lists the file once it's written"))
 }
 
-/// Exports a database to a `.bacpac` in lazyrunner's folder.
+/// Exports a database to a `.bacpac` in lazyrunner's folder: a local one, or a source's (`"source"`, #114).
 pub fn export(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    if args["source"].is_string() {
+        return super::sources::from_source(controller, args, Mode::Export);
+    }
     let (server, name) = database(controller, args)?;
     let doing = controller.export_database(&server, &name).map_err(|why| ("refused", why))?;
     Ok(format!("{doing} - database op files lists the file once it's written"))
@@ -208,8 +211,12 @@ fn file(controller: &Controller, args: &Value) -> Result<DbFile, Refusal> {
     })
 }
 
-/// Imports a `.bak` or `.bacpac` as a new database: `"name"`, else the file's name.
+/// Imports a `.bak` or `.bacpac` as a new database: `"name"`, else the file's name - or a source's database
+/// (`"source"`, #114), not switched to.
 pub fn import(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    if args["source"].is_string() {
+        return super::sources::from_source(controller, args, Mode::Import);
+    }
     controller.refresh_files();
     let file = file(controller, args)?;
     let server = match &file.server {
@@ -248,11 +255,11 @@ pub fn drop_database(controller: &mut Controller, args: &Value) -> Result<String
 /// after `"confirm": true` (the APIs restart on it). Refused when its password isn't kept: only the user types it,
 /// pulling once from lazyrunner.
 pub fn pull(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
-    let source = match args["source"].as_str() {
-        Some(source) => clean(source, CLIENT_CHARS),
-        None => controller.last_pull_source().ok_or_else(|| {
-            let known: Vec<&str> = controller.pull_sources().iter().map(|source| source.name.as_str()).collect();
-            ("bad_args", format!("\"source\" names one of the profile's databaseSources: {}", known.join(", ")))
+    let (source, remote) = match args["source"].as_str() {
+        Some(source) => (clean(source, CLIENT_CHARS), args["database"].as_str().map(|db| clean(db, CLIENT_CHARS))),
+        None => controller.last_pull().ok_or_else(|| {
+            let known: Vec<String> = controller.pull_sources().into_iter().map(|source| source.name).collect();
+            ("bad_args", format!("\"source\" names one of the databaseSources: {}", known.join(", ")))
         })?,
     };
     if let Some(why) = controller.password_missing(&source) {
@@ -263,7 +270,7 @@ pub fn pull(controller: &mut Controller, args: &Value) -> Result<String, Refusal
             "pulling {source} makes a new database from it and switches to it, restarting the running APIs -"
         )));
     }
-    let doing = controller.pull_database(&source, None).map_err(|why| ("refused", why))?;
+    let doing = controller.pull_from(Mode::Pull, &source, remote.as_deref(), None).map_err(|why| ("refused", why))?;
     Ok(format!("{doing} - database op files says the step it's at; wait for pull_done"))
 }
 
@@ -271,7 +278,8 @@ pub fn pull(controller: &mut Controller, args: &Value) -> Result<String, Refusal
 /// it ended - never a password or a connection string.
 fn pull_state(controller: &Controller) -> Option<Value> {
     let pull = controller.pull.as_ref()?;
-    let steps: Vec<Value> = Step::ALL
+    let steps: Vec<Value> = pull
+        .steps()
         .iter()
         .map(|step| {
             let run = pull.step(*step);
@@ -280,7 +288,10 @@ fn pull_state(controller: &Controller) -> Option<Value> {
         })
         .collect();
     Some(json!({
+        "mode": pull.mode.name(),
         "source": pull.source,
+        "twin": pull.twin(),
+        "updating": pull.target,
         "into": format!("{} @ {}", pull.database, pull.server),
         "running": pull.running().map(Step::name),
         "steps": steps,

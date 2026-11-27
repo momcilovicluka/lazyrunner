@@ -13,7 +13,8 @@ use serde_json::{Map, Value, json};
 use crate::json;
 
 /// The settings kept per project.
-pub const PROJECT_KEYS: [&str; 5] = ["columnWidths", "columnViews", "apps", "frontend", "stopFrontendOnStop"];
+pub const PROJECT_KEYS: [&str; 6] =
+    ["columnWidths", "columnViews", "apps", "frontend", "stopFrontendOnStop", "databaseSources"];
 const WRITE_ATTEMPTS: usize = 10;
 const WRITE_RETRY: Duration = Duration::from_millis(40);
 
@@ -229,7 +230,11 @@ fn project_section(saved: &Map<String, Value>, project: Option<&str>) -> Map<Str
 /// Writes JSON whole or not at all (a temp file next to it, then a rename), retrying while another process has the
 /// file open.
 pub fn write(path: &Path, value: &Value) -> Result<()> {
-    let text = serde_json::to_string_pretty(value)? + "\n";
+    write_text(path, &(serde_json::to_string_pretty(value)? + "\n"))
+}
+
+/// Writes text whole or not at all, as [`write`] does: a profile changed in place (#114).
+pub fn write_text(path: &Path, text: &str) -> Result<()> {
     if let Some(dir) = path.parent().filter(|dir| !dir.as_os_str().is_empty()) {
         std::fs::create_dir_all(dir)?;
     }
@@ -237,7 +242,7 @@ pub fn write(path: &Path, value: &Value) -> Result<()> {
     temp.push(format!(".{}.tmp", std::process::id()));
     let temp = PathBuf::from(temp);
     for _ in 0..WRITE_ATTEMPTS {
-        if std::fs::write(&temp, &text).is_ok() && std::fs::rename(&temp, path).is_ok() {
+        if std::fs::write(&temp, text).is_ok() && std::fs::rename(&temp, path).is_ok() {
             return Ok(());
         }
         thread::sleep(WRITE_RETRY);

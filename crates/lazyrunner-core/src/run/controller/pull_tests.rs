@@ -12,29 +12,37 @@ use super::Controller;
 use super::tests::controller;
 use crate::profile::sources::{Auth, DatabaseSource, Pulling, Reach};
 use crate::run::credentials::{self, Memory, Password, Store};
-use crate::run::pull::{Pulled, State, Step};
+use crate::run::pull::{Pulled, State};
 use crate::run::sql::Sql;
 use crate::run::sqlpackage::{Action, Package};
 use crate::run::{Event, secrets};
 use crate::testing::TempDir;
 
-const SECRET: &str = "s3cret-Pa55";
+pub(super) const SECRET: &str = "s3cret-Pa55";
 
-/// SQL that answers a pull's queries and keeps what it was asked, and the connection strings it got.
+/// SQL that answers a pull's queries and keeps what it was asked, and the connection strings it got; it fails what
+/// names `fail`.
 #[derive(Default)]
-struct Scripted {
-    asked: Mutex<Vec<String>>,
+pub(super) struct Scripted {
+    pub(super) asked: Mutex<Vec<String>>,
+    pub(super) fail: Mutex<Option<&'static str>>,
 }
 
 impl Sql for Scripted {
     fn run(&self, connection: &str, _: Option<&str>, sql: &str, line: &mut dyn FnMut(&str)) -> Result<(), String> {
         self.asked.lock().unwrap().push(format!("{connection} | {sql}"));
+        if self.fail.lock().unwrap().is_some_and(|fail| sql.contains(fail)) {
+            return Err(format!("Msg 5030: {sql} failed"));
+        }
         if sql == crate::run::pull::CHECK_SQL {
             line("reader");
         } else if sql.contains("ISNULL(DB_ID(") {
             line("0");
         } else if sql.contains("COUNT(*) FROM sys.tables") {
             line("1");
+        } else if sql == crate::run::catalog::LIST_SQL {
+            line("120|2026-01-12T09:00:00+01:00|Shop");
+            line("-|2026-03-02T10:00:00+01:00|Shop_Audit");
         }
         Ok(())
     }
@@ -61,16 +69,19 @@ impl Package for Packaged {
 }
 
 /// A controller with a source `qa` (a SQL login), a script after the pull, its secrets.json and stand-ins.
-fn pulling(temp: &TempDir, keep: Option<usize>) -> (Controller, UnboundedReceiver<Event>, Arc<Scripted>, Arc<Memory>) {
+pub(super) fn pulling(
+    temp: &TempDir,
+    keep: Option<usize>,
+) -> (Controller, UnboundedReceiver<Event>, Arc<Scripted>, Arc<Memory>) {
     let (mut controller, rx) = controller(temp, json!({}));
     let reach = Reach::Server {
         server: "qa-sql.example.com,1433".into(),
-        database: "Shop".into(),
+        database: Some("Shop".into()),
         auth: Auth::Sql,
         user: Some("reader".into()),
     };
     controller.project.pulling = Pulling {
-        sources: vec![DatabaseSource { name: "qa".into(), reach }],
+        sources: vec![DatabaseSource::new("qa", reach)],
         after_pull: vec!["scripts/local.sql".into()],
         keep_pulled: keep,
         migrate: false,
@@ -92,7 +103,7 @@ fn pulling(temp: &TempDir, keep: Option<usize>) -> (Controller, UnboundedReceive
 }
 
 /// The pull's news handled until its thread is done, then the controller's own steps.
-async fn pulled(rx: &mut UnboundedReceiver<Event>, controller: &mut Controller) {
+pub(super) async fn pulled(rx: &mut UnboundedReceiver<Event>, controller: &mut Controller) {
     loop {
         match rx.recv().await.unwrap() {
             Event::Pull { job, news: news @ crate::run::pull::News::Ended(_) } => {
@@ -106,7 +117,7 @@ async fn pulled(rx: &mut UnboundedReceiver<Event>, controller: &mut Controller) 
     controller.tick_pull();
 }
 
-fn said(controller: &Controller) -> String {
+pub(super) fn said(controller: &Controller) -> String {
     controller.log.iter().map(|entry| entry.text.clone()).collect::<Vec<_>>().join("\n")
 }
 
@@ -116,7 +127,7 @@ async fn without_a_kept_password_a_pull_is_refused_and_says_to_pull_once_from_la
     let (mut controller, _rx, _, _) = pulling(&temp, None);
     let why = controller.pull_database("qa", None).unwrap_err();
     assert!(why.contains("ask the user to pull once from lazyrunner") && why.contains("the tests' store"), "{why}");
-    assert!(controller.pull_database("nowhere", None).unwrap_err().contains("the profile's: qa"));
+    assert!(controller.pull_database("nowhere", None).unwrap_err().contains("the ones there: qa"));
     assert!(controller.pull.is_none());
 }
 
@@ -126,8 +137,12 @@ async fn a_pull_runs_its_steps_switches_to_the_copy_and_never_says_the_password(
     let (mut controller, mut rx, sql, store) = pulling(&temp, None);
     controller.keep_password("qa", &Password::new(SECRET)).unwrap();
     assert!(controller.password_kept("qa"));
-    let target = credentials::target(&controller.project.id, "qa");
-    assert_eq!(store.get(&target).unwrap().unwrap().expose(), SECRET, "kept under lazyrunner/<project>/<source>");
+    let target = credentials::shared_target(&controller.project.id, "reader@qa-sql.example.com,1433");
+    assert_eq!(
+        store.get(&target).unwrap().unwrap().expose(),
+        SECRET,
+        "kept under lazyrunner/<project>/<login>@<server>"
+    );
     let doing = controller.pull_database("qa", None).unwrap();
     let today = jiff::ZonedDateTime::now().strftime("%Y%m%d").to_string();
     let database = format!("Shop_qa_{today}");
@@ -136,7 +151,7 @@ async fn a_pull_runs_its_steps_switches_to_the_copy_and_never_says_the_password(
     assert!(controller.backup_database("localhost", "Shop").is_err(), "one database job at a time");
     pulled(&mut rx, &mut controller).await;
     let pull = controller.pull.as_ref().unwrap();
-    let states: Vec<State> = Step::ALL.iter().map(|step| pull.step(*step).state).collect();
+    let states: Vec<State> = pull.steps().iter().map(|step| pull.step(*step).state).collect();
     assert_eq!(states, [State::Done, State::Done, State::Done, State::Done, State::Skipped, State::Done]);
     assert!(pull.went_well(), "{}", said(&controller));
     let asked = sql.asked.lock().unwrap().clone();
@@ -149,6 +164,8 @@ async fn a_pull_runs_its_steps_switches_to_the_copy_and_never_says_the_password(
     assert!(!text.contains(SECRET));
     let log = said(&controller);
     assert!(log.contains("✓ Pulled qa in") && log.contains("o opens the folder"), "{log}");
+    let link = controller.link_of("localhost", &database).expect("a pull links what it made");
+    assert_eq!((link.twin(), link.pulled.is_some()), ("qa/Shop".to_string(), true));
     assert!(
         !log.contains(SECRET) && !format!("{:?}", controller.pull.as_ref().map(|pull| &pull.steps)).contains(SECRET)
     );
@@ -168,15 +185,16 @@ async fn keep_pulled_offers_the_older_copies_and_a_pull_never_writes_to_the_serv
         server: "localhost".into(),
         database: "Shop_qa_20261101".into(),
         at: "2026-11-01T09:00:00Z".into(),
+        remote: None,
     };
     controller.pulled = vec![older.clone()];
     controller.pull_database("qa", Some(Password::new(SECRET))).unwrap();
     pulled(&mut rx, &mut controller).await;
     assert_eq!(controller.pull_stale, [older], "{}", said(&controller));
-    assert!(said(&controller).contains("keepPulled: 1 older pulled copies (Shop_qa_20261101)"));
+    assert!(said(&controller).contains("keepPulled: 1 older copy (Shop_qa_20261101)"));
 
     controller.project.pulling.sources[0].reach =
-        Reach::Server { server: "LOCALHOST".into(), database: "Shop".into(), auth: Auth::Windows, user: None };
+        Reach::Server { server: "LOCALHOST".into(), database: Some("Shop".into()), auth: Auth::Windows, user: None };
     let why = controller.pull_database("qa", None).unwrap_err();
     assert!(why.contains("is the server in use"), "{why}");
 }

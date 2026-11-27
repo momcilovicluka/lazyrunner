@@ -157,8 +157,8 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, typed: Option<c
     true
 }
 
-/// `Tab`: the databases, then the save points' rail, the files and the pull's steps - each when there's something
-/// in it.
+/// `Tab`: the databases, then the save points' rail, the files, the pull's steps - each when there's something in it -
+/// and the sources (always: `a` adds one there).
 fn cycle(ui: &mut Ui, controller: &mut Controller) {
     let Some(entry) = highlighted(ui) else { return };
     let has = [
@@ -166,16 +166,13 @@ fn cycle(ui: &mut Ui, controller: &mut Controller) {
         !controller.save_points_of(&entry.server, &entry.database).is_empty(),
         !controller.db_files.is_empty(),
         super::pull_view::can_focus(controller),
+        true,
     ];
-    let now = [ui.save_view.on_rail, ui.files_view.on_files, ui.pull_view.focused].iter().position(|on| *on);
-    let now = now.map_or(0, |at| at + 1);
+    let on = [ui.save_view.on_rail, ui.files_view.on_files, ui.pull_view.focused, ui.sources_view.focused];
+    let now = on.iter().position(|on| *on).map_or(0, |at| at + 1);
     let next = (1..=has.len()).map(|step| (now + step) % has.len()).find(|at| has[*at]).unwrap_or(0);
-    if next == 0 && now == 0 {
-        let said =
-            format!("No save points of {} and no files yet - s makes a save point, b backs it up", entry.database);
-        controller.add_log(said, Hue::Gray);
-    }
-    (ui.save_view.on_rail, ui.files_view.on_files, ui.pull_view.focused) = (next == 1, next == 2, next == 3);
+    (ui.save_view.on_rail, ui.files_view.on_files, ui.pull_view.focused, ui.sources_view.focused) =
+        (next == 1, next == 2, next == 3, next == 4);
 }
 
 /// The keys while the files have them; whether the key was one of theirs.
@@ -355,6 +352,11 @@ pub fn yes(ui: &mut Ui, controller: &mut Controller, yes: SavePointYes) {
             Ok(())
         }
         SavePointYes::DropPulled(copies) => controller.drop_pulled(&copies).map(|_| ()),
+        SavePointYes::RemoveSource(name) => {
+            super::sources::remove(ui, controller, &name);
+            Ok(())
+        }
+        SavePointYes::ForgetPassword(source) => controller.forget_password_of(&source).map(|_| ()),
         SavePointYes::Switch { server, database } => {
             switch_to(ui, controller, &server, &database);
             Ok(())
