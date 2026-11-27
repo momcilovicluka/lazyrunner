@@ -4,7 +4,7 @@ expression: frame
 ---
   K  E  H  M  A  T  P  D  ~ DB DATABASE
  DefaultConnection · secrets.json · 1 connection strings · the active one ●
- h l pick a step · Enter its whole output · x cancel the pull · Tab databases · Esc back
+ h l pick a step · Enter its whole output · x cancel the pull · Tab sources · Esc back
 
    DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SIZE      SWITCHED TO
  ● Shop @ localhost              – local          -               -               -         -

@@ -10,6 +10,9 @@ use crate::run::save_points as points;
 use crate::run::sql::{self, Sql};
 use crate::run::sqlpackage::{self, Action, Package};
 
+/// Whether the signed-in user may create databases: 1 or 0.
+pub(super) const CAN_CREATE_SQL: &str = "SET NOCOUNT ON; SELECT HAS_PERMS_BY_NAME(NULL, NULL, 'CREATE ANY DATABASE')";
+
 /// What a job reports its progress through.
 pub(super) type Report<'a> = &'a dyn Fn(Progress);
 
@@ -22,6 +25,13 @@ pub(super) fn first(
 ) -> Result<Option<String>, String> {
     let rows = sql::query(sql, connection, database, text, 1)?;
     Ok(rows.into_iter().next().and_then(|row| row.into_iter().next()).filter(|value| value != "NULL"))
+}
+
+/// Whether the Windows user may create a database on the server: an import then signs in as it, as SSMS does - not as
+/// the connection string's login, which a `.bacpac` with a user of the same name can't be imported as (a sysadmin
+/// login is `dbo` in the new database, so its own user clashes).
+fn can_create_databases(sql: &dyn Sql, windows: &str) -> bool {
+    first(sql, windows, Some(MASTER), CAN_CREATE_SQL).is_ok_and(|can| can.as_deref() == Some("1"))
 }
 
 /// The server's backup folder.
@@ -230,7 +240,8 @@ pub(super) fn import(
     }
     let tables = sqlpackage::tables_in(Path::new(path));
     report(Progress { tables: tables.map(|of| (0, of)), ..step("making its schema", true) });
-    let target = sqlpackage::with_database(connection, to);
+    let windows = sql::as_windows_user(connection).filter(|windows| can_create_databases(sql, windows));
+    let target = sqlpackage::with_database(windows.as_deref().unwrap_or(connection), to);
     package.run(Action::Import, &target, path, private, &mut package_line(report, tables, path, true))?;
     Ok(Done { database: Some(to.to_string()), ..Done::default() })
 }
@@ -244,4 +255,65 @@ pub(super) fn remove_database(sql: &dyn Sql, connection: &str, database: &str) -
     }
     sql.run(connection, Some(MASTER), &files::drop_database_sql(database), &mut |_| {})?;
     Ok(Done::default())
+}
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    /// SQL whose Windows user may (or may not) create databases.
+    struct Server {
+        windows_can_create: bool,
+    }
+
+    impl Sql for Server {
+        fn run(&self, connection: &str, _: Option<&str>, text: &str, line: &mut dyn FnMut(&str)) -> Result<(), String> {
+            if text == CAN_CREATE_SQL {
+                assert!(connection.ends_with("Integrated Security=True"), "asked as the Windows user: {connection}");
+                line(if self.windows_can_create { "1" } else { "0" });
+            } else if text.contains("DB_ID(") {
+                line("0");
+            }
+            Ok(())
+        }
+
+        fn ready(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    /// SqlPackage that keeps the connection it imported with.
+    #[derive(Default)]
+    struct Imported(Mutex<Option<String>>);
+
+    impl Package for Imported {
+        fn run(&self, _: Action, connection: &str, _: &str, _: &Path, _: &mut dyn FnMut(&str)) -> Result<(), String> {
+            *self.0.lock().unwrap() = Some(connection.to_string());
+            Ok(())
+        }
+
+        fn ready(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    fn imported_as(windows_can_create: bool) -> String {
+        let package = Imported::default();
+        let login = "Server=Shop-PC;Database=Shop;User ID=shop;Password=pw;TrustServerCertificate=True";
+        let done =
+            import(&Server { windows_can_create }, &package, login, "Shop.bacpac", "Shop_qa", Path::new("."), &|_| {});
+        assert_eq!(done.unwrap().database.as_deref(), Some("Shop_qa"));
+        package.0.lock().unwrap().clone().unwrap()
+    }
+
+    #[test]
+    fn an_import_signs_in_as_the_windows_user_as_ssms_does_else_as_the_login() {
+        let windows = imported_as(true);
+        assert!(windows.contains("Database=Shop_qa") && windows.contains("Integrated Security=True"), "{windows}");
+        assert!(!windows.contains("User ID") && !windows.contains("Password"), "{windows}");
+        assert!(windows.contains("TrustServerCertificate=True"), "the rest kept: {windows}");
+        let login = imported_as(false);
+        assert!(login.contains("User ID=shop") && login.contains("Database=Shop_qa"), "{login}");
+    }
 }

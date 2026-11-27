@@ -40,6 +40,7 @@ const PASSWORD_KEYS: [&str; 2] = ["password", "pwd"];
 const TRUST_KEYS: [&str; 1] = ["trustservercertificate"];
 const ENCRYPT_KEYS: [&str; 1] = ["encrypt"];
 const YES: [&str; 5] = ["true", "yes", "sspi", "mandatory", "strict"];
+const WINDOWS_USER: &str = "Integrated Security=True";
 
 /// sqlcmd's version, from the line `-?` prints it on.
 pub fn version_of(line: &str) -> String {
@@ -127,6 +128,59 @@ fn parts(connection: &str) -> Vec<(String, String)> {
             return found;
         }
     }
+}
+
+/// A connection string's `key=value` parts as written, split at the `;`s outside quoted values.
+fn segments(connection: &str) -> Vec<String> {
+    let (mut found, mut now) = (Vec::new(), String::new());
+    let (mut quote, mut in_value) = (None, false);
+    let mut chars = connection.chars().peekable();
+    while let Some(c) = chars.next() {
+        now.push(c);
+        match (quote, c) {
+            (Some(open), _) if c == open && chars.peek() == Some(&open) => now.extend(chars.next()),
+            (Some(open), _) if c == open => quote = None,
+            (Some(_), _) => {}
+            (None, ';') => {
+                now.pop();
+                found.push(std::mem::take(&mut now));
+                in_value = false;
+            }
+            (None, '=') if !in_value => {
+                in_value = true;
+                while chars.peek().is_some_and(|next| next.is_whitespace()) {
+                    now.extend(chars.next());
+                }
+                if let Some(&open @ ('\'' | '"')) = chars.peek() {
+                    quote = Some(open);
+                    now.extend(chars.next());
+                }
+            }
+            _ => {}
+        }
+    }
+    found.push(now);
+    found.into_iter().filter(|segment| !segment.trim().is_empty()).collect()
+}
+
+/// `connection` signed in as the Windows user instead of its login, the rest as written - what SSMS imports as;
+/// `None` when it already is.
+pub fn as_windows_user(connection: &str) -> Option<String> {
+    if target(connection).ok()?.integrated {
+        return None;
+    }
+    let signed_in = [USER_KEYS.as_slice(), PASSWORD_KEYS.as_slice(), INTEGRATED_KEYS.as_slice()].concat();
+    let mut kept: Vec<String> = segments(connection)
+        .into_iter()
+        .filter(|segment| {
+            let key = segment.split('=').next().unwrap_or_default();
+            let key: String =
+                key.chars().filter(|c| !c.is_whitespace() && *c != '_').collect::<String>().to_lowercase();
+            !signed_in.contains(&key.as_str())
+        })
+        .collect();
+    kept.push(WINDOWS_USER.to_string());
+    Some(kept.join(";"))
 }
 
 /// The server, database and login a connection string names; an error when it names no server.
@@ -429,5 +483,25 @@ mod tests {
         assert_eq!(percent("45 percent processed."), Some(0.45));
         assert_eq!(percent("100 percent processed."), Some(1.0));
         assert_eq!(percent("Processed 368 pages for database 'Shop'"), None);
+    }
+
+    #[test]
+    fn a_login_becomes_the_windows_user_with_the_rest_as_written() {
+        let login =
+            "Server=Shop-PC;Database=Shop;User ID=shop;Password='p;w''d';Encrypt=False;TrustServerCertificate=True";
+        assert_eq!(
+            as_windows_user(login).as_deref(),
+            Some("Server=Shop-PC;Database=Shop;Encrypt=False;TrustServerCertificate=True;Integrated Security=True")
+        );
+        let spaced = r#"Data Source=.\SQLEXPRESS; uid = shop ;pwd=x;Application Name="a;b""#;
+        assert_eq!(
+            as_windows_user(spaced).as_deref(),
+            Some(r#"Data Source=.\SQLEXPRESS;Application Name="a;b";Integrated Security=True"#)
+        );
+        assert_eq!(as_windows_user("Server=.;Database=Shop;Trusted_Connection=True"), None, "already the Windows user");
+        assert_eq!(as_windows_user("Server=.;Database=Shop"), None, "no login: the Windows user");
+        let back = as_windows_user(login).unwrap();
+        let target = target(&back).unwrap();
+        assert!(target.integrated && target.user.is_none() && target.password.is_none() && target.trust);
     }
 }

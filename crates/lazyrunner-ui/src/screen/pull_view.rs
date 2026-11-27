@@ -212,9 +212,7 @@ fn focused_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
 pub fn hint(ui: &Ui) -> Option<&'static str> {
     match (ui.pull_view.focused, ui.pull_view.output) {
         (true, true) => Some(" j k scroll · Enter or Esc back to the steps · x cancel the pull"),
-        (true, false) => {
-            Some(" h l pick a step · Enter its whole output · x cancel the pull · Tab databases · Esc back")
-        }
+        (true, false) => Some(" h l pick a step · Enter its whole output · x cancel the pull · Tab sources · Esc back"),
         _ => None,
     }
 }

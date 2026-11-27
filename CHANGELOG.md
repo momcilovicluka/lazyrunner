@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.120.2] - 2026-11-27
+
+### Fixed
+- Importing a `.bacpac` (a pull, `U`, `i`) signs in as the Windows user when it may create databases there, as SSMS does - not as the connection string's login: when that login is a sysadmin and the `.bacpac` has a user of the same name (a QA database's own login), the import failed with "The object [...] already exists in database with a different definition". Without a Windows login it signs in as before (#114).
+- The Sources section stays on the database screen while a pull or an update runs: the graph took its rows on a long list of databases, so `Tab` from the pull's steps went to a section that wasn't drawn; the list of databases scrolls to make room instead, and the steps' hint says `Tab sources` (#114).
+
 ## [1.120.1] - 2026-11-27
 
 ### Fixed

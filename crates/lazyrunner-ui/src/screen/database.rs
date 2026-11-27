@@ -49,6 +49,8 @@ const GAP: usize = 2;
 const MOST_GAP: usize = 6;
 const LABEL_LEAST: usize = 24;
 const MARK_CELLS: usize = 3;
+/// While a pull runs, the table makes room for its graph and at least this many rows of the sources.
+const SOURCES_LEAST: usize = 4;
 const CUT: &str = "…";
 /// The answer of a server that doesn't answer: the widest the answers column holds, so it's never narrower.
 const NO_ANSWER: &str = "✗ no answer";
@@ -356,7 +358,9 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     if entries.is_empty() {
         lines.push(vec![seg("   nothing matches", C::DarkGray)]);
     }
-    let lower = if entries.is_empty() { 0 } else { super::save_points::LOWER_LEAST };
+    let pulling = super::pull_graph::height(ui, controller, super::pull_graph::LEAST);
+    let beside_pull = if pulling > 0 { pulling + 1 + SOURCES_LEAST } else { 0 };
+    let lower = if entries.is_empty() { 0 } else { super::save_points::LOWER_LEAST + beside_pull };
     let room = rows.saturating_sub(lines.len() + 2 + lower).max(1).min(entries.len().max(1));
     let (index, mut top) = (picker.index, picker.top);
     if index < top {
@@ -417,7 +421,10 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let left = rows.saturating_sub(lines.len() + 1);
     if left > 0 && !entries.is_empty() {
         let files = super::database_files::height(controller, left);
-        let pull = super::pull_graph::height(ui, controller, left.saturating_sub(files + 2));
+        let kept = super::sources::height(ui, controller, SOURCES_LEAST);
+        let beside = left.saturating_sub(files + 2 + kept + 2);
+        let room = if beside >= super::pull_graph::LEAST { beside } else { left.saturating_sub(files + 2) };
+        let pull = super::pull_graph::height(ui, controller, room);
         let taken = files + 2 + if pull > 0 { pull + 1 } else { 0 };
         let sources = super::sources::height(ui, controller, left.saturating_sub(taken + 1));
         let below = files + if sources > 0 { sources + 1 } else { 0 };

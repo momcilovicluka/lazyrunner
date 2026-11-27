@@ -333,3 +333,25 @@ async fn every_text_field_takes_every_key_and_the_database_choice_goes_back_with
     screen.press("Left");
     assert_eq!(form(&screen).choice[source_form::DATABASE], 0, "back to the whole server while typing a name");
 }
+
+#[tokio::test]
+async fn the_sources_keep_their_rows_beside_a_running_pull_on_a_long_list_of_databases() {
+    let (mut screen, _) = pulling_screen("sources-beside-pull");
+    let many: String = (1..=17)
+        .map(|at| {
+            format!("  //\"DefaultConnection\": \"Server=localhost;Database=Shop{at};Trusted_Connection=True\",\n")
+        })
+        .collect();
+    let secrets = format!("{{\n{many}}}\n");
+    if let Some(picker) = screen.ui.picker.as_mut() {
+        picker.groups = lazyrunner_core::run::secrets::groups(&secrets);
+        picker.index = 16;
+    }
+    let states = [State::Done, State::Running, State::Waiting, State::Waiting, State::Waiting, State::Waiting];
+    let started = screen.ui.now - Duration::from_secs(60);
+    screen.controller.pretend_pull(("qa", "Shop_qa_20261123"), started, &states, Progress::default());
+    let frame = screen.render(110, 40);
+    assert!(frame.contains("● export"), "the graph: {frame}");
+    assert!(frame.contains("SOURCES") && frame.contains("qa-sql.example.com,1433"), "the sources too: {frame}");
+    assert!(frame.contains("Shop17"), "the picked database still in view: {frame}");
+}
