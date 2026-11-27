@@ -131,7 +131,7 @@ impl Controller {
 
     /// What the database job does, when one runs: a database job runs one at a time.
     pub fn database_busy(&self) -> Option<String> {
-        let work = self.db_work.as_ref()?;
+        let Some(work) = self.db_work.as_ref() else { return self.pull_busy() };
         let what = match &work.doing {
             Doing::Making(kind) => format!("making a {} save point of {}", kind.name(), work.database),
             Doing::Rewinding(id) => format!("rewinding {} to {}", work.database, self.save_point_label(id)),

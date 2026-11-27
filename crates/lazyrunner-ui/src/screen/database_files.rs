@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use lazyrunner_core::output::Hue;
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::controller::Doing;
+use lazyrunner_core::run::controller::database_files::is_local;
 use lazyrunner_core::run::controller::save_points::db_key;
 use lazyrunner_core::run::database_files::{self as files, Chore, DbFile, Kind};
 use lazyrunner_core::run::secrets::{self, Entry};
@@ -138,6 +139,7 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, typed: Option<c
                 controller.add_log(format!("✗ {why}"), Hue::Red);
             }
         }
+        "o" => open_folder(ui, controller, None),
         "i" if controller.db_files.is_empty() => controller.add_log(
             format!(
                 "No .bak or .bacpac files yet - b backs up, e exports, or put one in {}",
@@ -155,25 +157,25 @@ pub fn key(ui: &mut Ui, controller: &mut Controller, name: &str, typed: Option<c
     true
 }
 
-/// `Tab`: the databases, then the save points' rail (when there are any), then the files (when there are any).
+/// `Tab`: the databases, then the save points' rail, the files and the pull's steps - each when there's something
+/// in it.
 fn cycle(ui: &mut Ui, controller: &mut Controller) {
     let Some(entry) = highlighted(ui) else { return };
-    let has_points = !controller.save_points_of(&entry.server, &entry.database).is_empty();
-    let has_files = !controller.db_files.is_empty();
-    let (rail, files) = (ui.save_view.on_rail, ui.files_view.on_files);
-    let next = match (rail, files) {
-        (false, false) if has_points => (true, false),
-        (false, false) if has_files => (false, true),
-        (false, false) => {
-            let said =
-                format!("No save points of {} and no files yet - s makes a save point, b backs it up", entry.database);
-            controller.add_log(said, Hue::Gray);
-            (false, false)
-        }
-        (true, _) => (false, has_files),
-        (false, true) => (false, false),
-    };
-    (ui.save_view.on_rail, ui.files_view.on_files) = next;
+    let has = [
+        true,
+        !controller.save_points_of(&entry.server, &entry.database).is_empty(),
+        !controller.db_files.is_empty(),
+        super::pull_view::can_focus(controller),
+    ];
+    let now = [ui.save_view.on_rail, ui.files_view.on_files, ui.pull_view.focused].iter().position(|on| *on);
+    let now = now.map_or(0, |at| at + 1);
+    let next = (1..=has.len()).map(|step| (now + step) % has.len()).find(|at| has[*at]).unwrap_or(0);
+    if next == 0 && now == 0 {
+        let said =
+            format!("No save points of {} and no files yet - s makes a save point, b backs it up", entry.database);
+        controller.add_log(said, Hue::Gray);
+    }
+    (ui.save_view.on_rail, ui.files_view.on_files, ui.pull_view.focused) = (next == 1, next == 2, next == 3);
 }
 
 /// The keys while the files have them; whether the key was one of theirs.
@@ -194,9 +196,40 @@ fn files_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
                 ask_delete(ui, &file);
             }
         }
+        "o" => {
+            let file = controller.db_files.get(picked).cloned();
+            open_folder(ui, controller, file.as_ref());
+        }
         _ => return false,
     }
     true
+}
+
+/// `o`: the folder of the backups and exports in the system's file manager - a picked file's, with it selected. A
+/// backup on another server's disk can't be shown here: its path is copied, and the log says it's on the server.
+fn open_folder(ui: &mut Ui, controller: &mut Controller, file: Option<&DbFile>) {
+    let Some(file) = file else {
+        let folder = controller.files_folder();
+        let opened = std::fs::create_dir_all(&folder).is_ok() && (ui.opener)(&folder.display().to_string());
+        let said = if opened { "Opened" } else { "Couldn't open" };
+        controller.add_log(format!("{said} {}", folder.display()), Hue::Gray);
+        return;
+    };
+    match &file.server {
+        Some(server) if !is_local(server) => {
+            let copied = (ui.clipboard)(&file.path).is_ok();
+            let how = if copied { "its path is copied" } else { "its path" };
+            controller.add_log(
+                format!("{} is on {server}, in its backup folder - {how}: {}", file.name, file.path),
+                Hue::Gray,
+            );
+        }
+        _ => {
+            let shown = (ui.revealer)(std::path::Path::new(&file.path));
+            let said = if shown { "Showed" } else { "Couldn't show" };
+            controller.add_log(format!("{said} {} in its folder", file.name), Hue::Gray);
+        }
+    }
 }
 
 fn start_copy(ui: &mut Ui, controller: &mut Controller, entry: &Entry) {
@@ -321,6 +354,7 @@ pub fn yes(ui: &mut Ui, controller: &mut Controller, yes: SavePointYes) {
             controller.install_sqlpackage();
             Ok(())
         }
+        SavePointYes::DropPulled(copies) => controller.drop_pulled(&copies).map(|_| ()),
         SavePointYes::Switch { server, database } => {
             switch_to(ui, controller, &server, &database);
             Ok(())
@@ -350,7 +384,7 @@ fn switch_to(ui: &mut Ui, controller: &mut Controller, server: &str, database: &
 }
 
 /// The picker's connection strings read again, the highlight on `keep` (else where it was).
-fn reload(ui: &mut Ui, keep: Option<(&str, &str)>) {
+pub(super) fn reload(ui: &mut Ui, keep: Option<(&str, &str)>) {
     let Some(picker) = ui.picker.as_mut() else { return };
     let text = std::fs::read_to_string(&picker.path).unwrap_or_default();
     let was = picker.entries().get(picker.index).map(|entry| (entry.server.clone(), entry.database.clone()));
@@ -530,7 +564,10 @@ fn files_note(ui: &Ui, controller: &Controller) -> Option<(String, C)> {
     if ui.files_view.on_files {
         return None;
     }
-    Some(("Tab picks a file · i imports it as a new database · Del deletes it".into(), C::DarkGray))
+    Some((
+        "Tab picks a file · i imports it as a new database · Del deletes it · o opens the folder".into(),
+        C::DarkGray,
+    ))
 }
 
 /// The prompt line while a new database's name is typed.
@@ -575,9 +612,9 @@ pub fn hint(ui: &Ui) -> Option<&'static str> {
         Some(Naming { making: Making::Import { .. }, .. }) => {
             Some(" type the new database's name · Enter imports it · Esc cancels")
         }
-        None => ui
-            .files_view
-            .on_files
-            .then_some(" j k pick a file · i import it as a new database · Del delete it · Tab databases · Esc back"),
+        None => ui.files_view.on_files.then_some(
+            " j k pick a file · i import it as a new database · Del delete it · o show it in its folder · Tab \
+                        databases · Esc back",
+        ),
     }
 }

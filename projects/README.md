@@ -96,6 +96,10 @@ What a project is for lazyrunner: the file that marks its repo, the folder whose
 | `tasks` | array of objects |  | Optional. One-off commands run from the palette or by an agent (the task table below). Example: `[{"key":"seed","name":"Seed the database","run":"python seed.py"}]`. |
 | `presets` | object |  | Optional. This profile's own presets, by name: a command app's "preset" finds them before yours and lazyrunner's (the preset table below). Example: `{"fastapi":{"run":"uvicorn main:app --port {port}","install":"uv sync"}}`. |
 | `layers` | object |  | Optional. Rules for the code map (K, then Tab): each key a project's name (* for anything, e.g. *.Api), and the projects it must not reference - a link that does is marked as a rule break. Nx's module boundaries (.eslintrc.json's depConstraints) are read as well. Example: `{"Orders.Core":{"mustNotReference":["Orders.Api"]}}`. |
+| `databaseSources` | array of objects |  | Optional. The other environments a copy of the database is pulled from (p on the database screen, the database source table below) - never a password: one is asked for once and kept in the OS's credential store. Example: `[{"name":"qa","server":"qa-sql.example.com,1433","database":"Shop","auth":"sql","user":"reader"},{"name":"staging","connectionStringEnv":"SHOP_STAGING_DB"}]`. |
+| `afterPull` | array of paths |  | Optional. .sql files from the repo root run in order on a pulled copy, stopping at the first error: point integration URLs at local, reset test logins, mask personal data. GO lines split a file into batches. Example: `["scripts/local-urls.sql","scripts/test-logins.sql"]`. |
+| `keepPulled` | integer |  | Optional. How many pulled copies of a source are kept: after a pull, lazyrunner offers to drop the older ones (never the one in use). The keepPulled setting overrides it on this machine. Example: `2`. |
+| `migrateAfterPull` | boolean |  | Optional. A pull applies the pending EF Core migrations to its copy before switching to it, as the migrations screen does (false without it). The migrateAfterPull setting overrides it on this machine. Example: `true`. |
 
 #### A .NET app ("type": "dotnet")
 
@@ -290,6 +294,19 @@ A one-off command run from the palette (: then its name) or by an agent (run_tas
 | `run` | text or list | yes | The command, as a command app's run. Example: `"python seed.py"`. |
 | `cwd` | path |  | Optional. Where it runs, from the repo root (the root without it). Example: `"tools"`. |
 | `env` | object |  | Optional. Variables it gets on top of lazyrunner's own; {cwd} is its folder. Example: `{"SEED":"demo"}`. |
+
+#### A database source ("databaseSources")
+
+Another environment's database a copy is pulled from (#110): p checks the login, exports a .bacpac with SqlPackage - the only thing ever run there, and it only reads - imports it as a new database <database>_<source>_<yyyyMMdd> on the server in use, runs afterPull, applies the migrations (migrateAfterPull) and switches to it. Either its server and database, or connectionStringEnv.
+
+| Field | Type | Required | What it does |
+|---|---|---|---|
+| `name` | string | yes | Short name, unique among the sources: in a pulled copy's name and where its password is kept (lazyrunner/<project>/<name>). Example: `"qa"`. |
+| `server` | string |  | Its server, as a connection string names it. Example: `"qa-sql.example.com,1433"`. |
+| `database` | string |  | The database to pull a copy of. Example: `"Shop"`. |
+| `auth` |  |  | Optional. How it logs in: sql (user, and a password asked for once), windows, or entra (not supported yet). sql with a user, windows without. Example: `"sql"`. |
+| `user` | string |  | Optional. A SQL login's name. Example: `"reader"`. |
+| `connectionStringEnv` | string |  | Optional, instead of the rest: an environment variable holding its whole connection string. Example: `"SHOP_STAGING_DB"`. |
 
 <!-- end of reference -->
 

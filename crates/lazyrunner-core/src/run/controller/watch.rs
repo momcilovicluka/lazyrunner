@@ -162,6 +162,7 @@ impl Controller {
         self.tick_tunnels(now);
         self.tick_faults();
         self.tick_live_levels(now);
+        self.tick_pull();
         if self.slow_tick_due.is_none_or(|due| now >= due) {
             self.slow_tick_due = Some(now + SLOW_TICK_EVERY);
             if self.building.is_none() {
@@ -572,7 +573,7 @@ impl Controller {
         }
         switched[&entry.label] = serde_json::json!(crate::time::now_rfc3339());
         self.set_setting(SWITCHED, switched);
-        let Some(path) = secrets::secrets_path(&self.root, &self.apps) else {
+        let Some(path) = self.secrets_file() else {
             self.add_log("No secrets.json: no API has a UserSecretsId.", Hue::Yellow);
             return;
         };

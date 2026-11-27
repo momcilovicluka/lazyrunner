@@ -30,6 +30,10 @@ mod npm_ci;
 mod overrides;
 mod parallel;
 pub mod profile;
+pub mod pull;
+mod pull_steps;
+#[cfg(test)]
+mod pull_tests;
 mod queries;
 pub mod save_points;
 mod session;
@@ -352,6 +356,13 @@ pub struct Controller {
     pub db_files: Vec<super::database_files::DbFile>,
     made_files: Vec<super::database_files::Made>,
     pub db_sizes: HashMap<String, database_files::Sizes>,
+    /// The pull running or the last one, the pulls that went well, the older copies `keepPulled` offers to drop, the
+    /// ones being dropped one after another, and where sources' passwords are kept (#110).
+    pub pull: Option<pull::PullRun>,
+    pulled: Vec<super::pull::Pulled>,
+    pub pull_stale: Vec<super::pull::Pulled>,
+    pull_drops: Vec<(String, String)>,
+    pub(crate) credentials: Arc<dyn super::credentials::Store>,
     /// What runs SqlPackage (tests put a script in its place).
     pub(crate) package: Arc<dyn super::sqlpackage::Package>,
     /// What runs SQL (sqlcmd; tests put a script in its place), and the secrets.json the tests use instead of the
@@ -388,6 +399,7 @@ impl Controller {
         let kept_levels = log_levels::load(&state_dir);
         let save_points = super::save_points::load(&state_dir);
         let made_files = super::database_files::load(&state_dir);
+        let pulled = super::pull::load(&state_dir);
         for state in &mut states {
             state.filter = apptypes::level_filter(&config, &state.key);
             state.view = apptypes::column_view(&config, &state.key);
@@ -546,6 +558,11 @@ impl Controller {
             db_files: Vec::new(),
             made_files,
             db_sizes: HashMap::new(),
+            pull: None,
+            pulled,
+            pull_stale: Vec::new(),
+            pull_drops: Vec::new(),
+            credentials: super::credentials::system(),
             package: Arc::new(super::sqlpackage::SqlPackage),
             sql: Arc::new(super::sql::Sqlcmd),
             secrets_at: None,
@@ -816,6 +833,7 @@ impl Controller {
             Event::ComposePorts { key, ports } => self.compose_ports_arrived(key, ports),
             Event::Sql { job, news } => self.sql_news(job, news),
             Event::DatabaseFiles { job, news } => self.files_news(job, news),
+            Event::Pull { job, news } => self.pull_news(job, news),
         }
     }
 

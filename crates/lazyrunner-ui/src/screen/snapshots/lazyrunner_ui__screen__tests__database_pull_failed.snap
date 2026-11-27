@@ -1,0 +1,30 @@
+---
+source: crates/lazyrunner-ui/src/screen/tests.rs
+expression: frame
+---
+  K  E  H  M  A  T  P  D  ~ DB DATABASE
+ DefaultConnection · secrets.json · 1 connection strings · the active one ●
+ h l pick a step · Enter its whole output · x cancel the pull · Tab databases · Esc back
+
+   DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SIZE      SWITCHED TO
+ ● Shop @ localhost              – local          -               -               -         -
+
+ PULL qa → localhost · Shop_qa_20261123                                                                 4m12s
+  ╭────────────────╮       ╭────────────────╮       ╭────────────────╮       ╭┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╮       ╭┄┄┄┄┄┄┄
+  │ ✓ check        │       │ ✓ export       │       │ ✗ import       │       ┆ ○ after-pull   ┆       ┆ ○ migr
+  │ qa · 38 ms     │──────▶│ 612 MB         │──────▶│ failed         │┄┄┄┄┄┄▶┆ 2 scripts      ┆┄┄┄┄┄┄▶┆ pendin
+  │ 2s             │       │ 3m20s          │       │ 52s            │       ┆                ┆       ┆
+  ╰────────────────╯       ╰────────────────╯       ╰────────────────╯       ╰┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯       ╰┄┄┄┄┄┄┄
+
+
+
+
+ ✓ check · sqlcmd   qa · 38 ms · as reader
+ ✗ import failed: Could not import package. The target database is full.
+
+
+ FILES · …\sample\databases
+ none yet - b backs a database up to the server's backup folder, e exports a .bacpac here
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ lazyrunner   ○ stopped   ⎇ main   DB ShopLocal @ localhost   /work/sample
+  u  start   b  build   U  start all                 :  commands   x  menu   ?  keys   ,  settings   q  quit

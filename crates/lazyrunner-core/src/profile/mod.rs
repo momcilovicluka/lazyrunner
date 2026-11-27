@@ -12,6 +12,7 @@ pub mod change;
 pub mod check;
 pub mod load;
 pub mod preset;
+pub mod sources;
 #[cfg(test)]
 mod tests;
 pub mod trust;
@@ -270,6 +271,8 @@ pub struct Project {
     pub layers: Vec<Layer>,
     /// One-off commands (`"tasks"`).
     pub tasks: Vec<Task>,
+    /// Where a copy of the database is pulled from, and what runs on it after (#110).
+    pub pulling: sources::Pulling,
     pub root: Option<PathBuf>,
     pub source: Source,
     /// What trust is given to: the file as written.

@@ -14,7 +14,12 @@ use crate::run::sqlpackage::{self, Action, Package};
 pub(super) type Report<'a> = &'a dyn Fn(Progress);
 
 /// The first column of a query's first row.
-fn first(sql: &dyn Sql, connection: &str, database: Option<&str>, text: &str) -> Result<Option<String>, String> {
+pub(super) fn first(
+    sql: &dyn Sql,
+    connection: &str,
+    database: Option<&str>,
+    text: &str,
+) -> Result<Option<String>, String> {
     let rows = sql::query(sql, connection, database, text, 1)?;
     Ok(rows.into_iter().next().and_then(|row| row.into_iter().next()).filter(|value| value != "NULL"))
 }
@@ -38,7 +43,7 @@ fn data_folders(sql: &dyn Sql, connection: &str) -> Result<(String, String), Str
 }
 
 /// Whether `database` is on the server.
-fn exists(sql: &dyn Sql, connection: &str, database: &str) -> Result<bool, String> {
+pub(super) fn exists(sql: &dyn Sql, connection: &str, database: &str) -> Result<bool, String> {
     Ok(first(sql, connection, Some(MASTER), &files::exists_sql(database))?.is_some_and(|id| id != "0"))
 }
 

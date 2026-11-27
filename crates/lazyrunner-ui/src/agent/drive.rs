@@ -115,6 +115,9 @@ pub fn press_keys(ui: &mut Ui, controller: &mut Controller, args: &Value) -> Res
     if typing(ui) {
         return Err(("user_typing", "the user is typing in a prompt - try again in a moment".into()));
     }
+    if crate::screen::pull_view::asking_password(ui) {
+        return Err(("refused", "lazyrunner is asking the user for a password - only they type it".into()));
+    }
     let risky = pressed.iter().any(|key| RISKY_KEYS.contains(&keys::key_name(key).as_str()));
     if risky && !confirmed(args) {
         return Err(confirm_first(&format!(

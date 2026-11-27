@@ -115,7 +115,7 @@ pub fn handle(ui: &mut Ui, controller: &mut Controller, request: &Value) -> Valu
         | "run_action" | "press_keys" | "switch_database" | "add_database" | "install_packages"
         | "apply_migrations" | "kill_port_holder" | "set_setting" | "run_task" | "profile" | "open_in_editor"
         | "save_point" | "rewind" | "copy_database" | "backup_database" | "export_database"
-        | "import_database" | "drop_database") => {
+        | "import_database" | "drop_database" | "pull_database") => {
             in_repo(controller, request["repo"].as_str()).and_then(|()| act(ui, controller, op, args, &client))
         }
         other => Err(("unknown_op", format!("no op '{}'", clean(other, CLIENT_CHARS)))),
@@ -223,6 +223,7 @@ pub(crate) fn status(ui: &Ui, controller: &Controller) -> Value {
             "migrations": controller.migrations_active(),
             "profiling": controller.profiling.is_some(),
             "database": controller.database_busy(),
+            "pull": controller.pull.as_ref().is_some_and(|pull| !pull.is_over()),
         },
         "apps": apps,
         "tasks": tasks(controller),
@@ -1072,6 +1073,7 @@ fn act(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, client:
         "export_database" => databases::export(controller, args)?,
         "import_database" => databases::import(controller, args)?,
         "drop_database" => databases::drop_database(controller, args)?,
+        "pull_database" => databases::pull(controller, args)?,
         "kill_port_holder" => drive::kill_port_holder(controller, args)?,
         "open_in_editor" => drive::open_in_editor(ui, controller, args)?,
         "set_setting" => drive::set_setting(controller, args)?,

@@ -10,6 +10,7 @@ pub mod browser;
 pub mod build;
 pub mod build_map;
 pub mod calls;
+pub mod cancel;
 pub mod cause;
 pub mod checks;
 pub mod child;
@@ -20,6 +21,7 @@ pub mod compose;
 pub mod controller;
 pub mod coverage;
 pub mod coverage_needs;
+pub mod credentials;
 pub mod database_files;
 pub mod diff;
 pub mod entries;
@@ -35,6 +37,7 @@ pub mod openapi;
 pub mod otlp;
 pub mod ports;
 pub mod profile;
+pub mod pull;
 pub mod query;
 pub mod requests;
 pub mod save_points;
@@ -191,6 +194,11 @@ pub enum Event {
     DatabaseFiles {
         job: u64,
         news: database_files::News,
+    },
+    /// A pull's news (#110): a step started, a line it printed, its progress, how it ended.
+    Pull {
+        job: u64,
+        news: pull::News,
     },
 }
 

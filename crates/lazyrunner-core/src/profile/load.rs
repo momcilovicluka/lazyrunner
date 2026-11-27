@@ -201,6 +201,7 @@ fn to_project(data: &Value, path: &Path) -> Project {
         apps,
         layers: to_layers(field(data, "layers")),
         tasks: to_tasks(field(data, "tasks")),
+        pulling: super::sources::to_pulling(data),
         root: None,
         source: Source::Given,
         file_hash: String::new(),

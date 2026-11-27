@@ -43,10 +43,18 @@ pub struct Confirm {
 pub enum SavePointYes {
     Rewind(String),
     Forget(String),
-    Switch { server: String, database: String },
-    DropDatabase { server: String, database: String },
+    Switch {
+        server: String,
+        database: String,
+    },
+    DropDatabase {
+        server: String,
+        database: String,
+    },
     DeleteFile(String),
     InstallSqlPackage,
+    /// `keepPulled`'s offer: the older pulled copies (#110).
+    DropPulled(Vec<lazyrunner_core::run::pull::Pulled>),
 }
 
 /// What a yes risks: nothing much (applying), a revert through Down(), or a step that drops or deletes data.

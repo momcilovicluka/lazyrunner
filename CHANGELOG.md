@@ -3,6 +3,19 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.118.0] - 2026-11-27
+
+### Added
+- Pulling a copy of another environment's database (#110): the profile's `databaseSources` name them - a server, database and login, or a connection string in an environment variable, never a password - and `p` on the database screen pulls one (`P` again from the last) in the background while the apps keep running: it checks the login, exports a `.bacpac` from the source with SqlPackage (the only thing ever run there, and it only reads), imports it as a new database `Shop_qa_20261123` - never over one that's there - runs the profile's `afterPull` scripts on it, applies the pending migrations (`migrateAfterPull`) and switches to it as `Enter` does.
+- A source's password is asked for once on a small card, typed masked, and kept in Windows Credential Manager under `lazyrunner/<project>/<source>` - never in the profile, the config, a log or an agent's answer; `,` changes or forgets it (#110).
+- The pull shows as a graph of its steps, drawn like the stack map: done steps solid, the running one lit with dots travelling into it, the ones to come dashed, a real progress bar of the tables under it, each step's whole output on `Enter`, its durations once it's done, and a failed step in red with the error under the graph (#110).
+- `x` cancels a pull's running step - a half-imported database is dropped - and `keepPulled` offers to drop the older pulled copies of a source, never the one in use (#110).
+- `o` on the database screen opens the folder of the backups and exports, or shows the picked file in it; a backup on another server's disk has its path copied instead (#110).
+- MCP: `database` with `op: "pull"` pulls a source (with `"confirm": true`) - refused while its password isn't kept, so the user pulls once first - `files` shows the pull's steps, and `wait` takes `pull_done` (#110).
+
+### Fixed
+- A box over the database screen (the drop's confirmation, now the pull's cards) no longer draws the screens' bar a second time behind it.
+
 ## [1.117.0] - 2026-11-26
 
 ### Added

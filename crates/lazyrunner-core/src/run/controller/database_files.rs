@@ -81,7 +81,7 @@ impl Controller {
     }
 
     /// A connection string's entry: to `database` on `server` (any database when `None`), the one in use first.
-    fn entry_on(&self, server: &str, database: Option<&str>) -> Option<secrets::Entry> {
+    pub(super) fn entry_on(&self, server: &str, database: Option<&str>) -> Option<secrets::Entry> {
         let mut found: Vec<secrets::Entry> = secrets::connections(&self.secrets_text()?)
             .into_iter()
             .filter(|entry| entry.server.eq_ignore_ascii_case(server))
@@ -460,12 +460,18 @@ impl Controller {
                 self.made_files.push(made);
                 self.keep_made_files();
                 self.list_files();
-                self.add_log(format!("✓ Backed up {database} @ {server} in {took}{size}: {path}"), Hue::Green);
+                self.add_log(
+                    format!("✓ Backed up {database} @ {server} in {took}{size}: {path} - o opens its folder"),
+                    Hue::Green,
+                );
             }
             Chore::Export => {
                 self.list_files();
                 let path = done.file.clone().unwrap_or_default();
-                self.add_log(format!("✓ Exported {database} @ {server} in {took}{size}: {path}"), Hue::Green);
+                self.add_log(
+                    format!("✓ Exported {database} @ {server} in {took}{size}: {path} - o opens its folder"),
+                    Hue::Green,
+                );
             }
             Chore::Copy { to } | Chore::Import { to, .. } => {
                 let source = if matches!(chore, Chore::Copy { .. }) { Some(database.as_str()) } else { None };
@@ -478,13 +484,17 @@ impl Controller {
                 self.add_log(format!("✓ {what} in {took}{note} - {added}"), Hue::Green);
                 self.measure(&server);
             }
-            Chore::Drop => self.dropped(&server, &database, took),
+            Chore::Drop => {
+                self.dropped(&server, &database, took);
+                self.forget_pulled(&server, &database);
+                self.drop_next_pulled();
+            }
         }
     }
 
     /// Adds a connection string to the new database `to`, as `n` does: a copy of `source`'s (else one to its server),
     /// inactive. What it says it did.
-    fn add_connection(&mut self, server: &str, source: Option<&str>, to: &str) -> String {
+    pub(super) fn add_connection(&mut self, server: &str, source: Option<&str>, to: &str) -> String {
         let entry =
             source.and_then(|source| self.entry_on(server, Some(source))).or_else(|| self.entry_on(server, None));
         let (Some(entry), Some(path)) = (entry, self.secrets_file()) else {
