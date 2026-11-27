@@ -32,6 +32,9 @@ pub struct Sizes {
     pub reading: Option<u64>,
 }
 
+/// SQL Server's own databases: never offered as a connection string.
+const SYSTEM_DATABASES: [&str; 4] = ["master", "model", "msdb", "tempdb"];
+
 fn say(events: &UnboundedSender<Event>, job: u64, news: News) {
     let _ = events.send(Event::DatabaseFiles { job, news });
 }
@@ -118,6 +121,38 @@ impl Controller {
     /// The databases on a server as last measured.
     pub fn sizes(&self, server: &str) -> Option<&Sizes> {
         self.db_sizes.get(&server.to_lowercase())
+    }
+
+    /// The databases on a server, as last measured, that no connection string in secrets.json names - SQL Server's
+    /// own left out: what `n` offers to add.
+    pub fn not_listed(&self, server: &str) -> Vec<String> {
+        let Some(sizes) = self.sizes(server) else { return Vec::new() };
+        let listed: Vec<String> = secrets::connections(&self.secrets_text().unwrap_or_default())
+            .into_iter()
+            .filter(|entry| entry.server.eq_ignore_ascii_case(server))
+            .map(|entry| entry.database.to_lowercase())
+            .collect();
+        let mut spare: Vec<String> = sizes
+            .databases
+            .iter()
+            .map(|(name, _)| name.clone())
+            .filter(|name| {
+                let lower = name.to_lowercase();
+                !SYSTEM_DATABASES.contains(&lower.as_str()) && !listed.contains(&lower)
+            })
+            .collect();
+        spare.sort_by_key(|name| name.to_lowercase());
+        spare
+    }
+
+    /// Whether the server, as last measured, has no database by that name: only its connection string is left.
+    pub fn is_missing(&self, server: &str, database: &str) -> bool {
+        self.sizes(server).is_some_and(|sizes| {
+            sizes.at.is_some()
+                && sizes.error.is_none()
+                && !sizes.databases.is_empty()
+                && !sizes.databases.iter().any(|(name, _)| name.eq_ignore_ascii_case(database))
+        })
     }
 
     /// A database's size in bytes, as last measured.
@@ -485,7 +520,8 @@ impl Controller {
                 self.measure(&server);
             }
             Chore::Drop => {
-                self.dropped(&server, &database, took);
+                let gone = done.note.as_deref() == Some(super::database_jobs::ALREADY_GONE);
+                self.dropped(&server, &database, took, gone);
                 self.forget_pulled(&server, &database);
                 self.drop_next_pulled();
             }
@@ -506,7 +542,7 @@ impl Controller {
         }
     }
 
-    fn dropped(&mut self, server: &str, database: &str, took: String) {
+    fn dropped(&mut self, server: &str, database: &str, took: String, gone: bool) {
         let before = self.save_points.len();
         self.save_points.retain(|point| !point.of(server, database));
         if self.save_points.len() != before {
@@ -519,7 +555,13 @@ impl Controller {
             Some(Ok(many)) => format!(" and its {many} connection strings"),
             Some(Err(error)) => format!(" (its connection strings stay: {error})"),
         };
-        self.add_log(format!("✓ Dropped {database} @ {server}{removed} in {took}"), Hue::Green);
+        let said = if gone {
+            let removed = removed.replacen(" and its", " - removed its", 1);
+            format!("✓ {database} @ {server} was {}{removed}", super::database_jobs::ALREADY_GONE)
+        } else {
+            format!("✓ Dropped {database} @ {server}{removed} in {took}")
+        };
+        self.add_log(said, Hue::Green);
         self.measure(server);
     }
 
@@ -577,12 +619,16 @@ mod tests {
     #[derive(Default)]
     struct Scripted {
         asked: Mutex<Vec<String>>,
+        /// Databases on the server besides `Taken`.
+        present: Mutex<Vec<&'static str>>,
     }
 
     impl Sql for Scripted {
         fn run(&self, _: &str, _: Option<&str>, sql: &str, line: &mut dyn FnMut(&str)) -> Result<(), String> {
             self.asked.lock().unwrap().push(sql.to_string());
-            if sql.contains("DB_ID(N'Taken')") {
+            let present =
+                self.present.lock().unwrap().iter().any(|name| sql.contains(&format!("ISNULL(DB_ID(N'{name}')")));
+            if sql.contains("DB_ID(N'Taken')") || present {
                 line("7");
             } else if sql.contains("DB_ID(") && sql.contains("ISNULL") {
                 line("0");
@@ -696,6 +742,7 @@ mod tests {
         let (mut controller, mut rx) = controller(&temp, json!({}));
         let secrets = "{\n  \"DefaultConnection\": \"Server=localhost;Database=Shop;Trusted_Connection=True\",\n  //\"DefaultConnection\": \"Server=localhost;Database=Shop_copy;Trusted_Connection=True\",\n}\n";
         let sql = with_secrets(&temp, &mut controller, secrets);
+        sql.present.lock().unwrap().push("Shop_copy");
         assert!(controller.drop_database("localhost", "Shop").unwrap_err().contains("in use"));
         assert!(controller.drop_database("localhost", "master").is_err());
         controller.drop_database("localhost", "Shop_copy").unwrap();

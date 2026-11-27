@@ -1061,6 +1061,18 @@ fn open_picker(ui: &mut Ui, controller: &mut Controller) {
     super::database_files::opened(ui, controller);
 }
 
+/// `Tab` while a new database's name is typed: the next of the server's databases missing from secrets.json - after
+/// the one typed, else the first that has what's typed in its name.
+fn next_spare<'a>(spare: &'a [String], typed: &str) -> Option<&'a String> {
+    match spare.iter().position(|name| name.eq_ignore_ascii_case(typed)) {
+        Some(at) => spare.get((at + 1) % spare.len()),
+        None => {
+            let typed = typed.to_lowercase();
+            spare.iter().find(|name| name.to_lowercase().contains(&typed)).or_else(|| spare.first())
+        }
+    }
+}
+
 fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
     picker_keys(ui, controller, name, key);
     super::save_points::follow_highlight(ui, controller);
@@ -1089,9 +1101,16 @@ fn picker_keys(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
         return;
     }
     let Some(picker) = ui.picker.as_mut() else { return };
+    let server = picker.entries().get(picker.index).map(|entry| entry.server.clone());
     if let Some(new_name) = picker.new_name.as_mut() {
         match name {
             "Escape" => picker.new_name = None,
+            "Tab" => {
+                let spare = server.map(|server| controller.not_listed(&server)).unwrap_or_default();
+                if let Some(next) = next_spare(&spare, new_name) {
+                    *new_name = next.to_string();
+                }
+            }
             "Backspace" => {
                 new_name.pop();
             }

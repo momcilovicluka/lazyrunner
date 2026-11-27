@@ -300,6 +300,16 @@ fn ask_drop(ui: &mut Ui, controller: &mut Controller, entry: &Entry) {
         controller.add_log(format!("✗ Can't drop {}: {why}", entry.label), Hue::Yellow);
         return;
     }
+    let yes = SavePointYes::DropDatabase { server: entry.server.clone(), database: entry.database.clone() };
+    if controller.is_missing(&entry.server, &entry.database) {
+        let lines = vec![
+            format!("{} @ {} isn't on the server - it was dropped some other way.", entry.database, entry.server),
+            "Remove its connection string from secrets.json? (The file before is kept as              secrets.json.lazyrunner-backup.)"
+                .to_string(),
+        ];
+        open_confirm(ui, Confirm { lines, jobs: Vec::new(), risk: Risk::Revert, save_point: Some(yes) });
+        return;
+    }
     let size = controller
         .size_of(&entry.server, &entry.database)
         .map_or_else(String::new, |bytes| format!(" ({})", files::size(bytes)));
@@ -315,7 +325,6 @@ fn ask_drop(ui: &mut Ui, controller: &mut Controller, entry: &Entry) {
     lines.push(
         "Its connection string leaves secrets.json (the file before is kept as secrets.json.lazyrunner-backup).".into(),
     );
-    let yes = SavePointYes::DropDatabase { server: entry.server.clone(), database: entry.database.clone() };
     open_confirm(ui, Confirm { lines, jobs: Vec::new(), risk: Risk::LosesData, save_point: Some(yes) });
 }
 
