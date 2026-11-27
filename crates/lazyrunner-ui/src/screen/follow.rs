@@ -160,6 +160,7 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
             | "export_database"
             | "import_database"
             | "drop_database"
+            | "pull_database"
             | "database_files"
             | "query_database"
             | "query_result"
@@ -169,7 +170,7 @@ fn show(ui: &mut Ui, controller: &mut Controller, op: &str, args: &Value, result
     }
     match op {
         "switch_database" | "add_database" | "save_point" | "rewind" | "copy_database" | "backup_database"
-        | "export_database" | "import_database" | "drop_database" => {
+        | "export_database" | "import_database" | "drop_database" | "pull_database" => {
             database_view(ui, controller, args);
             result["doing"].as_str().map(str::to_string)
         }

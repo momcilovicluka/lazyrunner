@@ -68,6 +68,8 @@ pub enum Target {
     Branch,
     /// A cell of a Health card's chart: its app, its cell (the pointer on it shows that moment's reading).
     Chart { app: usize, cell: usize },
+    /// A step of the pull graph on the database screen (#110), by its place: a click picks it.
+    Step(usize),
 }
 
 /// Where a target was drawn in the last frame: one row, from `x`, `width` cells.
@@ -200,6 +202,7 @@ fn click(ui: &mut Ui, controller: &mut Controller, target: Option<Target>, doubl
         || super::code::click(ui, controller, target, double)
         || super::durations::click(ui, controller, target)
         || super::problems::click(ui, target)
+        || super::pull_view::click(ui, target, double)
     {
         return;
     }

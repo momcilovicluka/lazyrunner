@@ -11,6 +11,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
+use super::cancel::{self, CANCELLED};
 use super::secrets::mask_text;
 use super::tools;
 
@@ -186,12 +187,16 @@ impl Package for SqlPackage {
         line: &mut dyn FnMut(&str),
     ) -> Result<(), String> {
         let program = find().ok_or_else(|| MISSING.to_string())?;
+        if cancel::asked() {
+            return Err(CANCELLED.into());
+        }
         let call = invocation(action, connection, file)?;
         let response = Response::write(private, &call.response)?;
         let mut command = Command::new(program);
         command.args(&call.args).arg(format!("@{}", response.0.display()));
         command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut child = tools::own_console(&mut command).spawn().map_err(|error| format!("{PROGRAM}: {error}"))?;
+        let watched = cancel::running(child.id());
         let errors = child.stderr.take().map(|stderr| {
             std::thread::spawn(move || BufReader::new(stderr).lines().map_while(Result::ok).collect::<Vec<String>>())
         });
@@ -207,9 +212,12 @@ impl Package for SqlPackage {
         }
         said.extend(errors.and_then(|errors| errors.join().ok()).unwrap_or_default());
         let status = child.wait().map_err(|error| format!("{PROGRAM}: {error}"))?;
-        drop(response);
+        drop((response, watched));
         if status.success() {
             return Ok(());
+        }
+        if cancel::asked() {
+            return Err(CANCELLED.into());
         }
         Err(error_of(&said).unwrap_or_else(|| format!("{PROGRAM} failed ({status})")))
     }

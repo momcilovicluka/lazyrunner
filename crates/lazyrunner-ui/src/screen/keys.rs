@@ -60,6 +60,7 @@ pub fn prompt(ui: &Ui) -> bool {
         || ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some())
         || super::save_points::typing(ui)
         || super::database_files::typing(ui)
+        || matches!(&ui.overlay, Some(Overlay::Pull(card)) if card.typing())
         || matches!(&ui.overlay, Some(Overlay::Palette { .. } | Overlay::Themes { .. }))
         || matches!(&ui.overlay, Some(Overlay::Marks { note: Some(_), .. }))
         || matches!(&ui.overlay, Some(Overlay::Sheet { typing: Some(_), .. }))
@@ -611,6 +612,7 @@ fn overlay_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
             }
         }
         Some(Overlay::Confirm(_)) => super::migrations::confirm_key(ui, controller, name),
+        Some(Overlay::Pull(_)) => super::pull_view::card_key(ui, controller, name, key),
         Some(Overlay::Palette { query, index }) => match name {
             "Escape" => ui.overlay = None,
             _ if list_step(name, key).is_some() => {
@@ -1064,10 +1066,14 @@ fn picker_key(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEve
 }
 
 fn picker_keys(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEvent) {
-    if super::screens::switch_key(ui, controller, name) {
+    let typing = ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
+    let pulls = name == "P" && !controller.pull_sources().is_empty();
+    if !pulls && super::screens::switch_key(ui, controller, name) {
         return;
     }
-    let typing = ui.picker.as_ref().is_some_and(|picker| picker.filtering || picker.new_name.is_some());
+    if !typing && !super::database_files::typing(ui) && super::pull_view::key(ui, controller, name) {
+        return;
+    }
     if !typing && super::database_files::key(ui, controller, name, typed(key)) {
         return;
     }

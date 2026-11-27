@@ -49,6 +49,8 @@ pub mod parsed;
 pub mod phases;
 pub mod ports;
 pub mod problems;
+pub mod pull_graph;
+pub mod pull_view;
 pub mod rail;
 pub mod rail_density;
 pub mod rail_motion;
@@ -301,6 +303,8 @@ pub enum Overlay {
         index: usize,
         picking: Option<usize>,
     },
+    /// `p` on the database screen: a source to pull from, or its password (#110).
+    Pull(Box<pull_view::Card>),
     /// The y/n box before migrations are applied or reverted.
     Confirm(Box<migrations::Confirm>),
     /// `O`: which place in code to open, when a stack has more than one of the app's own (#107).
@@ -373,6 +377,7 @@ impl Overlay {
             Self::Flame(_) => "profile",
             Self::Migrations { .. } => "migrations",
             Self::Confirm(_) => "confirm",
+            Self::Pull(_) => "pull",
             Self::Themes { .. } => "themes",
             Self::About { .. } => "about",
         }
@@ -492,6 +497,8 @@ pub struct Ui {
     pub save_view: save_points::View,
     /// The database screen's files, and its copies, backups, exports and imports as they move (#110).
     pub files_view: database_files::View,
+    /// The database screen's pull: the graph's keys, the picked step, its motion (#110).
+    pub pull_view: pull_view::View,
     /// The resumed apps whose columns fade in once they run, and the fades under way, by app (#85).
     pub restoring: Vec<String>,
     pub fades: HashMap<String, Instant>,
@@ -654,6 +661,7 @@ impl Ui {
             db_motion: database::Motion::default(),
             save_view: save_points::View::default(),
             files_view: database_files::View::default(),
+            pull_view: pull_view::View::default(),
             restoring: Vec::new(),
             fades: HashMap::new(),
             help_typing: false,
@@ -909,6 +917,8 @@ impl Ui {
             || database::animating(self)
             || save_points::animating(self, controller)
             || database_files::animating(self, controller)
+            || pull_graph::animating(self, controller)
+            || pull_view::animating(self)
             || session::animating(self)
             || durations::animating(self)
             || problems::animating(self)
@@ -1101,6 +1111,7 @@ fn boxed_over(overlay: &Overlay) -> bool {
             | Overlay::About { .. }
             | Overlay::BranchChanges { .. }
             | Overlay::Confirm(_)
+            | Overlay::Pull(_)
             | Overlay::Changelog { .. }
             | Overlay::Marks { .. }
             | Overlay::Sheet { .. }
@@ -1115,7 +1126,7 @@ fn boxed_over(overlay: &Overlay) -> bool {
 
 /// Whether a box is open over its context: not over the database screen - but its y/n box is (#110).
 fn over_its_context(ui: &Ui) -> bool {
-    let over_picker = ui.picker.is_none() || matches!(ui.overlay, Some(Overlay::Confirm(_)));
+    let over_picker = ui.picker.is_none() || matches!(ui.overlay, Some(Overlay::Confirm(_) | Overlay::Pull(_)));
     over_picker && ui.overlay.as_ref().is_some_and(boxed_over)
 }
 
@@ -1124,6 +1135,7 @@ fn body(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<
     flame::open_fresh(ui, controller);
     save_points::poll(ui, controller);
     database_files::poll(ui, controller);
+    pull_view::poll(ui, controller);
     let screen = screens::current(ui);
     if screen != ui.last_screen {
         if let (Some(from), Some(to)) = (ui.last_screen, screen) {
@@ -1158,15 +1170,16 @@ fn under_bar(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) ->
         .collect()
 }
 
-/// What a box is drawn over: the view it was opened from (its screen's bar on top), else the columns - dimmed and
-/// still (nothing scrolls sideways or spins behind the box), nothing in it to click. The view's own selection bar is
+/// What a box is drawn over: the view it was opened from (its screen's bar on top, unless the database screen around
+/// it drew that already), else the columns - dimmed and still (nothing scrolls sideways or spins behind the box),
+/// nothing in it to click. The view's own selection bar is
 /// drawn without moving the box's.
 fn context(ui: &mut Ui, controller: &Controller, width: usize, rows: usize) -> Vec<Vec<Seg>> {
     let kept = ui.motion.kept_bar();
     let reduced = std::mem::replace(&mut ui.reduced_motion, true);
     let shown = ui.overlay.take();
     ui.overlay = ui.behind.take();
-    let lines = match screens::current(ui) {
+    let lines = match screens::current(ui).filter(|_| ui.picker.is_none()) {
         Some(screen) => {
             let mut lines = vec![screens::bar(ui, screen, width)];
             lines.extend(under_bar(ui, controller, width, rows.saturating_sub(1)));
@@ -1184,6 +1197,7 @@ fn overlay_rows(ui: &mut Ui, controller: &Controller, width: usize, rows: usize)
     match &ui.overlay {
         Some(Overlay::Checklist(_)) => return overlays::checklist(ui, width, rows),
         Some(Overlay::Confirm(_)) => return migrations::confirm_rows(ui, width, rows),
+        Some(Overlay::Pull(_)) => return pull_view::card_rows(ui, controller, width, rows),
         _ if ui.picker.is_some() => return database::rows(ui, controller, width, rows),
         Some(Overlay::Palette { .. }) => return palette::rows(ui, controller, width, rows),
         Some(Overlay::Changelog { .. }) => return overlays::changelog(ui, width, rows),

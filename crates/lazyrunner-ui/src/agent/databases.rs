@@ -1,7 +1,8 @@
 //! Save points over MCP (#110): `save_point` makes one of a database, `rewind` takes it back to one (after
 //! `"confirm": true` - what changed since is lost), `database_changes` says what changed since one, table by table;
 //! get_status lists them. And copies, backups, exports and imports - the `database` tool's copy, backup, export,
-//! import and files - and `drop_database` (after `"confirm": true`). A database is
+//! import and files - and `drop_database` (after `"confirm": true`). Its pull takes a copy of a profile's source as a
+//! new database and switches to it; a source's password is kept by the OS and only the user types it. A database is
 //! named by its label (`Shop @ localhost`) or its name, the one in use when left out; a save point by its label or id,
 //! the database's newest when left out; a file by its name or path. Passwords never leave lazyrunner.
 
@@ -9,6 +10,7 @@ use std::time::Duration;
 
 use lazyrunner_core::run::Controller;
 use lazyrunner_core::run::database_files::{self as files, DbFile, Kind as FileKind};
+use lazyrunner_core::run::pull::Step;
 use lazyrunner_core::run::save_points::{self as points, Kind, SavePoint};
 use lazyrunner_core::run::secrets::{self, Entry};
 use serde_json::{Value, json};
@@ -242,6 +244,56 @@ pub fn drop_database(controller: &mut Controller, args: &Value) -> Result<String
     controller.drop_database(&server, &name).map_err(|why| ("refused", why))
 }
 
+/// Pulls a copy of a source (`"source"`, else the last one) as a new database and switches to it, in the background,
+/// after `"confirm": true` (the APIs restart on it). Refused when its password isn't kept: only the user types it,
+/// pulling once from lazyrunner.
+pub fn pull(controller: &mut Controller, args: &Value) -> Result<String, Refusal> {
+    let source = match args["source"].as_str() {
+        Some(source) => clean(source, CLIENT_CHARS),
+        None => controller.last_pull_source().ok_or_else(|| {
+            let known: Vec<&str> = controller.pull_sources().iter().map(|source| source.name.as_str()).collect();
+            ("bad_args", format!("\"source\" names one of the profile's databaseSources: {}", known.join(", ")))
+        })?,
+    };
+    if let Some(why) = controller.password_missing(&source) {
+        return Err(("refused", why));
+    }
+    if !confirmed(args) {
+        return Err(confirm_first(&format!(
+            "pulling {source} makes a new database from it and switches to it, restarting the running APIs -"
+        )));
+    }
+    let doing = controller.pull_database(&source, None).map_err(|why| ("refused", why))?;
+    Ok(format!("{doing} - database op files says the step it's at; wait for pull_done"))
+}
+
+/// The pull running or the last one, as `files` says it: its source, the new database, each step, the progress, how
+/// it ended - never a password or a connection string.
+fn pull_state(controller: &Controller) -> Option<Value> {
+    let pull = controller.pull.as_ref()?;
+    let steps: Vec<Value> = Step::ALL
+        .iter()
+        .map(|step| {
+            let run = pull.step(*step);
+            let state = format!("{:?}", run.state).to_lowercase();
+            json!({ "step": step.name(), "state": state, "detail": run.detail })
+        })
+        .collect();
+    Some(json!({
+        "source": pull.source,
+        "into": format!("{} @ {}", pull.database, pull.server),
+        "running": pull.running().map(Step::name),
+        "steps": steps,
+        "tables": pull.progress.tables,
+        "table": pull.progress.table,
+        "seconds": pull.ended.unwrap_or_else(std::time::Instant::now).saturating_duration_since(pull.started).as_secs(),
+        "done": pull.is_over(),
+        "went_well": pull.went_well(),
+        "error": pull.error.as_ref().map(|(step, why)| format!("{}: {why}", step.name())),
+        "older_copies_to_drop": controller.pull_stale.iter().map(|old| old.database.clone()).collect::<Vec<_>>(),
+    }))
+}
+
 /// The files section's files, each database's size as last measured, and the job running on one - read-only.
 pub fn files(controller: &mut Controller) -> Value {
     controller.refresh_files();
@@ -283,6 +335,7 @@ pub fn files(controller: &mut Controller) -> Value {
         "files": listed,
         "databases": sizes,
         "running": job,
+        "pull": pull_state(controller),
         "sqlpackage": controller.sqlpackage_ready().err(),
     })
 }

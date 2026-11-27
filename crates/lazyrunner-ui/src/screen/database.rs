@@ -256,11 +256,14 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         " type to filter · Enter keeps it · Esc clears it".to_string()
     } else if picker.new_name.is_some() {
         " type the database name · Enter adds it (inactive) · Esc cancels".to_string()
-    } else if let Some(hint) = super::database_files::hint(ui).or_else(|| super::save_points::hint(ui)) {
+    } else if let Some(hint) =
+        super::database_files::hint(ui).or_else(|| super::pull_view::hint(ui)).or_else(|| super::save_points::hint(ui))
+    {
         hint.to_string()
     } else {
         " j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin · u \
-         changes · c copy · b back up · e export · i import · Del drop · Tab save points, files · n new connection \
+         changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · o folder · Tab save points, \
+         files, pull · n new connection \
          string · / filter · y copy row · Esc back"
             .to_string()
     };
@@ -337,8 +340,16 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
     let left = rows.saturating_sub(lines.len() + 1);
     if left > 0 && !entries.is_empty() {
         let files = super::database_files::height(controller, left);
+        let pull = super::pull_graph::height(ui, controller, left.saturating_sub(files + 2));
         lines.push(Vec::new());
-        lines.extend(super::save_points::rows(ui, controller, cells, left.saturating_sub(files + 1)));
+        if pull > 0 {
+            lines.extend(super::pull_graph::rows(ui, controller, cells, pull));
+            lines.push(Vec::new());
+        }
+        let points = left.saturating_sub(files + 1 + if pull > 0 { pull + 1 } else { 0 });
+        if points > 0 {
+            lines.extend(super::save_points::rows(ui, controller, cells, points));
+        }
         lines.push(Vec::new());
         lines.extend(super::database_files::rows(ui, controller, cells, files));
     }

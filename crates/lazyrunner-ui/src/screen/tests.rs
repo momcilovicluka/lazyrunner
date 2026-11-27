@@ -6558,3 +6558,182 @@ async fn the_tests_view_spins_while_it_looks_for_suites() {
     assert!(screen.frame().contains("Looking for tests…"), "{}", screen.frame());
     assert!(super::suites::spinning(&screen.ui, &screen.controller), "its spinner steps the screen");
 }
+
+/// SqlPackage that is there and does nothing: a pull's keys, without a server.
+struct ReadyPackage;
+
+impl lazyrunner_core::run::sqlpackage::Package for ReadyPackage {
+    fn run(
+        &self,
+        _: lazyrunner_core::run::sqlpackage::Action,
+        _: &str,
+        _: &str,
+        _: &std::path::Path,
+        _: &mut dyn FnMut(&str),
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn ready(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/// The database screen on Shop @ localhost, with the source `qa` (a SQL login) and the tests' credential store.
+fn pulling_screen(label: &str) -> (Screen, std::sync::Arc<lazyrunner_core::run::credentials::Memory>) {
+    use lazyrunner_core::profile::sources::{Auth, DatabaseSource, Pulling, Reach};
+
+    let mut screen = screen(label, json!({}));
+    let path = screen.temp.join("secrets.json");
+    let secrets = "{\n  \"DefaultConnection\": \"Server=localhost;Database=Shop;Trusted_Connection=True\",\n}\n";
+    std::fs::write(&path, secrets).unwrap();
+    screen.controller.use_sql(std::sync::Arc::new(Silent), std::sync::Arc::new(ReadyPackage), path.clone());
+    let store = std::sync::Arc::new(lazyrunner_core::run::credentials::Memory::default());
+    screen.controller.use_credentials(store.clone());
+    let reach = Reach::Server {
+        server: "qa-sql.example.com,1433".into(),
+        database: "Shop".into(),
+        auth: Auth::Sql,
+        user: Some("reader".into()),
+    };
+    screen.controller.project.pulling = Pulling {
+        sources: vec![DatabaseSource { name: "qa".into(), reach }],
+        after_pull: vec!["scripts/local-urls.sql".into(), "scripts/test-logins.sql".into()],
+        keep_pulled: Some(2),
+        migrate: true,
+    };
+    let groups = lazyrunner_core::run::secrets::groups(secrets);
+    let picker =
+        Picker { path, groups, group: 0, index: 0, top: 0, filter: String::new(), filtering: false, new_name: None };
+    screen.ui.picker = Some(picker);
+    (screen, store)
+}
+
+#[tokio::test]
+async fn database_pull() {
+    use lazyrunner_core::run::database_files::Progress;
+    use lazyrunner_core::run::pull::{State, Step};
+
+    let (mut screen, _) = pulling_screen("snap-database-pull");
+    let started = screen.ui.now - Duration::from_secs(252);
+    let mb = 1024 * 1024;
+    let progress = Progress {
+        share: Some(112.0 / 214.0),
+        tables: Some((112, 214)),
+        table: Some("dbo.OrderLines".into()),
+        bytes: Some(612 * mb),
+        ..Progress::default()
+    };
+    let states = [State::Done, State::Running, State::Waiting, State::Waiting, State::Waiting, State::Waiting];
+    screen.controller.pretend_pull(("qa", "Shop_qa_20261123"), started, &states, progress);
+    if let Some(pull) = screen.controller.pull.as_mut() {
+        pull.steps[0].detail = "qa · 38 ms · as reader".into();
+        pull.steps[0].ended = Some(started + Duration::from_secs(2));
+        pull.steps[1].output = vec!["Processing Table '[dbo].[OrderLines]'.".into()];
+    }
+    let frame = screen.frame();
+    assert!(frame.contains("PULL qa → localhost · Shop_qa_20261123") && frame.contains("● export"), "{frame}");
+    assert!(frame.contains("112 / 214 tables · dbo.OrderLines · 612 MB so far"), "{frame}");
+    insta::assert_snapshot!("database_pull_running", frame);
+
+    screen.press("Tab");
+    assert!(screen.ui.pull_view.focused, "nothing else to pick: Tab gives the steps the keys");
+    screen.press("l Enter");
+    assert!(screen.frame().contains("OUTPUT · import · SqlPackage"), "{}", screen.frame());
+    screen.press("Esc h h");
+    assert!(screen.frame().contains("✓ check · sqlcmd   qa · 38 ms · as reader"), "{}", screen.frame());
+
+    if let Some(pull) = screen.controller.pull.as_mut() {
+        pull.steps[1].state = State::Done;
+        pull.steps[1].ended = Some(started + Duration::from_secs(200));
+        pull.steps[1].detail = "612 MB".into();
+        pull.steps[2] = lazyrunner_core::run::controller::pull::StepRun {
+            state: State::Running,
+            started: pull.steps[1].ended,
+            ..Default::default()
+        };
+    }
+    let why = "Could not import package. The target database is full.\nMore detail";
+    screen.controller.pretend_pull_over(Some((Step::Import, why)), screen.ui.now);
+    let frame = screen.frame();
+    assert!(frame.contains("✗ import failed: Could not import package. The target database is full."), "{frame}");
+    assert!(!frame.contains("More detail"), "its first line: {frame}");
+    insta::assert_snapshot!("database_pull_failed", frame);
+
+    let done = [State::Done; 6];
+    screen.press("Esc");
+    screen.controller.pretend_pull(("qa", "Shop_qa_20261123"), started, &done, Progress::default());
+    screen.controller.pretend_pull_over(None, screen.ui.now);
+    let frame = screen.frame();
+    assert!(frame.contains("✓ export") && frame.contains("│ 20s"), "each box keeps its duration: {frame}");
+    insta::assert_snapshot!("database_pull_done", frame);
+    screen.ui.now += Duration::from_secs(5);
+    let frame = screen.frame();
+    assert!(frame.contains("✓ pulled qa in 4m12s · Shop_qa_20261123 is active"), "folded into its row: {frame}");
+}
+
+#[tokio::test]
+async fn a_sources_password_is_typed_masked_kept_and_never_shown() {
+    let (mut screen, store) = pulling_screen("snap-pull-password");
+    screen.controller.project.pulling.after_pull.clear();
+    screen.press("p");
+    assert!(super::pull_view::asking_password(&screen.ui), "nothing kept: it asks");
+    screen.press("s 3 c r e t y");
+    let frame = screen.frame();
+    assert!(frame.contains("••••••") && !frame.contains("s3cret"), "masked: {frame}");
+    assert!(frame.contains("qa-sql.example.com,1433 · Shop · as reader"), "{frame}");
+    assert!(copied().is_empty(), "y is a character here, never a copy");
+    insta::assert_snapshot!("database_pull_password", frame);
+
+    screen.press("Enter");
+    let target = lazyrunner_core::run::credentials::target(&screen.controller.project.id, "qa");
+    use lazyrunner_core::run::credentials::Store;
+    assert_eq!(store.get(&target).unwrap().unwrap().expose(), "s3crety");
+    assert!(screen.frame().contains("✓ saved in the tests' store"), "{}", screen.frame());
+    let said: Vec<String> = screen.controller.log.iter().map(|entry| entry.text.clone()).collect();
+    assert!(!said.iter().any(|line| line.contains("s3crety")), "{said:?}");
+    assert!(screen.controller.pull.is_some(), "and it pulls");
+    screen.ui.now += Duration::from_secs(2);
+    screen.frame();
+    assert!(screen.ui.overlay.is_none(), "it folds away");
+
+    screen.controller.pull = None;
+    screen.press(", Delete");
+    assert!(!screen.controller.password_kept("qa") && screen.last_log().starts_with("Forgot qa's password"));
+}
+
+#[tokio::test]
+async fn o_opens_the_folder_of_the_backups_and_exports_and_shows_a_picked_file_in_it() {
+    let (mut screen, _) = pulling_screen("database-files-o");
+    let folder = screen.controller.files_folder();
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("Shop_qa_20261120.bacpac"), "x").unwrap();
+    screen.controller.refresh_files();
+    screen.press("o");
+    assert_eq!(OPENED.with(|opened| opened.borrow().clone()), [folder.display().to_string()]);
+    screen.press("Tab o");
+    let path = folder.join("Shop_qa_20261120.bacpac").display().to_string();
+    assert_eq!(OPENED.with(|opened| opened.borrow().last().cloned()), Some(format!("reveal {path}")));
+    assert!(screen.frame().contains("o show it in its folder"), "{}", screen.frame());
+}
+
+#[tokio::test]
+async fn an_agents_pull_is_refused_without_a_kept_password_and_never_sees_one() {
+    let (mut screen, _) = pulling_screen("agent-pull");
+    screen.controller.project.pulling.after_pull.clear();
+    let refused = agent(&mut screen, "pull_database", json!({ "source": "qa" }), None).to_string();
+    assert!(refused.contains("ask the user to pull once from lazyrunner"), "{refused}");
+    assert!(screen.controller.pull.is_none());
+    let secret = lazyrunner_core::run::credentials::Password::new("s3cret-Pa55");
+    screen.controller.keep_password("qa", &secret).unwrap();
+    let asked = agent(&mut screen, "pull_database", json!({ "source": "qa" }), None).to_string();
+    assert!(asked.contains("needs_confirm") && asked.contains("restarting the running APIs"), "{asked}");
+    let pulling = agent(&mut screen, "pull_database", json!({ "source": "qa", "confirm": true }), None);
+    assert_eq!(pulling["ok"], json!(true), "{pulling}");
+    let files = agent(&mut screen, "database_files", json!({}), None).to_string();
+    assert!(files.contains("\"source\":\"qa\"") && files.contains("\"step\":\"export\""), "{files}");
+    let status = agent(&mut screen, "status", json!({}), None).to_string();
+    for answer in [&pulling.to_string(), &files, &status] {
+        assert!(!answer.contains("s3cret-Pa55") && !answer.contains("Password="), "{answer}");
+    }
+}

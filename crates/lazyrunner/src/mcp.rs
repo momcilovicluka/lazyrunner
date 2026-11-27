@@ -35,8 +35,17 @@ const WAIT_DEFAULT_SECS: u64 = 120;
 const WAIT_MAX_SECS: u64 = 600;
 /// What a tool answers at most; more is cut, with a note to ask for less.
 const MAX_ANSWER_CHARS: usize = 60_000;
-const WAITS: [&str; 8] =
-    ["ready", "build_done", "tests_done", "migrations_checked", "task_done", "profile_done", "request", "error"];
+const WAITS: [&str; 9] = [
+    "ready",
+    "build_done",
+    "tests_done",
+    "migrations_checked",
+    "task_done",
+    "profile_done",
+    "pull_done",
+    "request",
+    "error",
+];
 const NOT_OPEN: &str = "not_running: lazyrunner isn't open - ask the user to open it in the project's folder (run \
                         lazyrunner in a terminal there), then try again.";
 const ELEVATED: &str = "elevated: lazyrunner runs as Administrator and this agent doesn't, and Windows doesn't let a \
@@ -461,6 +470,7 @@ fn done(condition: &str, status: &Value, built: &HashSet<String>) -> Option<Stri
         }
         "migrations_checked" if busy["migrations"] != true => Some("migrations checked (get_migrations)".into()),
         "profile_done" if busy["profiling"] != true => Some("the capture is done (get_profile)".into()),
+        "pull_done" if busy["pull"] != true => Some("the pull is done (database op files says how it went)".into()),
         "task_done"
             if status["tasks"].as_array().is_none_or(|tasks| tasks.iter().all(|task| task["running"] != true)) =>
         {
@@ -705,6 +715,11 @@ mod tests {
         assert_eq!(asked()["args"], json!({ "database": "Shop", "name": "Shop_2" }));
         ask(&server, call(3, "database", json!({ "op": "files" }))).await;
         assert_eq!(asked()["op"], "database_files");
+        ask(&server, call(30, "database", json!({ "op": "pull", "source": "qa", "confirm": true }))).await;
+        assert_eq!(
+            (asked()["op"].clone(), asked()["args"].clone()),
+            (json!("pull_database"), json!({ "source": "qa", "confirm": true }))
+        );
 
         let calls = server.channel.calls.load(Ordering::SeqCst);
         let wrong = text(&ask(&server, call(4, "get_view", json!({ "view": "weather" }))).await.0.unwrap());
@@ -928,6 +943,14 @@ mod task_wait {
     use serde_json::json;
 
     use super::done;
+
+    #[test]
+    fn pull_done_waits_for_the_pull() {
+        let pulling = json!({ "busy": { "pull": true } });
+        assert_eq!(done("pull_done", &pulling, &HashSet::new()), None);
+        let said = done("pull_done", &json!({ "busy": { "pull": false } }), &HashSet::new()).unwrap();
+        assert!(said.starts_with("the pull is done"), "{said}");
+    }
 
     #[test]
     fn task_done_waits_for_every_running_task_then_says_how_they_went() {

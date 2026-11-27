@@ -6,6 +6,7 @@
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 
+use super::cancel::{self, CANCELLED};
 use super::secrets::mask_text;
 use super::tools;
 
@@ -255,7 +256,11 @@ impl Sql for Sqlcmd {
 }
 
 /// Runs sqlcmd (`program`) as `invocation` says, each line it prints to `line`; the error it reported when it failed.
+/// Its thread's job cancelled ([`cancel`]), it doesn't start, or is killed.
 fn spawn(program: std::path::PathBuf, invocation: &Invocation, line: &mut dyn FnMut(&str)) -> Result<(), String> {
+    if cancel::asked() {
+        return Err(CANCELLED.into());
+    }
     let mut command = Command::new(program);
     command.args(&invocation.args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     for (name, value) in &invocation.env {
@@ -265,6 +270,7 @@ fn spawn(program: std::path::PathBuf, invocation: &Invocation, line: &mut dyn Fn
         };
     }
     let mut child = tools::own_console(&mut command).spawn().map_err(|error| format!("{PROGRAM}: {error}"))?;
+    let watched = cancel::running(child.id());
     let errors = child.stderr.take().map(|stderr| {
         std::thread::spawn(move || BufReader::new(stderr).lines().map_while(Result::ok).collect::<Vec<String>>())
     });
@@ -279,8 +285,12 @@ fn spawn(program: std::path::PathBuf, invocation: &Invocation, line: &mut dyn Fn
     }
     said.extend(errors.and_then(|errors| errors.join().ok()).unwrap_or_default());
     let status = child.wait().map_err(|error| format!("{PROGRAM}: {error}"))?;
+    drop(watched);
     if status.success() {
         return Ok(());
+    }
+    if cancel::asked() {
+        return Err(CANCELLED.into());
     }
     Err(error_of(&said).unwrap_or_else(|| format!("{PROGRAM} failed ({status})")))
 }

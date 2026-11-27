@@ -59,6 +59,29 @@
         "properties": { "mustNotReference": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "Project names (or patterns) it must not reference." } }
       },
       "examples": [{ "Orders.Core": { "mustNotReference": ["Orders.Api"] } }]
+    },
+    "databaseSources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/databaseSource" },
+      "description": "Optional. The other environments a copy of the database is pulled from (p on the database screen, the database source table below) - never a password: one is asked for once and kept in the OS's credential store.",
+      "examples": [[{ "name": "qa", "server": "qa-sql.example.com,1433", "database": "Shop", "auth": "sql", "user": "reader" }, { "name": "staging", "connectionStringEnv": "SHOP_STAGING_DB" }]]
+    },
+    "afterPull": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relativePath" },
+      "description": "Optional. .sql files from the repo root run in order on a pulled copy, stopping at the first error: point integration URLs at local, reset test logins, mask personal data. GO lines split a file into batches.",
+      "examples": [["scripts/local-urls.sql", "scripts/test-logins.sql"]]
+    },
+    "keepPulled": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional. How many pulled copies of a source are kept: after a pull, lazyrunner offers to drop the older ones (never the one in use). The keepPulled setting overrides it on this machine.",
+      "examples": [2]
+    },
+    "migrateAfterPull": {
+      "type": "boolean",
+      "description": "Optional. A pull applies the pending EF Core migrations to its copy before switching to it, as the migrations screen does (false without it). The migrateAfterPull setting overrides it on this machine.",
+      "examples": [true]
     }
   },
   "allOf": [{
@@ -266,6 +289,21 @@
         "run": { "$ref": "#/$defs/command", "description": "The command, as a command app's run.", "examples": ["python seed.py"] },
         "cwd": { "$ref": "#/$defs/relativePath", "description": "Optional. Where it runs, from the repo root (the root without it).", "examples": ["tools"] },
         "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Optional. Variables it gets on top of lazyrunner's own; {cwd} is its folder.", "examples": [{ "SEED": "demo" }] }
+      }
+    },
+    "databaseSource": {
+      "title": "A database source (\"databaseSources\")",
+      "description": "Another environment's database a copy is pulled from (#110): p checks the login, exports a .bacpac with SqlPackage - the only thing ever run there, and it only reads - imports it as a new database <database>_<source>_<yyyyMMdd> on the server in use, runs afterPull, applies the migrations (migrateAfterPull) and switches to it. Either its server and database, or connectionStringEnv.",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "Short name, unique among the sources: in a pulled copy's name and where its password is kept (lazyrunner/<project>/<name>).", "examples": ["qa"] },
+        "server": { "type": "string", "minLength": 1, "description": "Its server, as a connection string names it.", "examples": ["qa-sql.example.com,1433"] },
+        "database": { "type": "string", "minLength": 1, "description": "The database to pull a copy of.", "examples": ["Shop"] },
+        "auth": { "enum": ["sql", "windows", "entra"], "description": "Optional. How it logs in: sql (user, and a password asked for once), windows, or entra (not supported yet). sql with a user, windows without.", "examples": ["sql"] },
+        "user": { "type": "string", "minLength": 1, "description": "Optional. A SQL login's name.", "examples": ["reader"] },
+        "connectionStringEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Optional, instead of the rest: an environment variable holding its whole connection string.", "examples": ["SHOP_STAGING_DB"] }
       }
     },
     "serveVariant": {

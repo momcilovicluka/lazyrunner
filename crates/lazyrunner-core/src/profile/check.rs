@@ -42,6 +42,10 @@ pub const FIELDS: Fields = Fields {
         "layers",
         "presets",
         "tasks",
+        "databaseSources",
+        "afterPull",
+        "keepPulled",
+        "migrateAfterPull",
     ],
     detect: &["anyFile"],
     dotnet: &[
@@ -148,6 +152,7 @@ impl Fields {
             self.ready,
             self.migrations,
             self.health,
+            super::sources::FIELDS,
         ]
         .concat();
         all.sort_unstable();
@@ -253,6 +258,7 @@ pub fn validate(data: &Value, in_repo: bool) -> Vec<String> {
     check_layers(field(data, "layers"), &mut problems);
     check_presets(field(data, "presets"), &mut problems);
     check_tasks(field(data, "tasks"), &mut problems);
+    super::sources::check(data, &mut problems);
     problems
 }
 
@@ -700,7 +706,7 @@ fn check_npm_app(app: &Value, at: &str, problems: &mut Vec<String>) {
     }
 }
 
-fn relative_path(value: &Value, at: &str, problems: &mut Vec<String>) {
+pub(super) fn relative_path(value: &Value, at: &str, problems: &mut Vec<String>) {
     let Some(path) = value.as_str().filter(|path| !path.trim().is_empty()) else {
         problems.push(format!("{at} must be a path"));
         return;

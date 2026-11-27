@@ -616,6 +616,65 @@ A job washes across its database's row as it runs, saying how far it is - `backi
 about 20s left` from the server's `STATS`, or an export's `table 112 of 214` - and folds into a file icon when it's
 done; a new database is a ghost row filling as it's restored.
 
+`o` opens the folder the files are in, in the system's file manager (Explorer, Finder, `xdg-open`): lazyrunner's own
+folder - where exports, files to import and pulled `.bacpac`s are - or, with the files picked (`Tab`), the picked
+file's folder with it selected. A backup in another server's backup folder isn't on this machine: `o` copies its path
+and says it's on the server. A finished backup, export or pull says `o` in its log line too.
+
+### Pulling a copy from another environment
+
+`p` pulls a copy of another environment's database - QA, staging - onto the server in use, as a new database, and
+switches to it; `P` pulls again from the last source, a one-key refresh. The sources are in the profile, without
+secrets:
+
+```json
+"databaseSources": [
+  { "name": "qa", "server": "qa-sql.example.com,1433", "database": "Shop", "auth": "sql", "user": "reader" },
+  { "name": "staging", "connectionStringEnv": "SHOP_STAGING_DB" }
+],
+"afterPull": ["scripts/local-urls.sql", "scripts/test-logins.sql"],
+"keepPulled": 2,
+"migrateAfterPull": true
+```
+
+`auth` is `sql` (a user, and a password asked for once), `windows`, or `entra` (not supported by pulls yet: give such a
+source `connectionStringEnv`); a whole connection string can come from an environment variable instead. A SQL login's
+password is asked for the first time on a small card - typed masked, a `•` a character - and kept in Windows
+Credential Manager under `lazyrunner/<project>/<source>`. It's never written to the profile, the config, a log or an
+answer to an agent, and `y` never copies it; `,` changes it or, with nothing typed, `Del` forgets it. Other OSes'
+credential stores aren't supported yet: there, it's asked for each time.
+
+With several sources `p` asks which. The pull then runs in the background while the apps keep working on the database
+in use - one database job at a time - through these steps:
+
+| Step | Does |
+|------|------|
+| check | Asks the source who lazyrunner is there (`SELECT SUSER_SNAME()`, through sqlcmd), so a wrong server or login fails at once |
+| export | Counts the source's tables, then exports a `.bacpac` of it with SqlPackage into lazyrunner's folder for the project - the only thing ever run against a source, and it only reads |
+| import | Imports it on the server in use as a new database, `Shop_qa_20261123` (`Shop_qa_202611232`... when that's taken) - never over one that's there, and never on a source's server |
+| after-pull | Runs the profile's `afterPull` scripts on it, in order, through sqlcmd (`GO` lines split a script into batches), stopping at the first error with its script's name: point integration URLs at local, reset test logins, mask personal data |
+| migrations | With `migrateAfterPull` (the profile's, or the setting's), applies each DbContext's pending migrations to it, as the migrations screen does |
+| switch | Adds its connection string beside the others and makes it the one in use, restarting the APIs - as `Enter` does, `secrets.json.lazyrunner-backup` and all - and waits for them to answer again |
+
+The pull shows as a graph of its steps under the databases, drawn like the stack map: a box per step left to right, the
+switch fanning out to the APIs it restarts. Done steps are solid, the running one lit with its `●` breathing and dots
+travelling into it - faster while data flows - and the ones to come dashed; a step that finishes settles into `✓` with
+one glint, and the edge to the next draws itself in before that one lights. Under the graph, the picked step's line:
+what it runs, a progress bar of the tables SqlPackage reports (`112 / 214 tables · dbo.OrderLines · 612 MB so far`), and
+about how long is left. `Tab` gives the graph the keys: `h` `l` pick a step, `Enter` opens its whole output (SqlPackage's,
+a script's, sqlcmd's), a click picks one. Once it's done each box keeps how long it took, the slowest tinted; one light
+sweep, and it folds into a summary row. A step that fails pulses red twice and keeps a red border, the steps after it
+dim, and the error's first line shows under the graph. Narrower than its boxes, the graph scrolls sideways to the
+running step; much narrower, it's a list.
+
+`x` cancels the running step: the source is untouched by then, and a half-imported database is dropped. A copy that's
+whole - its scripts or migrations failed - stays, its connection string added, for `Del` to drop. `keepPulled` keeps
+the newest pulled copies of a source and, after a pull, offers to drop the older ones (never the one in use); the
+setting of the same name overrides the profile's on this machine.
+
+Pulled data can be personal data: the `.bacpac`s stay in lazyrunner's folder, outside the repo, and the after-pull
+scripts are the place to mask it. Pulling needs sqlcmd and SqlPackage, as copies and exports do.
+
 ## lazygit (`L`)
 
 `L` opens [lazygit](https://github.com/jesseduffield/lazygit) in the project's folder without leaving lazyrunner. It
@@ -1206,7 +1265,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `replay_request` | A request from `get_requests` sent again to its app on localhost - on the app's own port, over https when the app served it so - with the `headers` (an `Authorization` you give it) and `body` the app's log doesn't keep; answers with the new request's id, status and time, what differs from the first, and what was sent, secret headers masked. Anything but a GET, HEAD or OPTIONS repeats its writes: after `"confirm": true` |
 | `get_screen` | The screen as you see it, as text - for what the other tools don't show |
 | `start_apps`, `stop_apps`, `restart_apps`, `build` | An app, or every app |
-| `wait` | Until `ready`, `build_done`, `tests_done`, `migrations_checked`, `task_done` or `profile_done` (10 minutes at most), then how it went; or for the next `request` (narrowed as in `get_requests`) or `error` (in any app, or `app`) to come, then which - its id for `get_request`, its lines |
+| `wait` | Until `ready`, `build_done`, `tests_done`, `migrations_checked`, `task_done`, `profile_done` or `pull_done` (10 minutes at most), then how it went; or for the next `request` (narrowed as in `get_requests`) or `error` (in any app, or `app`) to come, then which - its id for `get_request`, its lines |
 | `list_tests`, `get_test_results`, `run_tests`, `stop_tests` | The tests view's suites and results, each failure's likely cause, one test's history with the code each run used, what a change affects, and each suite's code coverage and its change; run all, a suite, its failed tests, one test or the affected suites |
 | `get_migrations`, `check_migrations` | The migrations view's DbContexts as last checked; check one, or all, against the database |
 | `get_view` | A read-only view, by `view`: `changelog` (what the newest versions changed, and the version that runs; `count`), `durations` (builds, starts, installs, test suites and tasks - each one's last runs, its usual time and how the last compares; `kind`), `ports` (each app's port, who holds it - PID, name, command line - and for how long, its last minute, and the ranges Windows reserved), `audit` (the last scans: each app's outdated and vulnerable packages, their advisories and the command that fixes each; it doesn't scan), `checks` (the startup checks as the last checklist left them; `rerun` runs them again) or `snapshot` (this run as `, A v`'s snapshot holds it, masked) |
@@ -1226,7 +1285,7 @@ claude mcp add --scope user lazyrunner -- lazyrunner mcp
 | `open_in_editor` | A file of the repo at a line in your editor, as `O` does - to show you the code it's talking about; after `"confirm": true` |
 | `save_point`, `rewind`, `database_changes` | A save point of a database (a snapshot, or a backup); a rewind to one (with `confirm`); what changed since one, table by table - rows then and now, and the small tables changed in place |
 | `query_database` | One read-only `SELECT` (`sql`) against the database in use or `database`: its columns, its rows (each an array of values in the columns' order, numbers as numbers), `count`, `more` when there were over `max_rows` (100; 1000 at most) and how long it took - or the SQL error. Pairs with `save_point` and `database_changes`: checking data is the most common side trip while debugging |
-| `database` | Database work that drops nothing, by `op`: `add` a connection string to secrets.json as `n` on the database screen does - a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet, or with `switch` (and `confirm`) the one in use; `copy` a database to a new one beside it; `backup` it to a `.bak`; `export` it to a `.bacpac`; `import` a file as a new database; `files`: the files, the databases' sizes and the job running - no connection string, ever |
+| `database` | Database work that drops nothing, by `op`: `add` a connection string to secrets.json as `n` on the database screen does - a copy of one there (`from`; the one in use when left out) with another database (`name`), not in use yet, or with `switch` (and `confirm`) the one in use; `copy` a database to a new one beside it; `backup` it to a `.bak`; `export` it to a `.bacpac`; `import` a file as a new database; `pull` a copy of `source` (the profile's `databaseSources`; the last one when left out) as a new database and switch to it (with `confirm`) - refused while its password isn't kept, since only you type it: pull once from lazyrunner first; `files`: the files, the databases' sizes, the job running and the pull's steps - no connection string or password, ever |
 | `drop_database` | A database dropped (with `confirm`; never the one in use) |
 | `set_log_level` | One of a running .NET app's log categories (`category`; `Default` too) at `level` for `minutes` (10; 120 at most), live through its user secrets - no restart; back by itself when its time is up, when the app stops or starts again and when lazyrunner quits. `"level": "reset"` puts it back now (all of the app's without `category`) |
 
@@ -1518,6 +1577,8 @@ out from where you picked it, a ring of its own colours with sparkles on it (not
 | `mouse` | `true` | Clicks and the wheel (off: the terminal selects text) |
 | `reducedMotion` | `false` | No blinking, spinners, glides or fades |
 | `frameRate` | `"auto"` | Frames a second for what moves: `auto` is the fastest display's refresh rate (60 at least - 120, 144, 240 on displays that show them), or a number from 30 to 480 |
+| `keepPulled` | | How many pulled copies of a source are kept (Database, Pulling a copy): after a pull, lazyrunner offers to drop the older ones; overrides the profile's |
+| `migrateAfterPull` | | Whether a pull applies the pending migrations to its copy; overrides the profile's |
 | `rewindPinned` | `"manualRestarts"` | Which restarts rewind the database to a pinned save point first (Database, Save points): `manualRestarts` (the ones you ask for) or `everyRestart` (those after a code change too) |
 | `gitTool` | `"lazygit"` | What `L` runs: a command (with arguments) on PATH or a path |
 | `gitBeside` | `false` | `L` opens it beside lazyrunner (in Windows Terminal) instead of in place |

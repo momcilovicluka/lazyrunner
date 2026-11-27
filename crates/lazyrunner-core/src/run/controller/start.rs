@@ -457,16 +457,5 @@ pub(super) fn clock() -> String {
 
 /// Kills another program's process tree (what holds a port lazyrunner needs); true when it is gone.
 pub(super) fn kill_process_tree(pid: u32) -> bool {
-    #[cfg(windows)]
-    {
-        std::process::Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .output()
-            .is_ok_and(|output| output.status.success())
-    }
-    #[cfg(unix)]
-    {
-        // SAFETY: sends a signal to the process the user chose to kill.
-        unsafe { libc::kill(pid as i32, libc::SIGKILL) == 0 }
-    }
+    crate::run::cancel::kill_tree(pid)
 }
