@@ -3,6 +3,14 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.121.0] - 2026-11-27
+
+### Added
+- The database screen lists the databases on a server that no connection string in `secrets.json` names (`+ 2 more on localhost not in secrets.json`): while the name after `n` is typed they narrow to what matches, and `Tab` fills one in - `Enter` adds it, as `n` does.
+
+### Fixed
+- A connection string whose database is no longer on the server says `✗ no database` in its row instead of the server's answer, and `Del` on it only removes the connection string: dropping it failed with SQL Server's "does not have permission to alter database ..., the database does not exist". A drop that finds its database already gone says so.
+
 ## [1.120.2] - 2026-11-27
 
 ### Fixed

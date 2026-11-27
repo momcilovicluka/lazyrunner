@@ -6585,6 +6585,7 @@ impl lazyrunner_core::run::sqlpackage::Package for ReadyPackage {
     }
 }
 
+mod missing_db;
 mod sources_ui;
 
 /// The database screen on Shop @ localhost, with the source `qa` (a SQL login) and the tests' credential store.

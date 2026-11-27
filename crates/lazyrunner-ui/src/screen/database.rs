@@ -54,6 +54,7 @@ const SOURCES_LEAST: usize = 4;
 const CUT: &str = "…";
 /// The answer of a server that doesn't answer: the widest the answers column holds, so it's never narrower.
 const NO_ANSWER: &str = "✗ no answer";
+const NO_DATABASE: &str = "✗ no database";
 /// Each row comes in this long after the one above it, dim at first for this long; an answer flashes this long.
 const ROW_STAGGER: Duration = Duration::from_millis(35);
 const ROW_DIM: Duration = Duration::from_millis(120);
@@ -226,7 +227,12 @@ fn parts(ui: &Ui, controller: &Controller, entry: &Entry, most: u64) -> [Seg; 6]
     let label = seg(text, color);
     let apps = super::save_points::apps_back(ui, controller, entry).unwrap_or_else(|| seg(apps, C::Gray));
     let size = super::database_jobs::size_cell(controller, entry, most);
-    [label, answer(ui, &entry.server), apps, pending, size, seg(last, C::DarkGray)]
+    let answer = if controller.is_missing(&entry.server, &entry.database) {
+        seg(NO_DATABASE, C::Red)
+    } else {
+        answer(ui, &entry.server)
+    };
+    [label, answer, apps, pending, size, seg(last, C::DarkGray)]
 }
 
 /// Each column's width and the gap between them for `cells`: each as wide as the most it holds (its title at least,
@@ -411,9 +417,26 @@ pub fn rows(ui: &mut Ui, controller: &Controller, cells: usize, rows: usize) -> 
         lines.push(Vec::new());
         lines.push(prompt);
     }
+    let spare = entries.get(picker.index).map(|entry| (entry.server.clone(), controller.not_listed(&entry.server)));
+    let spare = spare.filter(|(_, spare)| !spare.is_empty());
     if let Some(name) = picker.new_name.clone() {
         lines.push(Vec::new());
         lines.push(vec![seg(format!(" + new database (a copy of the picked one): {name}{cursor}"), C::Cyan)]);
+        if let Some((server, spare)) = &spare {
+            let typed = name.to_lowercase();
+            let matching: Vec<&str> =
+                spare.iter().filter(|spare| spare.to_lowercase().contains(&typed)).map(String::as_str).collect();
+            let text = if matching.is_empty() {
+                format!("   none of {server}'s databases missing from secrets.json matches")
+            } else {
+                format!("   on {server}, not in secrets.json (Tab fills one in): {}", matching.join(" · "))
+            };
+            lines.push(super::columns::fit(vec![seg(text, C::DarkGray)], cells));
+        }
+    } else if let Some((server, spare)) = &spare {
+        let count = spare.len();
+        let text = format!(" + {count} more on {server} not in secrets.json (n adds one): {}", spare.join(", "));
+        lines.push(super::columns::fit(vec![seg(text, C::DarkGray)], cells));
     }
     if let Some(picker) = ui.picker.as_mut() {
         picker.top = top;

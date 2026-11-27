@@ -10,6 +10,9 @@ use crate::run::save_points as points;
 use crate::run::sql::{self, Sql};
 use crate::run::sqlpackage::{self, Action, Package};
 
+/// The note of a drop that found the database already gone: only its connection strings are left to remove.
+pub(super) const ALREADY_GONE: &str = "already gone from the server";
+
 /// Whether the signed-in user may create databases: 1 or 0.
 pub(super) const CAN_CREATE_SQL: &str = "SET NOCOUNT ON; SELECT HAS_PERMS_BY_NAME(NULL, NULL, 'CREATE ANY DATABASE')";
 
@@ -249,6 +252,9 @@ pub(super) fn import(
 /// Drops `database`: lazyrunner's snapshots of it first (SQL Server won't drop a database with snapshots), then the
 /// database, everyone else cut off.
 pub(super) fn remove_database(sql: &dyn Sql, connection: &str, database: &str) -> Result<Done, String> {
+    if !exists(sql, connection, database)? {
+        return Ok(Done { note: Some(ALREADY_GONE.to_string()), ..Done::default() });
+    }
     let snapshots = sql::query(sql, connection, Some(MASTER), &points::snapshots_sql(database), 1)?;
     for snapshot in snapshots.into_iter().filter_map(|row| row.into_iter().next()).filter(|name| ours(name, database)) {
         sql.run(connection, Some(MASTER), &points::drop_sql(&snapshot), &mut |_| {})?;
@@ -315,5 +321,32 @@ mod tests {
         assert!(windows.contains("TrustServerCertificate=True"), "the rest kept: {windows}");
         let login = imported_as(false);
         assert!(login.contains("User ID=shop") && login.contains("Database=Shop_qa"), "{login}");
+    }
+
+    /// SQL on a server without the database: it keeps what it was asked to run.
+    #[derive(Default)]
+    struct Without(Mutex<Vec<String>>);
+
+    impl Sql for Without {
+        fn run(&self, _: &str, _: Option<&str>, text: &str, line: &mut dyn FnMut(&str)) -> Result<(), String> {
+            self.0.lock().unwrap().push(text.to_string());
+            if text.contains("DB_ID(") {
+                line("0");
+            }
+            Ok(())
+        }
+
+        fn ready(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_drop_of_a_database_already_gone_runs_nothing_and_says_so() {
+        let sql = Without::default();
+        let done = remove_database(&sql, "Server=Shop-PC;Database=Shop_old;Integrated Security=True", "Shop_old");
+        assert_eq!(done.unwrap().note.as_deref(), Some(ALREADY_GONE));
+        let ran = sql.0.lock().unwrap().clone();
+        assert!(ran.iter().all(|text| !text.contains("DROP DATABASE")), "{ran:?}");
     }
 }
