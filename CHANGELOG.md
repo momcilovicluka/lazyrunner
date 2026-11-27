@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.120.1] - 2026-11-27
+
+### Fixed
+- The new source form on the database screen takes every key as text: a screen's key (`A` Audit, `T` Tests, `K`, `P`...) switched screens instead, so a name, a server or a pasted connection string couldn't be typed - nor in any other text field while a screen was open (#114).
+- `←` `→` on the form's Database row go back to "the whole server" from "one:" while a database name is being typed (#114).
+
 ## [1.120.0] - 2026-11-27
 
 ### Added

@@ -271,7 +271,7 @@ fn typing(ui: &Ui) -> bool {
 pub fn switch_key(ui: &mut Ui, controller: &mut Controller, name: &str) -> bool {
     let Some(open) = current(ui) else { return false };
     let Some(next) = Screen::ALL.into_iter().find(|screen| screen.key() == name) else { return false };
-    if next == open || open.keeps(name) || typing(ui) {
+    if next == open || open.keeps(name) || typing(ui) || super::keys::prompt(ui) {
         return false;
     }
     go(ui, controller, next);
