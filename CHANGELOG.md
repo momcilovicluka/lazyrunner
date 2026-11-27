@@ -3,6 +3,12 @@
 What changed in each lazyrunner version, newest first. lazyrunner shows the new entries in its startup checklist after
 it updates itself; `,` then `c` shows the whole file. How to release a version: README, "Releasing".
 
+## [1.122.0] - 2026-11-27
+
+### Added
+- `a` on the database screen puts the servers next to `secrets.json`: under each server that answers, its databases marked `●` (in a connection string too), `+` (in none) or `✗` (gone from the server), and a server that doesn't answer in red with its connection strings. `Enter` adds a `+`, takes a `✗` out or goes to a `●`; `+` adds them all, `-` takes them all out, `r` does both - never the one in use, and nothing on a server is touched.
+- `Del` on a connection string whose server doesn't answer (an old name of this machine) only takes it out of `secrets.json`, and `a` in that box takes out every one to that server; the box names the servers that answer and have a database by that name.
+
 ## [1.121.0] - 2026-11-27
 
 ### Added

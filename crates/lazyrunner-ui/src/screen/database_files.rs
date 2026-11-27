@@ -300,16 +300,12 @@ fn ask_drop(ui: &mut Ui, controller: &mut Controller, entry: &Entry) {
         controller.add_log(format!("✗ Can't drop {}: {why}", entry.label), Hue::Yellow);
         return;
     }
-    let yes = SavePointYes::DropDatabase { server: entry.server.clone(), database: entry.database.clone() };
-    if controller.is_missing(&entry.server, &entry.database) {
-        let lines = vec![
-            format!("{} @ {} isn't on the server - it was dropped some other way.", entry.database, entry.server),
-            "Remove its connection string from secrets.json? (The file before is kept as              secrets.json.lazyrunner-backup.)"
-                .to_string(),
-        ];
-        open_confirm(ui, Confirm { lines, jobs: Vec::new(), risk: Risk::Revert, save_point: Some(yes) });
+    let down = super::database::reach_of(ui, &entry.server) == Some(super::database::Reach::Down);
+    if down || controller.is_missing(&entry.server, &entry.database) {
+        ask_forget(ui, controller, entry, down);
         return;
     }
+    let yes = SavePointYes::DropDatabase { server: entry.server.clone(), database: entry.database.clone() };
     let size = controller
         .size_of(&entry.server, &entry.database)
         .map_or_else(String::new, |bytes| format!(" ({})", files::size(bytes)));
@@ -326,6 +322,49 @@ fn ask_drop(ui: &mut Ui, controller: &mut Controller, entry: &Entry) {
         "Its connection string leaves secrets.json (the file before is kept as secrets.json.lazyrunner-backup).".into(),
     );
     open_confirm(ui, Confirm { lines, jobs: Vec::new(), risk: Risk::LosesData, save_point: Some(yes) });
+}
+
+/// `Del` on a connection string that leads nowhere - its server doesn't answer (an old name of this machine, a server
+/// that's gone) or no longer has the database: a box that only takes connection strings out of secrets.json, this one
+/// (`y`) or every one to that server (`a`), and names the servers that answer and have a database by that name.
+fn ask_forget(ui: &mut Ui, controller: &Controller, entry: &Entry, down: bool) {
+    let (server, database) = (entry.server.clone(), entry.database.clone());
+    let mut lines = vec![if down {
+        format!("{server} doesn't answer - an old name of this machine, or a server that's gone.")
+    } else {
+        format!("{database} @ {server} isn't on the server - it was dropped some other way.")
+    }];
+    lines.push(format!("y takes the connection string to {database} @ {server} out of secrets.json."));
+    let all = if down { controller.connections_to(&server) } else { Vec::new() };
+    if all.len() > 1 {
+        lines.push(format!("a takes all {} connection strings to {server} out.", all.len()));
+    }
+    lines.push("Nothing on any server is touched; the file before is kept as secrets.json.lazyrunner-backup.".into());
+    let servers = ui.picker.as_ref().map(|picker| {
+        let mut servers: Vec<String> =
+            picker.groups.iter().flat_map(|(_, entries)| entries.iter().map(|entry| entry.server.clone())).collect();
+        servers.sort_by_key(|server| server.to_lowercase());
+        servers.dedup_by(|one, other| one.eq_ignore_ascii_case(other));
+        servers
+    });
+    for other in servers.unwrap_or_default().iter().filter(|other| !other.eq_ignore_ascii_case(&server)) {
+        let has = controller
+            .sizes(other)
+            .is_some_and(|sizes| sizes.databases.iter().any(|(name, _)| name.eq_ignore_ascii_case(&database)));
+        if has {
+            lines.push(format!("{other} has a {database}: n on one of its rows adds it back (Tab fills it in)."));
+        }
+    }
+    let yes = SavePointYes::ForgetConnections { server, database, all };
+    open_confirm(ui, Confirm { lines, jobs: Vec::new(), risk: Risk::Revert, save_point: Some(yes) });
+}
+
+/// Takes connection strings to `server` out of secrets.json (`Del` on ones that lead nowhere), the list read again.
+pub(super) fn forget(ui: &mut Ui, controller: &mut Controller, server: &str, databases: &[String]) {
+    if let Err(why) = controller.forget_connections(server, databases) {
+        controller.add_log(format!("✗ {why}"), Hue::Red);
+    }
+    reload(ui, None);
 }
 
 /// `Del` on a file: a y/n box that names it, its size and where it is.
@@ -361,6 +400,10 @@ pub fn yes(ui: &mut Ui, controller: &mut Controller, yes: SavePointYes) {
             Ok(())
         }
         SavePointYes::DropPulled(copies) => controller.drop_pulled(&copies).map(|_| ()),
+        SavePointYes::ForgetConnections { server, database, .. } => {
+            forget(ui, controller, &server, &[database]);
+            Ok(())
+        }
         SavePointYes::RemoveSource(name) => {
             super::sources::remove(ui, controller, &name);
             Ok(())

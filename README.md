@@ -519,6 +519,12 @@ password included. Databases on the highlighted one's server that no connection 
 table (`+ 2 more on localhost not in secrets.json`, SQL Server's own left out): while you type the name after `n` they
 narrow to what matches, and `Tab` fills one in.
 
+`a` puts every server the connection strings name next to `secrets.json`, in a box: under each server that answers,
+its databases - `●` in a connection string too, `+` in none, `✗` in one but gone from the server - and a server that
+doesn't answer (an old name of this machine) in red with its connection strings. `Enter` acts on the picked row (adds
+a `+`, takes a `✗` out, goes to a `●`), `+` adds every `+`, `-` takes every `✗` out, and `r` does both: `secrets.json`
+made to match the servers. The one in use is never taken out, and nothing on a server is touched.
+
 It's a screen in the bar like the others, a row per connection string: whether its server answers - each is tried as
 the screen opens, `◌ checking` breathing meanwhile, then `● 12 ms` or `✗ no answer` (`– local` for LocalDB or a
 pipe), or `✗ no database` when the server answers but no longer has it - the apps on the active one, how many migrations are pending on that database, and when you last switched to
@@ -589,7 +595,7 @@ keys there make files of it, or a new database from one:
 | `b` | Backs it up to `Shop_20261123_1042.bak` in the server's own backup folder (`COPY_ONLY, INIT, STATS = 5`) |
 | `e` | Exports it to `Shop_20261123_1042.bacpac` with SqlPackage, into lazyrunner's folder for the project - portable across SQL Server versions and to Azure |
 | `i` | Imports the picked file as a new database: a `.bak` restored `WITH MOVE`, a `.bacpac` through SqlPackage |
-| `Del` | Drops the highlighted database, after a yes that names it and its size: its save point snapshots go first, everyone still connected is cut off, and its connection string leaves `secrets.json` (the file before is kept as `secrets.json.lazyrunner-backup`). Never the one in use, nor one a running app is on. On a database that's no longer on the server (`✗ no database`), the yes only removes its connection string |
+| `Del` | Drops the highlighted database, after a yes that names it and its size: its save point snapshots go first, everyone still connected is cut off, and its connection string leaves `secrets.json` (the file before is kept as `secrets.json.lazyrunner-backup`). Never the one in use, nor one a running app is on. On a database that's no longer on the server (`✗ no database`) or a server that doesn't answer (`✗ no answer` - an old name of this machine), the yes only takes the connection string out of `secrets.json`, and `a` takes out every one to that server |
 
 A copy or an import never goes over a database that's there: the name is checked first, and the SQL stops itself
 when the database has turned up meanwhile (`IF DB_ID(...) IS NOT NULL THROW`). Once it's made, its connection string

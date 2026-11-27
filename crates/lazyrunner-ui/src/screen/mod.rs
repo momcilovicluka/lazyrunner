@@ -20,6 +20,7 @@ pub mod database;
 pub mod database_files;
 pub mod database_jobs;
 pub mod db_rows;
+pub mod db_sync;
 pub mod diff;
 pub mod durations;
 pub mod editor;

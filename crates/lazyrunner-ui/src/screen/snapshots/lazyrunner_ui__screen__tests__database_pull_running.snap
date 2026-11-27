@@ -6,7 +6,8 @@ expression: frame
  DefaultConnection · secrets.json · 1 connection strings · the active one ●
  j k choose · Enter switch + restart the APIs · s snapshot · S backup save point · r rewind · R pin
  u changes · c copy · b back up · e export · i import · Del drop · p pull · P pull again · L link · o folder
- Tab save points, files, pull, sources · n new connection string · / filter · y copy row · Esc back
+ Tab save points, files, pull, sources · n new connection string · a servers vs secrets.json · / filter
+ y copy row · Esc back
 
    DATABASE @ SERVER             ANSWERS          APPS ON IT      MIGRATIONS      SIZE      SWITCHED TO
  ● Shop @ localhost              – local          -               -               -         -
@@ -17,7 +18,6 @@ expression: frame
   │ qa · 38 ms     │──────▶│ 112 / 214      │┄┄┄┄┄┄▶┆ new database   ┆┄┄┄┄┄┄▶┆ 2 scripts      ┆┄┄┄┄┄┄▶┆ pendin
   │ as reader      │       │ dbo.OrderLines │       ┆                ┆       ┆                ┆       ┆
   ╰────────────────╯       ╰────────────────╯       ╰┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯       ╰┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯       ╰┄┄┄┄┄┄┄
-
 
 
  ● export · SqlPackage   ██████████▌            52% · 112 / 214 tables · dbo.OrderLines · 612 MB so far

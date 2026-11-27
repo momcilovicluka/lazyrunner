@@ -32,9 +32,6 @@ pub struct Sizes {
     pub reading: Option<u64>,
 }
 
-/// SQL Server's own databases: never offered as a connection string.
-const SYSTEM_DATABASES: [&str; 4] = ["master", "model", "msdb", "tempdb"];
-
 fn say(events: &UnboundedSender<Event>, job: u64, news: News) {
     let _ = events.send(Event::DatabaseFiles { job, news });
 }
@@ -138,11 +135,43 @@ impl Controller {
             .map(|(name, _)| name.clone())
             .filter(|name| {
                 let lower = name.to_lowercase();
-                !SYSTEM_DATABASES.contains(&lower.as_str()) && !listed.contains(&lower)
+                !files::SYSTEM.iter().any(|system| system.eq_ignore_ascii_case(&lower)) && !listed.contains(&lower)
             })
             .collect();
         spare.sort_by_key(|name| name.to_lowercase());
         spare
+    }
+
+    /// The databases of the connection strings to `server` that aren't in use.
+    pub fn connections_to(&self, server: &str) -> Vec<String> {
+        let entries = secrets::connections(&self.secrets_text().unwrap_or_default()).into_iter();
+        let mut found: Vec<String> = entries
+            .filter(|entry| !entry.active && entry.server.eq_ignore_ascii_case(server))
+            .map(|entry| entry.database)
+            .collect();
+        found.dedup_by(|one, other| one.eq_ignore_ascii_case(other));
+        found
+    }
+
+    /// Takes connection strings out of secrets.json without reaching their server: for a database the server no
+    /// longer has, or a server that doesn't answer (an old name of this machine). Their save points go too.
+    pub fn forget_connections(&mut self, server: &str, databases: &[String]) -> Result<String, String> {
+        let path = self.secrets_file().ok_or_else(|| "no secrets.json for this project".to_string())?;
+        let mut removed = 0;
+        for database in databases {
+            removed += secrets::remove(&path, server, database).map_err(|error| error.to_string())?;
+            self.save_points.retain(|point| !point.of(server, database));
+            self.db_counts.remove(&super::save_points::db_key(server, database));
+        }
+        self.keep_save_points();
+        let what = match (removed, databases) {
+            (1, [database]) => format!("the connection string to {database} @ {server}"),
+            _ => format!("{removed} connection strings to {server}"),
+        };
+        let said =
+            format!("Removed {what} from secrets.json (the file before is kept as secrets.json.lazyrunner-backup)");
+        self.add_log(said.clone(), Hue::Green);
+        Ok(said)
     }
 
     /// Whether the server, as last measured, has no database by that name: only its connection string is left.

@@ -1171,6 +1171,7 @@ fn picker_keys(ui: &mut Ui, controller: &mut Controller, name: &str, key: &KeyEv
     let count = picker.entries().len();
     match name {
         "n" | "+" | "Insert" => picker.new_name = Some(String::new()),
+        "a" => super::db_sync::open(ui, controller),
         "y" => {
             if let Some(entry) = picker.entries().get(picker.index).cloned() {
                 let path = picker.path.clone();
